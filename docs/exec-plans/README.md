@@ -1,0 +1,30 @@
+---
+id: exec-plans.index
+title: Execution Plans
+type: guide
+status: current
+owner: project-governance
+created: 2026-02-16
+updated: 2026-08-16
+summary: Active and completed execution plans for the current source repository.
+---
+
+# Execution Plans
+
+Active plans are short-lived work records. Completed plans retain concise source closeout context;
+Git remains the implementation history and recovery mechanism.
+
+## Active
+
+- No active source implementation plans.
+
+## Completed
+
+- [Provider-aware agent orchestration](completed/2026-08-16-provider-aware-agent-orchestration.md)
+  completed Codex/Claude native-host routing, compact work briefs, one-wave authorization, and
+  terminal-only model-mix telemetry.
+- [Governance V1.1 evidence integrity](completed/2026-08-15-governance-v1.1-evidence-integrity.md)
+  completed packet identity, finding lifecycle, exact waivers, bounded evidence indexing,
+  telemetry, and clean-wheel proof.
+- [Governance streamlining](completed/2026-08-14-governance-streamlining.md) completed its source
+  implementation and proof. Any shadow adoption is target-owned work outside this checkout.

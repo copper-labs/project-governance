@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://governance-template.invalid/schemas/quality-disposition.schema.json",
+  "title": "Maintainability Finding Dispositions",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "owner", "dispositions"],
+  "properties": {
+    "version": {"const": 2},
+    "owner": {"type": "string", "minLength": 1},
+    "dispositions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["finding", "path", "symbol", "disposition", "owner", "reviewer", "approved_on", "responsibility", "rationale"],
+        "properties": {
+          "finding": {
+            "enum": [
+              "quality.large-file",
+              "quality.large-type",
+              "quality.large-function",
+              "quality.high-cyclomatic",
+              "quality.high-cognitive",
+              "quality.deep-nesting"
+            ]
+          },
+          "path": {"type": "string", "minLength": 1},
+          "symbol": {"type": "string", "minLength": 1},
+          "disposition": {"enum": ["refactor-required", "cohesion-accepted", "temporary-waiver"]},
+          "owner": {"type": "string", "minLength": 1},
+          "reviewer": {"type": "string", "minLength": 1},
+          "approved_on": {"type": "string", "format": "date"},
+          "responsibility": {"type": "string", "minLength": 20},
+          "rationale": {"type": "string", "minLength": 20},
+          "current_value": {"type": "integer", "minimum": 1},
+          "source_fingerprint": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+          "expires": {"type": "string", "format": "date"},
+          "remediation_plan": {"type": "string", "minLength": 40}
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {"disposition": {"const": "cohesion-accepted"}},
+              "required": ["disposition"]
+            },
+            "then": {
+              "not": {
+                "anyOf": [
+                  {"required": ["current_value"]},
+                  {"required": ["source_fingerprint"]},
+                  {"required": ["expires"]},
+                  {"required": ["remediation_plan"]}
+                ]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {"disposition": {"const": "temporary-waiver"}},
+              "required": ["disposition"]
+            },
+            "then": {
+              "required": ["current_value", "source_fingerprint", "expires", "remediation_plan"]
+            }
+          },
+          {
+            "if": {
+              "properties": {"disposition": {"const": "refactor-required"}},
+              "required": ["disposition"]
+            },
+            "then": {
+              "not": {
+                "anyOf": [
+                  {"required": ["current_value"]},
+                  {"required": ["source_fingerprint"]},
+                  {"required": ["expires"]},
+                  {"required": ["remediation_plan"]}
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

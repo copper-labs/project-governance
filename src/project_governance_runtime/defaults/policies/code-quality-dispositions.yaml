@@ -1,0 +1,7 @@
+version: 2
+owner: __PROJECT_OWNER__
+# A changed architectural source unit above the shared limit must be reviewed, not split
+# mechanically. Cohesion decisions survive line movement and modest cohesive growth because they
+# are keyed by finding, repository path, and qualified symbol. Temporary waivers remain bound to
+# exact source bytes and require an expiry plus a concrete remediation plan.
+dispositions: []

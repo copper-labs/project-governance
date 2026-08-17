@@ -1,0 +1,17 @@
+id: dependencies
+label: Dependency policy
+implementation_status: active
+enforcement: blocking
+stages: [pre-commit, pre-push, pre-pr, ci-pr, release]
+run_when: matched
+path_globs:
+  - "**/Package.swift"
+  - "**/Package.resolved"
+  - "**/package.json"
+  - "**/package-lock.json"
+  - "**/gradle/libs.versions.toml"
+  - "**/pubspec.yaml"
+  - "config/policies/dependency-*.yaml"
+depends_on: []
+commands:
+  - builtin: dependencies

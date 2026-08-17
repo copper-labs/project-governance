@@ -1,0 +1,26 @@
+version: 1
+kind: review-finding-schema
+id: shared-review-finding
+required_fields:
+  - severity
+  - title
+  - location
+  - risk
+  - recommendation
+  - evidence
+severity_values:
+  - critical
+  - high
+  - medium
+  - low
+  - note
+location_fields:
+  - path
+  - line
+  - artifact
+resolution_values:
+  - open
+  - fixed
+  - accepted-risk
+  - not-applicable
+  - superseded

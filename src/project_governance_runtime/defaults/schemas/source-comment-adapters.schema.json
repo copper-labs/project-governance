@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://governance-template.invalid/schemas/source-comment-adapters.schema.json",
+  "title": "Source Comment Adapter Registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "owner", "adapters"],
+  "properties": {
+    "version": {"const": 1},
+    "owner": {"type": "string", "minLength": 1},
+    "adapters": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["language", "status", "analyzer", "analyzer_version", "extensions", "capabilities", "fixture_cases"],
+        "properties": {
+          "language": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+          "status": {"enum": ["active", "advisory", "planned"]},
+          "analyzer": {"type": "string", "minLength": 1},
+          "analyzer_version": {"type": "string", "minLength": 1},
+          "extensions": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^\\.[A-Za-z0-9]+$"}},
+          "capabilities": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+          "fixture_cases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "path", "expected_blocking_rule_ids"],
+              "properties": {
+                "id": {"type": "string", "minLength": 1},
+                "path": {"type": "string", "minLength": 1},
+                "boundary_required": {"type": "boolean"},
+                "expected_blocking_rule_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^SC[0-9]{3}$"}}
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

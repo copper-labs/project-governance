@@ -1,0 +1,48 @@
+schema_version: 1
+source_commit: e87a170438a100347be3ad285752b44f8b01acb9
+purpose: Preserve user-visible capabilities while removing administrative coupling.
+scenarios:
+  - id: react-native-source
+    stage: pre-pr
+    mode: impacted
+    changed_paths: [apps/mobile/src/SessionRunner.tsx]
+    required_packs: [comments, maintainability, naming, secrets]
+  - id: flutter-source
+    stage: pre-pr
+    mode: impacted
+    changed_paths: [apps/mobile/lib/session_runner.dart]
+    required_packs: [maintainability, secrets]
+  - id: kmp-source
+    stage: pre-pr
+    mode: impacted
+    changed_paths: [product/runtime/src/commonMain/kotlin/example/Session.kt]
+    required_packs: [comments, maintainability, naming, secrets]
+  - id: swift-source
+    stage: pre-pr
+    mode: impacted
+    changed_paths: [apps/ios/Sources/SessionRunner.swift]
+    required_packs: [comments, maintainability, naming, secrets]
+  - id: documentation
+    stage: pre-pr
+    mode: impacted
+    changed_paths: [docs/specs/example.md]
+    required_packs: [documentation, format, secrets]
+  - id: governance-configuration
+    stage: pre-pr
+    mode: impacted
+    changed_paths: [config/governance/profile.yaml]
+    required_packs: [secrets]
+  - id: packaging-manifest
+    stage: pre-pr
+    mode: impacted
+    changed_paths: [MANIFEST.in]
+    required_packs: [format, secrets]
+  - id: unmapped-path
+    stage: pre-pr
+    mode: impacted
+    changed_paths: [unmapped/source.file]
+    blocker: unknown-impact
+  - id: explicit-pack
+    mode: explicit
+    packs: [naming]
+    required_packs: [naming]

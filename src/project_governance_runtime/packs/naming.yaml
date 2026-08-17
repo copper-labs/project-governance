@@ -1,0 +1,18 @@
+id: naming
+label: Naming
+implementation_status: active
+enforcement: blocking
+stages: [pre-commit, pre-push, pre-pr, ci-pr]
+run_when: matched
+path_globs:
+  - "**/*.py"
+  - "**/*.kt"
+  - "**/*.kts"
+  - "**/*.swift"
+  - "**/*.ts"
+  - "**/*.tsx"
+  - "**/*.js"
+  - "**/*.jsx"
+depends_on: []
+commands:
+  - builtin: naming

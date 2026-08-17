@@ -1,0 +1,39 @@
+version: 1
+owner: __PROJECT_OWNER__
+comments:
+  mode: report_existing_enforce_touched
+naming:
+  forbidden_terms: []
+  vague_terms:
+    - manager
+    - helper
+    - util
+    - utils
+    - common
+  package_roots: [packages, services, apps]
+  conventional_stems: [index, main, app, config, constants, types]
+  preferred_file_name_length: 48
+  blocking_file_name_length: 72
+  ignore_paths:
+    - "**/generated/**"
+    - "**/build/**"
+    - "**/.gradle/**"
+maintainability:
+  language_neutral_checks: [physical-file-size]
+  declaration_enrichment: optional-native
+  active_adapters: [python-ast, typescript-compiler, swift-compiler, kotlin-compiler, shellcheck]
+  planned_adapters: [java, csharp, dart, go, rust, c-family]
+  ignore_paths:
+    - "**/generated/**"
+    - "**/build/**"
+    - "**/.gradle/**"
+  thresholds:
+    file_lines_blocking: 500
+    type_lines_blocking: 500
+    function_lines_advisory: 60
+    function_lines_blocking: 100
+    cyclomatic_complexity_advisory: 10
+    cyclomatic_complexity_blocking: 15
+    cognitive_complexity_advisory: 15
+    cognitive_complexity_blocking: 25
+    nesting_depth_blocking: 5

@@ -1,0 +1,6 @@
+version: 1
+owner: __PROJECT_OWNER__
+minimum_age_days: 14
+fail_closed_when_unknown: true
+evidence_path: config/policies/dependency-freshness-evidence.yaml
+override_max_days: 30

@@ -1,0 +1,24 @@
+name: Governance Runtime Release Proof
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  source-readiness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.x"
+      - run: python3 -m pip install -r requirements-dev.txt
+      - run: python3 -m pip wheel . --no-deps --wheel-dir dist
+      - run: python3 -m unittest discover -s tests -p 'test_runtime_*.py'
+      - run: python3 tools/verify-runtime-wheel.py dist/project_governance_runtime-*.whl

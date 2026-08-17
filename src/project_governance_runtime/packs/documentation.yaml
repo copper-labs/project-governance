@@ -1,0 +1,10 @@
+id: documentation
+label: Documentation
+implementation_status: active
+enforcement: blocking
+stages: [pre-commit, pre-push, pre-pr, ci-pr]
+run_when: matched
+path_globs: ["docs/**", "AGENTS.md", "CHARTER.md", "README.md"]
+depends_on: []
+commands:
+  - builtin: documentation

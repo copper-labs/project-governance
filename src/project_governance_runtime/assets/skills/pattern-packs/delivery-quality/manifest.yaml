@@ -1,0 +1,104 @@
+version: 1
+id: delivery-quality-pattern-pack
+display_name: Delivery Quality Pattern Pack
+source:
+  type: internal-pattern-extraction
+  imported_on: 2026-07-05
+  policy: Sanitized reusable workflow and review patterns only; project names, private paths, credentials, and domain nouns are intentionally excluded.
+default_status: included
+skills:
+  - id: structured-discovery-interview
+    path: .governance/runtime/skills/pattern-packs/delivery-quality/structured-discovery-interview/SKILL.md
+    status: included
+    category: discovery
+    rationale: Captures a reusable interview pattern for converting vague intent into governed requirements and open questions.
+  - id: risk-assessment
+    path: .governance/runtime/skills/pattern-packs/delivery-quality/risk-assessment/SKILL.md
+    status: included
+    category: discovery
+    rationale: Adds a reusable risk lens before implementation, release, security, or architecture changes.
+  - id: architecture-cleanliness-review
+    path: .governance/runtime/skills/pattern-packs/delivery-quality/architecture-cleanliness-review/SKILL.md
+    status: included
+    category: review
+    rationale: Provides a concrete review skill for coupling, layering, source ownership, and maintainability.
+  - id: code-review
+    path: .governance/runtime/skills/pattern-packs/delivery-quality/code-review/SKILL.md
+    status: included
+    category: review
+    rationale: Provides a standard bug/risk-first code review workflow for changed code.
+  - id: code-simplification-review
+    path: .governance/runtime/skills/pattern-packs/delivery-quality/code-simplification-review/SKILL.md
+    status: included
+    category: review
+    rationale: Captures post-implementation cleanup that preserves behavior while reducing complexity.
+  - id: implementation-quality-gate
+    path: .governance/runtime/skills/pattern-packs/delivery-quality/implementation-quality-gate/SKILL.md
+    status: included
+    category: review
+    rationale: Adds a consistent quality gate around readability, comments, simplicity, abstraction, and platform boundaries.
+  - id: scope-check-review
+    path: .governance/runtime/skills/pattern-packs/delivery-quality/scope-check-review/SKILL.md
+    status: included
+    category: review
+    rationale: Prevents agent overbuild by tracing additions back to approved requirements or necessary infrastructure.
+  - id: spec-compliance-review
+    path: .governance/runtime/skills/pattern-packs/delivery-quality/spec-compliance-review/SKILL.md
+    status: included
+    category: review
+    rationale: Checks implementation against spec requirements, non-goals, acceptance criteria, and traceability.
+  - id: async-ci-stability
+    path: .governance/runtime/skills/pattern-packs/delivery-quality/async-ci-stability/SKILL.md
+    status: included
+    category: validation
+    rationale: Defines a deterministic local CI mirror loop before push or PR.
+  - id: test-driven-development
+    path: .governance/runtime/skills/pattern-packs/delivery-quality/test-driven-development/SKILL.md
+    status: included
+    category: implementation
+    rationale: Gives agents a runnable red-green-refactor workflow for behavior-first changes.
+  - id: build-engineering
+    path: .governance/runtime/skills/pattern-packs/delivery-quality/build-engineering/SKILL.md
+    status: included
+    category: build
+    rationale: Generalizes build failure triage, fast feedback, cache care, and CI parity outside KMP-only contexts.
+  - id: governed-spec-workflow
+    path: .governance/runtime/skills/pattern-packs/delivery-quality/governed-spec-workflow/SKILL.md
+    status: included
+    category: planning
+    rationale: Provides a compact technical spec workflow that complements the authoring harness.
+  - id: implementation-plan-workflow
+    path: .governance/runtime/skills/pattern-packs/delivery-quality/implementation-plan-workflow/SKILL.md
+    status: included
+    category: planning
+    rationale: Provides a practical plan shape for scoped implementation with validation and rollback notes.
+  - id: commit-message-workflow
+    path: .governance/runtime/skills/pattern-packs/delivery-quality/commit-message-workflow/SKILL.md
+    status: included
+    category: delivery
+    rationale: Keeps commit subjects and bodies concise, human-readable, and traceable to impact.
+  - id: pr-description-workflow
+    path: .governance/runtime/skills/pattern-packs/delivery-quality/pr-description-workflow/SKILL.md
+    status: included
+    category: delivery
+    rationale: Provides a reusable PR body structure with what, why, testing, risks, and review notes.
+  - id: docs-structure-migration
+    path: .governance/runtime/skills/pattern-packs/delivery-quality/docs-structure-migration/SKILL.md
+    status: included
+    category: documentation
+    rationale: Helps move docs safely while preserving links, traceability, and reader orientation.
+  - id: external-docs-authoring
+    path: .governance/runtime/skills/pattern-packs/delivery-quality/external-docs-authoring/SKILL.md
+    status: included
+    category: documentation
+    rationale: Adds a reusable public/customer-facing docs workflow that avoids internal shorthand and missing prerequisites.
+  - id: external-docs-style-guide
+    path: .governance/runtime/skills/pattern-packs/delivery-quality/external-docs-style-guide/SKILL.md
+    status: included
+    category: documentation
+    rationale: Provides a starting style-guide pattern for externally consumed docs.
+  - id: mermaid-diagramming
+    path: .governance/runtime/skills/pattern-packs/delivery-quality/mermaid-diagramming/SKILL.md
+    status: included
+    category: documentation
+    rationale: Consolidates reusable Mermaid diagram guidance for sequence, state, journey, ER, and comparison views.

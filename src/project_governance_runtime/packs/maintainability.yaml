@@ -1,0 +1,24 @@
+id: maintainability
+label: Maintainability
+implementation_status: active
+enforcement: blocking
+stages: [pre-commit, pre-push, pre-pr, ci-pr]
+run_when: matched
+path_globs:
+  - "**/*.py"
+  - "**/*.kt"
+  - "**/*.kts"
+  - "**/*.swift"
+  - "**/*.ts"
+  - "**/*.tsx"
+  - "**/*.js"
+  - "**/*.jsx"
+  - "**/*.cjs"
+  - "**/*.mjs"
+  - "**/*.cts"
+  - "**/*.mts"
+  - "**/*.dart"
+  - "**/*.sh"
+depends_on: []
+commands:
+  - builtin: maintainability

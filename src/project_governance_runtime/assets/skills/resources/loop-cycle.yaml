@@ -1,0 +1,19 @@
+version: 1
+kind: loop-cycle
+id: governed-loop-cycle
+stages:
+  - id: frame
+    skill: .governance/runtime/skills/frame/SKILL.md
+    exit_evidence: framed outcome and risk class
+  - id: plan
+    skill: .governance/runtime/skills/plan/SKILL.md
+    exit_evidence: slice plan or no-plan rationale
+  - id: work
+    skill: .governance/runtime/skills/work/SKILL.md
+    exit_evidence: changed files and validation results
+  - id: review
+    skill: .governance/runtime/skills/review/SKILL.md
+    exit_evidence: shared-schema findings and reconciliations
+  - id: capture
+    skill: .governance/runtime/skills/capture/SKILL.md
+    exit_evidence: lesson path or no-learning rationale

@@ -1,0 +1,10 @@
+id: prose
+label: Prose style
+implementation_status: active
+enforcement: advisory
+stages: [pre-commit, pre-push, pre-pr, ci-pr]
+run_when: matched
+path_globs: ["docs/**", "README.md", "AGENTS.md", "CHARTER.md"]
+depends_on: []
+commands:
+  - builtin: prose

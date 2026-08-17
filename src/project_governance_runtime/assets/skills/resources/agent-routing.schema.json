@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:project-governance:schema:agent-routing:v1",
+  "title": "Native-host routing input and output",
+  "oneOf": [
+    {"$ref": "#/$defs/input"},
+    {"$ref": "#/$defs/output"}
+  ],
+  "$defs": {
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "model", "tier", "tier_rank", "effort", "roles", "enabled"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1, "maxLength": 256},
+        "model": {"type": "string", "minLength": 1, "maxLength": 256},
+        "tier": {"enum": ["economy", "balanced", "primary"]},
+        "tier_rank": {"type": "integer", "minimum": 0},
+        "effort": {"enum": ["low", "medium", "high", "xhigh", "max", "ultra"]},
+        "roles": {
+          "type": "array",
+          "items": {"enum": ["research-scout", "implementation-worker", "qa-reviewer"]},
+          "uniqueItems": true
+        },
+        "enabled": {"type": "boolean"}
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "task", "session", "catalog", "control_state"],
+      "properties": {
+        "kind": {"const": "agent-route-input"},
+        "task": {"type": "object"},
+        "session": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["provider", "profile_id", "model", "tier_rank"],
+          "properties": {
+            "provider": {"enum": ["codex", "claude"]},
+            "profile_id": {"type": "string", "minLength": 1},
+            "model": {"type": "string", "minLength": 1},
+            "tier_rank": {"type": "integer", "minimum": 0}
+          }
+        },
+        "catalog": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["provider", "digest", "profiles"],
+          "properties": {
+            "version": {"type": "integer", "minimum": 1},
+            "provider": {"enum": ["codex", "claude"]},
+            "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+            "profiles": {"type": "array", "items": {"$ref": "#/$defs/profile"}}
+          }
+        },
+        "control_state": {"type": "object"},
+        "evaluation_instant": {"type": "string", "format": "date-time"}
+      }
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "status", "decision", "issued_at", "start_expires_at", "request_digest"],
+      "properties": {
+        "kind": {"const": "agent-route-request"},
+        "status": {"enum": ["delegated", "solo"]},
+        "decision": {"type": "object"},
+        "issued_at": {"type": "string", "format": "date-time"},
+        "start_expires_at": {"type": "string", "format": "date-time"},
+        "request_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    }
+  }
+}

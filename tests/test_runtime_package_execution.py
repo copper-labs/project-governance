@@ -1,0 +1,716 @@
+#!/usr/bin/env python3
+"""Prove bounded execution, normalized evidence, and local telemetry."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import signal
+import subprocess
+import sys
+import tempfile
+import time
+import unittest
+from contextlib import contextmanager
+from pathlib import Path
+from unittest.mock import patch
+
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
+from project_governance_runtime.processes import run_command  # noqa: E402
+from project_governance_runtime.changed_paths import (  # noqa: E402
+    resolve_change_scope,
+    subject_digest,
+)
+from project_governance_runtime.execution_commands import command_argv  # noqa: E402
+from project_governance_runtime.planning import build_plan  # noqa: E402
+from project_governance_runtime.runner import execute  # noqa: E402
+
+
+def all_change_scope() -> dict[str, object]:
+    """Return the explicit full-repository packet used by execution-only tests."""
+    return {
+        "kind": "project-governance-change-packet",
+        "version": 1,
+        "scope": "all",
+        "mode": "all",
+        "base_ref": None,
+        "records": [],
+    }
+
+
+def empty_changed_scope() -> dict[str, object]:
+    """Return one content-bound empty changed subject for execution-only evidence tests."""
+    records: list[dict[str, object]] = []
+    return {
+        "kind": "project-governance-change-packet",
+        "version": 1,
+        "scope": "changed",
+        "mode": "explicit",
+        "base_ref": None,
+        "records": records,
+        "subject_digest": subject_digest(records),
+    }
+
+
+class RuntimeExecutionTests(unittest.TestCase):
+    """Keep execution shell-free, bounded, and evidence-producing."""
+
+    def test_timeout_terminates_the_owned_process(self) -> None:
+        """Return the stable timeout code instead of leaving a child alive."""
+        with tempfile.TemporaryDirectory() as directory:
+            result = run_command(
+                [sys.executable, "-c", "import time; time.sleep(5)"],
+                root=Path(directory),
+                timeout_seconds=0.05,
+                environment={},
+            )
+        self.assertEqual(result.exit_code, 124)
+        self.assertEqual(result.termination_reason, "timeout")
+
+    def test_timeout_cleans_up_a_spawned_child(self) -> None:
+        """Terminate descendants with the owned process group, not just their parent."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            pid_path = root / "child.pid"
+            script = (
+                "import pathlib,subprocess,time; "
+                "child=subprocess.Popen(['sleep','30']); "
+                f"pathlib.Path({str(pid_path)!r}).write_text(str(child.pid)); "
+                "time.sleep(30)"
+            )
+            result = run_command(
+                [sys.executable, "-c", script],
+                root=root,
+                timeout_seconds=0.2,
+                environment=dict(os.environ),
+            )
+            child_pid = int(pid_path.read_text(encoding="utf-8"))
+            with self.assertRaises(ProcessLookupError):
+                os.kill(child_pid, 0)
+        self.assertEqual(result.termination_reason, "timeout")
+
+    def test_interrupt_returns_the_stable_cancelled_result(self) -> None:
+        """Convert an operator interrupt into code 130 after child cleanup."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            ready = root / "ready"
+            child = (
+                "from pathlib import Path; import time; "
+                f"Path({str(ready)!r}).write_text('ready'); "
+                "time.sleep(30)"
+            )
+            program = (
+                "from pathlib import Path; import os,sys; "
+                f"sys.path.insert(0,{str(ROOT / 'src')!r}); "
+                "from project_governance_runtime.processes import run_command; "
+                f"result=run_command([sys.executable,'-c',{child!r}],"
+                f"root=Path({str(root)!r}),timeout_seconds=40,environment=dict(os.environ)); "
+                "print(result.exit_code,result.termination_reason)"
+            )
+            process = subprocess.Popen(
+                [sys.executable, "-c", program],
+                cwd=root,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            deadline = time.monotonic() + 2
+            while not ready.exists() and time.monotonic() < deadline:
+                time.sleep(0.01)
+            self.assertTrue(ready.exists())
+            process.send_signal(signal.SIGINT)
+            stdout, stderr = process.communicate(timeout=3)
+        self.assertEqual(process.returncode, 0, stderr)
+        self.assertEqual(stdout.strip(), "130 cancelled")
+
+    def test_target_command_is_normalized_and_recorded(self) -> None:
+        """Retain a child pack's structured findings, run identity, and telemetry."""
+        payload = json.dumps({"status": "passed", "finding_count": 0, "findings": []})
+        packs = {
+            "target-check": {
+                "enforcement": "blocking",
+                "commands": [[sys.executable, "-c", f"print({payload!r})"]],
+            }
+        }
+        plan = {
+            "stage": None,
+            "mode": "explicit",
+            "changed_paths": [],
+            "change_scope": all_change_scope(),
+            "selected_packs": ["target-check"],
+            "execution_order": ["target-check"],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = execute(root, packs, plan, timeout_seconds=2)
+            records = [
+                json.loads(line)
+                for line in (root / ".governance/telemetry/runs.jsonl")
+                .read_text(encoding="utf-8")
+                .splitlines()
+            ]
+        self.assertEqual(output["status"], "passed")
+        self.assertEqual(output["run_id"], records[0]["run_id"])
+        self.assertEqual(output["run_id"], records[-1]["run_id"])
+        self.assertEqual(records[0]["event"], "run-started")
+        self.assertEqual(records[-1]["event"], "run-terminal")
+        self.assertEqual(records[0]["changed_path_count"], 0)
+        self.assertEqual(records[0]["selected_pack_count"], 1)
+        self.assertEqual(records[-1]["changed_path_count"], 0)
+        self.assertEqual(records[-1]["selected_pack_count"], 1)
+        self.assertEqual(records[-1]["packs"][0]["command_count"], 1)
+        self.assertEqual(records[-1]["packs"][0]["process_failure_count"], 0)
+        self.assertNotIn("commands", records[-1]["packs"][0])
+        self.assertNotIn("stdout", records[-1]["packs"][0])
+        self.assertNotIn("paths", records[-1])
+        self.assertNotIn("content", records[-1])
+        self.assertNotIn("queue_duration", records[-1])
+        self.assertIsNone(output["subject_digest"])
+        self.assertNotIn("subject_digest", records[0])
+        self.assertNotIn("subject_digest", records[-1])
+        self.assertEqual(output["evidence"][0]["evidence_manifest"]["status"], "absent")
+        self.assertEqual(records[-1]["packs"][0]["evidence_manifest_count"], 0)
+
+    def test_valid_pack_evidence_manifest_is_digest_indexed(self) -> None:
+        """Index bounded claims without copying claim IDs or artifact data into telemetry."""
+        child = (
+            "import json,os,pathlib; "
+            "root=pathlib.Path(os.environ['PROJECT_GOVERNANCE_EVIDENCE_ROOT']); "
+            "manifest={'kind':'project-governance-evidence-manifest','version':1,"
+            "'subject_digest':os.environ['PROJECT_GOVERNANCE_SUBJECT_DIGEST'],"
+            "'claims':[{'id':'target.behavior','outcome':'passed',"
+            "'artifact_digests':['sha256:'+'2'*64]}]}; "
+            "(root/'evidence-manifest.json').write_text(json.dumps(manifest)); "
+            "print(json.dumps({'status':'passed','finding_count':0,'findings':[]}))"
+        )
+        packs = {
+            "target-check": {
+                "enforcement": "blocking",
+                "commands": [[sys.executable, "-c", child]],
+            }
+        }
+        plan = {
+            "stage": None,
+            "mode": "explicit",
+            "changed_paths": [],
+            "change_scope": empty_changed_scope(),
+            "selected_packs": ["target-check"],
+            "execution_order": ["target-check"],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = execute(root, packs, plan, timeout_seconds=2)
+            telemetry = (
+                root / ".governance/telemetry/runs.jsonl"
+            ).read_text(encoding="utf-8")
+            terminal = json.loads(telemetry.splitlines()[-1])
+
+        item = output["evidence"][0]
+        self.assertEqual(output["status"], "passed")
+        self.assertEqual(item["evidence_manifest"]["status"], "valid")
+        self.assertRegex(
+            item["evidence_manifest"]["manifest_digest"],
+            r"^sha256:[0-9a-f]{64}$",
+        )
+        self.assertEqual(item["evidence_claim_count"], 1)
+        self.assertEqual(item["evidence_artifact_digest_count"], 1)
+        self.assertEqual(item["process_failure_count"], 0)
+        self.assertEqual(terminal["packs"][0]["valid_evidence_manifest_count"], 1)
+        self.assertEqual(terminal["packs"][0]["evidence_claim_count"], 1)
+        self.assertNotIn("target.behavior", telemetry)
+        self.assertNotIn("22222222", telemetry)
+
+    def test_inactive_findings_do_not_keep_the_run_in_warning(self) -> None:
+        """Retain reviewed findings while restoring signal for new active warnings."""
+        payload = json.dumps({
+            "status": "warning",
+            "findings": [
+                {"rule_id": "review.accepted", "severity": "accepted"},
+                {"rule_id": "review.waived", "severity": "waived"},
+                {"rule_id": "review.suppressed", "severity": "suppressed"},
+            ],
+        })
+        packs = {
+            "target-check": {
+                "enforcement": "blocking",
+                "commands": [[sys.executable, "-c", f"print({payload!r})"]],
+            }
+        }
+        plan = {
+            "stage": None,
+            "mode": "explicit",
+            "changed_paths": [],
+            "change_scope": all_change_scope(),
+            "selected_packs": ["target-check"],
+            "execution_order": ["target-check"],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = execute(root, packs, plan, timeout_seconds=2)
+            terminal = json.loads(
+                (root / ".governance/telemetry/runs.jsonl")
+                .read_text(encoding="utf-8")
+                .splitlines()[-1]
+            )
+
+        self.assertEqual(output["status"], "passed")
+        item = output["evidence"][0]
+        self.assertEqual(item["status"], "passed")
+        self.assertEqual(item["finding_count"], 3)
+        self.assertEqual(terminal["packs"][0]["accepted_finding_count"], 1)
+        self.assertEqual(terminal["packs"][0]["waived_finding_count"], 1)
+        self.assertEqual(terminal["packs"][0]["suppressed_finding_count"], 1)
+
+    def test_advisory_pack_runtime_integrity_failures_still_fail_the_run(self) -> None:
+        """Keep pack enforcement from downgrading process and envelope integrity."""
+        cases = {
+            "nonzero": ((
+                "import json; print(json.dumps({'status':'passed','findings':[]})); "
+                "raise SystemExit(7)"
+            ), 1, 0),
+            "malformed": ("print('ordinary tool output')", 0, 1),
+            "unknown-severity": ((
+                "import json; print(json.dumps({'status':'passed','findings':"
+                "[{'rule_id':'bad.state','severity':'ignored'}]}))"
+            ), 0, 1),
+            "timeout": ("import time; time.sleep(2)", 1, 0),
+        }
+        for label, (script, process_failures, integrity_failures) in cases.items():
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as directory:
+                packs = {
+                    "advisory-target": {
+                        "enforcement": "advisory",
+                        "commands": [[sys.executable, "-c", script]],
+                    }
+                }
+                plan = {
+                    "stage": None,
+                    "mode": "explicit",
+                    "changed_paths": [],
+                    "change_scope": all_change_scope(),
+                    "selected_packs": ["advisory-target"],
+                    "execution_order": ["advisory-target"],
+                }
+                output = execute(Path(directory), packs, plan, timeout_seconds=0.05)
+
+            self.assertEqual(output["status"], "failed")
+            self.assertEqual(
+                output["evidence"][0]["process_failure_count"], process_failures
+            )
+            self.assertEqual(
+                output["evidence"][0]["integrity_failure_count"], integrity_failures
+            )
+
+    def test_command_cannot_persistently_change_packet_materializations(self) -> None:
+        """Fail the run when one command rewrites bytes shared with later checkers."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "sample.py"
+            source.write_text("planned\n", encoding="utf-8")
+            identity = "sha256:" + hashlib.sha256(source.read_bytes()).hexdigest()
+            records = [{
+                "status": "added",
+                "path": "sample.py",
+                "previous_path": None,
+                "before": None,
+                "after": {
+                    "kind": "worktree",
+                    "path": "sample.py",
+                    "identity": identity,
+                },
+                "changed_ranges": [{"start": 1, "end": 1}],
+            }]
+            scope = {
+                "kind": "project-governance-change-packet",
+                "version": 1,
+                "scope": "changed",
+                "mode": "explicit",
+                "base_ref": None,
+                "records": records,
+                "subject_digest": subject_digest(records),
+            }
+            child = (
+                "import json,os,pathlib; "
+                "packet=json.loads(pathlib.Path(os.environ['PROJECT_GOVERNANCE_CHANGE_PACKET']).read_text()); "
+                "after=pathlib.Path(packet['records'][0]['after_path']); "
+                "after.chmod(0o600); after.write_text('tampered\\n'); "
+                "print(json.dumps({'status':'passed','findings':[]}))"
+            )
+            packs = {
+                "target-check": {
+                    "enforcement": "blocking",
+                    "commands": [[sys.executable, "-c", child]],
+                }
+            }
+            plan = {
+                "stage": None,
+                "mode": "explicit",
+                "changed_paths": ["sample.py"],
+                "change_scope": scope,
+                "selected_packs": ["target-check"],
+                "execution_order": ["target-check"],
+            }
+            output = execute(root, packs, plan, timeout_seconds=2)
+
+        self.assertEqual(output["status"], "failed")
+        command = output["evidence"][0]["commands"][0]
+        self.assertTrue(command["integrity_failure"])
+        self.assertEqual(command["findings"][-1]["rule_id"], "packet.materialization-changed")
+
+    def test_later_stage_secret_surface_has_no_changed_only_digest(self) -> None:
+        """Mark the deliberate live exhaustive secret surface honestly per pack."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            subprocess.run(["git", "init", "-q", "-b", "main"], cwd=root, check=True)
+            subprocess.run(
+                ["git", "config", "user.email", "runtime@example.invalid"],
+                cwd=root,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Runtime Tests"], cwd=root, check=True
+            )
+            (root / "baseline.txt").write_text("safe\n", encoding="utf-8")
+            subprocess.run(["git", "add", "baseline.txt"], cwd=root, check=True)
+            subprocess.run(["git", "commit", "-qm", "baseline"], cwd=root, check=True)
+            packs = {
+                "secrets": {
+                    "enforcement": "blocking",
+                    "commands": [{"builtin": "secrets"}],
+                }
+            }
+            plan = {
+                "stage": "pre-pr",
+                "mode": "impacted",
+                "changed_paths": [],
+                "change_scope": empty_changed_scope(),
+                "selected_packs": ["secrets"],
+                "execution_order": ["secrets"],
+            }
+            with patch.dict(
+                os.environ, {"PYTHONPATH": str(ROOT / "src")}, clear=False
+            ):
+                output = execute(root, packs, plan, timeout_seconds=5)
+
+        self.assertRegex(output["subject_digest"], r"^sha256:")
+        item = output["evidence"][0]
+        self.assertEqual(item["status"], "passed")
+        self.assertIsNone(item["subject_digest"])
+        self.assertEqual(item["commands"][0]["argv"][-1], "--all")
+
+    def test_invalid_manifest_blocks_even_when_pack_is_advisory(self) -> None:
+        """Treat pack-local evidence integrity as runtime-owned, not pack enforcement."""
+        child = (
+            "import json,os,pathlib; "
+            "root=pathlib.Path(os.environ['PROJECT_GOVERNANCE_EVIDENCE_ROOT']); "
+            "manifest={'kind':'project-governance-evidence-manifest','version':1,"
+            "'subject_digest':'sha256:'+'0'*64,'claims':[]}; "
+            "(root/'evidence-manifest.json').write_text(json.dumps(manifest)); "
+            "print(json.dumps({'status':'passed','finding_count':0,'findings':[]}))"
+        )
+        packs = {
+            "advisory-target": {
+                "enforcement": "advisory",
+                "commands": [[sys.executable, "-c", child]],
+            },
+            "later": {
+                "enforcement": "blocking",
+                "commands": [[sys.executable, "-c", "raise SystemExit(0)"]],
+            },
+        }
+        plan = {
+            "stage": None,
+            "mode": "explicit",
+            "changed_paths": [],
+            "change_scope": empty_changed_scope(),
+            "selected_packs": ["advisory-target", "later"],
+            "execution_order": ["advisory-target", "later"],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            output = execute(Path(directory), packs, plan, timeout_seconds=2)
+
+        self.assertEqual(output["status"], "failed")
+        self.assertEqual([item["pack_id"] for item in output["evidence"]], ["advisory-target"])
+        item = output["evidence"][0]
+        self.assertEqual(item["evidence_manifest"]["status"], "invalid")
+        self.assertEqual(item["finding_counts"]["blocking"], 1)
+        self.assertEqual(item["findings"][0]["pack_id"], "advisory-target")
+
+    def test_materialization_exception_records_terminal_and_reraises(self) -> None:
+        """Close the lifecycle without persisting exception text or changing the error."""
+        self._assert_runtime_exception_receipt("execution_environment")
+
+    def test_orchestrator_exception_records_terminal_and_reraises(self) -> None:
+        """Close the lifecycle when orchestration fails after materialization."""
+        self._assert_runtime_exception_receipt("execute_packs")
+
+    def _assert_runtime_exception_receipt(self, failing_call: str) -> None:
+        plan = {
+            "stage": "pre-commit",
+            "mode": "impacted",
+            "changed_paths": ["private/source.py"],
+            "change_scope": all_change_scope(),
+            "selected_packs": ["target-check"],
+            "execution_order": ["target-check"],
+        }
+        error = RuntimeError("private packet or orchestrator detail")
+
+        @contextmanager
+        def prepared_environment():
+            yield {}
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            if failing_call == "execution_environment":
+                patches = (
+                    patch(
+                        "project_governance_runtime.runner.execution_environment",
+                        side_effect=error,
+                    ),
+                    patch("project_governance_runtime.runner.execute_packs"),
+                )
+            else:
+                patches = (
+                    patch(
+                        "project_governance_runtime.runner.execution_environment",
+                        return_value=prepared_environment(),
+                    ),
+                    patch(
+                        "project_governance_runtime.runner.execute_packs",
+                        side_effect=error,
+                    ),
+                )
+            with patches[0], patches[1], self.assertRaises(RuntimeError) as raised:
+                execute(root, {}, plan, timeout_seconds=2)
+            records_text = (root / ".governance/telemetry/runs.jsonl").read_text(
+                encoding="utf-8"
+            )
+            records = [json.loads(line) for line in records_text.splitlines()]
+
+        self.assertIs(raised.exception, error)
+        self.assertEqual([record["event"] for record in records], ["run-started", "run-terminal"])
+        self.assertEqual(records[0]["run_id"], records[1]["run_id"])
+        self.assertEqual(records[1]["status"], "failed")
+        self.assertEqual(records[1]["termination_reason"], "runtime-exception")
+        self.assertEqual(records[1]["packs"], [])
+        self.assertNotIn("private packet", records_text)
+
+    def test_each_pack_receives_one_run_scoped_evidence_root(self) -> None:
+        """Keep sequential evidence writers in distinct directories within one run."""
+        child = (
+            "import json,os; "
+            "print(json.dumps({'status':'passed','finding_count':0,'findings':[],"
+            "'run_id':os.environ['PROJECT_GOVERNANCE_RUN_ID'],"
+            "'pack_id':os.environ['PROJECT_GOVERNANCE_PACK_ID'],"
+            "'evidence_root':os.environ['PROJECT_GOVERNANCE_EVIDENCE_ROOT']}))"
+        )
+        packs = {
+            pack_id: {
+                "enforcement": "blocking",
+                "commands": [[sys.executable, "-c", child]],
+            }
+            for pack_id in ("first", "second", "../outside-run")
+        }
+        plan = {
+            "stage": None,
+            "mode": "explicit",
+            "changed_paths": [],
+            "change_scope": all_change_scope(),
+            "selected_packs": ["first", "second", "../outside-run"],
+            "execution_order": ["first", "second", "../outside-run"],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = execute(root, packs, plan, timeout_seconds=2)
+            child_outputs = [
+                json.loads(item["commands"][0]["stdout"])
+                for item in output["evidence"]
+            ]
+            evidence_roots = [Path(item["evidence_root"]) for item in child_outputs]
+            self.assertTrue(all(path.is_dir() for path in evidence_roots))
+        self.assertEqual({item["run_id"] for item in child_outputs}, {output["run_id"]})
+        self.assertEqual(
+            [item["pack_id"] for item in child_outputs],
+            ["first", "second", "../outside-run"],
+        )
+        self.assertEqual(len(set(evidence_roots)), 3)
+        self.assertTrue(all(path.parent.name == output["run_id"] for path in evidence_roots))
+        self.assertEqual(
+            [path.parts[-2:] for path in evidence_roots[:2]],
+            [
+                (output["run_id"], "first"),
+                (output["run_id"], "second"),
+            ],
+        )
+        self.assertTrue(evidence_roots[-1].name.startswith("pack-"))
+
+    def test_target_child_reads_the_staged_after_image_from_the_packet(self) -> None:
+        """Prove a replacement command can analyze index bytes instead of dirty worktree bytes."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            subprocess.run(["git", "init", "-q", "-b", "main"], cwd=root, check=True)
+            subprocess.run(
+                ["git", "config", "user.email", "runtime@example.invalid"],
+                cwd=root,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Runtime Tests"], cwd=root, check=True
+            )
+            source = root / "sample.txt"
+            source.write_text("baseline\n", encoding="utf-8")
+            subprocess.run(["git", "add", source.name], cwd=root, check=True)
+            subprocess.run(["git", "commit", "-qm", "baseline"], cwd=root, check=True)
+            source.write_text("staged marker\n", encoding="utf-8")
+            subprocess.run(["git", "add", source.name], cwd=root, check=True)
+            source.write_text("working marker\n", encoding="utf-8")
+            scope = resolve_change_scope(root, staged=True)
+            child = (
+                "import json,os,pathlib; "
+                "packet=json.loads(pathlib.Path(os.environ['PROJECT_GOVERNANCE_CHANGE_PACKET']).read_text()); "
+                "content=pathlib.Path(packet['records'][0]['after_path']).read_text(); "
+                "ok=content == 'staged marker\\n'; "
+                "print(json.dumps({'status':'passed' if ok else 'failed','finding_count':0 if ok else 1,'findings':[]})); "
+                "raise SystemExit(0 if ok else 1)"
+            )
+            packs = {
+                "target-check": {
+                    "enforcement": "blocking",
+                    "commands": [[sys.executable, "-c", child]],
+                }
+            }
+            plan = {
+                "stage": "pre-commit",
+                "mode": "impacted",
+                "changed_paths": [source.name],
+                "change_scope": scope,
+                "selected_packs": ["target-check"],
+                "execution_order": ["target-check"],
+            }
+            output = execute(root, packs, plan, timeout_seconds=2)
+        self.assertEqual(output["status"], "passed", output)
+        self.assertEqual(output["subject_digest"], scope["subject_digest"])
+
+    def test_replacement_executes_once_and_builtin_does_not_execute(self) -> None:
+        """Carry one explicit ownership transfer from planning through execution."""
+        passed = json.dumps({"status": "passed", "finding_count": 0, "findings": []})
+        packs = {
+            "generic": {
+                "implementation_status": "active",
+                "enforcement": "blocking",
+                "stages": ["pre-commit"],
+                "path_globs": ["src/**"],
+                "commands": [[sys.executable, "-c", "raise SystemExit(9)"]],
+            },
+            "target": {
+                "implementation_status": "active",
+                "enforcement": "blocking",
+                "stages": ["pre-commit"],
+                "path_globs": ["src/**"],
+                "commands": [[sys.executable, "-c", f"print({passed!r})"]],
+                "replaces_builtin_packs": ["generic"],
+                "change_packet_contract": 1,
+            },
+        }
+        plan = build_plan(
+            packs,
+            stage="pre-commit",
+            mode="all",
+            changed_paths=[],
+        )
+        plan["change_scope"] = all_change_scope()
+        with tempfile.TemporaryDirectory() as directory:
+            output = execute(Path(directory), packs, plan, timeout_seconds=2)
+        self.assertEqual(output["status"], "passed", output)
+        self.assertEqual([item["pack_id"] for item in output["evidence"]], ["target"])
+
+    def test_plain_finding_is_normalized_once_at_the_runner_boundary(self) -> None:
+        """Let target-owned checkers stay simple without weakening the evidence schema."""
+        payload = json.dumps({
+            "status": "failed",
+            "finding_count": 1,
+            "findings": ["project rule failed"],
+        })
+        packs = {
+            "target-check": {
+                "enforcement": "blocking",
+                "commands": [[sys.executable, "-c", f"print({payload!r}); raise SystemExit(1)"]],
+            }
+        }
+        plan = {
+            "stage": None,
+            "mode": "explicit",
+            "changed_paths": [],
+            "change_scope": all_change_scope(),
+            "selected_packs": ["target-check"],
+            "execution_order": ["target-check"],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            output = execute(Path(directory), packs, plan, timeout_seconds=2)
+        finding = output["evidence"][0]["commands"][0]["findings"][0]
+        self.assertEqual(finding["rule_id"], "checker.finding")
+        self.assertEqual(finding["severity"], "blocking")
+        self.assertEqual(finding["message"], "project rule failed")
+
+    def test_target_pack_argument_is_substituted_as_one_argv_token(self) -> None:
+        """Preserve PR lifecycle inputs without shell quoting or split path values."""
+        entry = {"run": "python3 scripts/check-pr.py --body-file {pr_body_file}"}
+        argv = command_argv(
+            entry,
+            stage="pre-pr",
+            mode="impacted",
+            command_arguments={"pr_body_file": "/tmp/body with spaces.md"},
+        )
+        self.assertEqual(
+            argv,
+            ["python3", "scripts/check-pr.py", "--body-file", "/tmp/body with spaces.md"],
+        )
+        self.assertIsNone(
+            command_argv(
+                entry,
+                stage="pre-pr",
+                mode="impacted",
+                command_arguments={"pr_body_file": ""},
+            )
+        )
+
+    def test_blocking_failure_stops_later_packs(self) -> None:
+        """Stop dependency-order execution when a blocking pack cannot complete."""
+        packs = {
+            "first": {
+                "enforcement": "blocking",
+                "commands": [[sys.executable, "-c", "raise SystemExit(1)"]],
+            },
+            "later": {
+                "enforcement": "blocking",
+                "commands": [[sys.executable, "-c", "raise SystemExit(0)"]],
+            },
+        }
+        plan = {
+            "stage": None,
+            "mode": "explicit",
+            "changed_paths": [],
+            "change_scope": all_change_scope(),
+            "selected_packs": ["first", "later"],
+            "execution_order": ["first", "later"],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = execute(root, packs, plan, timeout_seconds=2)
+            terminal = json.loads(
+                (root / ".governance/telemetry/runs.jsonl")
+                .read_text(encoding="utf-8")
+                .splitlines()[-1]
+            )
+        self.assertEqual(output["status"], "failed")
+        self.assertEqual([item["pack_id"] for item in output["evidence"]], ["first"])
+        self.assertEqual(terminal["packs"][0]["process_failure_count"], 1)
+        self.assertEqual(terminal["packs"][0]["integrity_failure_count"], 0)
+
+
+if __name__ == "__main__":
+    unittest.main()

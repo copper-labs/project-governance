@@ -1,0 +1,297 @@
+"""Route and materialize a small, repository-local context packet.
+
+The runtime reads only child-owned profile and facts files.  It keeps route selection,
+skill discovery, and local file materialization deterministic without a generated profile,
+provider client, or persistent cache.
+"""
+
+from __future__ import annotations
+
+import fnmatch
+import hashlib
+import json
+import re
+import shutil
+import tempfile
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+
+TOKEN_BYTES = 4
+DEFAULT_BUDGET = {
+    "primary_context_tokens": 6000,
+    "active_plan_context_tokens": 1500,
+    "expansion_context_tokens": 3000,
+    "total_context_tokens": 10000,
+}
+SAFE_SKILL_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+
+class ContextError(ValueError):
+    """Report invalid child context configuration or an unsafe local reference."""
+
+
+def _load_mapping(path: Path) -> dict[str, Any]:
+    """Load one child-owned YAML mapping with an actionable error."""
+    if not path.is_file() or path.is_symlink():
+        raise ContextError(f"{path}: required ordinary YAML file is missing")
+    value = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    if not isinstance(value, dict):
+        raise ContextError(f"{path}: expected a YAML mapping")
+    return value
+
+
+def _relative_path(value: Any, *, label: str) -> str:
+    """Reject absolute, parent-traversing, and empty target-owned references."""
+    if not isinstance(value, str) or not value.strip():
+        raise ContextError(f"{label}: expected a non-empty repository-relative path")
+    relative = Path(value.strip().removeprefix("./"))
+    if relative.is_absolute() or ".." in relative.parts:
+        raise ContextError(f"{label}: path must stay inside the repository")
+    return relative.as_posix()
+
+
+def _file_bytes(root: Path, relative: str) -> bytes | None:
+    """Read one ordinary file only when it resolves below the repository root."""
+    source = root / relative
+    if not source.is_file() or source.is_symlink():
+        return None
+    try:
+        source.resolve().relative_to(root.resolve())
+    except ValueError as error:
+        raise ContextError(f"{relative}: resolved outside the repository") from error
+    return source.read_bytes()
+
+
+def _unique(values: list[str]) -> list[str]:
+    """Preserve declaration order while dropping repeated route values."""
+    return list(dict.fromkeys(values))
+
+
+def _term_matches(task: str, term: str) -> bool:
+    """Match a configured term without treating a substring as a route hit."""
+    if not term:
+        return False
+    pattern = r"(?<![A-Za-z0-9_-])" + re.escape(term.lower()) + r"(?![A-Za-z0-9_-])"
+    return re.search(pattern, task.lower()) is not None
+
+
+def _route_score(route: dict[str, Any], task: str, changed_paths: list[str], weights: dict[str, Any]) -> tuple[int, list[str]]:
+    """Score one route from its child-declared prompt and path signals."""
+    match = route.get("match", {}) if isinstance(route.get("match"), dict) else {}
+    path_weight = int(weights.get("changed_path", 100))
+    term_weight = int(weights.get("prompt_term", 20))
+    product_weight = int(weights.get("product_term", 80))
+    reasons: list[str] = []
+    path_globs = [str(value) for value in match.get("path_globs", []) or []]
+    for path in changed_paths:
+        matching = next((pattern for pattern in path_globs if fnmatch.fnmatch(path, pattern)), None)
+        if matching:
+            reasons.append(f"path:{path}->{matching}")
+    product_terms = [str(value) for value in [*(match.get("product_terms", []) or []), *(route.get("aliases", []) or [])]]
+    prompt_terms = [
+        str(value)
+        for key in ("prompt_terms", "workflow_terms", "task_terms")
+        for value in match.get(key, []) or []
+    ]
+    product_matches = [term for term in _unique(product_terms) if _term_matches(task, term)]
+    prompt_matches = [term for term in _unique(prompt_terms) if _term_matches(task, term)]
+    reasons.extend(f"product:{term}" for term in product_matches)
+    reasons.extend(f"term:{term}" for term in prompt_matches)
+    return (
+        len([reason for reason in reasons if reason.startswith("path:")]) * path_weight
+        + len(product_matches) * product_weight
+        + len(prompt_matches) * term_weight,
+        reasons,
+    )
+
+
+def _select_route(router: dict[str, Any], task: str, changed_paths: list[str]) -> dict[str, Any]:
+    """Choose one deterministic route and retain close alternatives as diagnostics."""
+    scoring = router.get("scoring", {}) if isinstance(router.get("scoring"), dict) else {}
+    weights = scoring.get("weights", {}) if isinstance(scoring.get("weights"), dict) else {}
+    scores: list[dict[str, Any]] = []
+    for route in router.get("routes", []) or []:
+        if not isinstance(route, dict) or not isinstance(route.get("id"), str):
+            continue
+        score, reasons = _route_score(route, task, changed_paths, weights)
+        scores.append({"route": route, "score": score, "reasons": reasons})
+    scores.sort(key=lambda entry: (-int(entry["score"]), str(entry["route"]["id"])))
+    if not scores or int(scores[0]["score"]) <= 0:
+        return {"outcome": "fallback", "selected": None, "secondary": [], "scores": scores}
+    selected = scores[0]
+    secondary_limit = int(scoring.get("max_secondary_routes", 2))
+    threshold = int(scoring.get("tie_threshold", 20))
+    secondary = [
+        entry
+        for entry in scores[1:]
+        if int(entry["score"]) > 0 and int(selected["score"]) - int(entry["score"]) <= threshold
+    ][:secondary_limit]
+    tied = bool(secondary and int(secondary[0]["score"]) == int(selected["score"]))
+    return {"outcome": "ambiguous" if tied else "matched", "selected": selected, "secondary": secondary, "scores": scores}
+
+
+def _budget(route: dict[str, Any] | None) -> dict[str, int]:
+    """Return validated route limits without requiring a generated profile."""
+    configured = route.get("token_budget", {}) if route and isinstance(route.get("token_budget"), dict) else {}
+    result: dict[str, int] = {}
+    for key, default in DEFAULT_BUDGET.items():
+        value = configured.get(key, default)
+        if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+            raise ContextError(f"context_router token_budget.{key}: expected a nonnegative integer")
+        result[key] = value
+    return result
+
+
+def _groups(router: dict[str, Any], decision: dict[str, Any], include_expansion: bool) -> tuple[str, dict[str, list[str]], dict[str, Any] | None]:
+    """Project declared context into disjoint required and optional groups."""
+    route_entry = decision["selected"]
+    route = route_entry["route"] if route_entry else None
+    primary_values = list(router.get("default_context", []) or [])
+    if route:
+        primary_values.extend(route.get("primary_context", []) or [])
+    primary = _unique([_relative_path(value, label="context_router primary_context") for value in primary_values])
+    active = _unique([_relative_path(value, label="context_router active_plan_context") for value in (route or {}).get("active_plan_context", []) or []])
+    active = [value for value in active if value not in set(primary)]
+    expansion_values = (route or {}).get("expansion_context", []) if include_expansion else []
+    expansion = _unique([_relative_path(value, label="context_router expansion_context") for value in expansion_values or []])
+    expansion = [value for value in expansion if value not in set(primary) and value not in set(active)]
+    return (str(route.get("id")) if route else "fallback", {"primary": primary, "active-plan": active, "expansion": expansion}, route)
+
+
+def _context_items(root: Path, groups: dict[str, list[str]], budget: dict[str, int]) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, int]]:
+    """Read declared files once and enforce exact per-group and total byte limits."""
+    selected: list[dict[str, Any]] = []
+    omissions: list[dict[str, Any]] = []
+    used = {"primary": 0, "active-plan": 0, "expansion": 0, "total": 0}
+    limits = {
+        "primary": budget["primary_context_tokens"] * TOKEN_BYTES,
+        "active-plan": budget["active_plan_context_tokens"] * TOKEN_BYTES,
+        "expansion": budget["expansion_context_tokens"] * TOKEN_BYTES,
+        "total": budget["total_context_tokens"] * TOKEN_BYTES,
+    }
+    for group in ("primary", "active-plan", "expansion"):
+        for relative in groups[group]:
+            content = _file_bytes(root, relative)
+            required = group != "expansion"
+            if content is None:
+                omissions.append({"path": relative, "group": group, "reason": "source-unavailable", "required": required})
+                continue
+            size = len(content)
+            if used[group] + size > limits[group] or used["total"] + size > limits["total"]:
+                omissions.append({"path": relative, "group": group, "reason": "outside-byte-budget", "required": required})
+                continue
+            item_id = hashlib.sha256(f"{group}\0{relative}".encode("utf-8")).hexdigest()[:16]
+            selected.append({
+                "id": f"context-{item_id}", "group": group, "source_path": relative,
+                "content": content, "sha256": hashlib.sha256(content).hexdigest(), "exact_bytes": size,
+            })
+            used[group] += size
+            used["total"] += size
+    return selected, omissions, limits
+
+
+def _discover_skills(root: Path, router: dict[str, Any], route: dict[str, Any] | None) -> tuple[list[dict[str, str]], list[str]]:
+    """Expose installed generic skills selected by target-owned route configuration."""
+    declared = [str(value) for value in router.get("default_skills", []) or []]
+    declared.extend(str(value) for value in (route or {}).get("skills", []) or [])
+    found: list[dict[str, str]] = []
+    missing: list[str] = []
+    for skill_id in _unique(declared):
+        if SAFE_SKILL_ID.fullmatch(skill_id) is None:
+            raise ContextError(f"context_router skill id is unsafe: {skill_id}")
+        relative = f".governance/runtime/skills/{skill_id}/SKILL.md"
+        content = _file_bytes(root, relative)
+        if content is None:
+            missing.append(skill_id)
+            continue
+        found.append({"id": skill_id, "path": relative, "sha256": hashlib.sha256(content).hexdigest()})
+    return found, missing
+
+
+def _materialize(root: Path, items: list[dict[str, Any]]) -> tuple[str, list[dict[str, Any]]]:
+    """Atomically publish selected bytes below ignored runtime state without overwriting content."""
+    identity = [
+        {"id": item["id"], "group": item["group"], "path": item["source_path"], "sha256": item["sha256"]}
+        for item in items
+    ]
+    packet_id = hashlib.sha256(json.dumps(identity, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()[:16]
+    runtime_root = root / ".governance/runtime/context"
+    runtime_root.mkdir(parents=True, exist_ok=True)
+    try:
+        runtime_root.resolve().relative_to(root.resolve())
+    except ValueError as error:
+        raise ContextError(".governance/runtime/context resolves outside the repository") from error
+    destination = runtime_root / f"context-{packet_id}"
+    materialized: list[dict[str, Any]] = []
+    for index, item in enumerate(items, start=1):
+        extension = Path(str(item["source_path"])).suffix
+        materialized.append({**item, "materialized_path": f"items/{index:03d}-{item['id']}{extension}"})
+    if destination.exists():
+        for item in materialized:
+            existing = destination / str(item["materialized_path"])
+            if _file_bytes(destination, str(item["materialized_path"])) != item["content"]:
+                raise ContextError(f"existing materialization does not match: {existing}")
+        return destination.relative_to(root).as_posix(), materialized
+    temporary = Path(tempfile.mkdtemp(prefix=".context-", dir=runtime_root))
+    try:
+        for item in materialized:
+            output = temporary / str(item["materialized_path"])
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_bytes(item["content"])
+        try:
+            temporary.rename(destination)
+        except FileExistsError:
+            shutil.rmtree(temporary)
+            return _materialize(root, items)
+    except BaseException:
+        shutil.rmtree(temporary, ignore_errors=True)
+        raise
+    return destination.relative_to(root).as_posix(), materialized
+
+
+def resolve_context(root: Path, task: str, changed_paths: list[str], *, include_expansion: bool = False) -> dict[str, Any]:
+    """Resolve one route and materialize its bounded local packet for the coordinator."""
+    profile = _load_mapping(root / "config/governance/profile.yaml")
+    facts = _load_mapping(root / "config/governance/facts.lock.yaml")
+    profile_id = profile.get("profile_id")
+    if profile_id and facts.get("profile_id") and profile_id != facts.get("profile_id"):
+        raise ContextError("profile.yaml and facts.lock.yaml identify different repositories")
+    router = profile.get("context_router", {})
+    if not isinstance(router, dict):
+        raise ContextError("config/governance/profile.yaml: context_router must be a mapping")
+    normalized_paths = _unique([_relative_path(path, label="--changed-path") for path in changed_paths])
+    decision = _select_route(router, task, normalized_paths)
+    route_id, groups, route = _groups(router, decision, include_expansion)
+    items, omissions, limits = _context_items(root, groups, _budget(route))
+    skills, missing_skills = _discover_skills(root, router, route)
+    runtime_path, materialized = _materialize(root, items)
+    blockers = [entry["reason"] for entry in omissions if entry["required"]]
+    blockers.extend(f"skill-unavailable:{skill_id}" for skill_id in missing_skills)
+    outcome = str(decision["outcome"])
+    if outcome in {"fallback", "ambiguous"}:
+        blockers.append(f"route-{outcome}")
+    public_items = [{key: value for key, value in item.items() if key != "content"} for item in materialized]
+    return {
+        "status": "blocked" if blockers else "passed",
+        "route": {
+            "id": route_id, "outcome": outcome,
+            "score": int(decision["selected"]["score"]) if decision["selected"] else 0,
+            "reasons": decision["selected"]["reasons"] if decision["selected"] else [],
+            "secondary": [
+                {"id": entry["route"]["id"], "score": entry["score"], "reasons": entry["reasons"]}
+                for entry in decision["secondary"]
+            ],
+        },
+        "changed_paths": normalized_paths,
+        "profile_id": profile_id or facts.get("profile_id"),
+        "facts_loaded": True,
+        "materialization": {"root": runtime_path, "items": public_items, "byte_limits": limits},
+        "omissions": omissions,
+        "skills": skills,
+        "skill_omissions": missing_skills,
+        "external_content": "target-owned provider boundary" if router.get("external_provider") else None,
+        "blockers": _unique(blockers),
+    }

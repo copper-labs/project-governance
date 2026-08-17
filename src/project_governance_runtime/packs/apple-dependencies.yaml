@@ -1,0 +1,17 @@
+id: apple-dependencies
+label: Apple dependency policy
+implementation_status: active
+enforcement: blocking
+stages: [pre-commit, pre-push, pre-pr, ci-pr, release]
+run_when: matched
+path_globs:
+  - "**/*.swift"
+  - "**/Package.swift"
+  - "**/Package.resolved"
+  - "**/Podfile"
+  - "**/*.podspec"
+  - "**/*.xcodeproj/project.pbxproj"
+  - "config/policies/apple-*.yaml"
+depends_on: []
+commands:
+  - builtin: apple-dependencies

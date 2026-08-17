@@ -1,0 +1,92 @@
+version: 1
+id: kmp-stack-pack
+display_name: KMP Stack Pack
+source:
+  repository: https://github.com/mmiani/kotlin-kmp-claude-agent-skills
+  source_path: skills
+  license: Apache-2.0
+  imported_on: 2026-07-05
+  notice_path: .governance/runtime/skills/stack-packs/kmp/NOTICE.md
+router_skill: .governance/runtime/skills/kmp-implementation/SKILL.md
+default_status: included
+support_files:
+  - path: .governance/runtime/skills/stack-packs/kmp/LICENSE
+    rationale: Preserve the Apache-2.0 license for the included upstream skill files.
+  - path: .governance/runtime/skills/stack-packs/kmp/NOTICE.md
+    rationale: Preserve provenance and the target-governance boundary for the included upstream skill files.
+skills:
+  - id: kotlin-build-kmp-gradle-governance
+    path: .governance/runtime/skills/stack-packs/kmp/upstream/kotlin-build-kmp-gradle-governance/SKILL.md
+    status: included
+    category: build
+    rationale: Sound Gradle/KMP build governance with low conflict against repository profile-owned commands.
+  - id: kotlin-data-kmp-data-layer
+    path: .governance/runtime/skills/stack-packs/kmp/upstream/kotlin-data-kmp-data-layer/SKILL.md
+    status: included
+    category: data
+    rationale: Strong repository/source-of-truth discipline that reinforces governance quality goals.
+  - id: kotlin-kmp-code-review
+    path: .governance/runtime/skills/stack-packs/kmp/upstream/kotlin-kmp-code-review/SKILL.md
+    status: included
+    category: review
+    rationale: Broad implementation review guidance aligned with architecture, quality, security, and maintainability controls.
+  - id: kotlin-kmp-refactor-safety
+    path: .governance/runtime/skills/stack-packs/kmp/upstream/kotlin-kmp-refactor-safety/SKILL.md
+    status: included
+    category: refactor
+    rationale: Narrow refactor discipline that aligns with scoped changes, migration safety, and regression prevention.
+  - id: kotlin-navigation-compose-multiplatform
+    path: .governance/runtime/skills/stack-packs/kmp/upstream/kotlin-navigation-compose-multiplatform/SKILL.md
+    status: included
+    category: navigation
+    rationale: Useful for Compose navigation, with version-sensitive guidance requiring current-doc verification.
+  - id: kotlin-platform-app-links-and-deep-links
+    path: .governance/runtime/skills/stack-packs/kmp/upstream/kotlin-platform-app-links-and-deep-links/SKILL.md
+    status: included
+    category: android-platform
+    rationale: Useful for Android app/deep links, but applicable only when Android link handling is in scope.
+  - id: kotlin-platform-kmp-bridges
+    path: .governance/runtime/skills/stack-packs/kmp/upstream/kotlin-platform-kmp-bridges/SKILL.md
+    status: included
+    category: platform-bridge
+    rationale: Strong source-set and platform boundary guidance that reinforces KMP boundary checks.
+  - id: kotlin-project-architecture-review
+    path: .governance/runtime/skills/stack-packs/kmp/upstream/kotlin-project-architecture-review/SKILL.md
+    status: included
+    category: architecture
+    rationale: Solid KMP structural review guidance for module boundaries, source sets, layering, and long-term maintainability.
+  - id: kotlin-project-bugfix
+    path: .governance/runtime/skills/stack-packs/kmp/upstream/kotlin-project-bugfix/SKILL.md
+    status: included
+    category: bugfix
+    rationale: Methodical root-cause and minimal-fix workflow that fits governed implementation.
+  - id: kotlin-project-feature-implementation
+    path: .governance/runtime/skills/stack-packs/kmp/upstream/kotlin-project-feature-implementation/SKILL.md
+    status: included
+    category: implementation
+    rationale: Strong pre-coding inspection, source-set discipline, state/data ownership, and test guidance.
+  - id: kotlin-project-modularization
+    path: .governance/runtime/skills/stack-packs/kmp/upstream/kotlin-project-modularization/SKILL.md
+    status: included
+    category: architecture
+    rationale: Useful module-boundary guidance that complements platform profiles and boundary packs.
+  - id: kotlin-project-state-management
+    path: .governance/runtime/skills/stack-packs/kmp/upstream/kotlin-project-state-management/SKILL.md
+    status: included
+    category: state
+    rationale: Good state-holder and effect-handling guidance for KMP UI layers.
+  - id: kotlin-testing-kmp
+    path: .governance/runtime/skills/stack-packs/kmp/upstream/kotlin-testing-kmp/SKILL.md
+    status: included
+    category: testing
+    rationale: Strong behavior-focused KMP testing guidance aligned with impact-aware validation.
+  - id: kotlin-ui-adaptive-resources
+    path: .governance/runtime/skills/stack-packs/kmp/upstream/kotlin-ui-adaptive-resources/SKILL.md
+    status: included
+    category: ui
+    rationale: Useful adaptive UI guidance for Compose targets, but optional for non-UI KMP libraries.
+  - id: kotlin-ui-compose-multiplatform
+    path: .governance/runtime/skills/stack-packs/kmp/upstream/kotlin-ui-compose-multiplatform/SKILL.md
+    status: included
+    category: ui
+    rationale: Useful shared Compose UI guidance when the target uses Compose Multiplatform.

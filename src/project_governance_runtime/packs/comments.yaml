@@ -1,0 +1,17 @@
+id: comments
+label: Source comments
+implementation_status: active
+enforcement: blocking
+stages: [pre-commit, pre-push, pre-pr, ci-pr]
+run_when: matched
+path_globs:
+  - "**/*.py"
+  - "**/*.kt"
+  - "**/*.swift"
+  - "**/*.ts"
+  - "**/*.tsx"
+  - "**/*.js"
+  - "**/*.jsx"
+depends_on: []
+commands:
+  - builtin: comments

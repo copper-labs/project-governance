@@ -1,0 +1,12 @@
+id: commit-message
+label: Commit message
+implementation_status: active
+enforcement: blocking
+stages: [commit-msg]
+run_when: always
+impact_role: supplemental
+path_globs: []
+depends_on: []
+commands:
+  - builtin: commit-message
+    arguments: [commit_message_file]

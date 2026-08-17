@@ -1,0 +1,13 @@
+.DS_Store
+.agent/
+.agent-context/
+.governance/
+.template-runs/
+.venv/
+*.egg-info/
+node_modules/
+__pycache__/
+artifacts/
+build/
+dist/
+out/

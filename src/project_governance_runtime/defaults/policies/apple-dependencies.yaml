@@ -1,0 +1,12 @@
+version: 1
+owner: __PROJECT_OWNER__
+applies: auto
+default: swiftpm
+planning_alert: required-before-writes
+existing_cocoapods: preserve-until-compatibility-decision
+exception_reasons:
+  - backward-compatibility
+  - upstream-has-no-usable-spm
+  - contract-or-regulatory
+  - migration-bridge
+  - emergency

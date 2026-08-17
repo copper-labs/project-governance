@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://governance-template.invalid/schemas/evidence-manifest.schema.json",
+  "title": "Pack Evidence Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "version", "subject_digest", "claims"],
+  "properties": {
+    "kind": {"const": "project-governance-evidence-manifest"},
+    "version": {"const": 1},
+    "subject_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "claims": {
+      "type": "array",
+      "maxItems": 128,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "outcome", "artifact_digests"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+          },
+          "outcome": {"enum": ["passed", "failed", "not-applicable"]},
+          "artifact_digests": {
+            "type": "array",
+            "maxItems": 64,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    }
+  }
+}

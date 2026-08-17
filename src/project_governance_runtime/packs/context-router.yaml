@@ -1,0 +1,15 @@
+id: context-router
+label: Context routing
+implementation_status: active
+enforcement: blocking
+stages: [pre-commit, pre-push, pre-pr, ci-pr]
+run_when: matched
+path_globs:
+  - "AGENTS.md"
+  - "config/governance/profile.yaml"
+  - "config/governance/facts.lock.yaml"
+  - ".governance/runtime/skills/**"
+  - ".agents/skills/**"
+depends_on: []
+commands:
+  - builtin: context-router

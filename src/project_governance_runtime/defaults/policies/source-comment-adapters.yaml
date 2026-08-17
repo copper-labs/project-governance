@@ -1,0 +1,96 @@
+version: 1
+owner: __PROJECT_OWNER__
+adapters:
+  - language: python
+    status: active
+    analyzer: python-ast
+    analyzer_version: stdlib-3.9+
+    extensions: [.py]
+    capabilities: [file-overview, public-types, public-functions, public-methods]
+    fixture_cases:
+      - id: python-good
+        path: config/validation/fixtures/comment-quality/python-good.py
+        expected_blocking_rule_ids: []
+      - id: python-missing-overview
+        path: config/validation/fixtures/comment-quality/python-missing-overview.py
+        expected_blocking_rule_ids: [SC002, SC003]
+      - id: python-missing-public-doc
+        path: config/validation/fixtures/comment-quality/python-missing-public-doc.py
+        expected_blocking_rule_ids: [SC005]
+      - id: python-restates-signature
+        path: config/validation/fixtures/comment-quality/python-restates-signature.py
+        expected_blocking_rule_ids: [SC007]
+      - id: python-missing-boundary
+        path: config/validation/fixtures/comment-quality/python-missing-boundary.py
+        boundary_required: true
+        expected_blocking_rule_ids: [SC004]
+  - language: kotlin
+    status: planned
+    analyzer: none
+    analyzer_version: none
+    extensions: [.kt, .kts]
+    capabilities: []
+    fixture_cases: []
+  - language: java
+    status: planned
+    analyzer: none
+    analyzer_version: none
+    extensions: [.java]
+    capabilities: []
+    fixture_cases: []
+  - language: swift
+    status: planned
+    analyzer: none
+    analyzer_version: none
+    extensions: [.swift]
+    capabilities: []
+    fixture_cases: []
+  - language: typescript
+    status: planned
+    analyzer: none
+    analyzer_version: none
+    extensions: [.ts, .tsx]
+    capabilities: []
+    fixture_cases: []
+  - language: javascript
+    status: planned
+    analyzer: none
+    analyzer_version: none
+    extensions: [.js, .jsx]
+    capabilities: []
+    fixture_cases: []
+  - language: csharp
+    status: planned
+    analyzer: none
+    analyzer_version: none
+    extensions: [.cs]
+    capabilities: []
+    fixture_cases: []
+  - language: dart
+    status: planned
+    analyzer: none
+    analyzer_version: none
+    extensions: [.dart]
+    capabilities: []
+    fixture_cases: []
+  - language: go
+    status: planned
+    analyzer: none
+    analyzer_version: none
+    extensions: [.go]
+    capabilities: []
+    fixture_cases: []
+  - language: rust
+    status: planned
+    analyzer: none
+    analyzer_version: none
+    extensions: [.rs]
+    capabilities: []
+    fixture_cases: []
+  - language: c-family
+    status: planned
+    analyzer: none
+    analyzer_version: none
+    extensions: [.c, .h, .cpp, .hpp]
+    capabilities: []
+    fixture_cases: []

@@ -1,0 +1,208 @@
+version: 1
+id: agent-context-catalog
+display_name: Agent Context Catalog
+agent_neutral: true
+purpose: >
+  Repo-native discovery catalog for Codex, Claude, and future agents. This file lets an agent
+  discover shared skills and optional packs without requiring user-level local configuration.
+
+target_input_contract: >
+  Paths outside .governance/runtime/skills are optional inputs owned by the target repository.
+  A skill must continue with the target's nearest equivalent guidance when one is absent. Paths
+  under .governance/runtime/skills are package-owned and must resolve after bootstrap.
+
+discovery_contract:
+  - Read AGENTS.md first.
+  - Read this catalog when the task requires a governed workflow or stack-specific skill.
+  - Select the narrowest matching skill by id, category, description, and target context.
+  - Read the selected SKILL.md completely before acting.
+  - For stack or pattern packs, read the pack manifest first, then the selected SKILL.md.
+  - Treat provider-specific files such as .claude/ as adapters only.
+  - Target governance and repository profile validation commands override generic skill guidance.
+
+canonical_roots:
+  skills: .governance/runtime/skills
+  stack_packs: .governance/runtime/skills/stack-packs
+  pattern_packs: .governance/runtime/skills/pattern-packs
+
+standard_skills:
+  - id: frame
+    category: loop
+    path: .governance/runtime/skills/frame/SKILL.md
+    description: Define the work boundary, context route, risk class, and next governed stage.
+  - id: plan
+    category: loop
+    path: .governance/runtime/skills/plan/SKILL.md
+    description: Turn framed work into an executable governed slice with validation and review.
+  - id: work
+    category: loop
+    path: .governance/runtime/skills/work/SKILL.md
+    description: Execute a governed slice with narrow edits, source-of-truth updates, and validation.
+  - id: delegated-execution
+    category: governance
+    path: .governance/runtime/skills/delegated-execution/SKILL.md
+    description: Adaptively select and operate provider-neutral specialist roles for implementation work.
+  - id: delegated-research
+    category: delegated-role
+    path: .governance/runtime/skills/delegated-research/SKILL.md
+    description: Execute a bounded read-only research packet without coordinator bootstrap or nested delegation.
+  - id: delegated-implementation
+    category: delegated-role
+    path: .governance/runtime/skills/delegated-implementation/SKILL.md
+    description: Implement one bounded write packet without assuming coordinator responsibilities.
+  - id: delegated-build-verification
+    category: delegated-role
+    path: .governance/runtime/skills/delegated-build-verification/SKILL.md
+    description: Run mechanical checks against one named snapshot without repairing governed source.
+  - id: delegated-qa-review
+    category: delegated-role
+    path: .governance/runtime/skills/delegated-qa-review/SKILL.md
+    description: Independently review one digest-bound packet using the shared finding schema.
+  - id: review
+    category: loop
+    path: .governance/runtime/skills/review/SKILL.md
+    description: Run peer review through shared review skills, finding schema, and peer resources.
+  - id: maintain
+    category: loop
+    path: .governance/runtime/skills/maintain/SKILL.md
+    description: Repair target-owned governance locally and report runtime-owned defects without source coupling.
+  - id: module-authoring
+    category: governance
+    path: .governance/runtime/skills/module-authoring/SKILL.md
+    description: Enable, add, validate, maintain, or retire modules and target extensions without duplicate authority or unmeasured bloat.
+  - id: environment-investigation
+    category: operations
+    path: .governance/runtime/skills/environment-investigation/SKILL.md
+    description: Use compact environment briefings and bounded read-only investigation, or author thin provider adapters without crossing release authority.
+  - id: work-item-lifecycle
+    category: governance
+    path: .governance/runtime/skills/work-item-lifecycle/SKILL.md
+    description: Create, claim, update, stage-verify, review, or close work items through the configured tracker without skipping state, evidence, or mutation gates.
+  - id: governed-implementation
+    category: governance
+    path: .governance/runtime/skills/governed-implementation/SKILL.md
+    description: Governed implementation workflow from context selection through validation and closeout.
+  - id: docs-governance-review
+    category: governance
+    path: .governance/runtime/skills/docs-governance-review/SKILL.md
+    description: Review durable docs for frontmatter, traceability, links, lifecycle, and governance fit.
+  - id: architecture-review
+    category: architecture
+    path: .governance/runtime/skills/architecture-review/SKILL.md
+    description: Review architecture boundaries, ownership, coupling, and generated-code risk.
+  - id: architecture-design
+    category: architecture
+    path: .governance/runtime/skills/architecture-design/SKILL.md
+    description: Design architecture changes using target docs, profile constraints, and validation impact.
+  - id: implementation-quality-review
+    category: review
+    path: .governance/runtime/skills/implementation-quality-review/SKILL.md
+    description: Review implementation quality, maintainability, comments, naming, and tests.
+  - id: qa-review
+    category: review
+    path: .governance/runtime/skills/qa-review/SKILL.md
+    description: Review testing strategy, coverage, validation evidence, and residual QA risk.
+  - id: release-readiness-review
+    category: release
+    path: .governance/runtime/skills/release-readiness-review/SKILL.md
+    description: Review release gates, smoke checks, artifact evidence, and residual release risk.
+  - id: security-trust-review
+    category: review
+    path: .governance/runtime/skills/security-trust-review/SKILL.md
+    description: Review security, trust, dependency freshness, and supply-chain risk.
+  - id: context-router
+    category: governance
+    path: .governance/runtime/skills/context-router/SKILL.md
+    description: Route and materialize the smallest provider-neutral context packet and validation set.
+  - id: impact-planning
+    category: governance
+    path: .governance/runtime/skills/impact-planning/SKILL.md
+    description: Map changed paths and dependency impact to validation packs and review skills.
+  - id: hook-check-operation
+    category: governance
+    path: .governance/runtime/skills/hook-check-operation/SKILL.md
+    description: Operate hooks and check packs consistently across local, pre-PR, and CI stages.
+  - id: capture
+    category: governance
+    path: .governance/runtime/skills/capture/SKILL.md
+    description: Capture target lessons and prepare redacted upstream feedback only when explicitly requested.
+  - id: install
+    category: governance
+    path: .governance/runtime/skills/install/SKILL.md
+    description: Install or refresh the governance kernel through a confirmed profile manifest and facts lockfile.
+  - id: technical-authoring
+    category: authoring
+    path: .governance/runtime/skills/technical-authoring/SKILL.md
+    description: Run governed technical authoring for PRDs, specs, plans, guides, and durable docs.
+  - id: kmp-implementation
+    category: stack
+    path: .governance/runtime/skills/kmp-implementation/SKILL.md
+    description: Implement or review Kotlin Multiplatform work with source-set and boundary discipline.
+  - id: typescript-implementation
+    category: stack
+    path: .governance/runtime/skills/typescript-implementation/SKILL.md
+    description: Implement or review TypeScript, Node, and web work with target validation.
+  - id: python-implementation
+    category: stack
+    path: .governance/runtime/skills/python-implementation/SKILL.md
+    description: Implement or review Python work with style, typing, tests, and target validation.
+
+stack_packs:
+  - id: kmp-stack-pack
+    category: kmp
+    manifest: .governance/runtime/skills/stack-packs/kmp/manifest.yaml
+    description: Imported Apache-licensed Kotlin/KMP skills with local governance routing.
+  - id: kmp-advanced-bridge-pack
+    category: kmp
+    manifest: .governance/runtime/skills/stack-packs/kmp/advanced-bridge/manifest.yaml
+    description: Advanced KMP bridge, native interop, build matrix, QA parity, and host shell skills.
+  - id: web-cloud-control-plane-stack-pack
+    category: web
+    manifest: .governance/runtime/skills/stack-packs/web-cloud-control-plane/manifest.yaml
+    description: Active SvelteKit cloud-control-plane skill pack with July 2026 freshness evidence and gated optional skills.
+
+pattern_packs:
+  - id: delivery-quality-pattern-pack
+    category: delivery-quality
+    manifest: .governance/runtime/skills/pattern-packs/delivery-quality/manifest.yaml
+    description: Deep workflow and review skills for discovery, risk, implementation quality, CI, docs, and delivery.
+
+resources:
+  - id: loop-cycle
+    path: .governance/runtime/skills/resources/loop-cycle.yaml
+    description: Frame to Plan to Work to Review to Capture dry-run stage map.
+  - id: peer-dispatch
+    path: .governance/runtime/skills/resources/peer-dispatch.yaml
+    description: Agent-neutral peer review resources and shared finding schema binding.
+  - id: execution-roles
+    path: .governance/runtime/skills/resources/execution-roles.yaml
+    description: Provider-neutral delegated role permissions, host envelope, worker brief, and result envelope.
+  - id: agent-routing-schema
+    path: .governance/runtime/skills/resources/agent-routing.schema.json
+    description: Native-host routing input and output schema.
+  - id: agent-worker-brief-schema
+    path: .governance/runtime/skills/resources/agent-worker-brief.schema.json
+    description: Compact delegated worker brief schema.
+  - id: agent-control-state-schema
+    path: .governance/runtime/skills/resources/agent-control-state.schema.json
+    description: Dispatch authorization and repository control-state schema.
+  - id: implementation-plan-template
+    path: .governance/runtime/skills/resources/implementation-plan-template.md
+    description: Canonical packet-ready implementation plan slice template.
+  - id: review-finding-schema
+    path: .governance/runtime/skills/review-finding.schema.yaml
+    description: Shared finding fields and severities for converted review skills.
+
+provider_adapters:
+  - id: codex
+    optional_target_files:
+      - CODEX.md
+      - .codex/config.toml
+      - .codex/agents
+    role: Thin adapter that points Codex to AGENTS.md and shared docs.
+  - id: claude
+    optional_target_files:
+      - CLAUDE.md
+      - .claude/CLAUDE.md
+      - .claude/agents
+    role: Thin adapter and review launch prompts that point to shared skills, resources, and schema.

@@ -1,0 +1,178 @@
+version: 1
+id: web-cloud-control-plane-stack-pack
+display_name: Web Cloud Control Plane Stack Pack
+status: active
+agent_neutral: true
+version_freshness:
+  verified_on: 2026-07-06
+  verification_method: npm-view-plus-official-docs
+  policy: >
+    Treat these versions as July 2026 freshness evidence, not universal pins. Target repositories may
+    pin different versions, but agents must re-check official docs and package versions before
+    making material framework, routing, ORM, validation, testing, or deployment changes.
+  npm_baseline:
+    svelte: 5.56.4
+    "@sveltejs/kit": 2.69.1
+    tailwindcss: 4.3.2
+    zod: 4.4.3
+    drizzle-orm: 0.45.2
+    prisma: 7.8.0
+    sveltekit-superforms: 2.30.2
+    "@auth/sveltekit": 1.11.2
+    "@sveltejs/mcp": 0.1.25
+    "@playwright/test": 1.61.1
+    vitest: 4.1.9
+source:
+  type: local-authored
+  optional_target_research_note: docs/research/web-stack-skill-catalog.md
+  policy: >
+    Skills are locally authored from official documentation, vetted public skill sources, and
+    reusable governance policy. Third-party sources remain references unless license/provenance
+    review explicitly approves vendoring.
+router_skill: .governance/runtime/skills/stack-packs/web-cloud-control-plane/sveltekit-stack-router/SKILL.md
+default_status: included
+skills:
+  - id: sveltekit-stack-router
+    path: .governance/runtime/skills/stack-packs/web-cloud-control-plane/sveltekit-stack-router/SKILL.md
+    status: included
+    category: router
+    activation: default
+    rationale: Routes SvelteKit control-plane tasks to the narrowest active web skill and validation pack.
+  - id: svelte-5-runes-reactivity
+    path: .governance/runtime/skills/stack-packs/web-cloud-control-plane/svelte-5-runes-reactivity/SKILL.md
+    status: included
+    category: svelte
+    activation: default
+    rationale: Prevents legacy Svelte syntax drift and guides explicit Svelte 5 reactivity.
+  - id: svelte-5-component-authoring
+    path: .governance/runtime/skills/stack-packs/web-cloud-control-plane/svelte-5-component-authoring/SKILL.md
+    status: included
+    category: svelte
+    activation: default
+    rationale: Provides component authoring discipline for props, snippets, events, styling, accessibility, and state.
+  - id: sveltekit-routing-structure
+    path: .governance/runtime/skills/stack-packs/web-cloud-control-plane/sveltekit-routing-structure/SKILL.md
+    status: included
+    category: sveltekit
+    activation: default
+    rationale: Keeps file routing, layouts, route groups, hooks, errors, and SSR boundaries consistent.
+  - id: sveltekit-data-loading
+    path: .governance/runtime/skills/stack-packs/web-cloud-control-plane/sveltekit-data-loading/SKILL.md
+    status: included
+    category: sveltekit
+    activation: default
+    rationale: Controls server/universal load ownership, invalidation, page data contracts, and data leakage risk.
+  - id: sveltekit-form-actions-zod
+    path: .governance/runtime/skills/stack-packs/web-cloud-control-plane/sveltekit-form-actions-zod/SKILL.md
+    status: included
+    category: forms
+    activation: default
+    rationale: Guides form actions, progressive enhancement, Zod validation, typed errors, and server-side write paths.
+  - id: sveltekit-server-boundaries-security
+    path: .governance/runtime/skills/stack-packs/web-cloud-control-plane/sveltekit-server-boundaries-security/SKILL.md
+    status: included
+    category: security
+    activation: default
+    rationale: Protects secrets, private env vars, database clients, entitlement checks, and server-only code.
+  - id: sveltekit-drizzle-postgres
+    path: .governance/runtime/skills/stack-packs/web-cloud-control-plane/sveltekit-drizzle-postgres/SKILL.md
+    status: included
+    category: data
+    activation: default
+    rationale: Provides Drizzle/PostgreSQL schema, migration, query, transaction, and server-only data access discipline.
+  - id: sveltekit-tailwind-design-system
+    path: .governance/runtime/skills/stack-packs/web-cloud-control-plane/sveltekit-tailwind-design-system/SKILL.md
+    status: included
+    category: styling
+    activation: default
+    rationale: Keeps Tailwind usage tied to project-owned design tokens and maintainable component styling.
+  - id: sveltekit-testing-playwright-vitest
+    path: .governance/runtime/skills/stack-packs/web-cloud-control-plane/sveltekit-testing-playwright-vitest/SKILL.md
+    status: included
+    category: testing
+    activation: default
+    rationale: Defines unit, integration, and browser proof expectations for SvelteKit control-plane workflows.
+  - id: sveltekit-deployment-adapters
+    path: .governance/runtime/skills/stack-packs/web-cloud-control-plane/sveltekit-deployment-adapters/SKILL.md
+    status: included
+    category: deployment
+    activation: default
+    rationale: Guides adapter selection, runtime constraints, environment handling, and deployment proof.
+  - id: sveltekit-db-migration-safety
+    path: .governance/runtime/skills/stack-packs/web-cloud-control-plane/sveltekit-db-migration-safety/SKILL.md
+    status: included
+    category: data
+    activation: default
+    rationale: Provides expand/contract, rollback, backfill, and production rollout discipline for database migrations.
+  - id: sveltekit-cloud-worker-boundary
+    path: .governance/runtime/skills/stack-packs/web-cloud-control-plane/sveltekit-cloud-worker-boundary/SKILL.md
+    status: included
+    category: architecture
+    activation: default
+    rationale: Prevents web request handlers from owning jobs, publishing, signing, encryption, entitlement, or audit pipelines.
+  - id: sveltekit-auth-session-boundaries
+    path: .governance/runtime/skills/stack-packs/web-cloud-control-plane/sveltekit-auth-session-boundaries/SKILL.md
+    status: included
+    category: auth
+    activation: repository profile-gated
+    profile_gate:
+      field: architecture_preferences.reference_architectures[web-cloud-control-plane].enabled_features
+      values:
+        - auth-session-boundaries
+    rationale: Supports auth/session wiring without selecting a mandatory provider.
+  - id: sveltekit-remote-functions
+    path: .governance/runtime/skills/stack-packs/web-cloud-control-plane/sveltekit-remote-functions/SKILL.md
+    status: included
+    category: sveltekit
+    activation: repository profile-gated
+    profile_gate:
+      field: architecture_preferences.reference_architectures[web-cloud-control-plane].enabled_features
+      values:
+        - sveltekit-remote-functions
+    rationale: Supports remote functions only when a target profile explicitly opts into the experimental feature.
+  - id: sveltekit-prisma-postgres-alternative
+    path: .governance/runtime/skills/stack-packs/web-cloud-control-plane/sveltekit-prisma-postgres-alternative/SKILL.md
+    status: included
+    category: data
+    activation: repository profile-gated
+    profile_gate:
+      field: architecture_preferences.reference_architectures[web-cloud-control-plane].enabled_features
+      values:
+        - prisma-postgres
+    rationale: Supports Prisma-backed profiles as an explicit alternative to the Drizzle default.
+  - id: sveltekit-svelte5-migration-audit
+    path: .governance/runtime/skills/stack-packs/web-cloud-control-plane/sveltekit-svelte5-migration-audit/SKILL.md
+    status: included
+    category: migration
+    activation: repository profile-gated
+    profile_gate:
+      field: architecture_preferences.reference_architectures[web-cloud-control-plane].enabled_features
+      values:
+        - svelte5-migration-audit
+    rationale: Audits existing Svelte/SvelteKit codebases before or during Svelte 5 migration.
+  - id: sveltekit-performance-observability
+    path: .governance/runtime/skills/stack-packs/web-cloud-control-plane/sveltekit-performance-observability/SKILL.md
+    status: included
+    category: quality
+    activation: default
+    rationale: Reviews load waterfalls, bundle growth, server latency, database behavior, and runtime observability.
+  - id: sveltekit-superforms
+    path: .governance/runtime/skills/stack-packs/web-cloud-control-plane/sveltekit-superforms/SKILL.md
+    status: included
+    category: forms
+    activation: repository profile-gated
+    profile_gate:
+      field: architecture_preferences.reference_architectures[web-cloud-control-plane].enabled_features
+      values:
+        - sveltekit-superforms
+    rationale: Supports Superforms only when target profiles adopt it.
+  - id: sveltekit-ui-library-integration
+    path: .governance/runtime/skills/stack-packs/web-cloud-control-plane/sveltekit-ui-library-integration/SKILL.md
+    status: included
+    category: ui
+    activation: repository profile-gated
+    profile_gate:
+      field: architecture_preferences.reference_architectures[web-cloud-control-plane].enabled_features
+      values:
+        - ui-library-integration
+    rationale: Supports component libraries only when target profiles choose one.

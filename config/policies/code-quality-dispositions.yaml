@@ -1,0 +1,30 @@
+version: 2
+owner: project-governance-maintainers
+dispositions:
+  - finding: quality.high-cyclomatic
+    path: src/project_governance_runtime/execution_commands.py
+    symbol: normalized_command
+    disposition: cohesion-accepted
+    owner: project-governance-maintainers
+    reviewer: Codex architecture review
+    approved_on: 2026-08-15
+    responsibility: Normalize one checker process result into governed command evidence.
+    rationale: The decisions form one linear normalization pipeline, and extracting them would scatter one integrity boundary across helper functions without separating responsibilities.
+  - finding: quality.high-cognitive
+    path: src/project_governance_runtime/execution_commands.py
+    symbol: normalized_command
+    disposition: cohesion-accepted
+    owner: project-governance-maintainers
+    reviewer: Codex architecture review
+    approved_on: 2026-08-15
+    responsibility: Normalize one checker process result into governed command evidence.
+    rationale: The control flow keeps process failure, envelope integrity, finding lifecycle, and final status visible together at the single command-normalization boundary.
+  - finding: quality.large-type
+    path: tests/test_runtime_package_execution.py
+    symbol: RuntimeExecutionTests
+    disposition: cohesion-accepted
+    owner: project-governance-maintainers
+    reviewer: Codex architecture review
+    approved_on: 2026-08-15
+    responsibility: Prove the runtime command execution and evidence-normalization contract.
+    rationale: The test class covers one narrow public execution boundary, and splitting it solely by file length would reduce navigability without isolating an independent fixture or responsibility.

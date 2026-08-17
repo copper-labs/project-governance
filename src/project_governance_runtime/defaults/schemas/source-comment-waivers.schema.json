@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://governance-template.invalid/schemas/source-comment-waivers.schema.json",
+  "title": "Source Comment Waivers",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "owner", "waivers"],
+  "properties": {
+    "version": {"const": 1},
+    "owner": {"type": "string", "minLength": 1},
+    "waivers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["rule_id", "path", "declaration", "owner", "expires", "rationale", "remediation"],
+        "properties": {
+          "rule_id": {"enum": ["SC002", "SC003", "SC004", "SC005", "SC006", "SC007", "SC008", "SC009", "SC011", "SC012"]},
+          "adapter_id": {"type": "string", "minLength": 1},
+          "path": {"type": "string", "minLength": 1},
+          "declaration": {"type": "string", "minLength": 1},
+          "owner": {"type": "string", "minLength": 1},
+          "expires": {"type": "string", "format": "date"},
+          "rationale": {"type": "string", "minLength": 20},
+          "remediation": {"type": "string", "minLength": 10}
+        }
+      }
+    }
+  }
+}

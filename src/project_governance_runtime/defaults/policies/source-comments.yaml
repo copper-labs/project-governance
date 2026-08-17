@@ -1,0 +1,29 @@
+version: 1
+owner: __PROJECT_OWNER__
+contract: docs/specs/polyglot-source-comment-contract.md
+mode: report-existing-enforce-touched
+unsupported_languages: advisory
+require_overview_labels: false
+require_type_context_paragraph: false
+minimum_overview_words: 8
+active_adapters: [python]
+source_roots: ["."]
+test_scope: excluded
+test_globs:
+  - "tests/**"
+  - "test/**"
+  - "**/tests/**"
+  - "**/test/**"
+  - "**/*_test.py"
+  - "**/test_*.py"
+  - "**/*Test.kt"
+  - "**/*Tests.kt"
+boundary_globs: []
+ignore_paths:
+  - "**/generated/**"
+  - "**/build/**"
+  - "**/vendor/**"
+  - "**/.gradle/**"
+  - "**/node_modules/**"
+  - "src/project_governance_runtime/defaults/fixtures/**"
+  - "config/validation/fixtures/**"

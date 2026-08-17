@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "provider": "codex",
+  "profiles": [
+    {
+      "id": "codex-economy-high",
+      "model": "gpt-5.6-luna",
+      "tier": "economy",
+      "tier_rank": 1,
+      "effort": "high",
+      "roles": ["implementation-worker", "research-scout", "qa-reviewer"],
+      "enabled": true
+    },
+    {
+      "id": "codex-balanced-high",
+      "model": "gpt-5.6-terra",
+      "tier": "balanced",
+      "tier_rank": 2,
+      "effort": "high",
+      "roles": ["implementation-worker", "research-scout", "qa-reviewer"],
+      "enabled": true
+    },
+    {
+      "id": "codex-primary-recommended",
+      "model": "gpt-5.6-sol",
+      "tier": "primary",
+      "tier_rank": 3,
+      "effort": "high",
+      "roles": [],
+      "enabled": true
+    }
+  ]
+}

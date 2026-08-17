@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://governance-template.invalid/schemas/apple-dependency-exception.schema.json",
+  "title": "Apple Dependency Policy Exceptions",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "owner", "exceptions"],
+  "properties": {
+    "version": {"const": 1},
+    "owner": {"type": "string", "minLength": 1},
+    "exceptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["work_id", "products", "path_globs", "reason", "rationale", "status", "operator", "approved_on", "expires", "spm_analysis", "compatibility_evidence", "compatibility_tests", "migration_or_deletion_gate"],
+        "properties": {
+          "work_id": {"type": "string", "minLength": 1},
+          "products": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+          "path_globs": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+          "reason": {"enum": ["backward-compatibility", "upstream-has-no-usable-spm", "contract-or-regulatory", "migration-bridge", "emergency"]},
+          "rationale": {"type": "string", "minLength": 20},
+          "status": {"const": "approved"},
+          "operator": {"type": "string", "minLength": 1},
+          "approved_on": {"type": "string", "format": "date"},
+          "expires": {"type": "string", "format": "date"}
+          ,"spm_analysis": {"type": "string", "minLength": 20}
+          ,"compatibility_evidence": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+          ,"compatibility_tests": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+          ,"migration_or_deletion_gate": {"enum": ["not-applicable", "operator-approved"]}
+        }
+      }
+    }
+  }
+}

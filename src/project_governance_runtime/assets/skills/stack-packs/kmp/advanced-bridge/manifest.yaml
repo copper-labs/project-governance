@@ -1,0 +1,55 @@
+version: 1
+id: kmp-advanced-bridge-pack
+display_name: KMP Advanced Bridge Pack
+source:
+  type: internal-pattern-extraction
+  imported_on: 2026-07-05
+  policy: Sanitized reusable patterns only; project names, private paths, product nouns, credentials, and release destinations are intentionally excluded.
+router_skill: .governance/runtime/skills/kmp-implementation/SKILL.md
+default_status: included
+skills:
+  - id: kmp-cross-platform-bridge-architecture
+    path: .governance/runtime/skills/stack-packs/kmp/advanced-bridge/kmp-cross-platform-bridge-architecture/SKILL.md
+    status: included
+    category: bridge-architecture
+    rationale: Captures shared-runtime-first bridge ownership, thin host shells, and all-host impact review for complex KMP products.
+  - id: kmp-bridge-event-delivery
+    path: .governance/runtime/skills/stack-packs/kmp/advanced-bridge/kmp-bridge-event-delivery/SKILL.md
+    status: included
+    category: bridge-runtime
+    rationale: Adds concrete queue, generation, stale-callback, drop-counter, and parity-test rules for reliable event delivery.
+  - id: kmp-multi-host-ui-shell
+    path: .governance/runtime/skills/stack-packs/kmp/advanced-bridge/kmp-multi-host-ui-shell/SKILL.md
+    status: included
+    category: multi-host-ui
+    rationale: Preserves the headless KMP core plus native host UI shell pattern for Android, iOS, web, React Native, Flutter, and similar hosts.
+  - id: kmp-platform-native-interop
+    path: .governance/runtime/skills/stack-packs/kmp/advanced-bridge/kmp-platform-native-interop/SKILL.md
+    status: included
+    category: native-interop
+    rationale: Captures FFI, Swift-facing, generated binding, ownership, memory, and lifecycle boundaries for KMP-native integrations.
+  - id: kmp-qa-parity-automation
+    path: .governance/runtime/skills/stack-packs/kmp/advanced-bridge/kmp-qa-parity-automation/SKILL.md
+    status: included
+    category: qa
+    rationale: Defines cross-host automation, stable selector parity, black-box E2E, and host-specific proof expectations.
+  - id: kmp-build-platform-governance
+    path: .governance/runtime/skills/stack-packs/kmp/advanced-bridge/kmp-build-platform-governance/SKILL.md
+    status: included
+    category: build
+    rationale: Keeps KMP target matrices, module archetypes, repository policy, CI lanes, native prebuilts, and publication as governed build-platform concerns.
+  - id: kmp-matrix-dependency-governance
+    path: .governance/runtime/skills/stack-packs/kmp/advanced-bridge/kmp-matrix-dependency-governance/SKILL.md
+    status: included
+    category: dependencies
+    rationale: Adds target-matrix and dependency compatibility discipline before agents update KMP, Android, iOS, Compose, Node, or browser-facing versions.
+  - id: compose-multiplatform-implementation
+    path: .governance/runtime/skills/stack-packs/kmp/advanced-bridge/compose-multiplatform-implementation/SKILL.md
+    status: included
+    category: ui
+    rationale: Provides practical Compose Multiplatform implementation boundaries for shared UI where a project chooses shared Compose.
+  - id: react-native-bridge-dev-loop
+    path: .governance/runtime/skills/stack-packs/kmp/advanced-bridge/react-native-bridge-dev-loop/SKILL.md
+    status: included
+    category: host-loop
+    rationale: Captures a disciplined React Native host development loop for KMP-backed native modules, event emitters, and app proof.

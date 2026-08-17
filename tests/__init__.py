@@ -1,0 +1,1 @@
+"""Governance template regression tests."""
