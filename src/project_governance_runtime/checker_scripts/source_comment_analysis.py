@@ -15,6 +15,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from kotlin_source_parser import PARSER_VERSION as KOTLIN_PARSER_VERSION
+
 SOURCE_FAMILIES = {
     ".py": "python",
     ".kt": "kotlin", ".kts": "kotlin", ".java": "java",
@@ -25,13 +27,22 @@ SOURCE_FAMILIES = {
 }
 SUPPORTED_ANALYZER_VERSIONS = {
     ("python", "python-ast"): "stdlib-3.9+",
+    ("kotlin", "kotlin-token-parser"): {
+        "governance-v3",
+        "governance-v5",
+        KOTLIN_PARSER_VERSION,
+    },
 }
 
 
 def analyzer_version_supported(family: str, analyzer: str, declared: Any) -> bool:
     """Return whether an active adapter declares the analyzer version this checker proves."""
-    expected = SUPPORTED_ANALYZER_VERSIONS.get((family, analyzer))
-    if declared != expected:
+    supported = SUPPORTED_ANALYZER_VERSIONS.get((family, analyzer))
+    if isinstance(supported, set):
+        matches = declared in supported
+    else:
+        matches = declared == supported
+    if not matches:
         return False
     return family != "python" or sys.version_info >= (3, 9)
 
@@ -348,6 +359,13 @@ def adapter_findings(
     """Dispatch one source file to its registered active adapter."""
     if family == "python" and adapter.get("analyzer") == "python-ast":
         return python_findings(path, text, policy, selection)
+    if family == "kotlin" and adapter.get("analyzer") == "kotlin-token-parser":
+        from kotlin_comment_analysis import kotlin_findings
+
+        kotlin_policy = dict(policy)
+        if adapter.get("analyzer_version") in {"governance-v3", "governance-v5"}:
+            kotlin_policy["require_type_context_paragraph"] = True
+        return kotlin_findings(path, text, kotlin_policy, selection)
     result: list[dict[str, Any]] = []
     add(result, "SC010", path, 1, f"Active adapter claim for {family} has no matching checker implementation.")
     return result

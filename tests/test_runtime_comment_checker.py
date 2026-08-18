@@ -30,6 +30,7 @@ def run_checker(
     packet: Path | None = None,
     waivers: Path | None = None,
     policy: Path | None = None,
+    adapters: Path | None = None,
 ) -> dict[str, object]:
     """Run the packaged checker against one source file and decode its evidence envelope."""
     result = subprocess.run(
@@ -42,7 +43,7 @@ def run_checker(
             "--waivers",
             str(waivers or DEFAULTS / "policies/source-comment-waivers.yaml"),
             "--adapters",
-            str(DEFAULTS / "policies/source-comment-adapters.yaml"),
+            str(adapters or DEFAULTS / "policies/source-comment-adapters.yaml"),
             "--policy-schema",
             str(DEFAULTS / "schemas/source-comments.schema.json"),
             "--waivers-schema",
@@ -158,6 +159,94 @@ class RuntimeCommentCheckerTests(unittest.TestCase):
         self.assertEqual(result["status"], "warning")
         self.assertTrue(result["findings"])
         self.assertEqual({item["severity"] for item in result["findings"]}, {"advisory"})
+
+    def test_kotlin_internal_containers_hide_default_and_explicit_public_members(self) -> None:
+        """Exclude declarations whose effective visibility is narrowed by an enclosing type."""
+        source = (
+            "// Responsibility: Provide internal persistence helpers for one runtime boundary.\n"
+            "// Context: Public callers reach these helpers only through a separately documented facade.\n"
+            "package fixtures\n\n"
+            "internal class Store {\n"
+            "    fun save() = Unit\n"
+            "    public fun replace() = Unit\n"
+            "    internal object Cache {\n"
+            "        fun clear() = Unit\n"
+            "    }\n"
+            "}\n\n"
+            "private object Registry {\n"
+            "    fun register() = Unit\n"
+            "}\n"
+        )
+        with tempfile.TemporaryDirectory(dir=ROOT) as directory:
+            root = Path(directory)
+            path = root / "internal-store.kt"
+            path.write_text(source, encoding="utf-8")
+            result = run_checker(root, path.name, expected=0)
+        self.assertEqual(result["status"], "passed")
+        self.assertEqual(result["findings"], [])
+
+    def test_kotlin_internal_nested_type_does_not_hide_public_siblings(self) -> None:
+        """Keep genuine public declarations governed beside an internal nested implementation."""
+        source = (
+            "// Responsibility: Expose one documented store while retaining internal helpers.\n"
+            "// Context: The fixture distinguishes public API from nested implementation details.\n"
+            "package fixtures\n\n"
+            "/** Provide the externally visible persistence operations used by callers. */\n"
+            "public class PublicStore {\n"
+            "    internal class Backend {\n"
+            "        fun save() = Unit\n"
+            "    }\n\n"
+            "    fun load() = Unit\n"
+            "}\n"
+        )
+        with tempfile.TemporaryDirectory(dir=ROOT) as directory:
+            root = Path(directory)
+            path = root / "public-store.kt"
+            path.write_text(source, encoding="utf-8")
+            result = run_checker(root, path.name, expected=1)
+        blockers = [item for item in result["findings"] if item["severity"] == "blocking"]
+        self.assertEqual({item["rule_id"] for item in blockers}, {"SC005"})
+        self.assertEqual(len(blockers), 1)
+        self.assertIn("PublicStore.load", blockers[0]["declaration"])
+
+    def test_kotlin_body_only_edit_keeps_old_comment_debt_advisory(self) -> None:
+        """Preserve the changed-signature ratchet when restoring Kotlin analysis."""
+        before = "public class LegacyStore {\n    fun save() {\n        return\n    }\n}\n"
+        after = "public class LegacyStore {\n    fun save() {\n        println(\"saved\")\n        return\n    }\n}\n"
+        with tempfile.TemporaryDirectory(dir=ROOT) as directory:
+            root = Path(directory)
+            packet = change_packet(root, "legacy-store.kt", before, after, [(3, 3)])
+            result = run_checker(root, expected=0, packet=packet)
+        self.assertEqual(result["status"], "warning")
+        self.assertTrue(result["findings"])
+        self.assertEqual({item["severity"] for item in result["findings"]}, {"advisory"})
+
+    def test_kotlin_checker_accepts_existing_v5_adapter_registry(self) -> None:
+        """Let adopters upgrade the wheel before rewriting their active Kotlin registry."""
+        source = (
+            "// Responsibility: Provide one internal persistence helper for compatibility proof.\n"
+            "// Context: Existing governance-v5 registries receive the corrected checker behavior.\n"
+            "package fixtures\n\n"
+            "internal class Store {\n"
+            "    fun save() = Unit\n"
+            "}\n"
+        )
+        with tempfile.TemporaryDirectory(dir=ROOT) as directory:
+            root = Path(directory)
+            path = root / "compatibility.kt"
+            path.write_text(source, encoding="utf-8")
+            adapters = root / "source-comment-adapters.yaml"
+            adapters.write_text(
+                (DEFAULTS / "policies/source-comment-adapters.yaml")
+                .read_text(encoding="utf-8")
+                .replace("analyzer_version: governance-v6", "analyzer_version: governance-v5"),
+                encoding="utf-8",
+            )
+            result = run_checker(
+                root, path.name, expected=0, adapters=adapters
+            )
+        self.assertEqual(result["status"], "passed")
+        self.assertEqual(result["findings"], [])
 
     def test_body_only_edit_keeps_old_comment_debt_advisory(self) -> None:
         """Do not reopen an old declaration gap when only its implementation body changes."""
