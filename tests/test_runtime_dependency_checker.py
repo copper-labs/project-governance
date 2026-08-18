@@ -189,6 +189,30 @@ class RuntimeDependencyCheckerTests(unittest.TestCase):
         self.assertEqual(code, 0, report)
         self.assertEqual(report["finding_count"], 0)
 
+    def test_workflow_action_tag_repair_accepts_only_a_new_pinned_coordinate(self) -> None:
+        """Allow repairing a legacy action tag when the replacement has evidence."""
+        before = """name: test\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v6\n"""
+        revision = "de0fac2e4500dabe0009e67214ff5f5447ce83dd"
+        after = before.replace("actions/checkout@v6", f"actions/checkout@{revision}")
+        with self._fixture({".github/workflows/test.yml": (before, after)}) as root:
+            self._write_evidence(root, [self._action_evidence("actions/checkout", revision)])
+            code, report = self._run_checker(root)
+        self.assertEqual(code, 0, report)
+        self.assertEqual(report["checked"][0]["changed_dependency_count"], 1)
+
+    def test_workflow_action_tag_ratcheting_rejects_new_or_changed_tags(self) -> None:
+        """Keep mutable action references blocked unless an identical legacy literal remains."""
+        before = """name: test\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v6\n"""
+        cases = {
+            "changed-tag": before.replace("@v6", "@v7"),
+            "added-tag": before.replace("@v6", "@v6\n      - uses: actions/setup-node@v6"),
+        }
+        for name, after in cases.items():
+            with self.subTest(name=name), self._fixture({".github/workflows/test.yml": (before, after)}) as root:
+                code, report = self._run_checker(root)
+            self.assertEqual(code, 1, report)
+            self.assertEqual(report["findings"][0]["rule_id"], "dependency.unsupported-format")
+
     def test_changed_npm_lock_defects_block(self) -> None:
         """Reject new lock defects even when a legacy defect remains tolerated."""
         legacy = self._lock_entry("legacy", "1.0.0", resolved="https://proxy.invalid/legacy/-/legacy-1.0.0.tgz")
@@ -440,6 +464,19 @@ class RuntimeDependencyCheckerTests(unittest.TestCase):
             "evaluated_at": "2026-07-01T00:00:00Z",
             "published_at": "2025-01-01T00:00:00Z",
             "source_url": f"https://registry.npmjs.org/{name}/{version}",
+        }
+
+    @staticmethod
+    def _action_evidence(name: str, version: str) -> dict[str, str]:
+        """Bind one immutable GitHub Action revision to its canonical source."""
+        return {
+            "name": name,
+            "ecosystem": "github-actions",
+            "version": version,
+            "artifact_type": "ci",
+            "evaluated_at": "2026-07-01T00:00:00Z",
+            "published_at": "2025-01-01T00:00:00Z",
+            "source_url": f"https://github.com/{name}/commit/{version}",
         }
 
     @staticmethod

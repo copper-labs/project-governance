@@ -369,12 +369,15 @@ def parse_package_lock_npm_entries(path: Path) -> tuple[list[dict[str, str]], li
 
 
 def extract_npm_dependencies(path: Path, *, logical_path: str | None = None) -> tuple[list[dict[str, str]], list[dict[str, Any]]]:
-    """Return tolerant npm extraction results only for manifest and lock entry ratcheting."""
+    """Return entry-level defects needed to ratchet supported dependency repairs."""
     name = Path(logical_path).name if logical_path is not None else path.name
     if name == "package.json":
         return parse_package_json_npm_entries(path)
     if name == "package-lock.json":
         return parse_package_lock_npm_entries(path)
+    relative = Path(logical_path).as_posix() if logical_path is not None else path.as_posix()
+    if relative.startswith(".github/workflows/") and path.suffix in {".yml", ".yaml"}:
+        return parse_workflow_entries(path)
     return extract_dependencies(path, logical_path=logical_path), []
 def xml_child(element: ET.Element, name: str) -> ET.Element | None:
     """Find a direct Maven XML child without exposing namespace details."""
@@ -600,8 +603,24 @@ def workflow_uses(document: dict[str, Any], path: Path) -> list[str]:
                     raise UnsupportedDependencyFormat(f"{path.as_posix()}: job {job_name!r} step {number} uses must be a string")
                 found.append(step["uses"])
     return found
-def parse_workflow(path: Path) -> list[dict[str, str]]:
-    """Parse a workflow and extract its governed action coordinates."""
+def workflow_action_defect(path: Path, uses: str) -> dict[str, Any]:
+    """Describe one legacy mutable action reference for content-stable repair ratcheting."""
+    name, separator, revision = uses.rpartition("@")
+    if not separator or not name:
+        message = f"{path.as_posix()}: action {uses!r} has no immutable revision"
+    elif not ACTION_SHA.fullmatch(revision):
+        message = f"{path.as_posix()}: action {uses!r} must be pinned to a 40-character commit SHA"
+    else:
+        raise ValueError("workflow_action_defect requires a mutable action reference")
+    return {
+        "identity": ("workflow-action", uses),
+        "repair_key": ("workflow-action", name or uses),
+        "message": message,
+    }
+
+
+def parse_workflow_entries(path: Path) -> tuple[list[dict[str, str]], list[dict[str, Any]]]:
+    """Extract pinned workflow actions while retaining legacy mutable references as defects."""
     try:
         document = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     except (OSError, UnicodeError, yaml.YAMLError) as exc:
@@ -609,17 +628,25 @@ def parse_workflow(path: Path) -> list[dict[str, str]]:
     if not isinstance(document, dict):
         raise UnsupportedDependencyFormat(f"{path.as_posix()}: workflow must contain a mapping")
     values: list[dict[str, str]] = []
+    defects: list[dict[str, Any]] = []
     for uses in workflow_uses(document, path):
         if uses.startswith("./"):
             continue
         if uses.startswith("docker://"):
             raise UnsupportedDependencyFormat(f"{path.as_posix()}: docker action references require a file-digest override")
-        if "@" not in uses:
-            raise UnsupportedDependencyFormat(f"{path.as_posix()}: action {uses!r} has no immutable revision")
-        name, version = uses.rsplit("@", 1)
+        name, _, version = uses.rpartition("@")
         if not name or not ACTION_SHA.fullmatch(version):
-            raise UnsupportedDependencyFormat(f"{path.as_posix()}: action {uses!r} must be pinned to a 40-character commit SHA")
+            defects.append(workflow_action_defect(path, uses))
+            continue
         values.append(dependency(name, "github-actions", version.lower(), "ci"))
+    return values, defects
+
+
+def parse_workflow(path: Path) -> list[dict[str, str]]:
+    """Keep direct workflow parsing strict outside changed-image repair reconciliation."""
+    values, defects = parse_workflow_entries(path)
+    if defects:
+        raise UnsupportedDependencyFormat(str(defects[0]["message"]))
     return values
 def extract_dependencies(path: Path, *, logical_path: str | None = None) -> list[dict[str, str]]:
     """Extract the complete supported dependency surface or fail closed."""
