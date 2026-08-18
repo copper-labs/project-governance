@@ -5,7 +5,7 @@ type: spec
 status: current
 owner: project-governance
 created: 2026-03-02
-updated: 2026-08-16
+updated: 2026-08-18
 summary: Contract for the package runtime, its configuration boundary, and its focused execution model.
 ---
 
@@ -135,7 +135,9 @@ Comment checks are a changed-code ratchet. New files are fully governed. In an e
 a new declaration or a declaration whose header or public signature intersects the packet's exact
 changed range receives blocking declaration enforcement; old overview debt remains advisory.
 Parser-backed waivers use normalized path, rule, and qualified declaration name, with `<file>` for
-overview rules.
+overview rules. Kotlin declarations are externally public only when the declaration and every
+enclosing named class, interface, or object are public; a public-by-default member inside an
+`internal`, `private`, or `protected` container is not part of the public documentation surface.
 
 Dependency freshness compares normalized `(ecosystem, name, version, artifact_type)` tuples from
 the packet's exact before- and after-images. Only introduced or updated after-image tuples require

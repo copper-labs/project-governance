@@ -6,7 +6,7 @@ unsupported_languages: advisory
 require_overview_labels: false
 require_type_context_paragraph: false
 minimum_overview_words: 8
-active_adapters: [python]
+active_adapters: [python, kotlin]
 source_roots: ["."]
 test_scope: excluded
 test_globs:

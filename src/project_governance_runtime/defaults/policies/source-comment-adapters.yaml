@@ -25,12 +25,43 @@ adapters:
         boundary_required: true
         expected_blocking_rule_ids: [SC004]
   - language: kotlin
-    status: planned
-    analyzer: none
-    analyzer_version: none
+    status: active
+    analyzer: kotlin-token-parser
+    analyzer_version: governance-v6
     extensions: [.kt, .kts]
-    capabilities: []
-    fixture_cases: []
+    capabilities: [file-overview, public-types, public-functions, public-methods, annotations, multiline-declarations, enclosing-visibility]
+    fixture_cases:
+      - id: kotlin-good
+        path: config/validation/fixtures/comment-quality/kotlin-good.kt
+        expected_blocking_rule_ids: []
+      - id: kotlin-annotated-multiline
+        path: config/validation/fixtures/comment-quality/kotlin-annotated-multiline.kt
+        expected_blocking_rule_ids: []
+      - id: kotlin-enclosing-visibility
+        path: config/validation/fixtures/comment-quality/kotlin-enclosing-visibility.kt
+        expected_blocking_rule_ids: []
+      - id: kotlin-missing-public-doc
+        path: config/validation/fixtures/comment-quality/kotlin-missing-public-doc.kt
+        expected_blocking_rule_ids: [SC005]
+      - id: kotlin-missing-overview
+        path: config/validation/fixtures/comment-quality/kotlin-missing-overview.kt
+        expected_blocking_rule_ids: [SC002, SC003]
+      - id: kotlin-wrong-attachment
+        path: config/validation/fixtures/comment-quality/kotlin-wrong-attachment.kt
+        expected_blocking_rule_ids: [SC005]
+      - id: kotlin-protected-member
+        path: config/validation/fixtures/comment-quality/kotlin-protected-member.kt
+        expected_blocking_rule_ids: []
+      - id: kotlin-modified-and-anonymous-types
+        path: config/validation/fixtures/comment-quality/kotlin-modified-and-anonymous-types.kt
+        expected_blocking_rule_ids: []
+      - id: kotlin-missing-boundary
+        path: config/validation/fixtures/comment-quality/kotlin-missing-boundary.kt
+        boundary_required: true
+        expected_blocking_rule_ids: [SC004]
+      - id: kotlin-restates-signature
+        path: config/validation/fixtures/comment-quality/kotlin-restates-signature.kt
+        expected_blocking_rule_ids: [SC007]
   - language: java
     status: planned
     analyzer: none
