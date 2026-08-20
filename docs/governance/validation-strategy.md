@@ -5,7 +5,7 @@ type: governance
 status: current
 owner: project-governance
 created: 2026-07-05
-updated: 2026-08-16
+updated: 2026-08-20
 summary: Defines focused, impact-aware validation for the package runtime and its adopters.
 ---
 
@@ -32,6 +32,11 @@ After it passes, run one closeout:
 ```sh
 project-governance check --stage pre-commit --mode impacted
 ```
+
+Freeze one candidate before a broad or cross-platform proof. An independent QA pass consumes that
+candidate and its existing proof; it does not replay the matrix. One QA repair permits one affected
+deterministic recheck. If that recheck fails, return to focused diagnosis or the operator instead of
+starting another general QA, verifier, or broad-proof cycle.
 
 ## Selection Rules
 
@@ -98,4 +103,11 @@ Report the focused test, affected seam, selected packs, any intentionally omitte
 residual risk. The JSON result contains normalized findings, status, execution duration, and
 termination reason. Bounded local telemetry adds changed-path, selected-pack, executed-command,
 and per-pack duration/count aggregates without retaining paths, commands, output, prompts, or
-source content.
+source content. `project-governance telemetry status` summarizes retained repeated scopes, broad
+runs, and slow packs as advisory observations. It does not prove a repeat was unnecessary because
+subject changes and invalidation reasons are not retained. It also excludes direct commands and
+native-host launches outside the runtime, so missing telemetry is never evidence that no work ran.
+
+Run deterministic builds through a target pack or the governed harness when one exists. If a
+necessary command has no governed execution surface, report that coverage gap with the evidence
+instead of silently treating runtime telemetry as complete.

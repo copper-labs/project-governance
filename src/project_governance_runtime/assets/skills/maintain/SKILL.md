@@ -33,8 +33,9 @@ telemetry status. These are optional target inputs.
 3. Change one component at a time and run its focused test.
 4. Run one directly affected integration seam. Do not repeat unrelated passing packs.
 5. Remove obsolete code and references rather than leaving a fallback or parallel policy.
-6. Use local telemetry only to spot repeated broad runs or slow packs; it never authorizes a policy
-   change by itself.
+6. Use local telemetry only to spot repeated scopes, broad runs, or slow packs; it never authorizes
+   a policy change by itself. Account separately for direct commands and native-host launches that
+   the status output explicitly excludes.
 
 ## Validation
 

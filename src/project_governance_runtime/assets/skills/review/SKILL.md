@@ -38,7 +38,9 @@ authoring, or migration changes.
    and prevent silent fixes. A delegated QA reviewer is a separate assurance wave with its own
    explicit operator start; otherwise the primary performs the dedicated pass.
 5. Reconcile high and medium findings with code, docs, tests, or a recorded rationale, then recheck
-   only the affected claim unless the patch invalidated broader evidence.
+   only the affected claim unless the patch invalidated broader evidence. Allow one primary-owned
+   repair and one affected recheck. A failed recheck returns to focused diagnosis or the operator;
+   it does not start a fresh general review, verifier, or broad-proof cycle.
 6. When the source repository provides a review preflight, run it against the exact staged
    candidate before closing the review. Reconcile fingerprint-bound baseline and cohesion records
    at this point, before broad validation or the commit hook.

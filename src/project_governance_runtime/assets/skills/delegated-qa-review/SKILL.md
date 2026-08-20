@@ -25,8 +25,10 @@ Use only when launched with a `qa-reviewer` worker brief.
 1. Confirm independence, snapshot, acceptance criteria, budgets, and stop conditions.
 2. Read only packet materialized refs. Do not call provider or graph tools; request expansion
    instead of loading general repository context.
-3. Review without editing governed source or delegating again.
-4. Return the shared result envelope without a transcript or repeated context.
+3. Review the whole assigned claim set once and return one complete bounded finding set. Do not
+   drip one finding into successive general review passes.
+4. Review without editing governed source or delegating again.
+5. Return the shared result envelope without a transcript or repeated context.
 
 ## Validation
 

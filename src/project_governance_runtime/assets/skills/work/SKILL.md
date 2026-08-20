@@ -47,7 +47,9 @@ after the work has been framed and scoped.
    and reject helper extraction that only relocates related code without creating a meaningful owner.
 10. Run deterministic build commands under the harness and bind build evidence to the integrated
     snapshot. Any delegated QA is a separate explicitly started assurance wave.
-11. Update evidence artifacts as part of the slice, not after memory fades.
+11. Reconcile QA with one primary-owned repair and one affected recheck. If it fails, stop instead
+    of starting another general QA, verifier, or broad-proof cycle.
+12. Update evidence artifacts as part of the slice, not after memory fades.
 
 ## Validation
 

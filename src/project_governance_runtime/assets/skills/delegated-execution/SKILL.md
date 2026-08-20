@@ -45,15 +45,19 @@ trigger. Skip it otherwise, including for a trivial direct edit.
    materialized context to the specialist.
 8. Treat the operator's explicit governed-delegation request as authority for one exact launch wave.
    Handle the internal route and start commands without asking the operator to prepare JSON. Do not
-   add writers, nested delegation, automatic specialist retries, or provider cascades.
+   add writers, nested delegation, automatic specialist retries, or provider cascades. Launch
+   native-host agents only from the entries returned by the governed start command and close that
+   wave through finish. If the host cannot bind those entries, continue solo and report the
+   delegation gap instead of spawning an ungoverned substitute.
 9. Integrate results through the primary. Reject stale, scope-expanded, digest-mismatched, or
    unidentified output.
 10. Rebaseline immediately when a clean integration snapshot advances. Retain exact subject-valid
    evidence and discard stale integration mechanics.
 11. Run deterministic build commands under the harness. A selected post-integration QA review is a
     separate optional assurance wave with its own explicit start.
-12. Fix or explicitly close high and medium findings and recheck only the affected evidence unless
-    the patch invalidated a broader claim.
+12. Fix or explicitly close high and medium findings. Permit one primary-owned repair and one
+    affected deterministic recheck. If that recheck fails, stop and return to focused diagnosis or
+    the operator; do not launch another QA reviewer, verifier, or broad proof cycle.
 13. Stop when the plan's proof budget and stop condition are satisfied. Require a recorded reason
     before repeating an equivalent passed gate.
 14. If specialist dispatch is unavailable or returns `needs_primary_decision`, let the primary

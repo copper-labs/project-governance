@@ -289,6 +289,66 @@ def _run_outcomes(records: list[dict[str, Any]]) -> tuple[int, dict[str, int]]:
     return len(terminal), counts
 
 
+def _validation_status(records: list[dict[str, Any]]) -> dict[str, Any]:
+    """Summarize retained validation repetition and cost without judging invalidation."""
+    terminal = [record for record in records if record.get("event") == "run-terminal"]
+    scope_counts: dict[str, int] = {}
+    mode_counts: dict[str, int] = {}
+    pack_totals: dict[str, dict[str, int | float]] = {}
+    total_duration_ms: int | float = 0
+
+    for record in terminal:
+        fingerprint = record.get("scope_fingerprint")
+        if isinstance(fingerprint, str):
+            scope_counts[fingerprint] = scope_counts.get(fingerprint, 0) + 1
+        mode = str(record.get("mode", "unknown"))
+        mode_counts[mode] = mode_counts.get(mode, 0) + 1
+        duration_ms = record.get("duration_ms")
+        if isinstance(duration_ms, (int, float)) and not isinstance(duration_ms, bool):
+            total_duration_ms += duration_ms
+        for pack in record.get("packs", []):
+            if not isinstance(pack, dict) or not isinstance(pack.get("id"), str):
+                continue
+            summary = pack_totals.setdefault(
+                pack["id"], {"run_count": 0, "total_duration_ms": 0, "max_duration_ms": 0}
+            )
+            summary["run_count"] += 1
+            pack_duration = pack.get("duration_ms")
+            if isinstance(pack_duration, (int, float)) and not isinstance(pack_duration, bool):
+                summary["total_duration_ms"] += pack_duration
+                summary["max_duration_ms"] = max(summary["max_duration_ms"], pack_duration)
+
+    repeated_scopes = [count for count in scope_counts.values() if count > 1]
+    slowest_packs = [
+        {"id": pack_id, **summary}
+        for pack_id, summary in sorted(
+            pack_totals.items(), key=lambda item: (-item[1]["total_duration_ms"], item[0])
+        )[:5]
+    ]
+    return {
+        "retained_run_count": len(terminal),
+        "total_duration_ms": total_duration_ms,
+        "mode_counts": dict(sorted(mode_counts.items())),
+        "broad_run_count": mode_counts.get("all", 0),
+        "fingerprinted_run_count": sum(scope_counts.values()),
+        "unfingerprinted_run_count": len(terminal) - sum(scope_counts.values()),
+        "repeated_scope_count": len(repeated_scopes),
+        "repeated_scope_run_count": sum(count - 1 for count in repeated_scopes),
+        "most_repeated_scope_run_count": max(repeated_scopes, default=0),
+        "slowest_packs": slowest_packs,
+        "excludes": [
+            "direct commands outside the runtime",
+            "native-host launches outside agent dispatch",
+            "evicted receipts",
+            "subject changes and invalidation reasons",
+        ],
+        "interpretation": (
+            "best-effort retained repetition and duration observations, not proof that a rerun was "
+            "unnecessary"
+        ),
+    }
+
+
 def _model_summaries(
     entries: list[dict[str, Any]],
 ) -> tuple[dict[str, int], dict[str, dict[str, int]]]:
@@ -378,6 +438,7 @@ def status(root: Path) -> dict[str, Any]:
         "record_count": len(records),
         "terminal_run_count": terminal_run_count,
         "outcomes": counts,
+        "validation": _validation_status(records),
         "orchestration": _orchestration_status(records),
         "path": path.relative_to(root).as_posix(),
     }

@@ -46,11 +46,13 @@ repository generated from this template.
 12. Use independent QA or a second model only when selected risk or the operator requests it. Bound
     review to changed files, the active plan, the owning contract, and at most five directly
     relevant supporting files or 20 minutes. Expand context only for a named uncertainty and return
-    at most five actionable findings by default.
+    at most five actionable findings by default. Reconcile those findings with one primary-owned
+    repair and one affected recheck; do not start a fresh general review after each repair.
 13. Keep deep threshold remediation to the highest-risk three classes or 30 minutes, helpful
     adjacent comment cleanup to five comments or 20 minutes, and unrelated cleanup at zero unless
     explicitly added.
-14. If the clean integration snapshot advances, rerun only proof invalidated by that change.
+14. If the clean integration snapshot advances, rerun only proof invalidated by that change. A
+    snapshot advance alone does not authorize a broad matrix; name the invalidated claim first.
 15. Reconcile docs, traceability, observability proof or gap rationale, and closeout evidence
     before handoff.
 

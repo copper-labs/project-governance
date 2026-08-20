@@ -93,6 +93,9 @@ class RuntimeSkillPayloadTests(unittest.TestCase):
             "one directly affected seam",
             "one impacted pre-commit closeout",
             "one impacted pre-pr boundary",
+            "one primary-owned",
+            "one affected recheck",
+            "do not start a fresh general review",
             "second failure",
             "warnings",
         ):

@@ -20,6 +20,8 @@ summary: <One-sentence final state.>
 - The operator explicitly starts each delegated launch wave.
 - Across active waves, one repository contains at most one writer and two read-only specialists.
 - Ordinary specialist failure returns work to the primary without automatic re-dispatch.
+- Native-host launches use the governed route, start, and finish lifecycle.
+- One QA repair permits one affected recheck, not another general review or broad proof.
 
 ## Slice <N>: <Outcome>
 
@@ -31,12 +33,15 @@ summary: <One-sentence final state.>
 - Fixed decisions: <facts workers must not revisit>
 - Acceptance: <observable completion claims>
 - Focused proof: <cheapest sufficient commands or inspection>
+- Invalidates prior proof when: <named subject or claim changes>
+- Proof state: not-run | passed on <snapshot> | invalidated by <reason>
 - Escalate or stop when: <bounded conditions>
 - Packet ready: yes | no
 
 ## Stable-Candidate Proof
 
-<One impacted pre-commit boundary, one impacted pre-PR boundary, and any risk-selected proof.>
+<Run once on the frozen candidate: one impacted pre-commit boundary, one impacted pre-PR boundary,
+and any risk-selected proof. QA consumes this evidence instead of replaying it.>
 
 ## Rollback
 

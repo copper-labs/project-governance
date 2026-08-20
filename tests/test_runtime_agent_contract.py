@@ -140,6 +140,9 @@ class RuntimeAgentContractTests(unittest.TestCase):
         self.assertIn("Depends on:", text)
         self.assertIn("Execution: sequential | parallel with", text)
         self.assertIn("Semantic contract: settled | unresolved", text)
+        self.assertIn("Invalidates prior proof when:", text)
+        self.assertIn("Proof state: not-run | passed on", text)
+        self.assertIn("Run once on the frozen candidate", text)
         self.assertIn("Packet ready: yes | no", text)
         self.assertNotIn("Parallel safe", text)
 
@@ -147,6 +150,14 @@ class RuntimeAgentContractTests(unittest.TestCase):
         """Keep activation a natural-language request rather than an operator-run CLI ritual."""
         path = ROOT / "src/project_governance_runtime/assets/skills/delegated-execution/SKILL.md"
         self.assertIn("Use delegation for this task", path.read_text(encoding="utf-8"))
+
+    def test_delegation_skill_requires_governed_native_lifecycle_and_one_qa_recheck(self) -> None:
+        """Prevent native spawning and repair loops from bypassing the one-wave contract."""
+        path = ROOT / "src/project_governance_runtime/assets/skills/delegated-execution/SKILL.md"
+        text = path.read_text(encoding="utf-8")
+        self.assertIn("native-host agents only from the entries returned", text)
+        self.assertIn("one primary-owned repair and one", text)
+        self.assertIn("do not launch another QA reviewer, verifier, or broad proof cycle", text)
 
     def test_peer_dispatch_pins_the_repeated_failure_consultation_ladder(self) -> None:
         """Start with a fresh perspective and reserve the heavier fallback for uncertainty."""
