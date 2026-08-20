@@ -45,6 +45,8 @@ def disposition_for(
         return True, "cohesion and readability accepted after explicit review"
     if item.get("disposition") == "temporary-waiver":
         return _temporary_waiver_status(item, actual, sha)
+    if item.get("disposition") == "waiver-resolved":
+        return False, "a prior waiver resolution does not authorize a current finding"
     if item.get("disposition") == "refactor-required":
         return False, "the recorded disposition requires refactoring"
     return False, "the matching disposition has an unknown value"
@@ -260,20 +262,61 @@ def _transition_candidates(
     return result
 
 
+def _valid_temporary_waiver_transition(
+    old: dict[str, Any], current: dict[str, Any]
+) -> bool:
+    """Preserve one exact waiver or accept one explicitly reviewed replacement."""
+    new_disposition = current.get("disposition")
+    old_value = old.get("current_value", old.get("current_lines"))
+    unchanged = (
+        new_disposition == "temporary-waiver"
+        and current.get("current_value") == old_value
+        and all(
+            current.get(field) == old.get(field)
+            for field in (
+                "source_fingerprint",
+                "supersedes_source_fingerprint",
+                "expires",
+                "remediation_plan",
+            )
+        )
+    )
+    if unchanged:
+        return True
+    try:
+        reviewed_on = date.fromisoformat(str(current.get("approved_on", "")))
+        prior_reviewed_on = date.fromisoformat(str(old.get("approved_on", "")))
+    except ValueError:
+        return False
+    old_fingerprint = old.get("source_fingerprint")
+    reviewed_replacement = (
+        current.get("supersedes_source_fingerprint") == old_fingerprint
+        and current.get("responsibility") == old.get("responsibility")
+        and reviewed_on >= prior_reviewed_on
+        and all(
+            str(current.get(field, "")).strip()
+            for field in ("reviewer", "approved_on", "rationale")
+        )
+    )
+    return reviewed_replacement and (
+        new_disposition == "waiver-resolved"
+        or (
+            new_disposition == "temporary-waiver"
+            and current.get("source_fingerprint") != old_fingerprint
+            and all(
+                str(current.get(field, "")).strip()
+                for field in ("expires", "remediation_plan")
+            )
+        )
+    )
+
+
 def _valid_transition(old: dict[str, Any], current: dict[str, Any]) -> bool:
     """Keep waivers exact and require a reviewed decision to resolve refactoring."""
     old_disposition = old.get("disposition")
     new_disposition = current.get("disposition")
     if old_disposition == "temporary-waiver":
-        old_value = old.get("current_value", old.get("current_lines"))
-        return (
-            new_disposition == "temporary-waiver"
-            and current.get("current_value") == old_value
-            and all(
-                current.get(field) == old.get(field)
-                for field in ("source_fingerprint", "expires", "remediation_plan")
-            )
-        )
+        return _valid_temporary_waiver_transition(old, current)
     if old_disposition != "refactor-required":
         return True
     responsibility_preserved = not old.get("responsibility") or (
@@ -296,6 +339,8 @@ def _transition_findings(
     packet: list[dict[str, Any]],
     disposition_path: Path,
     history_error: str,
+    source_fingerprints: dict[str, str],
+    observed_findings: set[tuple[Any, Any, Any]],
 ) -> list[dict[str, Any]]:
     """Prevent a registry edit from silently deleting or weakening active decisions."""
     if history_error:
@@ -312,7 +357,23 @@ def _transition_findings(
     renamed = _renamed_paths(packet)
     for old in _active_relocation_records(prior):
         candidates = _transition_candidates(old, current, renamed)
-        if len(candidates) != 1 or not _valid_transition(old, candidates[0]):
+        candidate = candidates[0] if len(candidates) == 1 else {}
+        source_required = candidate.get("disposition") == "waiver-resolved" or (
+            candidate.get("disposition") == "temporary-waiver"
+            and candidate.get("source_fingerprint") != old.get("source_fingerprint")
+        )
+        source_proven = not source_required or (
+            str(candidate.get("path", "")) in source_fingerprints
+        )
+        resolution_proven = candidate.get("disposition") != "waiver-resolved" or (
+            _stable_key(candidate) not in observed_findings
+        )
+        if (
+            not candidate
+            or not _valid_transition(old, candidate)
+            or not source_proven
+            or not resolution_proven
+        ):
             invalid.append("|".join(_stable_key(old)))
     if not invalid:
         return []
@@ -342,21 +403,6 @@ def _record_is_orphaned(
     )
 
 
-def _temporary_waiver_is_invalid(
-    item: dict[str, Any], source_fingerprints: dict[str, str]
-) -> bool:
-    """Recheck a selected temporary waiver even when its metric no longer triggers."""
-    path = str(item.get("path", ""))
-    if item.get("disposition") != "temporary-waiver" or path not in source_fingerprints:
-        return False
-    try:
-        active = date.fromisoformat(str(item.get("expires", ""))) >= date.today()
-    except ValueError:
-        active = False
-    exact = item.get("source_fingerprint") == f"sha256:{source_fingerprints[path]}"
-    return not active or not exact
-
-
 def _current_record_issues(
     records: list[dict[str, Any]],
     removed_paths: set[str],
@@ -382,7 +428,8 @@ def _current_record_issues(
     invalid_waivers = [
         "|".join(_stable_key(item))
         for item in live_records
-        if _temporary_waiver_is_invalid(item, source_fingerprints)
+        if item.get("disposition") == "temporary-waiver"
+        and str(item.get("path", "")) in source_fingerprints
         and _stable_key(item) not in observed_findings
     ]
     return (
@@ -405,7 +452,13 @@ def integrity_findings(
     packet = [] if mode in {"all", "explicit"} else packet_records(mode)
     prior, history_error = _prior_registry(packet, disposition_path)
     findings = _transition_findings(
-        prior, config, packet, disposition_path, history_error
+        prior,
+        config,
+        packet,
+        disposition_path,
+        history_error,
+        source_fingerprints,
+        observed_findings,
     )
     removed_paths = {
         value
@@ -448,7 +501,7 @@ def integrity_findings(
             disposition_path,
             "active-records",
             len(invalid_waivers),
-            "Temporary waivers changed or expired: "
+            "Temporary waivers changed, expired, or no longer match a finding: "
             + ", ".join(sorted(invalid_waivers)),
         ))
     return findings

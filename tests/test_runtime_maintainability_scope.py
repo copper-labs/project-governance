@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -74,6 +75,104 @@ def packet_file(root: Path, records: list[dict[str, Any]], *, mode: str = "chang
         encoding="utf-8",
     )
     return path
+
+
+def waiver_transition_case(
+    root: Path,
+    replacement: Callable[[dict[str, Any], str, str], list[dict[str, Any]]],
+    *,
+    expected: int,
+    after_content: str = "# new\n" * 502,
+    include_source: bool = True,
+) -> dict[str, Any]:
+    """Run one exact before-to-after temporary-waiver registry transition."""
+    before_content = "# old\n" * 501
+    source_before = root / "source-before.py"
+    source_after = root / "source-after.py"
+    source_before.write_text(before_content, encoding="utf-8")
+    source_after.write_text(after_content, encoding="utf-8")
+    old_fingerprint = f"sha256:{hashlib.sha256(source_before.read_bytes()).hexdigest()}"
+    new_fingerprint = f"sha256:{hashlib.sha256(source_after.read_bytes()).hexdigest()}"
+    old = decision(
+        "quality.large-file",
+        "large.py",
+        "<file>",
+        "temporary-waiver",
+        current_value=501,
+        source_fingerprint=old_fingerprint,
+        expires="2099-12-31",
+        remediation_plan=(
+            "Extract the independent responsibility after the current release boundary."
+        ),
+    )
+    current_records = replacement(old, old_fingerprint, new_fingerprint)
+    previous_registry = root / "registry-before.yaml"
+    previous_registry.write_text(json.dumps({
+        "version": 2,
+        "owner": "test-owner",
+        "dispositions": [old],
+    }), encoding="utf-8")
+    current_registry = disposition_file(root, current_records)
+    records = [
+        *([{
+            "status": "modified",
+            "path": "large.py",
+            "previous_path": None,
+            "before_path": str(source_before),
+            "after_path": str(source_after),
+            "changed_ranges": [
+                {"start": 1, "end": max(1, len(after_content.splitlines()))}
+            ],
+        }] if include_source else []),
+        {
+            "status": "modified",
+            "path": current_registry.name,
+            "previous_path": None,
+            "before_path": str(previous_registry),
+            "after_path": str(current_registry),
+            "changed_ranges": [{"start": 1, "end": 1}],
+        },
+    ]
+    packet = packet_file(root, records)
+    return run_checker(
+        root, dispositions=current_registry, packet=packet, expected=expected
+    )
+
+
+def reviewed_waiver_refresh(
+    old: dict[str, Any], old_fingerprint: str, new_fingerprint: str, **updates: Any
+) -> list[dict[str, Any]]:
+    """Return one normally valid reviewed refresh with selected overrides or omissions."""
+    record = {
+        **old,
+        "approved_on": "2026-08-20",
+        "current_value": 502,
+        "source_fingerprint": new_fingerprint,
+        "supersedes_source_fingerprint": old_fingerprint,
+    }
+    for key, value in updates.items():
+        if value is None:
+            record.pop(key, None)
+        else:
+            record[key] = value
+    return [record]
+
+
+def reviewed_waiver_resolution(
+    old: dict[str, Any], old_fingerprint: str, _new_fingerprint: str
+) -> list[dict[str, Any]]:
+    """Return one inert reviewed resolution of an exact prior waiver."""
+    record = {
+        key: value for key, value in old.items()
+        if key not in {"current_value", "source_fingerprint", "expires", "remediation_plan"}
+    }
+    record.update({
+        "disposition": "waiver-resolved",
+        "approved_on": "2026-08-20",
+        "rationale": "The oversized responsibility was split and the finding no longer exists.",
+        "supersedes_source_fingerprint": old_fingerprint,
+    })
+    return [record]
 
 
 def run_checker(
@@ -417,6 +516,248 @@ class RuntimeMaintainabilityScopeTests(unittest.TestCase):
             ])
             result = run_checker(
                 root, dispositions=current_registry, packet=packet, expected=1
+            )
+        self.assertTrue(any(
+            item["rule_id"] == "quality.disposition-transition-required"
+            for item in result["findings"]
+        ))
+
+class TemporaryWaiverAndIntegrityTests(unittest.TestCase):
+    """Prove waiver transitions and neighboring integrity rules fail closed."""
+
+    def test_registry_edit_preserves_unchanged_exact_temporary_waiver(self) -> None:
+        """Keep an exact active waiver valid without inventing transition metadata."""
+        with tempfile.TemporaryDirectory() as directory:
+            result = waiver_transition_case(
+                Path(directory),
+                lambda old, _old_fingerprint, _new_fingerprint: [dict(old)],
+                expected=0,
+                after_content="# old\n" * 501,
+            )
+        self.assertEqual(result["finding_counts"]["accepted"], 1)
+
+    def test_registry_edit_rejects_stale_temporary_waiver(self) -> None:
+        """Block changed source when the registry retains the prior exact waiver."""
+        with tempfile.TemporaryDirectory() as directory:
+            result = waiver_transition_case(
+                Path(directory),
+                lambda old, _old_fingerprint, _new_fingerprint: [dict(old)],
+                expected=1,
+            )
+        self.assertTrue(any("stale" in item["message"] for item in result["findings"]))
+
+    def test_registry_edit_allows_reviewed_temporary_waiver_refresh(self) -> None:
+        """Permit source work only when review binds the exact superseded waiver."""
+        with tempfile.TemporaryDirectory() as directory:
+            result = waiver_transition_case(
+                Path(directory),
+                reviewed_waiver_refresh,
+                expected=0,
+            )
+        self.assertEqual(result["finding_counts"]["blocking"], 0)
+        self.assertEqual(result["finding_counts"]["accepted"], 1)
+
+    def test_registry_edit_rejects_invalid_waiver_refreshes(self) -> None:
+        """Keep every reviewed refresh precondition and current-source check blocking."""
+        cases = (
+            (
+                "unbound",
+                lambda old, old_fingerprint, new_fingerprint: reviewed_waiver_refresh(
+                    old,
+                    old_fingerprint,
+                    new_fingerprint,
+                    supersedes_source_fingerprint=None,
+                ),
+                "quality.disposition-transition-required",
+                "",
+            ),
+            (
+                "wrong predecessor",
+                lambda old, old_fingerprint, new_fingerprint: reviewed_waiver_refresh(
+                    old,
+                    old_fingerprint,
+                    new_fingerprint,
+                    supersedes_source_fingerprint=f"sha256:{'0' * 64}",
+                ),
+                "quality.disposition-transition-required",
+                "",
+            ),
+            (
+                "invalid approval",
+                lambda old, old_fingerprint, new_fingerprint: reviewed_waiver_refresh(
+                    old, old_fingerprint, new_fingerprint, approved_on="not-a-date"
+                ),
+                "quality.disposition-schema",
+                "",
+            ),
+            (
+                "older approval",
+                lambda old, old_fingerprint, new_fingerprint: reviewed_waiver_refresh(
+                    old, old_fingerprint, new_fingerprint, approved_on="2026-08-14"
+                ),
+                "quality.disposition-transition-required",
+                "",
+            ),
+            (
+                "changed responsibility",
+                lambda old, old_fingerprint, new_fingerprint: reviewed_waiver_refresh(
+                    old,
+                    old_fingerprint,
+                    new_fingerprint,
+                    responsibility="Own a different source responsibility after review.",
+                ),
+                "quality.disposition-transition-required",
+                "",
+            ),
+            (
+                "wrong current source",
+                lambda old, old_fingerprint, new_fingerprint: reviewed_waiver_refresh(
+                    old,
+                    old_fingerprint,
+                    new_fingerprint,
+                    source_fingerprint=f"sha256:{'1' * 64}",
+                ),
+                "",
+                "stale",
+            ),
+            (
+                "expired",
+                lambda old, old_fingerprint, new_fingerprint: reviewed_waiver_refresh(
+                    old, old_fingerprint, new_fingerprint, expires="2000-01-01"
+                ),
+                "",
+                "expired",
+            ),
+        )
+        for name, replacement, expected_rule, expected_message in cases:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                result = waiver_transition_case(
+                    Path(directory), replacement, expected=1
+                )
+            if expected_rule:
+                self.assertTrue(any(
+                    item["rule_id"] == expected_rule for item in result["findings"]
+                ))
+            if expected_message:
+                self.assertTrue(any(
+                    expected_message in item["message"] for item in result["findings"]
+                ))
+
+    def test_registry_edit_rejects_silent_temporary_waiver_deletion(self) -> None:
+        """Keep an active waiver from disappearing without a reviewed terminal record."""
+        with tempfile.TemporaryDirectory() as directory:
+            result = waiver_transition_case(
+                Path(directory),
+                lambda _old, _old_fingerprint, _new_fingerprint: [],
+                expected=1,
+            )
+        self.assertTrue(any(
+            item["rule_id"] == "quality.disposition-transition-required"
+            for item in result["findings"]
+        ))
+
+    def test_registry_edit_rejects_ambiguous_waiver_replacements(self) -> None:
+        """Refuse to choose between two records claiming the prior responsibility."""
+        def replacements(
+            old: dict[str, Any], old_fingerprint: str, new_fingerprint: str
+        ) -> list[dict[str, Any]]:
+            refreshed = {
+                **old,
+                "approved_on": "2026-08-20",
+                "current_value": 502,
+                "source_fingerprint": new_fingerprint,
+                "supersedes_source_fingerprint": old_fingerprint,
+            }
+            competing = decision(
+                "quality.large-file",
+                "other.py",
+                "<file>",
+                "waiver-resolved",
+                supersedes_source_fingerprint=old_fingerprint,
+            )
+            return [refreshed, competing]
+
+        with tempfile.TemporaryDirectory() as directory:
+            result = waiver_transition_case(
+                Path(directory), replacements, expected=1
+            )
+        self.assertTrue(any(
+            item["rule_id"] == "quality.disposition-transition-required"
+            for item in result["findings"]
+        ))
+
+    def test_registry_edit_allows_reviewed_waiver_resolution(self) -> None:
+        """Close a remediated waiver with an inert exact predecessor record."""
+        with tempfile.TemporaryDirectory() as directory:
+            result = waiver_transition_case(
+                Path(directory),
+                reviewed_waiver_resolution,
+                expected=0,
+                after_content="value = 1\n",
+            )
+        self.assertEqual(result["findings"], [])
+
+    def test_waiver_resolution_never_authorizes_a_current_finding(self) -> None:
+        """Require a new decision if the supposedly resolved finding still exists or recurs."""
+        with tempfile.TemporaryDirectory() as directory:
+            result = waiver_transition_case(
+                Path(directory), reviewed_waiver_resolution, expected=1
+            )
+        self.assertTrue(any(
+            "does not authorize" in item["message"] for item in result["findings"]
+        ))
+
+    def test_registry_only_edit_cannot_refresh_or_resolve_waiver(self) -> None:
+        """Require immutable changed-source proof for both reviewed transitions."""
+        for name, replacement, after_content in (
+            ("refresh", reviewed_waiver_refresh, "# new\n" * 502),
+            ("resolution", reviewed_waiver_resolution, "value = 1\n"),
+        ):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                result = waiver_transition_case(
+                    Path(directory),
+                    replacement,
+                    expected=1,
+                    after_content=after_content,
+                    include_source=False,
+                )
+            self.assertTrue(any(
+                item["rule_id"] == "quality.disposition-transition-required"
+                for item in result["findings"]
+            ))
+
+    def test_superseded_fingerprint_schema_requires_exact_sha256(self) -> None:
+        """Reject transition preconditions that are not exact lowercase SHA-256 values."""
+        with tempfile.TemporaryDirectory() as directory:
+            result = waiver_transition_case(
+                Path(directory),
+                lambda old, old_fingerprint, new_fingerprint: reviewed_waiver_refresh(
+                    old,
+                    old_fingerprint,
+                    new_fingerprint,
+                    supersedes_source_fingerprint="sha256:INVALID",
+                ),
+                expected=1,
+            )
+        self.assertTrue(any(
+            item["rule_id"] == "quality.disposition-schema"
+            for item in result["findings"]
+        ))
+
+    def test_unchanged_waiver_cannot_rewrite_its_supersession_marker(self) -> None:
+        """Keep retained predecessor evidence immutable until another real refresh."""
+        def rewrite_marker(
+            old: dict[str, Any], _old_fingerprint: str, _new_fingerprint: str
+        ) -> list[dict[str, Any]]:
+            old["supersedes_source_fingerprint"] = f"sha256:{'2' * 64}"
+            return [{**old, "supersedes_source_fingerprint": f"sha256:{'3' * 64}"}]
+
+        with tempfile.TemporaryDirectory() as directory:
+            result = waiver_transition_case(
+                Path(directory),
+                rewrite_marker,
+                expected=1,
+                after_content="# old\n" * 501,
             )
         self.assertTrue(any(
             item["rule_id"] == "quality.disposition-transition-required"

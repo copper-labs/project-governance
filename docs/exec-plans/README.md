@@ -16,7 +16,8 @@ Git remains the implementation history and recovery mechanism.
 
 ## Active
 
-- No active source implementation plans.
+- [Temporary-waiver transitions](active/2026-08-20-temporary-waiver-transitions.md) adds one
+  exact reviewed refresh path and one reviewed resolution exit for source-bound waivers.
 
 ## Completed
 
