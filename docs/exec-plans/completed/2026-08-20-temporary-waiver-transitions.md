@@ -2,7 +2,7 @@
 id: exec-plan.temporary-waiver-transitions
 title: Temporary-Waiver Transitions
 type: exec-plan
-status: active
+status: completed
 owner: project-governance
 created: 2026-08-20
 updated: 2026-08-20
@@ -45,23 +45,26 @@ state store, CLI, migration, or compatibility path.
 - Contract: `docs/specs/governance-kernel.md`
 - Focused proof: `tests/test_runtime_maintainability_scope.py`
 
-## Proof Budget
+## Completed Proof
 
-1. Run the exact transition tests while implementing.
-2. Run `python3 -m unittest tests.test_runtime_maintainability_scope` once on the stable focused
-   candidate; this exercises schema validation through the checker.
-3. Inspect and validate the changed schema directly once.
-4. Because the wheel schema and shared state-machine contract change, run the complete runtime
-   suite, build one wheel, and run the clean installed-wheel verifier once before publication.
-5. Run one branch-aware affected pre-push sign-off at the publication boundary. Do not repeat broad
-   proof after a pass unless the candidate changes in a way that invalidates it.
+- All 30 focused maintainability-scope tests passed, including the required refresh, rejection,
+  deletion, ambiguity, expiry, and resolution cases.
+- The schema was directly validated with legacy, temporary-waiver, valid resolution, and forbidden
+  resolution-field cases.
+- The broad runtime run passed 233 tests and skipped one. Its sole dirty-checkout wheel precondition
+  was satisfied by the clean checkpoint, after which that exact reproducibility test passed.
+- The clean checkout built `project_governance_runtime-1.2.6.dev1+gc927fdbfe839` and the installed-
+  wheel verifier passed.
+- The affected pre-commit sign-off passed all eight selected packs after the implementation was
+  simplified into a dedicated waiver-transition helper and test class.
 
-## Acceptance
+## Migration Note
 
-- All twelve required refresh, rejection, deletion, ambiguity, expiry, and resolution cases are
-  deterministic and passing.
-- Version-1 behavior and existing relocation behavior remain unchanged.
-- The wheel remains project-neutral and the release lock names exact immutable coordinates.
+Existing version-2 records remain valid. A reviewed refresh or resolution must name the prior
+waiver's exact `source_fingerprint` in `supersedes_source_fingerprint`, preserve responsibility,
+and include the governed source and registry in the same change packet. A refresh supplies the new
+metric, fingerprint, expiry, and remediation plan. A resolution uses `waiver-resolved` and omits
+those active-waiver fields.
 
 ## Rollback
 
