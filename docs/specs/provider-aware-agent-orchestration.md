@@ -5,7 +5,7 @@ type: spec
 status: current
 owner: project-governance
 created: 2026-08-16
-updated: 2026-08-16
+updated: 2026-08-20
 summary: Native-host agent routing with compact work briefs, bounded execution, and low-overhead evaluation.
 ---
 
@@ -73,6 +73,10 @@ host identity or catalog data returns solo without machine scanning or provider 
    critical suspension.
 10. **Builds remain deterministic.** The harness runs the build subprocess; the primary interprets
     bounded results. Version 1 enables no build agent.
+11. **Native tools do not bypass governance.** A host launches only entries returned by
+    `agent-dispatch start` and closes them through `agent-dispatch finish`. Direct native spawning
+    is outside governed delegation and must be reported as such rather than silently treated as an
+    equivalent path.
 
 ## Specialist Roles
 
@@ -312,6 +316,8 @@ critical violations are result-integrity failures and do suspend.
 - Parallel writers, nested delegation, provider cascades, and specialist retries are prohibited.
 - One primary-owned repair and one deterministic recheck may follow QA. If that recheck fails, stop
   and return to the operator.
+- The recheck closes the named QA finding and directly adjacent claim only. It does not authorize a
+  fresh general QA pass, another verifier, or a repeated broad matrix.
 - A passed proof repeats only after recorded invalidation.
 
 ## Low-Overhead Telemetry
@@ -371,6 +377,7 @@ does not schedule, enforce, or repeatedly prompt for it.
 - Missing decisions and ordinary failures cannot create re-dispatch or review-prompt loops.
 - Deterministic build commands run under the harness and the primary handles bounded results.
 - Start/finish commands provide the only control and terminal-telemetry write surfaces.
+- Native-host launches that bypass start/finish are ungoverned and absent from the receipt summary.
 - Telemetry writes once per wave and reports retained delegated model counts, percentages, outcomes,
   and optional reported tokens only.
 - Disabling orchestration leaves the existing solo workflow unchanged.

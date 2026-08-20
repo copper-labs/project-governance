@@ -37,8 +37,9 @@ after the work has been framed and scoped.
 5. Make the smallest coherent edits that advance the approved final state.
 6. Keep source of truth changes in shared docs, skills, manifests, or generated policy before
    provider adapters.
-7. Run one focused owner test and one directly affected seam during implementation. Before
-   publication, run one impacted pre-commit closeout and one impacted pre-PR boundary.
+7. Run one focused owner test during implementation. Add one directly affected seam only when the
+   change crosses that seam. On the stable candidate, run one branch-aware impacted pre-push
+   sign-off; do not run a separate manual pre-commit or pre-PR gate.
 8. Repair and replay a failed focused owner. If the same check fails twice, diagnose its owner
    instead of refreshing every pack or widening the loop. Warnings do not create implementation
    scope.
@@ -47,12 +48,14 @@ after the work has been framed and scoped.
    and reject helper extraction that only relocates related code without creating a meaningful owner.
 10. Run deterministic build commands under the harness and bind build evidence to the integrated
     snapshot. Any delegated QA is a separate explicitly started assurance wave.
-11. Update evidence artifacts as part of the slice, not after memory fades.
+11. Reconcile QA with one primary-owned repair and one affected recheck. If it fails, stop instead
+    of starting another general QA, verifier, or broad-proof cycle.
+12. Update evidence artifacts as part of the slice, not after memory fades.
 
 ## Validation
 
-Use `project-governance check --pack <pack>` for focused repair. Run the impacted pre-commit and
-pre-PR boundaries once at closeout before publication.
+Use `project-governance check --pack <pack>` for focused repair. Run one branch-aware impacted
+pre-push sign-off on the stable candidate before publication.
 
 ## Evidence
 

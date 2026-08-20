@@ -280,6 +280,50 @@ class RuntimeTelemetryTests(unittest.TestCase):
             summary = status(root)
         self.assertEqual(summary["status"], "empty")
         self.assertEqual(summary["orchestration"]["delegated_entry_count"], 0)
+        self.assertEqual(summary["validation"]["retained_run_count"], 0)
+        self.assertEqual(summary["validation"]["repeated_scope_run_count"], 0)
+
+    def test_status_surfaces_repeated_scopes_and_slow_packs_without_scope_identity(self) -> None:
+        """Expose bounded efficiency observations without claiming that a repeat was invalid."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for run_id, mode, fingerprint, duration, pack_duration in (
+                ("run-1", "impacted", "sha256:private-a", 15, 10),
+                ("run-2", "impacted", "sha256:private-a", 25, 20),
+                ("run-3", "all", "sha256:private-b", 40, 30),
+            ):
+                append(root, {
+                    "event": "run-terminal",
+                    "run_id": run_id,
+                    "mode": mode,
+                    "scope_fingerprint": fingerprint,
+                    "status": "passed",
+                    "duration_ms": duration,
+                    "packs": [{
+                        "id": "tests",
+                        "status": "passed",
+                        "duration_ms": pack_duration,
+                    }],
+                })
+            summary = status(root)["validation"]
+            rendered = json.dumps(summary, sort_keys=True)
+
+        self.assertEqual(summary["retained_run_count"], 3)
+        self.assertEqual(summary["mode_counts"], {"all": 1, "impacted": 2})
+        self.assertEqual(summary["broad_run_count"], 1)
+        self.assertEqual(summary["repeated_scope_count"], 1)
+        self.assertEqual(summary["repeated_scope_run_count"], 1)
+        self.assertEqual(summary["most_repeated_scope_run_count"], 2)
+        self.assertEqual(summary["total_duration_ms"], 80)
+        self.assertEqual(summary["slowest_packs"], [{
+            "id": "tests",
+            "run_count": 3,
+            "total_duration_ms": 60,
+            "max_duration_ms": 30,
+        }])
+        self.assertNotIn("private-a", rendered)
+        self.assertIn("not proof", summary["interpretation"])
+        self.assertIn("direct commands outside the runtime", summary["excludes"])
 
     def test_orchestration_values_cannot_retain_host_free_text(self) -> None:
         """Clamp outcome and proof fields to bounded enums instead of content-bearing strings."""

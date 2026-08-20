@@ -5,7 +5,7 @@ type: governance
 status: current
 owner: project-governance
 created: 2026-07-05
-updated: 2026-08-16
+updated: 2026-08-20
 summary: Defines focused, impact-aware validation for the package runtime and its adopters.
 ---
 
@@ -18,7 +18,7 @@ because they exist.
 
 1. Change one owning component.
 2. Run its focused unit or behavior test.
-3. Run the one affected integration seam.
+3. Run one directly affected integration seam only when the change crosses that seam.
 4. Commit the coherent result.
 
 For a failed governance check, rerun only the failed pack:
@@ -27,11 +27,21 @@ For a failed governance check, rerun only the failed pack:
 project-governance check --pack <pack-id>
 ```
 
-After it passes, run one closeout:
+After it passes, freeze the candidate and run one branch-aware local sign-off:
 
 ```sh
-project-governance check --stage pre-commit --mode impacted
+project-governance check --stage pre-push --mode impacted
 ```
+
+Pre-commit remains the staged changed-file hook; it is not a second completion boundary. Do not run
+a separate local pre-PR gate after the branch-aware pre-push sign-off. CI may run its own affected
+gate as an independent environment and trust boundary.
+
+Freeze one candidate before a broad or cross-platform proof. An independent QA pass consumes that
+candidate and its existing proof; it does not replay the matrix. It adds one focused check only for
+a named changed seam with no evidence. One QA repair permits one affected deterministic recheck. If
+that recheck fails, return to focused diagnosis or the operator instead of starting another general
+QA, verifier, or broad-proof cycle.
 
 ## Selection Rules
 
@@ -98,4 +108,11 @@ Report the focused test, affected seam, selected packs, any intentionally omitte
 residual risk. The JSON result contains normalized findings, status, execution duration, and
 termination reason. Bounded local telemetry adds changed-path, selected-pack, executed-command,
 and per-pack duration/count aggregates without retaining paths, commands, output, prompts, or
-source content.
+source content. `project-governance telemetry status` summarizes retained repeated scopes, broad
+runs, and slow packs as advisory observations. It does not prove a repeat was unnecessary because
+subject changes and invalidation reasons are not retained. It also excludes direct commands and
+native-host launches outside the runtime, so missing telemetry is never evidence that no work ran.
+
+Run deterministic builds through a target pack or the governed harness when one exists. If a
+necessary command has no governed execution surface, report that coverage gap with the evidence
+instead of silently treating runtime telemetry as complete.

@@ -37,8 +37,9 @@ fixtures, or release readiness.
 
 ## Validation
 
-Run impacted unit, integration, smoke, or release checks from the target profile. If no test maps to
-the change, report the gap.
+Consume the stable candidate's existing affected sign-off evidence. Run one focused unit,
+integration, or smoke check only for a named changed seam with no evidence. If no test maps to the
+change, report the gap; release checks remain at the release boundary.
 
 ## Evidence
 

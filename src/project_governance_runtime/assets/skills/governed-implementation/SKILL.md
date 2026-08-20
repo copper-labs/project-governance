@@ -33,8 +33,9 @@ repository generated from this template.
 6. Make narrowly scoped edits using repository conventions and the selected role boundaries.
 7. Add file and type comments that explain responsibility and reader context in simple language;
    keep method comments concise while preserving the same reader-first purpose.
-8. During implementation, run one focused owner test and one directly affected seam. Before
-   publication, run one impacted pre-commit closeout and one impacted pre-PR boundary.
+8. During implementation, run one focused owner test. Add one directly affected seam only when the
+   change crosses that seam. On the stable candidate, run one branch-aware impacted pre-push
+   sign-off; do not run a separate manual pre-commit or pre-PR gate.
 9. If a check fails, repair and replay that focused owner. After a second failure of the same
    check, diagnose whether the owner is a product defect, evidence gap, or governance defect; do
    not refresh every pack or widen the diagnosis loop.
@@ -46,17 +47,19 @@ repository generated from this template.
 12. Use independent QA or a second model only when selected risk or the operator requests it. Bound
     review to changed files, the active plan, the owning contract, and at most five directly
     relevant supporting files or 20 minutes. Expand context only for a named uncertainty and return
-    at most five actionable findings by default.
+    at most five actionable findings by default. Reconcile those findings with one primary-owned
+    repair and one affected recheck; do not start a fresh general review after each repair.
 13. Keep deep threshold remediation to the highest-risk three classes or 30 minutes, helpful
     adjacent comment cleanup to five comments or 20 minutes, and unrelated cleanup at zero unless
     explicitly added.
-14. If the clean integration snapshot advances, rerun only proof invalidated by that change.
+14. If the clean integration snapshot advances, rerun only proof invalidated by that change. A
+    snapshot advance alone does not authorize a broad matrix; name the invalidated claim first.
 15. Reconcile docs, traceability, observability proof or gap rationale, and closeout evidence
     before handoff.
 
 ## Validation
 
-Run one impacted pre-commit closeout and one impacted pre-PR boundary before publication or
+Run one branch-aware impacted pre-push sign-off on the stable candidate before publication or
 handoff. Use explicit `--pack` execution for focused diagnosis and repair.
 
 ## Evidence

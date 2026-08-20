@@ -20,6 +20,10 @@ Git remains the implementation history and recovery mechanism.
 
 ## Completed
 
+- [Single affected sign-off](completed/2026-08-20-single-affected-signoff.md) made one branch-aware
+  impacted pre-push pass the local completion boundary and made QA evidence-consuming by default.
+- [Execution efficiency controls](completed/2026-08-20-execution-efficiency.md) closed the gap
+  between narrow-proof policy, native-host delegation, and telemetry needed to spot repeated work.
 - [Provider-aware agent orchestration](completed/2026-08-16-provider-aware-agent-orchestration.md)
   completed Codex/Claude native-host routing, compact work briefs, one-wave authorization, and
   terminal-only model-mix telemetry.
