@@ -128,8 +128,16 @@ testability. It does not require extraction when the source unit remains cohesiv
 
 A durable `cohesion-accepted` decision is keyed by finding, normalized repository path, and
 qualified symbol, so comments, formatting, and modest cohesive growth do not reopen it. A temporary
-waiver remains bound to exact bytes, current metric, expiry, and remediation plan. A version-1
-decision never authorizes a pass and produces one grouped migration obligation.
+waiver remains bound to exact bytes, current metric, expiry, and remediation plan. When necessary
+work changes waived source without resolving the finding, an explicit reviewed replacement may
+bind the new exact bytes and metric only by naming the superseded fingerprint and including the
+governed source in the immutable change packet. Completed
+remediation exits through an inert reviewed `waiver-resolved` record that names the same exact
+waiver fingerprint and never authorizes a future finding. Both transitions preserve responsibility
+and carry a named reviewer, valid non-older approval date, and rationale. Unbound refresh, silent
+deletion, ambiguous replacement, expiry, stale evidence, and unreviewed weakening remain blocking.
+A selected source with no remaining matching finding must take the reviewed resolution exit. A
+version-1 decision never authorizes a pass and produces one grouped migration obligation.
 
 Comment checks are a changed-code ratchet. New files are fully governed. In an existing file, only
 a new declaration or a declaration whose header or public signature intersects the packet's exact

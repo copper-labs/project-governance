@@ -27,7 +27,7 @@
           },
           "path": {"type": "string", "minLength": 1},
           "symbol": {"type": "string", "minLength": 1},
-          "disposition": {"enum": ["refactor-required", "cohesion-accepted", "temporary-waiver"]},
+          "disposition": {"enum": ["refactor-required", "cohesion-accepted", "temporary-waiver", "waiver-resolved"]},
           "owner": {"type": "string", "minLength": 1},
           "reviewer": {"type": "string", "minLength": 1},
           "approved_on": {"type": "string", "format": "date"},
@@ -35,6 +35,7 @@
           "rationale": {"type": "string", "minLength": 20},
           "current_value": {"type": "integer", "minimum": 1},
           "source_fingerprint": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+          "supersedes_source_fingerprint": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
           "expires": {"type": "string", "format": "date"},
           "remediation_plan": {"type": "string", "minLength": 40}
         },
@@ -49,6 +50,7 @@
                 "anyOf": [
                   {"required": ["current_value"]},
                   {"required": ["source_fingerprint"]},
+                  {"required": ["supersedes_source_fingerprint"]},
                   {"required": ["expires"]},
                   {"required": ["remediation_plan"]}
                 ]
@@ -70,6 +72,24 @@
               "required": ["disposition"]
             },
             "then": {
+              "not": {
+                "anyOf": [
+                  {"required": ["current_value"]},
+                  {"required": ["source_fingerprint"]},
+                  {"required": ["supersedes_source_fingerprint"]},
+                  {"required": ["expires"]},
+                  {"required": ["remediation_plan"]}
+                ]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {"disposition": {"const": "waiver-resolved"}},
+              "required": ["disposition"]
+            },
+            "then": {
+              "required": ["supersedes_source_fingerprint"],
               "not": {
                 "anyOf": [
                   {"required": ["current_value"]},

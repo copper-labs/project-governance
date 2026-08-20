@@ -20,6 +20,8 @@ Git remains the implementation history and recovery mechanism.
 
 ## Completed
 
+- [Temporary-waiver transitions](completed/2026-08-20-temporary-waiver-transitions.md) added one
+  exact reviewed refresh path and one inert reviewed resolution exit for source-bound waivers.
 - [Single affected sign-off](completed/2026-08-20-single-affected-signoff.md) made one branch-aware
   impacted pre-push pass the local completion boundary and made QA evidence-consuming by default.
 - [Execution efficiency controls](completed/2026-08-20-execution-efficiency.md) closed the gap
