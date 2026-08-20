@@ -33,8 +33,9 @@ repository generated from this template.
 6. Make narrowly scoped edits using repository conventions and the selected role boundaries.
 7. Add file and type comments that explain responsibility and reader context in simple language;
    keep method comments concise while preserving the same reader-first purpose.
-8. During implementation, run one focused owner test and one directly affected seam. Before
-   publication, run one impacted pre-commit closeout and one impacted pre-PR boundary.
+8. During implementation, run one focused owner test. Add one directly affected seam only when the
+   change crosses that seam. On the stable candidate, run one branch-aware impacted pre-push
+   sign-off; do not run a separate manual pre-commit or pre-PR gate.
 9. If a check fails, repair and replay that focused owner. After a second failure of the same
    check, diagnose whether the owner is a product defect, evidence gap, or governance defect; do
    not refresh every pack or widen the diagnosis loop.
@@ -58,7 +59,7 @@ repository generated from this template.
 
 ## Validation
 
-Run one impacted pre-commit closeout and one impacted pre-PR boundary before publication or
+Run one branch-aware impacted pre-push sign-off on the stable candidate before publication or
 handoff. Use explicit `--pack` execution for focused diagnosis and repair.
 
 ## Evidence

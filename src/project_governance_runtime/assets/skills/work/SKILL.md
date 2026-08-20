@@ -37,8 +37,9 @@ after the work has been framed and scoped.
 5. Make the smallest coherent edits that advance the approved final state.
 6. Keep source of truth changes in shared docs, skills, manifests, or generated policy before
    provider adapters.
-7. Run one focused owner test and one directly affected seam during implementation. Before
-   publication, run one impacted pre-commit closeout and one impacted pre-PR boundary.
+7. Run one focused owner test during implementation. Add one directly affected seam only when the
+   change crosses that seam. On the stable candidate, run one branch-aware impacted pre-push
+   sign-off; do not run a separate manual pre-commit or pre-PR gate.
 8. Repair and replay a failed focused owner. If the same check fails twice, diagnose its owner
    instead of refreshing every pack or widening the loop. Warnings do not create implementation
    scope.
@@ -53,8 +54,8 @@ after the work has been framed and scoped.
 
 ## Validation
 
-Use `project-governance check --pack <pack>` for focused repair. Run the impacted pre-commit and
-pre-PR boundaries once at closeout before publication.
+Use `project-governance check --pack <pack>` for focused repair. Run one branch-aware impacted
+pre-push sign-off on the stable candidate before publication.
 
 ## Evidence
 

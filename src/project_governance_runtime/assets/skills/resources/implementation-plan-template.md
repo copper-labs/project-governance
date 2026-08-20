@@ -40,8 +40,9 @@ summary: <One-sentence final state.>
 
 ## Stable-Candidate Proof
 
-<Run once on the frozen candidate: one impacted pre-commit boundary, one impacted pre-PR boundary,
-and any risk-selected proof. QA consumes this evidence instead of replaying it.>
+<Run once on the frozen candidate: focused owner proof, one directly affected seam only when the
+change crosses it, and one branch-aware impacted pre-push sign-off. QA consumes this evidence
+instead of replaying it.>
 
 ## Rollback
 

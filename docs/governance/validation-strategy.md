@@ -18,7 +18,7 @@ because they exist.
 
 1. Change one owning component.
 2. Run its focused unit or behavior test.
-3. Run the one affected integration seam.
+3. Run one directly affected integration seam only when the change crosses that seam.
 4. Commit the coherent result.
 
 For a failed governance check, rerun only the failed pack:
@@ -27,16 +27,21 @@ For a failed governance check, rerun only the failed pack:
 project-governance check --pack <pack-id>
 ```
 
-After it passes, run one closeout:
+After it passes, freeze the candidate and run one branch-aware local sign-off:
 
 ```sh
-project-governance check --stage pre-commit --mode impacted
+project-governance check --stage pre-push --mode impacted
 ```
 
+Pre-commit remains the staged changed-file hook; it is not a second completion boundary. Do not run
+a separate local pre-PR gate after the branch-aware pre-push sign-off. CI may run its own affected
+gate as an independent environment and trust boundary.
+
 Freeze one candidate before a broad or cross-platform proof. An independent QA pass consumes that
-candidate and its existing proof; it does not replay the matrix. One QA repair permits one affected
-deterministic recheck. If that recheck fails, return to focused diagnosis or the operator instead of
-starting another general QA, verifier, or broad-proof cycle.
+candidate and its existing proof; it does not replay the matrix. It adds one focused check only for
+a named changed seam with no evidence. One QA repair permits one affected deterministic recheck. If
+that recheck fails, return to focused diagnosis or the operator instead of starting another general
+QA, verifier, or broad-proof cycle.
 
 ## Selection Rules
 

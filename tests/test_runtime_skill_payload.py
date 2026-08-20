@@ -91,8 +91,8 @@ class RuntimeSkillPayloadTests(unittest.TestCase):
         for required in (
             "one focused owner test",
             "one directly affected seam",
-            "one impacted pre-commit closeout",
-            "one impacted pre-pr boundary",
+            "one branch-aware impacted pre-push sign-off",
+            "do not run a separate manual pre-commit or pre-pr gate",
             "one primary-owned",
             "one affected recheck",
             "do not start a fresh general review",
@@ -100,6 +100,21 @@ class RuntimeSkillPayloadTests(unittest.TestCase):
             "warnings",
         ):
             self.assertIn(required, governed)
+
+        qa_review = (SKILLS_SOURCE / "qa-review" / "SKILL.md").read_text(
+            encoding="utf-8"
+        ).lower()
+        self.assertIn("consume the stable candidate's existing affected sign-off", qa_review)
+        self.assertIn("named changed seam with no evidence", qa_review)
+        self.assertNotIn(
+            "run impacted unit, integration, smoke, or release checks", qa_review
+        )
+
+        plan_template = (
+            SKILLS_SOURCE / "resources" / "implementation-plan-template.md"
+        ).read_text(encoding="utf-8").lower()
+        self.assertIn("one branch-aware impacted pre-push sign-off", plan_template)
+        self.assertNotIn("one impacted pre-commit boundary", plan_template)
 
         for review_skill in (
             skill_text["implementation-quality-review"],
