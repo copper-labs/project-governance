@@ -171,6 +171,10 @@ class RuntimeDocumentationSystemTests(unittest.TestCase):
             self.assertEqual(preview["status"], "failed")
             self.assertEqual(applied["status"], "failed")
             self.assertEqual(preview["conflicts"], ["docs/developer"])
+            self.assertEqual(preview["created"], [])
+            self.assertEqual(preview["updated"], [])
+            self.assertEqual(applied["created"], [])
+            self.assertEqual(applied["updated"], [])
 
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

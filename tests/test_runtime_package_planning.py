@@ -172,7 +172,12 @@ class RuntimePlanningTests(unittest.TestCase):
                                 "title": "Runtime",
                                 "reference": "knowledge/developer/reference.md",
                                 "sources": ["src/runtime.py"],
-                            }
+                            },
+                            {
+                                "id": "unsafe",
+                                "title": "Unsafe",
+                                "reference": "../../outside.md",
+                            },
                         ],
                     }
                 ),

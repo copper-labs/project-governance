@@ -254,7 +254,7 @@ def initialize_documentation(root: Path, *, dry_run: bool = False) -> dict[str, 
         unchanged.insert(0, PROFILE_PATH.as_posix())
 
     updated = [PROFILE_PATH.as_posix()] if profile_updated else []
-    if conflicts and not dry_run:
+    if conflicts:
         created = []
         updated = []
     status = "failed" if conflicts else ("dry-run" if dry_run else "initialized")
@@ -347,10 +347,8 @@ def _normalize_capability(
     return normalized
 
 
-def load_catalog(
-    root: Path, config: dict[str, Any], *, validate_paths: bool = True
-) -> list[dict[str, Any]]:
-    """Load structurally valid capability records and their contained local paths."""
+def _raw_catalog(root: Path, config: dict[str, Any]) -> tuple[str, list[Any]]:
+    """Load the catalog envelope before applying record-level validation policy."""
     root = root.resolve()
     path = _catalog_path(root, config)
     if not path.is_file():
@@ -364,6 +362,15 @@ def load_catalog(
             f"{path.relative_to(root).as_posix()}: capabilities must be a list"
         )
     catalog_label = path.relative_to(root).as_posix()
+    return catalog_label, capabilities
+
+
+def load_catalog(
+    root: Path, config: dict[str, Any], *, validate_paths: bool = True
+) -> list[dict[str, Any]]:
+    """Load structurally valid capability records and their contained local paths."""
+    root = root.resolve()
+    catalog_label, capabilities = _raw_catalog(root, config)
     return [
         _normalize_capability(
             root,
@@ -384,10 +391,19 @@ def documentation_selection_paths(root: Path) -> list[str]:
         if config is None or not config["enabled"]:
             return sorted(paths)
         paths.add(f"{config['root']}/**")
-        for record in load_catalog(root, config, validate_paths=False):
-            paths.update(
-                [record["reference"], *record["guides"], *record["sources"]]
-            )
+        catalog_label, capabilities = _raw_catalog(root, config)
+        for index, value in enumerate(capabilities):
+            try:
+                record = _normalize_capability(
+                    root,
+                    value,
+                    index=index,
+                    catalog_label=catalog_label,
+                    validate_paths=False,
+                )
+            except DocumentationError:
+                continue
+            paths.update([record["reference"], *record["guides"], *record["sources"]])
     except (DocumentationError, OSError, UnicodeError):
         pass
     return sorted(paths)
