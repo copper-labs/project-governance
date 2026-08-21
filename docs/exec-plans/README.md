@@ -16,7 +16,9 @@ Git remains the implementation history and recovery mechanism.
 
 ## Active
 
-- No active source implementation plans.
+- [Reader-first authoring and on-demand developer documentation](active/2026-08-21-on-demand-developer-documentation.md)
+  delivers an installable human and agent documentation system, current-research handoff, and the
+  first proof by documenting this project.
 
 ## Completed
 
