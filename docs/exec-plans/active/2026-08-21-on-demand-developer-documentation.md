@@ -171,8 +171,23 @@ candidate, published as `1.3.0`, and read back from the immutable release.
   - Claude has no open verified critical, high, or medium finding after reconciliation.
   - Source readiness passes on the candidate merge result before integration.
   - Tag target, lock source commit, lock/wheel versions, and wheel SHA agree after publication.
-- Proof state: implementation and both semantic pilots passed locally on 2026-08-21; Opus review,
-  final certification, source readiness, and publication remain open
+- Proof state: implementation, both semantic pilots, and Opus review reconciliation passed locally
+  on 2026-08-21; final certification, source readiness, and publication remain open
+
+## Independent Review Reconciliation
+
+Claude Opus 5 reviewed the frozen implementation at high effort with fallback disabled, read-only
+plan permissions, and wrapper audit proof of no repository writes. The first pass identified unsafe
+profile-first activation, incomplete root preflight, selection gaps, inert research policy,
+catalog-containment and route-degradation defects, telemetry-schema gaps, and documentation claims
+that did not match the candidate. Reconciliation commits `10a4932`, `70e9e7b`, `d73a793`, and
+`17beac8` repaired or clarified those findings and added distinguishing regression proof.
+
+Focused Opus rechecks confirmed the repaired behavior. The last recheck found no critical or high
+finding; its final medium observation was a missing distinguishing assertion for partial-conflict
+dry-run behavior. Commit `17beac8` added that exact assertion. No verified critical, high, or medium
+finding remains open. The review did not add a new runtime subsystem or restore any item removed by
+the simplification pass.
 
 ## Simplification Record
 
