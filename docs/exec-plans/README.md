@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-02-16
-updated: 2026-08-16
+updated: 2026-08-21
 summary: Active and completed execution plans for the current source repository.
 ---
 
@@ -16,7 +16,8 @@ Git remains the implementation history and recovery mechanism.
 
 ## Active
 
-- No active source implementation plans.
+- [Release candidate efficiency](active/2026-08-20-release-candidate-efficiency.md) moves complete
+  release proof before integration and keeps repair loops on one stable publication candidate.
 
 ## Completed
 

@@ -28,6 +28,7 @@ FORBIDDEN_TEXT = (
     "generated runtime",
     "organizational application runtime",
     "knowledge graph runtime dependency",
+    "central-observability-lens.md",
     "telemetry lifecycle",
     "receipt invalidator",
     "duplicated proof cache",
@@ -124,6 +125,35 @@ class RuntimeSkillPayloadTests(unittest.TestCase):
             self.assertIn("cohesive narrow unit may be accepted", review_skill)
             self.assertIn("helper extraction", review_skill)
             self.assertIn("meaningful owner", review_skill)
+
+    def test_materialized_release_skill_defines_one_candidate_cycle(self) -> None:
+        """Keep installed release review candidate-bound and free of retired profiles."""
+        from project_governance_runtime.installation import materialize_skills
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            materialize_skills(root)
+            release_review = (
+                root
+                / ".governance/runtime/skills/release-readiness-review/SKILL.md"
+            ).read_text(encoding="utf-8").lower()
+        for required in (
+            "one exact publication candidate",
+            "same candidate branch",
+            "complete declared release proof once",
+            "before merge or tag",
+            "new candidate",
+            "publication readback",
+            "smoke or post-deploy evidence",
+        ):
+            self.assertIn(required, release_review)
+        for retired in (
+            "ci.release_profiles",
+            "ci.smoke_checks",
+            "configured release profile",
+            "dry-run equivalent",
+        ):
+            self.assertNotIn(retired, release_review)
 
 
 if __name__ == "__main__":
