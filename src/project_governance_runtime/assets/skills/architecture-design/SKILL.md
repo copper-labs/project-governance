@@ -19,7 +19,6 @@ introducing a new subsystem, or converting an approved idea into an implementati
 - `AGENTS.md`
 - `docs/index.md`
 - `docs/architecture/`
-- `docs/architecture/reference-architectures/central-observability-lens.md`
 - `docs/governance/code-quality-policy.md`
 - `docs/governance/validation-strategy.md`
 - repository profile `products`
@@ -31,7 +30,8 @@ introducing a new subsystem, or converting an approved idea into an implementati
 1. State the problem, owner, affected products, and non-goals.
 2. Locate existing patterns that solve similar problems.
 3. Propose the smallest architecture change that fits existing boundaries.
-4. Define ownership, module boundaries, data flow, public surface, central observability hooks, and validation packs.
+4. Define ownership, module boundaries, data flow, public surface, target observability hooks when
+   applicable, and validation packs.
 5. Call out alternatives rejected and why.
 6. Update or create the governed architecture artifact before implementation begins.
 

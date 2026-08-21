@@ -2,14 +2,14 @@ name: Governance Runtime Release Proof
 
 on:
   pull_request:
-  push:
-    branches: [main]
+    types: [opened, reopened, ready_for_review]
 
 permissions:
   contents: read
 
 jobs:
   source-readiness:
+    if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4

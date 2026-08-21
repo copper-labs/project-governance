@@ -5,7 +5,7 @@ type: governance
 status: current
 owner: project-governance
 created: 2026-07-05
-updated: 2026-08-20
+updated: 2026-08-21
 summary: Defines focused, impact-aware validation for the package runtime and its adopters.
 ---
 
@@ -42,6 +42,29 @@ candidate and its existing proof; it does not replay the matrix. It adds one foc
 a named changed seam with no evidence. One QA repair permits one affected deterministic recheck. If
 that recheck fails, return to focused diagnosis or the operator instead of starting another general
 QA, verifier, or broad-proof cycle.
+
+## Publication Candidate
+
+A publication candidate is one exact integration snapshot whose content is intended for release.
+For a pull request, that snapshot is the proposed merge result: candidate content plus its current
+integration base, not the branch head alone. An adopting repository applies this boundary to every
+release kind it supports; `candidate` does not mean that the version must contain an `rc` suffix.
+This runtime's own public releases retain the exact stable semantic versions defined by the
+[release process](release-process.md).
+
+The stable review candidate above becomes the publication candidate when release certification
+begins. The one-recheck limit bounds an independent QA wave; it does not prevent focused release
+repair on the candidate line.
+
+The candidate boundary is operator-held, not runtime state. From candidate certification through
+publication, keep the pinned governance runtime, required release checks, toolchain, and baselines
+fixed. If one must change, form a new candidate. A freeze does not extend a waiver, dependency
+freshness record, or other time-bound policy evidence beyond its real expiry.
+
+Keep repairs on the candidate branch or equivalent integration line. During repair, replay the
+failed owner and directly affected seam only. When the replacement candidate is stable, run the
+complete declared release proof once before merge or tag. Integration must preserve the certified
+content and base. If either changes, the integrated snapshot is a new candidate.
 
 ## Selection Rules
 

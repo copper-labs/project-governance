@@ -10,6 +10,8 @@ import unittest
 import zipfile
 from pathlib import Path
 
+import yaml
+
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
@@ -86,6 +88,24 @@ class RuntimeReleaseVersioningTests(unittest.TestCase):
         self.assertEqual(lock["wheel"], wheel.name)
         self.assertEqual(lock["configuration_schema"], 2)
         self.assertEqual(len(lock["required_target_migrations"]), 3)
+
+    def test_source_readiness_runs_once_at_candidate_boundaries(self) -> None:
+        """Avoid complete release proof on every repair push and again after merge."""
+        workflow = yaml.load(
+            (ROOT / ".github/workflows/source-readiness.yml").read_text(encoding="utf-8"),
+            Loader=yaml.BaseLoader,
+        )
+        triggers = workflow["on"]
+        self.assertEqual(set(triggers), {"pull_request"})
+        self.assertEqual(
+            triggers["pull_request"]["types"],
+            ["opened", "reopened", "ready_for_review"],
+        )
+        self.assertNotIn("push", triggers)
+        self.assertEqual(
+            workflow["jobs"]["source-readiness"]["if"],
+            "github.event.pull_request.draft == false",
+        )
 
 
 if __name__ == "__main__":

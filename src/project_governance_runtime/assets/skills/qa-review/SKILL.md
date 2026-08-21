@@ -17,7 +17,6 @@ fixtures, or release readiness.
 ## Required Reads
 
 - `docs/governance/validation-strategy.md`
-- `docs/architecture/reference-architectures/central-observability-lens.md`
 - `.governance/runtime/skills/review-finding.schema.yaml`
 - `.governance/runtime/skills/resources/execution-roles.yaml`
 - repository profile `validation.packs`

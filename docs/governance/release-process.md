@@ -5,7 +5,7 @@ type: governance
 status: current
 owner: project-governance
 created: 2026-08-15
-updated: 2026-08-15
+updated: 2026-08-21
 summary: Defines semantic release identity and the automated immutable wheel publication boundary.
 ---
 
@@ -24,12 +24,23 @@ such as `1.1.2.dev3+gabcdef123456`. They are CI or local artifacts, not GitHub r
 
 ## Publication
 
-1. Merge the validated release change to `main`.
-2. Create one exact semantic tag on that merge commit, such as `1.1.0`.
-3. Push the tag. The release workflow runs the complete runtime tests, builds one wheel, creates its
-   exact adopter lock, and verifies the installed wheel.
-4. Only after every proof passes does the workflow publish the GitHub release, wheel, generated
-   release notes, and `runtime.lock.yaml`.
+1. Select one exact publication candidate and keep repairs on its branch until it is stable.
+2. Keep the pinned governance runtime, required release checks, toolchain, and baselines fixed for
+   that candidate. If one changes, form and certify a new candidate.
+3. Before merge or tag, run the source-readiness workflow on the candidate's proposed merge result.
+   Opening or reopening a ready pull request, or marking a draft ready, starts it; a repair push does
+   not automatically replay it. The workflow runs the complete runtime tests, builds the wheel, and
+   verifies the installed-wheel boundary. After a failure, return the pull request to draft, repair
+   the failed owner and directly affected seam, then mark the stable replacement candidate ready to
+   run source readiness once.
+4. Merge the certified content and integration base to `main`. If the base advances or integration
+   changes the certified result, form and certify a new candidate before proceeding.
+5. Create and push one exact semantic tag on the certified merge commit, such as `1.1.0`.
+6. The tag workflow verifies the immutable tagged source at the independent publication trust
+   boundary, builds the final versioned wheel and exact adopter lock, and verifies the installed
+   wheel. Only then does it publish the GitHub release, wheel, generated release notes, and
+   `runtime.lock.yaml`.
+7. Confirm the published tag, wheel, lock, hashes, and release page as publication readback.
 
 The runtime lock version equals the GitHub tag so `project-governance update --to <version>` resolves
 one unambiguous release directory. Existing hash-named releases remain historical; new releases do
