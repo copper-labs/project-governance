@@ -2,7 +2,7 @@
 id: exec-plan.on-demand-developer-documentation
 title: Reader-First Authoring And On-Demand Developer Documentation
 type: exec-plan
-status: active
+status: completed
 owner: project-governance
 created: 2026-08-21
 updated: 2026-08-21
@@ -171,8 +171,8 @@ candidate, published as `1.3.0`, and read back from the immutable release.
   - Claude has no open verified critical, high, or medium finding after reconciliation.
   - Source readiness passes on the candidate merge result before integration.
   - Tag target, lock source commit, lock/wheel versions, and wheel SHA agree after publication.
-- Proof state: implementation, both semantic pilots, and Opus review reconciliation passed locally
-  on 2026-08-21; final certification, source readiness, and publication remain open
+- Proof state: completed on 2026-08-21; local certification, source readiness, immutable `1.3.0`
+  publication, and downloaded-asset readback all passed
 
 ## Independent Review Reconciliation
 
@@ -199,6 +199,25 @@ freshness enforcement, example-proof subsystem, migration machinery, and broad c
 The surviving V1 is deliberately small: one installed skill and field guide, one profile extension,
 one index, one catalog, one exact route command, one existing validation pack, and one bounded
 telemetry event family.
+
+## Publication Closeout
+
+- Frozen candidate: `5b3a6b908420c9a4603df9b20eed7222dcbd90aa`
+- Local certification: 253 runtime tests passed with one intentional skip; fresh development wheel
+  and installed-wheel proof passed; impacted pre-push selected nine affected packs against
+  `canonical/main@178b5909bf53814b92a6704b6a6d3437febb2b49` with zero findings
+- Proposed-merge certification: [PR 6](https://github.com/copper-labs/project-governance/pull/6)
+  passed the source-readiness workflow before merge
+- Immutable release commit and tag: `1.3.0` at
+  `e1bddde3b370cc48ec4060f00a581e712624c850`
+- Publication workflow: [run 32507221439](https://github.com/copper-labs/project-governance/actions/runs/32507221439)
+  passed its tests, stable wheel build, lock generation, installed-wheel proof, and release creation
+- Published release: [Project Governance 1.3.0](https://github.com/copper-labs/project-governance/releases/tag/1.3.0)
+- Downloaded wheel: `project_governance_runtime-1.3.0-py3-none-any.whl`
+- Downloaded wheel SHA256: `b0847e593a78d9aad6b8f3aa189e714c455aa762c486b4a4cf111f43cfe9da28`
+- Downloaded lock: version `1.3.0`, source commit `e1bddde3b370cc48ec4060f00a581e712624c850`,
+  and the same wheel name and SHA256
+- Independent readback: downloaded release assets passed `tools/verify-runtime-wheel.py`
 
 ## Stable-Candidate Proof
 
