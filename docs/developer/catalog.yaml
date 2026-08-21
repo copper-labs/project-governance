@@ -1,0 +1,30 @@
+version: 1
+capabilities:
+  - id: first-governed-check
+    title: Install the runtime and run the first affected check
+    aliases: [runtime-first-check]
+    tasks:
+      - understand the runtime and adopter responsibility boundary
+      - install governance and run a first check
+      - diagnose an unavailable installed runtime
+    symbols: [project-governance init, project-governance check]
+    reference: docs/architecture/governance-runtime.md
+    guides: [docs/developer/guides/first-governed-check.md]
+    sources:
+      - src/project_governance_runtime/installation.py
+      - src/project_governance_runtime/planning.py
+      - src/project_governance_runtime/runner.py
+  - id: change-runtime
+    title: Make and prove a focused runtime change
+    aliases: [runtime-source-change]
+    tasks:
+      - locate the source owner for a runtime behavior
+      - run focused source proof and the directly affected seam
+      - finish a source change with one impacted sign-off
+    symbols: [tools/run-source-governance.sh]
+    reference: docs/governance/validation-strategy.md
+    guides: [docs/developer/guides/change-the-runtime.md]
+    sources:
+      - AGENTS.md
+      - src/project_governance_runtime/cli.py
+      - tools/run-source-governance.sh

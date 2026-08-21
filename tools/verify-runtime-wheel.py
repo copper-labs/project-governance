@@ -186,6 +186,7 @@ def initialize_target(root: Path, wheel: Path) -> tuple[Path, Path]:
     )
     for relative in (
         ".governance/runtime/skills/catalog.yaml",
+        ".governance/runtime/skills/resources/reader-first-authoring.md",
         ".governance/runtime/skills/stack-packs/kmp/advanced-bridge/manifest.yaml",
     ):
         if not (root / relative).is_file():
@@ -334,6 +335,80 @@ def verify_agent_orchestration(root: Path, command: Path) -> None:
             raise RuntimeError(f"{provider} synthetic dispatch did not complete")
 
 
+def verify_documentation_system(root: Path, command: Path) -> None:
+    """Prove installed init, exact routes, validation, and content-free local telemetry."""
+    preview = json.loads(
+        run([str(command), "docs", "init", "--dry-run"], root=root, expected=0).stdout
+    )
+    if preview.get("status") != "dry-run" or (root / "docs/developer").exists():
+        raise RuntimeError("documentation dry-run mutated the clean adopter")
+    initialized = json.loads(
+        run([str(command), "docs", "init"], root=root, expected=0).stdout
+    )
+    if initialized.get("status") != "initialized":
+        raise RuntimeError("documentation initialization did not report initialized")
+
+    profile_path = root / "config/governance/profile.yaml"
+    profile_text = profile_path.read_text(encoding="utf-8")
+    profile_path.write_text(
+        profile_text.replace("research: allowed", "research: disabled"),
+        encoding="utf-8",
+    )
+    catalog_path = root / "docs/developer/catalog.yaml"
+    catalog_path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "capabilities": [
+                    {
+                        "id": "installed-runtime",
+                        "title": "Installed Runtime",
+                        "reference": "docs/developer/index.md",
+                        "aliases": ["governed-check"],
+                        "symbols": ["project-governance"],
+                        "sources": ["config/governance/profile.yaml"],
+                    }
+                ],
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    for flag, query in (
+        ("--capability", "installed-runtime"),
+        ("--capability", "governed-check"),
+        ("--symbol", "project-governance"),
+    ):
+        routed = json.loads(
+            run(
+                [str(command), "docs", "route", flag, query, "--json"],
+                root=root,
+                expected=0,
+            ).stdout
+        )
+        if routed.get("status") != "matched":
+            raise RuntimeError(f"installed documentation route did not match {flag}")
+    repeated = json.loads(
+        run([str(command), "docs", "init"], root=root, expected=0).stdout
+    )
+    if repeated.get("status") != "unchanged":
+        raise RuntimeError("repeated documentation initialization was not idempotent")
+    run(
+        [str(command), "check", "--pack", "documentation", "--base-ref", "HEAD"],
+        root=root,
+        expected=0,
+    )
+    telemetry = (root / ".governance/telemetry/runs.jsonl").read_text(encoding="utf-8")
+    if any(value in telemetry for value in ("installed-runtime", "governed-check", "docs/developer")):
+        raise RuntimeError("documentation telemetry retained a route identifier or path")
+    status = json.loads(
+        run([str(command), "telemetry", "status"], root=root, expected=0).stdout
+    )
+    if status.get("documentation", {}).get("retained_operation_count", 0) < 5:
+        raise RuntimeError("documentation telemetry status omitted installed operations")
+
+
 def main() -> int:
     """Install the supplied wheel and prove its target-facing seams."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -350,6 +425,7 @@ def main() -> int:
         verify_replacement_plan(root, command)
         verify_staged_outcomes(root, command)
         verify_agent_orchestration(root, command)
+        verify_documentation_system(root, command)
     return 0
 
 

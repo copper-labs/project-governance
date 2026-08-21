@@ -189,6 +189,9 @@ resources:
   - id: implementation-plan-template
     path: .governance/runtime/skills/resources/implementation-plan-template.md
     description: Canonical packet-ready implementation plan slice template.
+  - id: reader-first-authoring
+    path: .governance/runtime/skills/resources/reader-first-authoring.md
+    description: Portable reader framing, local grounding, public research, progressive explanation, and editorial review workflow.
   - id: review-finding-schema
     path: .governance/runtime/skills/review-finding.schema.yaml
     description: Shared finding fields and severities for converted review skills.

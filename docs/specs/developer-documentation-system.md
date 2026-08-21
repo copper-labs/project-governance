@@ -25,12 +25,12 @@ installation, the catalog, exact routing, deterministic validation, and bounded 
 
 ## Implementation State
 
-This document is a target contract. The current runtime installs its governance integration,
-selects validation packs, runs structural documentation checks, records local run telemetry, and
-provides a thin authoring skill. It does not yet install the developer-documentation structure,
-route a capability catalog, or report documentation-operation telemetry. The active
-[implementation plan](../exec-plans/active/2026-08-21-on-demand-developer-documentation.md) delivers
-that behavior and uses this repository as the first semantic pilot.
+The source runtime implements this contract. It installs the minimal structure, resolves exact
+catalog routes, extends the existing documentation pack, and reports privacy-bounded local
+operation telemetry. The installed authoring skill carries the reader-first field guide and the
+local-first external-research boundary. This repository is the semantic pilot. The active
+[implementation plan](../exec-plans/active/2026-08-21-on-demand-developer-documentation.md) remains
+open until independent review and the `1.3.0` publication are complete.
 
 ## Problem
 

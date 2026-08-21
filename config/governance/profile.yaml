@@ -1,0 +1,6 @@
+schema_version: 1
+project_extensions: []
+documentation:
+  enabled: true
+  root: docs/developer
+  research: allowed

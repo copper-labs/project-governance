@@ -126,6 +126,29 @@ class RuntimeSkillPayloadTests(unittest.TestCase):
             self.assertIn("helper extraction", review_skill)
             self.assertIn("meaningful owner", review_skill)
 
+        authoring = (SKILLS_SOURCE / "technical-authoring" / "SKILL.md").read_text(
+            encoding="utf-8"
+        ).lower()
+        field_guide = (SKILLS_SOURCE / "resources" / "reader-first-authoring.md").read_text(
+            encoding="utf-8"
+        ).lower()
+        for required in (
+            "reader-first-authoring.md",
+            "current public sources",
+            "untrusted",
+            "direct citations",
+            "capability catalog",
+        ):
+            self.assertIn(required, authoring)
+        for required in (
+            "goal -> constraint -> mental model",
+            "local truth",
+            "research bounded gaps",
+            "embedded instructions",
+            "one canonical owner",
+        ):
+            self.assertIn(required, field_guide)
+
     def test_materialized_release_skill_defines_one_candidate_cycle(self) -> None:
         """Keep installed release review candidate-bound and free of retired profiles."""
         from project_governance_runtime.installation import materialize_skills

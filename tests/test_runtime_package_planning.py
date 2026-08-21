@@ -128,6 +128,18 @@ class RuntimePlanningTests(unittest.TestCase):
                 self.assertEqual(plan["status"], "ready", plan["blockers"])
                 self.assertIn("secrets", plan["selected_packs"])
 
+    def test_documentation_profile_change_selects_the_existing_documentation_pack(self) -> None:
+        """Keep module configuration under the established documentation owner."""
+        plan = build_plan(
+            self.packs,
+            stage="pre-commit",
+            mode="impacted",
+            changed_paths=["config/governance/profile.yaml"],
+        )
+        self.assertEqual(plan["status"], "ready", plan["blockers"])
+        self.assertIn("documentation", plan["selected_packs"])
+        self.assertNotIn("developer-documentation", plan["selected_packs"])
+
     def test_branch_selection_prefers_the_configured_upstream(self) -> None:
         """Compare established release branches with their upstream before main."""
         with patch.dict("os.environ", {}, clear=True), patch(

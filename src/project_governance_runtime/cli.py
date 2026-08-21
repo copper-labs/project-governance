@@ -5,9 +5,11 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
+from . import __version__
 from .agent_orchestration import (
     AgentOrchestrationError,
     finish_dispatch,
@@ -18,6 +20,11 @@ from .agent_routing import catalog_digest, route_task, solo_route
 from .changed_paths import ChangedPathError, resolve_change_scope
 from .configuration import ConfigurationError, load_packs
 from .context import ContextError, resolve_context
+from .documentation import (
+    DocumentationError,
+    initialize_documentation,
+    route_documentation,
+)
 from .installation import InstallationError, initialize, load_lock, update
 from .planning import build_plan, public_plan
 from .runner import execute
@@ -77,6 +84,15 @@ def _parser() -> argparse.ArgumentParser:
     telemetry = commands.add_parser("telemetry")
     telemetry.add_argument("telemetry_command", choices=["status"])
     commands.add_parser("init")
+    docs = commands.add_parser("docs")
+    docs_commands = docs.add_subparsers(dest="docs_command", required=True)
+    docs_init = docs_commands.add_parser("init")
+    docs_init.add_argument("--dry-run", action="store_true")
+    docs_route = docs_commands.add_parser("route")
+    docs_route_query = docs_route.add_mutually_exclusive_group(required=True)
+    docs_route_query.add_argument("--capability")
+    docs_route_query.add_argument("--symbol")
+    docs_route.add_argument("--json", action="store_true")
     upgrade = commands.add_parser("update")
     upgrade.add_argument("--to", required=True)
     action = upgrade.add_mutually_exclusive_group(required=True)
@@ -316,6 +332,66 @@ def _run_agent_command(args: argparse.Namespace, root: Path) -> int:
     return _result_exit_code(output)
 
 
+def _documentation_terminal_event(
+    args: argparse.Namespace, output: dict[str, Any], started: float
+) -> dict[str, Any]:
+    """Build one bounded terminal event without retaining a route query or local path."""
+    event = {
+        "event": "documentation-terminal",
+        "runtime_version": __version__,
+        "operation": args.docs_command,
+        "outcome": output["status"],
+        "duration_ms": (time.monotonic() - started) * 1000,
+    }
+    if args.docs_command == "init":
+        event.update(
+            {
+            "dry_run": bool(args.dry_run),
+            "created_count": len(output.get("created", [])),
+            "unchanged_count": len(output.get("unchanged", [])),
+            "conflict_count": len(output.get("conflicts", [])),
+            }
+        )
+    else:
+        event.update(
+            {
+                "query_kind": output.get(
+                    "query_kind", "capability" if args.capability is not None else "symbol"
+                ),
+                "match_count": output.get("match_count", 0),
+            }
+        )
+    return event
+
+
+def _run_documentation_command(args: argparse.Namespace, root: Path) -> int:
+    """Install or resolve the minimal documentation module and record bounded telemetry."""
+    started = time.monotonic()
+    try:
+        if args.docs_command == "init":
+            output = initialize_documentation(root, dry_run=args.dry_run)
+        else:
+            output = route_documentation(
+                root,
+                capability=args.capability,
+                symbol=args.symbol,
+            )
+    except (DocumentationError, OSError, ValueError) as error:
+        output = {"status": "failed", "error": str(error)}
+    event = _documentation_terminal_event(args, output, started)
+    telemetry_append(root, event)
+    if args.docs_command == "route" and not args.json:
+        print(
+            f"status={output['status']} "
+            f"query_kind={output['query_kind']} "
+            f"match_count={output['match_count']}"
+        )
+    else:
+        _emit(output)
+    successful = {"initialized", "unchanged", "dry-run", "matched"}
+    return 0 if output.get("status") in successful else 1
+
+
 def _run_administration(args: argparse.Namespace, root: Path) -> int:
     """Run one non-validation command and emit its normalized result."""
     if args.command == "doctor":
@@ -341,12 +417,15 @@ def main() -> int:
             return _run_context(args, root)
         if args.command in {"agent-route", "agent-dispatch"}:
             return _run_agent_command(args, root)
+        if args.command == "docs":
+            return _run_documentation_command(args, root)
         return _run_administration(args, root)
     except (
         AgentOrchestrationError,
         ChangedPathError,
         ConfigurationError,
         ContextError,
+        DocumentationError,
         InstallationError,
         OSError,
         ValueError,

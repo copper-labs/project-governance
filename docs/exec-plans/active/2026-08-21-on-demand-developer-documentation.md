@@ -88,7 +88,8 @@ candidate, published as `1.3.0`, and read back from the immutable release.
   - The installed skill works without target `docs/governance/**` files.
   - Wheel inspection finds the field guide and updated skill.
 - Focused proof: documentation and format packs, skill payload tests, and wheel asset inspection
-- Proof state: not-run
+- Proof state: passed in focused skill tests, documentation and format policy, and built-wheel
+  field-guide inspection on 2026-08-21
 
 ## Slice 2: Implement Minimal Initialization And Exact Routing
 
@@ -117,7 +118,8 @@ candidate, published as `1.3.0`, and read back from the immutable release.
   - No route performs fuzzy matching or returns unrelated corpus content.
   - Ordinary initialization and existing CLI tests remain unchanged.
 - Focused proof: documentation command tests plus installation and CLI regression tests
-- Proof state: not-run
+- Proof state: passed in documentation domain and CLI tests, including malformed, conflict,
+  traversal, symlink, idempotence, and exact-route cases, on 2026-08-21
 
 ## Slice 3: Extend Existing Validation And Bounded Telemetry
 
@@ -139,7 +141,8 @@ candidate, published as `1.3.0`, and read back from the immutable release.
   - Telemetry loss does not affect command outcome and status describes what it cannot measure.
 - Focused proof: documentation checker, selection, telemetry redaction/retention/failure/status, and
   command hook tests
-- Proof state: not-run
+- Proof state: passed in checker, selection, command-hook, telemetry redaction, failure, retention,
+  and status tests on 2026-08-21
 
 ## Slice 4: Pilot, Review, Certify, And Release 1.3.0
 
@@ -168,7 +171,8 @@ candidate, published as `1.3.0`, and read back from the immutable release.
   - Claude has no open verified critical, high, or medium finding after reconciliation.
   - Source readiness passes on the candidate merge result before integration.
   - Tag target, lock source commit, lock/wheel versions, and wheel SHA agree after publication.
-- Proof state: not-run
+- Proof state: implementation and both semantic pilots passed locally on 2026-08-21; Opus review,
+  final certification, source readiness, and publication remain open
 
 ## Simplification Record
 

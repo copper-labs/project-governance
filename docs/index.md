@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-07-05
-updated: 2026-08-16
+updated: 2026-08-21
 summary: Entry point for the reusable, package-based project governance runtime.
 ---
 
@@ -27,6 +27,8 @@ lock.
   conservative native-host routing for Codex and Claude using compact bounded work contracts.
 - [Operator guide](guides/user-guide.md) explains bootstrap, routine checks, and deliberate
   upgrades.
+- [Developer documentation](developer/index.md) provides progressive evaluator/operator and
+  source-contributor journeys plus the shared agent catalog.
 - [Validation strategy](governance/validation-strategy.md) defines narrow proof by default and the
   few situations that require broader proof.
 

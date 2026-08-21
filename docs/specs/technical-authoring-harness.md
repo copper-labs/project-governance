@@ -25,11 +25,10 @@ both contracts and uses this repository's own documentation as the first pilot.
 ## Implementation State
 
 The reader contract, content intents, story spine, research boundary, and review questions below are
-normative target behavior. Today, the runtime supplies structural documentation checks, placeholder
-detection, and a thin authoring skill; this source repository supplies a brief local style guide.
-The active plan adds a portable field guide, governed external-research instructions, and the
-installable developer-documentation system. Until those slices pass, the target behavior must not
-be described as installed capability.
+normative behavior. The source runtime supplies structural checks, placeholder detection, the
+portable reader-first field guide, and governed external-research instructions through the
+installed authoring skill. The companion developer-documentation system is implemented in source.
+The active plan remains open until independent review and the `1.3.0` publication are complete.
 
 ## Problem
 
