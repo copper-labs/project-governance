@@ -2,7 +2,7 @@
 id: exec-plan.release-candidate-efficiency
 title: Release Candidate Efficiency
 type: exec-plan
-status: active
+status: completed
 owner: project-governance
 created: 2026-08-20
 updated: 2026-08-21
@@ -63,14 +63,24 @@ integration and tagging.
 - Add focused assertions to `tests/test_runtime_skill_payload.py`.
 - Do not change the CLI, planner, runner, schemas, telemetry, hooks, or adopter repositories.
 
-## Proof
+## Completed Proof
 
-- Focused owner: `python3 -m unittest tests.test_runtime_skill_payload`.
-- Workflow owner: `python3 -m unittest tests.test_runtime_release_versioning`.
-- Direct seam: the focused test materializes package-owned skills into an installed runtime tree.
-- Closeout: one branch-aware impacted pre-push sign-off on the stable candidate.
-- Release proof: the existing source-readiness workflow runs the complete runtime suite, builds the
-  wheel, and verifies the installed boundary before merge.
+- Claude Opus 5 reviewed the design and focused diffs at high effort. Its ordering, vocabulary,
+  integration-base, workflow-trigger, and stale-required-read findings were reconciled; the final
+  recheck reported no remaining high or medium issue.
+- `python3 -m unittest tests.test_runtime_skill_payload tests.test_runtime_release_versioning`
+  passed all eight focused tests, including installed skill materialization and source-readiness
+  trigger behavior.
+- One branch-aware impacted pre-push sign-off passed all eight selected packs on candidate
+  `1ad68bcba9ebfc4d2eb33e8d4c847ffa084ce41e`.
+- Pull request `#5` source readiness passed the complete runtime suite, wheel build, and installed-
+  wheel verification in 42 seconds before merge.
+- The certified candidate merged as `b91e0dad66e81b0e1478c77cfee1024a157eceb6` and tag `1.2.7`
+  names that exact commit.
+- The independent publication workflow passed in 55 seconds and published Project Governance
+  `1.2.7`. The downloaded wheel reports version `1.2.7`; its SHA-256
+  `70b8738b4a3000c0f2296b0b92d757ee0bc04e7832b2743bed20cc5a060990e2` matches the published
+  lock, whose source commit matches the tag target.
 
 ## Rollback
 

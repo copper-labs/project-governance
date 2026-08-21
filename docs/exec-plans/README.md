@@ -16,11 +16,13 @@ Git remains the implementation history and recovery mechanism.
 
 ## Active
 
-- [Release candidate efficiency](active/2026-08-20-release-candidate-efficiency.md) moves complete
-  release proof before integration and keeps repair loops on one stable publication candidate.
+- No active source implementation plans.
 
 ## Completed
 
+- [Release candidate efficiency](completed/2026-08-20-release-candidate-efficiency.md) moved
+  complete release proof before integration and kept repair loops on one stable publication
+  candidate.
 - [Temporary-waiver transitions](completed/2026-08-20-temporary-waiver-transitions.md) added one
   exact reviewed refresh path and one inert reviewed resolution exit for source-bound waivers.
 - [Single affected sign-off](completed/2026-08-20-single-affected-signoff.md) made one branch-aware
