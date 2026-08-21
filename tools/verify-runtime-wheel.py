@@ -409,6 +409,47 @@ def verify_documentation_system(root: Path, command: Path) -> None:
         raise RuntimeError("documentation telemetry status omitted installed operations")
 
 
+def verify_custom_documentation_root(root: Path, command: Path) -> None:
+    """Prove the installed command resolves a profile-owned non-default root."""
+    custom_root = root / "custom-documentation-adopter"
+    custom_root.mkdir()
+    run([str(command), "init"], root=custom_root, expected=0)
+    custom_profile = custom_root / "config/governance/profile.yaml"
+    custom_profile.write_text(
+        custom_profile.read_text(encoding="utf-8")
+        + "documentation:\n"
+        + "  enabled: true\n"
+        + "  root: knowledge/developer\n"
+        + "  research: disabled\n",
+        encoding="utf-8",
+    )
+    custom = json.loads(
+        run([str(command), "docs", "init"], root=custom_root, expected=0).stdout
+    )
+    if custom.get("status") != "initialized" or not (
+        custom_root / "knowledge/developer/catalog.yaml"
+    ).is_file():
+        raise RuntimeError("installed documentation init ignored the configured root")
+
+
+def verify_documentation_conflict(root: Path, command: Path) -> None:
+    """Prove an installed conflict neither activates nor claims a profile mutation."""
+    conflict_root = root / "conflicting-documentation-adopter"
+    target = conflict_root / "docs/developer"
+    target.parent.mkdir(parents=True)
+    target.write_text("not a directory\n", encoding="utf-8")
+    conflict = json.loads(
+        run([str(command), "docs", "init"], root=conflict_root, expected=1).stdout
+    )
+    if (
+        conflict.get("status") != "failed"
+        or conflict.get("created")
+        or conflict.get("updated")
+        or (conflict_root / "config/governance/profile.yaml").exists()
+    ):
+        raise RuntimeError("installed documentation conflict reported or wrote profile changes")
+
+
 def main() -> int:
     """Install the supplied wheel and prove its target-facing seams."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -426,6 +467,8 @@ def main() -> int:
         verify_staged_outcomes(root, command)
         verify_agent_orchestration(root, command)
         verify_documentation_system(root, command)
+        verify_custom_documentation_root(root, command)
+        verify_documentation_conflict(root, command)
     return 0
 
 

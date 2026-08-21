@@ -377,6 +377,7 @@ class RuntimeTelemetryTests(unittest.TestCase):
             })
             path = root / ".governance/telemetry/runs.jsonl"
             text = path.read_text(encoding="utf-8")
+            records = [json.loads(line) for line in text.splitlines()]
             summary = status(root)["documentation"]
 
         for forbidden in (
@@ -389,6 +390,7 @@ class RuntimeTelemetryTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden, text)
         self.assertEqual(summary["retained_operation_count"], 2)
+        self.assertEqual(records[0]["runtime_version"], "1.3.0")
         self.assertEqual(summary["operation_counts"], {"init": 1, "route": 1})
         self.assertEqual(summary["outcome_counts"], {"initialized": 1, "matched": 1})
         self.assertEqual(summary["query_kind_counts"], {"capability": 1})

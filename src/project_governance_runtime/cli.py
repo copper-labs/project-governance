@@ -387,7 +387,20 @@ def _run_documentation_command(args: argparse.Namespace, root: Path) -> int:
             )
     except (DocumentationError, OSError, ValueError) as error:
         output = {"status": "failed", "error": str(error)}
-        if args.docs_command == "route":
+        if args.docs_command == "init":
+            output.update(
+                {
+                    "kind": "project-governance-documentation-init",
+                    "version": 1,
+                    "dry_run": bool(args.dry_run),
+                    "created": [],
+                    "updated": [],
+                    "unchanged": [],
+                    "conflicts": [],
+                    "agent_pointer": None,
+                }
+            )
+        else:
             output.update(
                 {
                     "kind": "project-governance-documentation-route",

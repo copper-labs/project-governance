@@ -209,9 +209,10 @@ and per-model percentages, explicitly excluding evicted receipts and control-sta
 It calculates no prices, spend, savings, or project-wide usage.
 
 An accepted documentation operation may add one `documentation-terminal` record. Its allowlist
-holds only operation, terminal outcome, duration, dry-run state, query kind, and aggregate created,
-updated, unchanged, conflict, or match counts. It excludes route values, identifiers, paths,
-content, prompts, citations, research topics, model identity, and shared run fingerprints.
+holds only runtime version, operation, terminal outcome, duration, dry-run state, query kind, and
+aggregate created, updated, unchanged, conflict, or match counts. It excludes route values,
+identifiers, paths, content, prompts, citations, research topics, model identity, and shared run
+fingerprints.
 
 V1.1 records only bounded per-pack integer counters:
 `blocking_finding_count`, `advisory_finding_count`, `accepted_finding_count`,

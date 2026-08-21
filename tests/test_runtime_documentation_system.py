@@ -135,6 +135,8 @@ class RuntimeDocumentationSystemTests(unittest.TestCase):
             result = initialize_documentation(root)
             self.assertEqual(result["status"], "failed")
             self.assertEqual(result["conflicts"], ["docs/developer/index.md"])
+            self.assertEqual(result["created"], [])
+            self.assertEqual(result["updated"], [])
             self.assertFalse((root / "docs/developer/catalog.yaml").exists())
 
         with tempfile.TemporaryDirectory() as directory:
@@ -266,6 +268,26 @@ class RuntimeDocumentationSystemTests(unittest.TestCase):
         self.assertEqual(routed["status"], "not-found")
         self.assertEqual(routed["research"], "disabled")
 
+    def test_route_rejects_catalog_paths_outside_the_repository(self) -> None:
+        """Keep exact context routes repository-contained even when evidence is missing."""
+        for reference in ("../../outside.md", "/etc/hosts"):
+            with self.subTest(reference=reference), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                initialize_documentation(root)
+                write_capability_catalog(
+                    root,
+                    [
+                        {
+                            "id": "unsafe",
+                            "title": "Unsafe",
+                            "reference": reference,
+                        }
+                    ],
+                )
+                routed = route_documentation(root, capability="unsafe")
+            self.assertEqual(routed["status"], "invalid")
+            self.assertNotIn("capability", routed)
+
     def test_cli_telemetry_does_not_retain_the_route_query(self) -> None:
         """Observe command outcomes while discarding private catalog identifiers and paths."""
         with tempfile.TemporaryDirectory() as directory:
@@ -366,8 +388,13 @@ class RuntimeDocumentationSystemTests(unittest.TestCase):
             telemetry = (root / ".governance/telemetry/runs.jsonl").read_text(
                 encoding="utf-8"
             )
+            output = json.loads(initialized.stdout)
 
         self.assertEqual(initialized.returncode, 1)
+        self.assertEqual(output["kind"], "project-governance-documentation-init")
+        self.assertEqual(output["version"], 1)
+        self.assertEqual(output["created"], [])
+        self.assertEqual(output["conflicts"], [])
         self.assertIn('"outcome": "failed"', telemetry)
         self.assertNotIn("invalid", telemetry)
 

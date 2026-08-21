@@ -254,6 +254,9 @@ def initialize_documentation(root: Path, *, dry_run: bool = False) -> dict[str, 
         unchanged.insert(0, PROFILE_PATH.as_posix())
 
     updated = [PROFILE_PATH.as_posix()] if profile_updated else []
+    if conflicts and not dry_run:
+        created = []
+        updated = []
     status = "failed" if conflicts else ("dry-run" if dry_run else "initialized")
     if not conflicts and not dry_run and not created and not updated:
         status = "unchanged"
@@ -299,10 +302,12 @@ def _string_list(record: dict[str, Any], field: str, label: str) -> list[str]:
     return [item.strip() for item in values]
 
 
-def _require_local_file(root: Path, value: str, label: str) -> None:
-    """Require one catalog route or source to remain inside the repository and exist."""
+def _require_local_file(
+    root: Path, value: str, label: str, *, require_exists: bool = True
+) -> None:
+    """Require one catalog path to remain local and optionally require a current file."""
     target = _repository_path(root, value, label)
-    if not target.is_file():
+    if require_exists and not target.is_file():
         raise DocumentationError(f"{label}: target is missing: {value}")
 
 
@@ -325,11 +330,20 @@ def _normalize_capability(
         normalized[field] = record[field].strip()
     for field in LIST_FIELDS:
         normalized[field] = _string_list(record, field, label)
-    if validate_paths:
-        _require_local_file(root, normalized["reference"], f"{label}.reference")
-        for field in ("guides", "sources"):
-            for value in normalized[field]:
-                _require_local_file(root, value, f"{label}.{field}")
+    _require_local_file(
+        root,
+        normalized["reference"],
+        f"{label}.reference",
+        require_exists=validate_paths,
+    )
+    for field in ("guides", "sources"):
+        for value in normalized[field]:
+            _require_local_file(
+                root,
+                value,
+                f"{label}.{field}",
+                require_exists=validate_paths,
+            )
     return normalized
 
 

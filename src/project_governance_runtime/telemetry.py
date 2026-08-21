@@ -255,7 +255,11 @@ def _sanitize(event: Any) -> dict[str, Any] | None:
     if not isinstance(event, dict) or event.get("event") not in _EVENT_FIELDS:
         return None
     event_name = event["event"]
-    common = set() if event_name == "documentation-terminal" else _COMMON_FIELDS
+    common = (
+        {"event", "runtime_version"}
+        if event_name == "documentation-terminal"
+        else _COMMON_FIELDS
+    )
     allowed = common | _EVENT_FIELDS[event_name]
     result: dict[str, Any] = {"schema_version": SCHEMA_VERSION, "event": event_name}
     for key in allowed - {"event", "selected_packs", "packs", "entries"}:
