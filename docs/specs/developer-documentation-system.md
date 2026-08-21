@@ -28,9 +28,9 @@ installation, the catalog, exact routing, deterministic validation, and bounded 
 The source runtime implements this contract. It installs the minimal structure, resolves exact
 catalog routes, extends the existing documentation pack, and reports privacy-bounded local
 operation telemetry. The installed authoring skill carries the reader-first field guide and the
-local-first external-research boundary. This repository is the semantic pilot. The active
-[implementation plan](../exec-plans/active/2026-08-21-on-demand-developer-documentation.md) remains
-open until independent review and the `1.3.0` publication are complete.
+local-first external-research boundary. This repository is the semantic pilot. The
+[completed implementation plan](../exec-plans/completed/2026-08-21-on-demand-developer-documentation.md)
+records independent review, clean-adopter proof, and the immutable `1.3.0` publication.
 
 ## Problem
 

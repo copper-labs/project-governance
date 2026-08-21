@@ -20,8 +20,8 @@ field guide through the technical-authoring skill and keeps editorial judgement 
 reviewer. The
 [On-Demand Developer Documentation System](developer-documentation-system.md) applies this contract
 to installed documentation structures, exact catalog routes, and agent entry points. The active
-[implementation plan](../exec-plans/active/2026-08-21-on-demand-developer-documentation.md) delivers
-both contracts and uses this repository's own documentation as the first pilot.
+[completed implementation plan](../exec-plans/completed/2026-08-21-on-demand-developer-documentation.md)
+records both contracts and this repository's documentation pilot.
 
 ## Implementation State
 
@@ -29,7 +29,7 @@ The reader contract, content intents, story spine, research boundary, and review
 normative behavior. The source runtime supplies structural checks, placeholder detection, the
 portable reader-first field guide, and governed external-research instructions through the
 installed authoring skill. The companion developer-documentation system is implemented in source.
-The active plan remains open until independent review and the `1.3.0` publication are complete.
+Independent review, clean-adopter proof, and the `1.3.0` publication are complete.
 
 ## Problem
 

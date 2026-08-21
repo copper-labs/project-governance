@@ -16,12 +16,13 @@ Git remains the implementation history and recovery mechanism.
 
 ## Active
 
-- [Reader-first authoring and on-demand developer documentation](active/2026-08-21-on-demand-developer-documentation.md)
-  delivers an installable human and agent documentation system, current-research handoff, and the
-  first proof by documenting this project.
+There are no active execution plans.
 
 ## Completed
 
+- [Reader-first authoring and on-demand developer documentation](completed/2026-08-21-on-demand-developer-documentation.md)
+  delivered the minimal shared human and agent corpus, governed research handoff, exact routing,
+  validation, telemetry, semantic pilots, Opus review reconciliation, and the `1.3.0` release.
 - [Release candidate efficiency](completed/2026-08-20-release-candidate-efficiency.md) moved
   complete release proof before integration and kept repair loops on one stable publication
   candidate.
