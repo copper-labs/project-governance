@@ -25,8 +25,9 @@ project-specific policy, packs, and commands.
    `GITHUB_TOKEN`, or the current `gh auth` credential; no credential enters the lock.
 6. Run `project-governance doctor` to confirm the runtime and configuration are usable.
 
-There is no separate source template or generator. The installed wheel's `init` command is the
-only initialization authority and never invents an artifact lock.
+There is no separate source template or generator. The installed wheel's `init` command owns the
+base runtime integration and never invents an artifact lock. Optional module commands such as
+`docs init` own only their declared extension and reuse the base profile seed.
 
 The lock, profile, facts, and project extensions stay tracked. The virtual environment, installed
 skills, and telemetry stay local and ignored.

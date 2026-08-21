@@ -116,10 +116,11 @@ project-governance docs init --dry-run
 project-governance docs init
 ```
 
-`--dry-run` previews the operation. The ordinary command adds the default `documentation` section
-when it is absent, then creates only missing module-owned paths. It preserves existing profile text
-and authored files. A malformed or conflicting existing value stops the operation rather than being
-rewritten.
+`--dry-run` previews the complete operation, including a conflicting documentation root. The
+ordinary command creates only missing module-owned paths, then writes a new or extended profile
+last so a failed structure write cannot activate an incomplete module. It preserves existing
+profile text and authored files. A malformed or conflicting existing value stops the operation
+rather than being rewritten.
 
 The minimal installed structure is:
 
@@ -136,9 +137,12 @@ point and explains the agent entry. `catalog.yaml` is the machine-readable map. 
 product names, capabilities, commands, support guarantees, or apparently complete placeholder
 claims. Repositories can configure another root before initialization.
 
-Initialization is idempotent and path-contained. It reports created, unchanged, and conflicting
-paths. It does not edit root agent instructions because those are repository-owned; its result names
-the one-line pointer an adopter may add to its existing agent entry point.
+Initialization is idempotent within a working tree and path-contained. It reports created, updated,
+unchanged, and conflicting paths. Git does not retain empty directories, so a fresh clone may
+recreate an empty `guides/` or `reference/` directory and report `initialized` without producing a
+tracked change. The command does not edit root agent instructions because those are
+repository-owned; its result names the one-line pointer an adopter may add to its existing agent
+entry point.
 
 ## Minimal Capability Catalog
 
@@ -194,6 +198,11 @@ returns the matched record and ordered local context paths: reference, guides, t
 duplicate exact match is `ambiguous`; an absent match is `not-found`. The runtime performs no fuzzy
 search, scoring, semantic inference, or corpus loading.
 
+Routine lookup states (`matched`, `not-found`, `ambiguous`, and `disabled`) exit successfully so an
+agent can branch on the returned status. Structurally `invalid` input and command `failed` states
+exit nonzero. Routing validates catalog shape but does not make an unrelated missing evidence path
+hide every capability; the blocking documentation check owns path existence.
+
 ## On-Demand Authoring Workflow
 
 The runtime does not need inventory, planning, or scaffolding commands to generate documentation.
@@ -220,8 +229,11 @@ decision.
 
 ## Deterministic Validation
 
-The existing `documentation` pack becomes module-aware. When the module is enabled and a selected
-change touches its profile or root, it may block on:
+The existing `documentation` pack becomes module-aware. When enabled, the module is checked whenever
+that existing pack runs. Impacted selection follows the configured root and every cataloged local
+reference, guide, and source path in addition to the pack's ordinary governed-documentation paths.
+An explicit or exhaustive documentation check also evaluates the complete enabled module. It may
+block on:
 
 - malformed module configuration or a root that escapes the repository;
 - a missing human index or catalog;
@@ -242,7 +254,7 @@ Documentation operations extend the existing bounded local telemetry. Initializa
 routing emit one terminal event containing only:
 
 - runtime version, operation (`init` or `route`), outcome, and duration;
-- dry-run status and created, unchanged, and conflict counts for initialization; or
+- dry-run status and created, updated, unchanged, and conflict counts for initialization; or
 - query kind and match count for routing.
 
 Telemetry never retains the query, capability id, alias, symbol, paths, documentation text, source
@@ -272,7 +284,8 @@ catalog.
 - Initialization previews safely and creates only missing module-owned content.
 - Existing profile text and authored documents are never silently replaced.
 - All configured and cataloged paths resolve inside the repository.
-- Routes read local configuration and catalog content only.
+- Routes read local configuration and catalog content, then append one bounded local telemetry
+  event on a best-effort basis.
 - Authoring research never discloses private repository material to public services.
 - Retrieved instructions cannot expand tool use or change the requested task.
 - No module command logs in, publishes, messages, purchases, pushes, tags, or changes remote state.
@@ -284,7 +297,7 @@ catalog.
 | --- | --- | --- |
 | Initialization installs the minimal neutral structure without overwriting adopter content. | Clean-adopter dry run, apply, repeated apply, custom-root, and conflict tests from the built wheel. | Source maintainer |
 | One catalog and corpus serve human and agent entry points. | Human navigation and exact capability/symbol routes reach the same reference and local sources. | Source maintainer and reviewer |
-| The installed skill establishes local truth and can use permitted current public research without making it project authority. | Pilot citations, any research notes, claim inspection, and editorial review. | Author and independent reviewer |
+| The installed skill establishes local truth and can use permitted current public research without making it project authority. | Route-visible research policy, conditional citations and research notes when used, claim inspection, and editorial review. | Author and independent reviewer |
 | Exact routing is deterministic and contains no fuzzy search or product inference. | Id, alias, symbol, ambiguous, disabled, invalid, and no-match fixtures. | Source maintainer |
 | Existing documentation validation owns module structure without a second pack. | Focused checker and selection fixtures plus the existing documentation regression suite. | Source maintainer |
 | Documentation telemetry is useful and privacy-bounded. | Event redaction, retention, failure, aggregation, and forbidden-field tests. | Source maintainer |
@@ -303,3 +316,7 @@ Human and agent tasks must reach the same canonical references and current local
 uses external research only where it materially improves explanation and records why no external
 source was allowed to override the runtime contract. A separate clean temporary adopter proves that
 installation, routing, validation, and telemetry are not coupled to this source repository.
+
+For these two source-specific pilot journeys, current repository contracts and executable proof are
+sufficient; no external enrichment is used. This is a deliberate no-research disposition, not a
+restriction on adopters whose bounded gaps benefit from current public context.

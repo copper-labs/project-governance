@@ -15,10 +15,11 @@ Technical documentation succeeds when a reader can form the right mental model, 
 recognize the result. Correct facts are necessary, but a correct inventory of facts is not yet an
 explanation.
 
-This specification defines the target authoring contract. The current runtime implements only part
-of it: structural checks, placeholder detection, and a thin authoring skill. The
+This specification defines the installed authoring contract. The runtime carries its portable
+field guide through the technical-authoring skill and keeps editorial judgement with the author and
+reviewer. The
 [On-Demand Developer Documentation System](developer-documentation-system.md) applies this contract
-to installed documentation structures, catalogs, generation plans, and agent routes. The active
+to installed documentation structures, exact catalog routes, and agent entry points. The active
 [implementation plan](../exec-plans/active/2026-08-21-on-demand-developer-documentation.md) delivers
 both contracts and uses this repository's own documentation as the first pilot.
 
@@ -89,7 +90,7 @@ One concern has one owner:
 | Concern | Owner |
 | --- | --- |
 | Normative definitions, content intents, enforcement boundary, and acceptance | This specification |
-| Target portable authoring and editorial-review workflow | Installed `technical-authoring` skill and its Slice 2 field guide |
+| Target portable authoring and editorial-review workflow | Installed `technical-authoring` skill and its Slice 1 field guide |
 | Source-repository drafting conventions | [Writing Style Guide](../governance/writing-style-guide.md) |
 | Artifact lifecycle and required repository structure | Existing governance specifications and document indexes |
 | Generic structural checks | Runtime wheel |
@@ -99,8 +100,8 @@ One concern has one owner:
 | Editorial judgement and approval | Author and reviewer |
 | Source comments and API documentation | Language-aware implementation checks |
 
-The PRD states why this capability exists. This specification owns the shared contract. After Slice
-2, the field guide will carry its concise operational form into adopting repositories. The source
+The PRD states why this capability exists. This specification owns the shared contract. The field
+guide carries its concise operational form into adopting repositories. The source
 writing style guide remains a one-page local overlay. Neither becomes another policy authority.
 
 ## Reader Contract
@@ -277,9 +278,9 @@ support review, but a human or governed review skill owns the conclusion.
 
 ## Project-Neutral Distribution
 
-Today the wheel distributes the thin authoring skill and generic structural checks. The active plan
-adds a cataloged field guide containing the portable workflow, research guidance, and
-review questions needed when an adopting repository has no `docs/governance/**` tree. Package-owned
+The wheel distributes the authoring skill, its cataloged field guide, and generic structural checks.
+The field guide contains the portable workflow, research guidance, and review questions needed when
+an adopting repository has no `docs/governance/**` tree. Package-owned
 paths declared by the skill catalog must resolve after bootstrap. Target-owned guidance remains
 optional: when it is absent, a skill continues with the repository's nearest equivalent, as
 required by the catalog's `target_input_contract`.
@@ -328,9 +329,9 @@ boundary.
 | The PRD, specification, source style guide, bundled field guide, installed skill, and automated checks have non-overlapping responsibilities. | The ownership table above plus a recorded overlap inspection. | Source maintainer |
 | Substantial documentation exposes a reader contract, uses an appropriate content intent, progresses concepts in dependency order, and grounds material claims. | Editorial-review record identifies the reader risk and disposition for each changed route. | Author and independent reviewer |
 | Procedures include the prerequisites, observations, verification, and recovery required by their stated reader job. | Safe command rehearsal or an explicit, justified verification boundary. | Source maintainer |
-| Permitted external research begins from a bounded local gap, uses current accountable sources, preserves citations and material uncertainty, and does not become project authority. | Claim-level citations, any separate research notes, and conflict inspection for the changed route. | Author and independent reviewer |
+| When permitted external research is used, it begins from a bounded local gap, uses current accountable sources, preserves citations and material uncertainty, and does not become project authority. | Claim-level citations and conflict inspection for researched claims; an explicit no-research disposition when local authority is sufficient. | Author and independent reviewer |
 | Structural blockers remain deterministic and editorial judgement remains outside automated verdicts. | Pack configuration, affected checker tests, and manual comparison with the enforcement boundary. | Source maintainer |
-| The pilot provides coherent evaluator/operator and source-contributor journeys without duplicating authority. | Four task records from the active plan, including routes, uncertainty, evidence, and fixes. | Pilot evaluator |
+| The pilot provides coherent evaluator/operator and source-contributor journeys without duplicating authority. | Both guides, their exact catalog routes, exercised commands, review findings, and validation proof. | Pilot evaluator |
 
 ## Research Basis
 

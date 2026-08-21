@@ -22,6 +22,7 @@ from .configuration import ConfigurationError, load_packs
 from .context import ContextError, resolve_context
 from .documentation import (
     DocumentationError,
+    documentation_selection_paths,
     initialize_documentation,
     route_documentation,
 )
@@ -200,6 +201,13 @@ def _attach_change_scope(
 def _resolve_plan(args: argparse.Namespace, root: Path) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
     """Load packs and resolve explicit, staged, or branch-aware paths once."""
     packs = load_packs(root)
+    if "documentation" in packs:
+        documentation_pack = dict(packs["documentation"])
+        documentation_pack["path_globs"] = sorted(
+            set(documentation_pack.get("path_globs", []))
+            | set(documentation_selection_paths(root))
+        )
+        packs["documentation"] = documentation_pack
     explicit = list(getattr(args, "pack", []))
     base_ref = getattr(args, "base_ref", None)
     mode = "explicit" if explicit else args.mode
@@ -348,6 +356,7 @@ def _documentation_terminal_event(
             {
             "dry_run": bool(args.dry_run),
             "created_count": len(output.get("created", [])),
+            "updated_count": len(output.get("updated", [])),
             "unchanged_count": len(output.get("unchanged", [])),
             "conflict_count": len(output.get("conflicts", [])),
             }
@@ -378,6 +387,17 @@ def _run_documentation_command(args: argparse.Namespace, root: Path) -> int:
             )
     except (DocumentationError, OSError, ValueError) as error:
         output = {"status": "failed", "error": str(error)}
+        if args.docs_command == "route":
+            output.update(
+                {
+                    "kind": "project-governance-documentation-route",
+                    "version": 1,
+                    "query_kind": (
+                        "capability" if args.capability is not None else "symbol"
+                    ),
+                    "match_count": 0,
+                }
+            )
     event = _documentation_terminal_event(args, output, started)
     telemetry_append(root, event)
     if args.docs_command == "route" and not args.json:
@@ -388,8 +408,7 @@ def _run_documentation_command(args: argparse.Namespace, root: Path) -> int:
         )
     else:
         _emit(output)
-    successful = {"initialized", "unchanged", "dry-run", "matched"}
-    return 0 if output.get("status") in successful else 1
+    return 1 if output.get("status") in {"failed", "invalid"} else 0
 
 
 def _run_administration(args: argparse.Namespace, root: Path) -> int:

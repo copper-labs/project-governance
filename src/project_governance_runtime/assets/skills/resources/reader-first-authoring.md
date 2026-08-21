@@ -31,10 +31,11 @@ document's shape.
 
 ## Research Bounded Gaps
 
-Follow the repository's documentation research setting. When research is allowed and network access
-is available, use current public research when standards, libraries, platforms, security guidance,
-laws, ecosystem practice, alternatives, tradeoffs, or common failure modes materially help the
-reader.
+Read `documentation.research` from `config/governance/profile.yaml` when the module is present, or
+use the repository's nearest equivalent policy. When it is `disabled`, do not browse for authoring.
+When it is `allowed` and network access is available under the host and operator boundary, use
+current public research when standards, libraries, platforms, security guidance, laws, ecosystem
+practice, alternatives, tradeoffs, or common failure modes materially help the reader.
 
 Start from a bounded question exposed by local inspection. Search broadly enough to understand the
 field, then prefer primary and directly accountable sources for support. Compare publication and

@@ -19,6 +19,7 @@ from .upgrade_cleanup import apply_upgrade_cleanup, build_upgrade_cleanup
 
 
 LOCK_PATH = Path("config/governance/runtime.lock.yaml")
+PROFILE_DEFAULT_TEXT = "schema_version: 1\nproject_extensions: []\n"
 REQUIRED_LOCK_KEYS = {
     "schema_version", "package", "version", "wheel", "sha256", "source_commit",
     "python", "configuration_schema", "release_base_url",
@@ -114,7 +115,7 @@ def initialize(root: Path) -> dict[str, Any]:
     """Create only missing child-owned configuration and thin launch surfaces."""
     created: list[str] = []
     defaults = {
-        "config/governance/profile.yaml": "schema_version: 1\nproject_extensions: []\n",
+        "config/governance/profile.yaml": PROFILE_DEFAULT_TEXT,
         "config/governance/facts.lock.yaml": "schema_version: 1\nfacts: {}\n",
         ".governance/.gitignore": "*\n!.gitignore\n",
     }

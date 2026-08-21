@@ -356,8 +356,11 @@ class RuntimeTelemetryTests(unittest.TestCase):
                 "duration_ms": 12,
                 "dry_run": False,
                 "created_count": 3,
+                "updated_count": 1,
                 "unchanged_count": 1,
                 "conflict_count": 0,
+                "run_id": "private-run-id",
+                "scope_fingerprint": "private-fingerprint",
                 "path": "/private/docs",
                 "prompt": "private prompt",
             })
@@ -376,7 +379,14 @@ class RuntimeTelemetryTests(unittest.TestCase):
             text = path.read_text(encoding="utf-8")
             summary = status(root)["documentation"]
 
-        for forbidden in ("/private", "private prompt", "private-capability", "private source"):
+        for forbidden in (
+            "/private",
+            "private prompt",
+            "private-capability",
+            "private source",
+            "private-run-id",
+            "private-fingerprint",
+        ):
             self.assertNotIn(forbidden, text)
         self.assertEqual(summary["retained_operation_count"], 2)
         self.assertEqual(summary["operation_counts"], {"init": 1, "route": 1})
@@ -384,6 +394,7 @@ class RuntimeTelemetryTests(unittest.TestCase):
         self.assertEqual(summary["query_kind_counts"], {"capability": 1})
         self.assertEqual(summary["total_duration_ms"], 16)
         self.assertEqual(summary["created_count"], 3)
+        self.assertEqual(summary["updated_count"], 1)
         self.assertEqual(summary["match_count"], 1)
         self.assertIn("not a documentation-quality score", summary["interpretation"])
 

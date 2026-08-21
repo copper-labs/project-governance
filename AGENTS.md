@@ -15,8 +15,9 @@ durable decisions and plans live under `docs/**`.
 ## Start Here
 
 - Read `docs/index.md` and `CHARTER.md`.
-- For developer-documentation or agent-routing work, read `docs/developer/index.md` and
-  `docs/developer/catalog.yaml`.
+- For developer-documentation work, read `docs/developer/index.md` and
+  `docs/developer/catalog.yaml`. For runtime agent routing, follow its owning specification and
+  source component.
 - Read the smallest live specification or plan that owns the requested change.
 - Use the installed wheel's ignored skill discovery path for generic skills. Keep project-specific
   skills with their owning project.

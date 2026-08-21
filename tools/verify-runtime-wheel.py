@@ -387,7 +387,7 @@ def verify_documentation_system(root: Path, command: Path) -> None:
                 expected=0,
             ).stdout
         )
-        if routed.get("status") != "matched":
+        if routed.get("status") != "matched" or routed.get("research") != "disabled":
             raise RuntimeError(f"installed documentation route did not match {flag}")
     repeated = json.loads(
         run([str(command), "docs", "init"], root=root, expected=0).stdout

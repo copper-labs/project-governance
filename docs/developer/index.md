@@ -27,7 +27,8 @@ The exact runtime/adopter responsibility split remains in
 
 Use [Change The Runtime Safely](guides/change-the-runtime.md) to find the owning component, run its
 focused proof, cross one directly affected seam, and finish with the source checkout's governed
-sign-off.
+sign-off. Use the [Validation Strategy](../governance/validation-strategy.md) as the canonical
+reference for that proof boundary.
 
 ## Agent Entry
 

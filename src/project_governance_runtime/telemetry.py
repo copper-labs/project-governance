@@ -50,6 +50,7 @@ _EVENT_FIELDS = {
         "duration_ms",
         "dry_run",
         "created_count",
+        "updated_count",
         "unchanged_count",
         "conflict_count",
         "query_kind",
@@ -105,6 +106,7 @@ _DOCUMENTATION_OUTCOMES = {
 _DOCUMENTATION_QUERY_KINDS = {"capability", "symbol"}
 _DOCUMENTATION_INTEGER_FIELDS = {
     "created_count",
+    "updated_count",
     "unchanged_count",
     "conflict_count",
     "match_count",
@@ -253,7 +255,8 @@ def _sanitize(event: Any) -> dict[str, Any] | None:
     if not isinstance(event, dict) or event.get("event") not in _EVENT_FIELDS:
         return None
     event_name = event["event"]
-    allowed = _COMMON_FIELDS | _EVENT_FIELDS[event_name]
+    common = set() if event_name == "documentation-terminal" else _COMMON_FIELDS
+    allowed = common | _EVENT_FIELDS[event_name]
     result: dict[str, Any] = {"schema_version": SCHEMA_VERSION, "event": event_name}
     for key in allowed - {"event", "selected_packs", "packs", "entries"}:
         value = _sanitize_event_scalar(event_name, key, event.get(key))
@@ -495,6 +498,7 @@ def _documentation_status(records: list[dict[str, Any]]) -> dict[str, Any]:
     total_duration_ms: int | float = 0
     totals = {
         "created_count": 0,
+        "updated_count": 0,
         "unchanged_count": 0,
         "conflict_count": 0,
         "match_count": 0,

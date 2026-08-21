@@ -10,6 +10,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import yaml
 
@@ -142,12 +143,43 @@ class RuntimeDocumentationSystemTests(unittest.TestCase):
             with self.assertRaisesRegex(DocumentationError, "repository-relative"):
                 initialize_documentation(root)
 
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_profile(root, str(root / "absolute"))
+            with self.assertRaisesRegex(DocumentationError, "repository-relative"):
+                initialize_documentation(root)
+
         with tempfile.TemporaryDirectory() as directory, tempfile.TemporaryDirectory() as external:
             root = Path(directory)
             write_profile(root)
             (root / "docs").symlink_to(Path(external), target_is_directory=True)
-            with self.assertRaisesRegex(DocumentationError, "escapes"):
+            with self.assertRaisesRegex(DocumentationError, "symlinks are not allowed"):
                 initialize_documentation(root)
+
+    def test_init_rejects_root_file_in_preview_and_writes_profile_last(self) -> None:
+        """Keep previews executable and leave an inert structure if profile activation fails."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_profile(root)
+            target = root / "docs/developer"
+            target.parent.mkdir(parents=True)
+            target.write_text("not a directory\n", encoding="utf-8")
+            preview = initialize_documentation(root, dry_run=True)
+            applied = initialize_documentation(root)
+            self.assertEqual(preview["status"], "failed")
+            self.assertEqual(applied["status"], "failed")
+            self.assertEqual(preview["conflicts"], ["docs/developer"])
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with patch(
+                "project_governance_runtime.documentation.atomic_write_text",
+                side_effect=OSError("profile write failed"),
+            ):
+                with self.assertRaisesRegex(OSError, "profile write failed"):
+                    initialize_documentation(root)
+            self.assertTrue((root / "docs/developer/index.md").is_file())
+            self.assertFalse((root / "config/governance/profile.yaml").exists())
 
     def test_exact_routes_share_one_record_and_reject_fuzzy_matches(self) -> None:
         """Resolve ids, aliases, and symbols without interpreting natural language."""
@@ -188,11 +220,18 @@ class RuntimeDocumentationSystemTests(unittest.TestCase):
             ambiguous = route_documentation(root, symbol="shared")
             issues = documentation_issues(root)
             (root / "docs/developer/reference/one.md").unlink()
+            degraded = route_documentation(root, capability="one")
+            missing_issues = documentation_issues(root)
+            (root / "docs/developer/catalog.yaml").write_text(
+                "version: [invalid]\n", encoding="utf-8"
+            )
             invalid = route_documentation(root, capability="one")
 
         self.assertEqual(ambiguous["status"], "ambiguous")
         self.assertEqual(ambiguous["match_count"], 2)
         self.assertTrue(any("shared" in issue for issue in issues))
+        self.assertEqual(degraded["status"], "matched")
+        self.assertTrue(any("target is missing" in issue for issue in missing_issues))
         self.assertEqual(invalid["status"], "invalid")
         self.assertNotIn("capability", invalid)
 
@@ -201,6 +240,31 @@ class RuntimeDocumentationSystemTests(unittest.TestCase):
             write_profile(root, enabled=False)
             disabled = route_documentation(root, capability="anything")
         self.assertEqual(disabled["status"], "disabled")
+
+    def test_route_rejects_symlinked_catalog_and_exposes_research_policy(self) -> None:
+        """Reject catalog indirection while giving the authoring host the adopter policy."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            initialize_documentation(root)
+            profile = root / "config/governance/profile.yaml"
+            profile.write_text(
+                profile.read_text(encoding="utf-8").replace(
+                    "research: allowed", "research: disabled"
+                ),
+                encoding="utf-8",
+            )
+            catalog = root / "docs/developer/catalog.yaml"
+            target = root / "catalog-target.yaml"
+            catalog.replace(target)
+            catalog.symlink_to(target)
+            invalid = route_documentation(root, capability="anything")
+            catalog.unlink()
+            target.replace(catalog)
+            routed = route_documentation(root, capability="anything")
+
+        self.assertEqual(invalid["status"], "invalid")
+        self.assertEqual(routed["status"], "not-found")
+        self.assertEqual(routed["research"], "disabled")
 
     def test_cli_telemetry_does_not_retain_the_route_query(self) -> None:
         """Observe command outcomes while discarding private catalog identifiers and paths."""
@@ -244,6 +308,43 @@ class RuntimeDocumentationSystemTests(unittest.TestCase):
         self.assertNotIn("private-capability", telemetry)
         self.assertNotIn("docs/developer", telemetry)
         self.assertIn('"query_kind": "symbol"', telemetry)
+
+    def test_cli_route_statuses_have_stable_text_and_exit_contracts(self) -> None:
+        """Reserve failure exits for broken input while keeping routine lookup states scriptable."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            initialize_documentation(root)
+            command = [sys.executable, "-m", "project_governance_runtime.cli"]
+            environment = {**os.environ, "PYTHONPATH": str(ROOT / "src")}
+            not_found = subprocess.run(
+                [*command, "docs", "route", "--capability", "missing"],
+                cwd=root,
+                env=environment,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            (root / "docs/developer/catalog.yaml").write_text(
+                "version: [invalid]\n", encoding="utf-8"
+            )
+            invalid = subprocess.run(
+                [*command, "docs", "route", "--symbol", "missing"],
+                cwd=root,
+                env=environment,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+        self.assertEqual(not_found.returncode, 0, not_found.stderr)
+        self.assertEqual(
+            not_found.stdout.strip(),
+            "status=not-found query_kind=capability match_count=0",
+        )
+        self.assertEqual(invalid.returncode, 1, invalid.stderr)
+        self.assertEqual(
+            invalid.stdout.strip(), "status=invalid query_kind=symbol match_count=0"
+        )
 
     def test_cli_records_failed_init_without_repository_content(self) -> None:
         """Retain a bounded failure outcome when initialization rejects the local profile."""

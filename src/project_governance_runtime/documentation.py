@@ -8,6 +8,7 @@ from typing import Any
 
 import yaml
 
+from .installation import PROFILE_DEFAULT_TEXT
 from .state_io import atomic_write_text
 
 
@@ -31,13 +32,22 @@ def _load_mapping(path: Path, label: str) -> dict[str, Any]:
     return value
 
 
-def _repository_path(root: Path, value: str, label: str) -> Path:
+def _repository_path(
+    root: Path, value: str, label: str, *, reject_symlinks: bool = False
+) -> Path:
     """Resolve one nonempty relative path inside the repository."""
     path = Path(value)
     if not value.strip() or path.is_absolute() or ".." in path.parts:
         raise DocumentationError(f"{label}: must be a repository-relative path")
     repository = root.resolve()
-    resolved = (repository / path).resolve()
+    candidate = repository / path
+    if reject_symlinks:
+        current = repository
+        for part in path.parts:
+            current /= part
+            if current.is_symlink():
+                raise DocumentationError(f"{label}: symlinks are not allowed")
+    resolved = candidate.resolve()
     try:
         resolved.relative_to(repository)
     except ValueError as error:
@@ -65,7 +75,12 @@ def load_documentation_config(root: Path) -> dict[str, Any] | None:
     documentation_root = value.get("root", DEFAULT_ROOT)
     if not isinstance(documentation_root, str):
         raise DocumentationError("profile documentation.root must be a string")
-    resolved_root = _repository_path(root, documentation_root, "profile documentation.root")
+    resolved_root = _repository_path(
+        root,
+        documentation_root,
+        "profile documentation.root",
+        reject_symlinks=True,
+    )
     if resolved_root == root.resolve():
         raise DocumentationError("profile documentation.root must not be the repository root")
     research = value.get("research", "allowed")
@@ -82,9 +97,7 @@ def load_documentation_config(root: Path) -> dict[str, Any] | None:
 
 def _default_profile_text() -> str:
     """Return the ordinary profile with the optional documentation module enabled."""
-    return (
-        "schema_version: 1\n"
-        "project_extensions: []\n"
+    return PROFILE_DEFAULT_TEXT + (
         "documentation:\n"
         "  enabled: true\n"
         f"  root: {DEFAULT_ROOT}\n"
@@ -174,6 +187,10 @@ def _profile_install_plan(
 
 def _target_plan(root: Path, documentation_root: Path) -> tuple[list[str], list[str], list[str]]:
     """Classify the four minimal module paths without mutating them."""
+    if documentation_root.is_symlink() or (
+        documentation_root.exists() and not documentation_root.is_dir()
+    ):
+        return [], [], [documentation_root.relative_to(root).as_posix()]
     paths = {
         documentation_root / "index.md": False,
         documentation_root / "catalog.yaml": False,
@@ -191,10 +208,6 @@ def _write_documentation_structure(
     root: Path, documentation_root: Path, profile_text: str | None
 ) -> None:
     """Apply one conflict-free create-only installation plan."""
-    if profile_text is not None:
-        profile_path = root / PROFILE_PATH
-        profile_path.parent.mkdir(parents=True, exist_ok=True)
-        atomic_write_text(profile_path, profile_text)
     documentation_root.mkdir(parents=True, exist_ok=True)
     for directory in (documentation_root / "guides", documentation_root / "reference"):
         directory.mkdir(exist_ok=True)
@@ -206,6 +219,10 @@ def _write_documentation_structure(
         if not path.exists():
             with path.open("x", encoding="utf-8") as stream:
                 stream.write(content)
+    if profile_text is not None:
+        profile_path = root / PROFILE_PATH
+        profile_path.parent.mkdir(parents=True, exist_ok=True)
+        atomic_write_text(profile_path, profile_text)
 
 
 def initialize_documentation(root: Path, *, dry_run: bool = False) -> dict[str, Any]:
@@ -224,6 +241,7 @@ def initialize_documentation(root: Path, *, dry_run: bool = False) -> dict[str, 
             "unchanged": [PROFILE_PATH.as_posix()],
             "conflicts": [],
             "agent_pointer": None,
+            "research": config["research"],
         }
 
     documentation_root = _repository_path(
@@ -250,8 +268,10 @@ def initialize_documentation(root: Path, *, dry_run: bool = False) -> dict[str, 
         "conflicts": conflicts,
         "agent_pointer": (
             f"Developer documentation: `{config['root']}/index.md`; "
-            f"agent catalog: `{config['root']}/catalog.yaml`."
+            f"agent catalog: `{config['root']}/catalog.yaml`; "
+            f"external research: `{config['research']}`."
         ),
+        "research": config["research"],
     }
     if conflicts or dry_run:
         return result
@@ -261,7 +281,12 @@ def initialize_documentation(root: Path, *, dry_run: bool = False) -> dict[str, 
 
 def _catalog_path(root: Path, config: dict[str, Any]) -> Path:
     """Return the configured catalog path inside the repository."""
-    return _repository_path(root, f"{config['root']}/catalog.yaml", "documentation catalog")
+    return _repository_path(
+        root,
+        f"{config['root']}/catalog.yaml",
+        "documentation catalog",
+        reject_symlinks=True,
+    )
 
 
 def _string_list(record: dict[str, Any], field: str, label: str) -> list[str]:
@@ -282,7 +307,12 @@ def _require_local_file(root: Path, value: str, label: str) -> None:
 
 
 def _normalize_capability(
-    root: Path, record: Any, *, index: int, catalog_label: str
+    root: Path,
+    record: Any,
+    *,
+    index: int,
+    catalog_label: str,
+    validate_paths: bool,
 ) -> dict[str, Any]:
     """Normalize one minimal capability while retaining project-owned extension keys."""
     label = f"{catalog_label}: capabilities[{index}]"
@@ -295,18 +325,21 @@ def _normalize_capability(
         normalized[field] = record[field].strip()
     for field in LIST_FIELDS:
         normalized[field] = _string_list(record, field, label)
-    _require_local_file(root, normalized["reference"], f"{label}.reference")
-    for field in ("guides", "sources"):
-        for value in normalized[field]:
-            _require_local_file(root, value, f"{label}.{field}")
+    if validate_paths:
+        _require_local_file(root, normalized["reference"], f"{label}.reference")
+        for field in ("guides", "sources"):
+            for value in normalized[field]:
+                _require_local_file(root, value, f"{label}.{field}")
     return normalized
 
 
-def load_catalog(root: Path, config: dict[str, Any]) -> list[dict[str, Any]]:
+def load_catalog(
+    root: Path, config: dict[str, Any], *, validate_paths: bool = True
+) -> list[dict[str, Any]]:
     """Load structurally valid capability records and their contained local paths."""
     root = root.resolve()
     path = _catalog_path(root, config)
-    if not path.is_file() or path.is_symlink():
+    if not path.is_file():
         raise DocumentationError(f"{path.relative_to(root).as_posix()}: catalog is missing")
     value = _load_mapping(path, path.relative_to(root).as_posix())
     if value.get("version") != 1:
@@ -318,14 +351,38 @@ def load_catalog(root: Path, config: dict[str, Any]) -> list[dict[str, Any]]:
         )
     catalog_label = path.relative_to(root).as_posix()
     return [
-        _normalize_capability(root, record, index=index, catalog_label=catalog_label)
+        _normalize_capability(
+            root,
+            record,
+            index=index,
+            catalog_label=catalog_label,
+            validate_paths=validate_paths,
+        )
         for index, record in enumerate(capabilities)
     ]
+
+
+def documentation_selection_paths(root: Path) -> list[str]:
+    """Return configured corpus and declared evidence paths owned by the existing pack."""
+    paths = {PROFILE_PATH.as_posix()}
+    try:
+        config = load_documentation_config(root)
+        if config is None or not config["enabled"]:
+            return sorted(paths)
+        paths.add(f"{config['root']}/**")
+        for record in load_catalog(root, config, validate_paths=False):
+            paths.update(
+                [record["reference"], *record["guides"], *record["sources"]]
+            )
+    except (DocumentationError, OSError, UnicodeError):
+        pass
+    return sorted(paths)
 
 
 def documentation_issues(root: Path) -> list[str]:
     """Return deterministic enabled-module defects for the existing documentation checker."""
     root = root.resolve()
+    issues: list[str] = []
     try:
         config = load_documentation_config(root)
         if config is None or not config["enabled"]:
@@ -335,12 +392,11 @@ def documentation_issues(root: Path) -> list[str]:
         )
         index = documentation_root / "index.md"
         if not index.is_file() or index.is_symlink():
-            return [f"{index.relative_to(root).as_posix()}: human entry point is missing"]
+            issues.append(f"{index.relative_to(root).as_posix()}: human entry point is missing")
         records = load_catalog(root, config)
     except (DocumentationError, OSError, UnicodeError) as error:
-        return [str(error)]
+        return sorted(set([*issues, str(error)]))
 
-    issues: list[str] = []
     capability_routes: dict[str, str] = {}
     symbol_routes: dict[str, str] = {}
     for record in records:
@@ -378,9 +434,12 @@ def route_documentation(
     }
     try:
         config = load_documentation_config(root)
-        if config is None or not config["enabled"]:
+        if config is None:
             return {**envelope, "status": "disabled", "match_count": 0}
-        records = load_catalog(root, config)
+        envelope["research"] = config["research"]
+        if not config["enabled"]:
+            return {**envelope, "status": "disabled", "match_count": 0}
+        records = load_catalog(root, config, validate_paths=False)
     except (DocumentationError, OSError, UnicodeError) as error:
         return {**envelope, "status": "invalid", "match_count": 0, "error": str(error)}
 

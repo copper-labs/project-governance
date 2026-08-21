@@ -140,6 +140,77 @@ class RuntimePlanningTests(unittest.TestCase):
         self.assertIn("documentation", plan["selected_packs"])
         self.assertNotIn("developer-documentation", plan["selected_packs"])
 
+    def test_configured_documentation_root_and_sources_extend_pack_selection(self) -> None:
+        """Follow adopter-owned corpus and evidence paths without creating another pack."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            profile = root / "config/governance/profile.yaml"
+            profile.parent.mkdir(parents=True)
+            profile.write_text(
+                yaml.safe_dump(
+                    {
+                        "schema_version": 1,
+                        "project_extensions": [],
+                        "documentation": {
+                            "enabled": True,
+                            "root": "knowledge/developer",
+                            "research": "allowed",
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            catalog = root / "knowledge/developer/catalog.yaml"
+            catalog.parent.mkdir(parents=True)
+            catalog.write_text(
+                yaml.safe_dump(
+                    {
+                        "version": 1,
+                        "capabilities": [
+                            {
+                                "id": "runtime",
+                                "title": "Runtime",
+                                "reference": "knowledge/developer/reference.md",
+                                "sources": ["src/runtime.py"],
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            arguments = argparse.Namespace(
+                pack=[],
+                mode="impacted",
+                stage="pre-commit",
+                staged=True,
+                changed_path=[],
+                base_ref=None,
+            )
+            for changed_path in ("knowledge/developer/catalog.yaml", "src/runtime.py"):
+                with self.subTest(path=changed_path), patch(
+                    "project_governance_runtime.cli.resolve_change_scope",
+                    return_value={
+                        "kind": "project-governance-change-packet",
+                        "version": 1,
+                        "scope": "changed",
+                        "mode": "staged",
+                        "base_ref": None,
+                        "records": [
+                            {
+                                "status": "modified",
+                                "path": changed_path,
+                                "previous_path": None,
+                                "before": {"kind": "index"},
+                                "after": {"kind": "index"},
+                                "changed_ranges": [],
+                            }
+                        ],
+                    },
+                ):
+                    plan, _ = _resolve_plan(arguments, root)
+                self.assertEqual(plan["status"], "ready", plan["blockers"])
+                self.assertIn("documentation", plan["selected_packs"])
+
     def test_branch_selection_prefers_the_configured_upstream(self) -> None:
         """Compare established release branches with their upstream before main."""
         with patch.dict("os.environ", {}, clear=True), patch(

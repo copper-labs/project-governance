@@ -24,7 +24,9 @@ tests own installed behavior. Git history preserves removed implementation.
 Locate one implementation owner before editing. The public CLI is in
 `src/project_governance_runtime/cli.py`; initialization and updates are in `installation.py`;
 selection is in `planning.py`; execution is in `runner.py`; built-in checker entry points are under
-`checker_scripts/`; installed generic guidance is under `assets/skills/`.
+`checker_scripts/`; installed generic guidance is under `assets/skills/`. The exact source proof and
+release boundary is owned by the
+[Validation Strategy](../../governance/validation-strategy.md).
 
 Do not add adopter identities, paths, product evidence, copied runtime code, compatibility shims, or
 a second policy authority to solve a source problem.
