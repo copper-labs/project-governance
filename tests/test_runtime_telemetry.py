@@ -344,6 +344,76 @@ class RuntimeTelemetryTests(unittest.TestCase):
         self.assertFalse(written)
         self.assertEqual(summary["delegated_entry_count"], 0)
 
+    def test_documentation_events_are_bounded_and_summarized_without_content(self) -> None:
+        """Measure initialization and routing friction without retaining authoring context."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            append(root, {
+                "event": "documentation-terminal",
+                "runtime_version": "1.3.0",
+                "operation": "init",
+                "outcome": "initialized",
+                "duration_ms": 12,
+                "dry_run": False,
+                "created_count": 3,
+                "updated_count": 1,
+                "unchanged_count": 1,
+                "conflict_count": 0,
+                "run_id": "private-run-id",
+                "scope_fingerprint": "private-fingerprint",
+                "path": "/private/docs",
+                "prompt": "private prompt",
+            })
+            append(root, {
+                "event": "documentation-terminal",
+                "runtime_version": "1.3.0",
+                "operation": "route",
+                "outcome": "matched",
+                "duration_ms": 4,
+                "query_kind": "capability",
+                "match_count": 1,
+                "query": "private-capability",
+                "source": "private source",
+            })
+            path = root / ".governance/telemetry/runs.jsonl"
+            text = path.read_text(encoding="utf-8")
+            records = [json.loads(line) for line in text.splitlines()]
+            summary = status(root)["documentation"]
+
+        for forbidden in (
+            "/private",
+            "private prompt",
+            "private-capability",
+            "private source",
+            "private-run-id",
+            "private-fingerprint",
+        ):
+            self.assertNotIn(forbidden, text)
+        self.assertEqual(summary["retained_operation_count"], 2)
+        self.assertEqual(records[0]["runtime_version"], "1.3.0")
+        self.assertEqual(summary["operation_counts"], {"init": 1, "route": 1})
+        self.assertEqual(summary["outcome_counts"], {"initialized": 1, "matched": 1})
+        self.assertEqual(summary["query_kind_counts"], {"capability": 1})
+        self.assertEqual(summary["total_duration_ms"], 16)
+        self.assertEqual(summary["created_count"], 3)
+        self.assertEqual(summary["updated_count"], 1)
+        self.assertEqual(summary["match_count"], 1)
+        self.assertIn("not a documentation-quality score", summary["interpretation"])
+
+    def test_documentation_events_reject_free_text_enums(self) -> None:
+        """Do not retain arbitrary operation, outcome, or query-kind strings."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            written = append(root, {
+                "event": "documentation-terminal",
+                "operation": "/private/path",
+                "outcome": "private outcome",
+                "query_kind": "private query",
+            })
+            summary = status(root)["documentation"]
+        self.assertFalse(written)
+        self.assertEqual(summary["retained_operation_count"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

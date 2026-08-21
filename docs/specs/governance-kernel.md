@@ -30,6 +30,9 @@ project-governance agent-dispatch finish --authorization <digest> --results <res
 project-governance doctor
 project-governance telemetry status
 project-governance init
+project-governance docs init --dry-run
+project-governance docs route --capability <id-or-alias> --json
+project-governance docs route --symbol <exact-symbol> --json
 project-governance update --to <version> --dry-run|--apply
 ```
 
@@ -204,6 +207,12 @@ only role, native model/profile, terminal outcome, duration, optional provider-r
 totals, proof result, and fallback/repair booleans. Status reports retained entry counts, outcomes,
 and per-model percentages, explicitly excluding evicted receipts and control-state-only timeouts.
 It calculates no prices, spend, savings, or project-wide usage.
+
+An accepted documentation operation may add one `documentation-terminal` record. Its allowlist
+holds only runtime version, operation, terminal outcome, duration, dry-run state, query kind, and
+aggregate created, updated, unchanged, conflict, or match counts. It excludes route values,
+identifiers, paths, content, prompts, citations, research topics, model identity, and shared run
+fingerprints.
 
 V1.1 records only bounded per-pack integer counters:
 `blocking_finding_count`, `advisory_finding_count`, `accepted_finding_count`,

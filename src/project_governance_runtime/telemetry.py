@@ -44,6 +44,18 @@ _EVENT_FIELDS = {
         "duration_ms",
         "entries",
     },
+    "documentation-terminal": {
+        "operation",
+        "outcome",
+        "duration_ms",
+        "dry_run",
+        "created_count",
+        "updated_count",
+        "unchanged_count",
+        "conflict_count",
+        "query_kind",
+        "match_count",
+    },
 }
 _PACK_FIELDS = {
     "id",
@@ -79,6 +91,26 @@ _ORCHESTRATION_OUTCOMES = {
     "needs-primary-decision",
 }
 _PROOF_RESULTS = {"passed", "failed", "not-run", "unavailable"}
+_DOCUMENTATION_OPERATIONS = {"init", "route"}
+_DOCUMENTATION_OUTCOMES = {
+    "initialized",
+    "unchanged",
+    "dry-run",
+    "failed",
+    "disabled",
+    "matched",
+    "ambiguous",
+    "not-found",
+    "invalid",
+}
+_DOCUMENTATION_QUERY_KINDS = {"capability", "symbol"}
+_DOCUMENTATION_INTEGER_FIELDS = {
+    "created_count",
+    "updated_count",
+    "unchanged_count",
+    "conflict_count",
+    "match_count",
+}
 
 
 def _now() -> str:
@@ -165,25 +197,27 @@ def _sanitize_orchestration_entry(value: Any) -> dict[str, Any] | None:
     return result if {"role", "profile_id", "model", "outcome"}.issubset(result) else None
 
 
-def _sanitize(event: Any) -> dict[str, Any] | None:
-    """Project an event onto the privacy-safe advisory telemetry schema."""
-    if not isinstance(event, dict) or event.get("event") not in _EVENT_FIELDS:
-        return None
-    event_name = event["event"]
-    allowed = _COMMON_FIELDS | _EVENT_FIELDS[event_name]
-    result: dict[str, Any] = {"schema_version": SCHEMA_VERSION, "event": event_name}
-    for key in allowed - {"event", "selected_packs", "packs", "entries"}:
-        value = event.get(key)
-        if key in {"changed_path_count", "selected_pack_count"}:
-            value = _non_negative_integer(value)
-        elif key == "duration_ms":
-            value = _non_negative_number(value)
-        elif key == "terminal_outcome":
-            value = value if value in _ORCHESTRATION_OUTCOMES else None
-        else:
-            value = _bounded_text(value)
-        if value is not None:
-            result[key] = value
+def _sanitize_event_scalar(event_name: str, key: str, value: Any) -> Any:
+    """Sanitize one non-collection event field through its bounded type or enum."""
+    if key in {"changed_path_count", "selected_pack_count"} | _DOCUMENTATION_INTEGER_FIELDS:
+        return _non_negative_integer(value)
+    if key == "duration_ms":
+        return _non_negative_number(value)
+    if key == "terminal_outcome":
+        return value if value in _ORCHESTRATION_OUTCOMES else None
+    if key == "operation":
+        return value if value in _DOCUMENTATION_OPERATIONS else None
+    if key == "outcome" and event_name == "documentation-terminal":
+        return value if value in _DOCUMENTATION_OUTCOMES else None
+    if key == "query_kind":
+        return value if value in _DOCUMENTATION_QUERY_KINDS else None
+    if key == "dry_run":
+        return value if isinstance(value, bool) else None
+    return _bounded_text(value)
+
+
+def _sanitize_event_collections(event: dict[str, Any], result: dict[str, Any]) -> None:
+    """Attach only the three explicitly bounded collection fields."""
     selected_packs = event.get("selected_packs")
     if isinstance(selected_packs, list):
         pack_ids = [item for item in (_bounded_text(item) for item in selected_packs) if item]
@@ -199,12 +233,41 @@ def _sanitize(event: Any) -> dict[str, Any] | None:
             item for item in (_sanitize_orchestration_entry(item) for item in entries) if item
         ]
         result["entries"] = summaries[:3]
-    if event_name == "orchestration-terminal" and (
-        result.get("terminal_outcome") not in _ORCHESTRATION_OUTCOMES
-        or not result.get("entries")
-    ):
+
+
+def _valid_terminal_event(event_name: str, result: dict[str, Any]) -> bool:
+    """Require the identity fields that make terminal event families interpretable."""
+    if event_name == "orchestration-terminal":
+        return (
+            result.get("terminal_outcome") in _ORCHESTRATION_OUTCOMES
+            and bool(result.get("entries"))
+        )
+    if event_name == "documentation-terminal":
+        return (
+            result.get("operation") in _DOCUMENTATION_OPERATIONS
+            and result.get("outcome") in _DOCUMENTATION_OUTCOMES
+        )
+    return True
+
+
+def _sanitize(event: Any) -> dict[str, Any] | None:
+    """Project an event onto the privacy-safe advisory telemetry schema."""
+    if not isinstance(event, dict) or event.get("event") not in _EVENT_FIELDS:
         return None
-    return result
+    event_name = event["event"]
+    common = (
+        {"event", "runtime_version"}
+        if event_name == "documentation-terminal"
+        else _COMMON_FIELDS
+    )
+    allowed = common | _EVENT_FIELDS[event_name]
+    result: dict[str, Any] = {"schema_version": SCHEMA_VERSION, "event": event_name}
+    for key in allowed - {"event", "selected_packs", "packs", "entries"}:
+        value = _sanitize_event_scalar(event_name, key, event.get(key))
+        if value is not None:
+            result[key] = value
+    _sanitize_event_collections(event, result)
+    return result if _valid_terminal_event(event_name, result) else None
 
 
 @contextmanager
@@ -428,6 +491,59 @@ def _orchestration_status(records: list[dict[str, Any]]) -> dict[str, Any]:
     return orchestration_summary
 
 
+def _documentation_status(records: list[dict[str, Any]]) -> dict[str, Any]:
+    """Summarize content-free documentation operation adoption and friction."""
+    operations = [
+        record for record in records if record.get("event") == "documentation-terminal"
+    ]
+    operation_counts: dict[str, int] = {}
+    outcome_counts: dict[str, int] = {}
+    query_kind_counts: dict[str, int] = {}
+    total_duration_ms: int | float = 0
+    totals = {
+        "created_count": 0,
+        "updated_count": 0,
+        "unchanged_count": 0,
+        "conflict_count": 0,
+        "match_count": 0,
+    }
+    for record in operations:
+        operation = str(record.get("operation", "unknown"))
+        outcome = str(record.get("outcome", "unknown"))
+        operation_counts[operation] = operation_counts.get(operation, 0) + 1
+        outcome_counts[outcome] = outcome_counts.get(outcome, 0) + 1
+        query_kind = record.get("query_kind")
+        if isinstance(query_kind, str):
+            query_kind_counts[query_kind] = query_kind_counts.get(query_kind, 0) + 1
+        duration = record.get("duration_ms")
+        if isinstance(duration, (int, float)) and not isinstance(duration, bool):
+            total_duration_ms += duration
+        for field in totals:
+            value = record.get(field)
+            if isinstance(value, int) and not isinstance(value, bool):
+                totals[field] += value
+    return {
+        "retained_operation_count": len(operations),
+        "operation_counts": dict(sorted(operation_counts.items())),
+        "outcome_counts": dict(sorted(outcome_counts.items())),
+        "query_kind_counts": dict(sorted(query_kind_counts.items())),
+        "total_duration_ms": total_duration_ms,
+        **totals,
+        "excludes": [
+            "queries, capability ids, aliases, symbols, and paths",
+            "documentation and source content",
+            "prompts, citations, research topics, and model identity",
+            "direct file edits and host-agent skill invocation",
+            "research quality, reader success, and documentation correctness",
+            "evicted events",
+        ],
+        "interpretation": (
+            "best-effort retained adoption and operational friction, not a documentation-quality "
+            "score"
+        ),
+    }
+
+
 def status(root: Path) -> dict[str, Any]:
     """Summarize local run outcomes without validating or approving repository state."""
     path = root / ".governance/telemetry/runs.jsonl"
@@ -440,5 +556,6 @@ def status(root: Path) -> dict[str, Any]:
         "outcomes": counts,
         "validation": _validation_status(records),
         "orchestration": _orchestration_status(records),
+        "documentation": _documentation_status(records),
         "path": path.relative_to(root).as_posix(),
     }

@@ -5,22 +5,22 @@ type: governance
 status: current
 owner: project-governance
 created: 2026-07-05
-updated: 2026-08-11
-summary: Default writing conventions for durable repository documentation.
+updated: 2026-08-21
+summary: Source-repository writing conventions layered over the shared reader-first authoring contract.
 ---
 
 # Writing Style Guide
 
-Write durable documentation so a busy technical reader can act without reconstructing the author's
-intent.
+The shared reader contract, research workflow, story spine, and editorial review live in
+[Reader-First Technical Authoring](../specs/technical-authoring-harness.md). This page adds only the
+source repository's local drafting conventions:
 
-- Introduce a concept before using it.
-- Explain why a rule exists before listing steps.
-- Prefer plain language over internal shorthand.
-- Keep each section focused on one job.
-- Name the owning document, source, or evidence for technical assertions.
-- Keep product terminology in the adopting repository.
-- Do not turn subjective prose preferences into blocking automation without a repository decision.
+- Lead with the runtime or operator outcome, then link to the owning contract.
+- Label target behavior separately from installed behavior.
+- Treat every command and example output as a claim that needs safe rehearsal or an explicit
+  verification boundary.
+- Keep adopter identities, paths, evidence, and product language outside this checkout.
+- Use exact current runtime names and keep model-specific files thin.
 
 Source comments should explain responsibility, context, or a material tradeoff. They should not
 repeat syntax.

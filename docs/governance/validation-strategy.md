@@ -74,6 +74,7 @@ content and base. If either changes, the integrated snapshot is a new candidate.
 | Governed documentation | Documentation governance |
 | Context routes, agent catalog, or root instructions | Context routing |
 | Runtime lock, bootstrap, hooks, profile, facts, or extension registration | Installation validation |
+| Enabled documentation profile or capability catalog | Existing documentation validation |
 | Telemetry implementation or telemetry policy | Telemetry verification |
 | Agent contract, routing, dispatch state, or native profile catalog | Agent contract plus synthetic native-host routing |
 | Pack definitions, schemas, selectors, or extension registration | Validation conformance |

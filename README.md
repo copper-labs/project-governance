@@ -26,6 +26,8 @@ project-governance doctor
 project-governance plan --stage pre-commit --mode impacted --json
 project-governance check --stage pre-commit --mode impacted
 project-governance check --pack naming
+project-governance docs init --dry-run
+project-governance docs route --capability <id> --json
 project-governance telemetry status
 ```
 
@@ -54,6 +56,8 @@ appear in GitHub release names. See the [release process](docs/governance/releas
   dependencies, test quality, and commit messages. Projects add only their own extension packs.
 - Generic skills are materialized from the installed wheel into ignored local discovery state;
   project-specific skills stay tracked by that project.
+- An optional minimal developer-documentation structure gives humans and agents one catalog and
+  canonical corpus while the host agent owns local-first, research-enabled authoring.
 - Product identities, paths, adapters, release evidence, and project-specific vocabulary do not
   belong in this repository or its wheel.
 
@@ -75,6 +79,7 @@ project hooks use their locked local wheel instead.
 ## Reference
 
 - [Documentation index](docs/index.md)
+- [Developer documentation](docs/developer/index.md)
 - [Charter](CHARTER.md)
 - [Execution plans](docs/exec-plans/README.md)
 - [Future knowledge-graph direction](docs/proposed/knowledge-graph/README.md)

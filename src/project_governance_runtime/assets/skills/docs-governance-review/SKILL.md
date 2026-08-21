@@ -16,26 +16,22 @@ governed artifact lifecycle states change.
 
 ## Required Reads
 
-- `AGENTS.md`
-- `CHARTER.md`
-- `docs/index.md`
-- `docs/governance/README.md`
-- `docs/governance/artifact-lifecycle.md`
-- `docs/governance/traceability-map.yaml`
+- `AGENTS.md` or the nearest repository instruction authority
+- `.governance/runtime/skills/resources/reader-first-authoring.md`
 - `.governance/runtime/skills/review-finding.schema.yaml`
-- repository profile `docs`
+- the repository's documentation index, catalog, lifecycle, and traceability guidance when present
 
 ## Workflow
 
 1. Identify every governed artifact touched or created.
 2. Check frontmatter keys, status values, owner, summary, and artifact id consistency.
-3. Verify traceability entries for durable docs.
-4. Check local links and context-route references.
+3. Verify configured catalog or traceability entries for durable docs.
+4. Check local links and exact documentation routes.
 5. Confirm lifecycle movement is intentional and supported by evidence.
 
 ## Validation
 
-Run the docs-governance validation pack when the target configures one.
+Run the existing documentation pack and any project-owned extension selected for the change.
 
 ## Evidence
 

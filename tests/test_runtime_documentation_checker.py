@@ -39,7 +39,7 @@ def run_checker(root: Path, path: str, *, expected: int) -> dict[str, object]:
         cwd=root,
         env={
             **os.environ,
-            "PYTHONPATH": str(CHECKER.parent),
+            "PYTHONPATH": os.pathsep.join([str(ROOT / "src"), str(CHECKER.parent)]),
             "PROJECT_GOVERNANCE_CHANGE_PACKET": str(packet_path.resolve()),
         },
         text=True,
@@ -147,6 +147,46 @@ class RuntimeDocumentationCheckerTests(unittest.TestCase):
             index.write_text("# Plans\n\n- [Work](./active/work.md)\n", encoding="utf-8")
             passed = run_checker(root, "docs/exec-plans/active/work.md", expected=0)
         self.assertEqual(passed["status"], "passed")
+
+    def test_enabled_module_uses_the_existing_documentation_checker(self) -> None:
+        """Validate catalog routes without registering a second documentation pack."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            profile = root / "config/governance/profile.yaml"
+            profile.parent.mkdir(parents=True)
+            profile.write_text(
+                "schema_version: 1\n"
+                "project_extensions: []\n"
+                "documentation:\n"
+                "  enabled: true\n"
+                "  root: docs/developer\n"
+                "  research: allowed\n",
+                encoding="utf-8",
+            )
+            docs = root / "docs/developer"
+            docs.mkdir(parents=True)
+            index = docs / "index.md"
+            index.write_text(
+                "---\n"
+                "id: developer.index\n"
+                "title: Developer Documentation\n"
+                "type: guide\n"
+                "status: current\n"
+                "owner: repository\n"
+                "created: 2026-08-21\n"
+                "updated: 2026-08-21\n"
+                "summary: Routes developer documentation.\n"
+                "---\n\n# Developer Documentation\n",
+                encoding="utf-8",
+            )
+            (docs / "catalog.yaml").write_text(
+                "version: 1\ncapabilities: []\n", encoding="utf-8"
+            )
+            passed = run_checker(root, "config/governance/profile.yaml", expected=0)
+            (docs / "catalog.yaml").write_text("version: 2\ncapabilities: []\n", encoding="utf-8")
+            failed = run_checker(root, "config/governance/profile.yaml", expected=1)
+        self.assertEqual(passed["status"], "passed")
+        self.assertTrue(any("version must be 1" in item["message"] for item in failed["findings"]))
 
 
 if __name__ == "__main__":

@@ -19,6 +19,7 @@ from typing import Any
 import yaml
 
 from governance_changed_paths import changed_path_views
+from project_governance_runtime.documentation import documentation_issues
 
 
 ROOT = Path.cwd()
@@ -273,6 +274,7 @@ def main() -> int:
     paths = selected_markdown_paths(mode, errors)
     validate_markdown(paths, errors)
     validate_links(paths, errors)
+    errors.extend(documentation_issues(ROOT))
     payload = result(errors)
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 1 if payload["status"] == "failed" else 0

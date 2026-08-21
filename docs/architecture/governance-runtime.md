@@ -5,7 +5,7 @@ type: architecture
 status: current
 owner: project-governance
 created: 2026-02-16
-updated: 2026-08-16
+updated: 2026-08-21
 summary: Architecture for a small, package-based, project-neutral governance runtime.
 ---
 
@@ -15,7 +15,7 @@ The architecture intentionally has two owners.
 
 | Owner | Responsibilities |
 | --- | --- |
-| Runtime wheel | CLI, changed-path selection, built-in generic packs, dependency ordering, timeout and process ownership, normalized findings, native-host routing and dispatch state, local telemetry, bootstrap/update commands, generic skills, and configuration schemas |
+| Runtime wheel | CLI, changed-path selection, built-in generic packs, dependency ordering, timeout and process ownership, normalized findings, native-host routing and dispatch state, minimal developer-doc installation and exact catalog routing, local telemetry, bootstrap/update commands, generic skills, and configuration schemas |
 | Adopting repository | Runtime lock, profile, facts, target packs, source mappings, tool commands, product documentation, root agent instructions, and product proof |
 
 ## Design Rules
@@ -42,6 +42,9 @@ The architecture intentionally has two owners.
     old issue encountered in a touched file.
 13. Provider-aware routing consumes explicit native session and catalog inputs, returns launch
     instructions only, and never calls a model or discovers a provider.
+14. Developer documentation uses one repository-owned corpus and catalog. The runtime installs its
+    minimal entry structure, resolves exact authored routes, and validates deterministic defects;
+    the host agent owns prose generation and permitted public research.
 
 ## Provider-Aware Dispatch Boundary
 

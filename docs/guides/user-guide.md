@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-03-02
-updated: 2026-08-16
+updated: 2026-08-21
 summary: Task-oriented guide for installing and operating the package-based governance runtime.
 ---
 
@@ -25,11 +25,26 @@ project-specific policy, packs, and commands.
    `GITHUB_TOKEN`, or the current `gh auth` credential; no credential enters the lock.
 6. Run `project-governance doctor` to confirm the runtime and configuration are usable.
 
-There is no separate source template or generator. The installed wheel's `init` command is the
-only initialization authority and never invents an artifact lock.
+There is no separate source template or generator. The installed wheel's `init` command owns the
+base runtime integration and never invents an artifact lock. Optional module commands such as
+`docs init` own only their declared extension and reuse the base profile seed.
 
 The lock, profile, facts, and project extensions stay tracked. The virtual environment, installed
 skills, and telemetry stay local and ignored.
+
+## Install Developer Documentation
+
+Preview and install the optional shared human and agent entry structure:
+
+```sh
+project-governance docs init --dry-run
+project-governance docs init
+```
+
+The command extends the existing profile and creates only missing index, catalog, and directory
+paths. It does not generate product claims or edit the repository's root agent instructions. The
+installed technical-authoring skill reads local authority first, then may use current public
+research when the profile and host allow it.
 
 ## Use Governed Delegation
 
