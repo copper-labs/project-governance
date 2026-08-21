@@ -132,7 +132,12 @@ class RuntimeDocumentationSystemTests(unittest.TestCase):
             write_profile(root)
             conflict = root / "docs/developer/index.md"
             conflict.mkdir(parents=True)
+            preview = initialize_documentation(root, dry_run=True)
             result = initialize_documentation(root)
+            self.assertEqual(preview["status"], "failed")
+            self.assertEqual(preview["conflicts"], ["docs/developer/index.md"])
+            self.assertEqual(preview["created"], [])
+            self.assertEqual(preview["updated"], [])
             self.assertEqual(result["status"], "failed")
             self.assertEqual(result["conflicts"], ["docs/developer/index.md"])
             self.assertEqual(result["created"], [])
