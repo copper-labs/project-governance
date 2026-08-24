@@ -100,16 +100,22 @@ class RuntimeContextTests(unittest.TestCase):
             materialize_skills(root)
             profile = routing_profile(context=[])
             profile["context_router"]["default_skills"] = []
-            profile["context_router"]["routes"][0]["skills"] = ["kotlin-testing-kmp"]
+            profile["context_router"]["routes"][0]["skills"] = ["kmp-bridge-event-delivery"]
+            profile["context_router"]["routes"][0]["token_budget"] = {
+                "primary_context_tokens": 100,
+                "active_plan_context_tokens": 100,
+                "expansion_context_tokens": 100,
+                "total_context_tokens": 10000,
+            }
             write_repository(root, profile)
 
             result = resolve_context(root, "Review governance", [])
 
             self.assertEqual(result["status"], "passed")
-            self.assertEqual([skill["id"] for skill in result["skills"]], ["kotlin-testing-kmp"])
+            self.assertEqual([skill["id"] for skill in result["skills"]], ["kmp-bridge-event-delivery"])
             self.assertEqual(
                 result["skills"][0]["path"],
-                ".governance/runtime/skills/stack-packs/kmp/upstream/kotlin-testing-kmp/SKILL.md",
+                ".governance/runtime/skills/stack-packs/kmp/advanced-bridge/kmp-bridge-event-delivery/SKILL.md",
             )
 
     def test_materialization_refuses_a_symlinked_context_source(self) -> None:

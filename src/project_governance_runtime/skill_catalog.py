@@ -87,6 +87,46 @@ def _references(asset_root: Path, entry: dict[str, Any], owner: str) -> list[str
     return result
 
 
+def _activation(entry: dict[str, Any], owner: str) -> tuple[str, str]:
+    """Normalize current activation metadata while accepting unrelated legacy strings."""
+    raw = entry.get("activation", {})
+    if raw is None or isinstance(raw, str):
+        value: dict[str, Any] = {}
+    elif isinstance(raw, dict):
+        value = raw
+    else:
+        raise SkillCatalogError(f"{owner}.activation: expected a mapping or legacy string")
+    mode = value.get("mode", "governed")
+    level = value.get("default_level", "available")
+    if mode not in ACTIVATION_MODES:
+        raise SkillCatalogError(f"{owner}.activation.mode: unsupported mode {mode}")
+    if level not in ACTIVATION_LEVELS:
+        raise SkillCatalogError(f"{owner}.activation.default_level: unsupported level {level}")
+    return str(mode), str(level)
+
+
+def _selector_metadata(entry: dict[str, Any], owner: str) -> tuple[dict[str, Any], list[str]]:
+    """Validate the two shallow manifest fields consumed by the selector."""
+    applicability = entry.get("applicability", {}) or {}
+    if not isinstance(applicability, dict):
+        raise SkillCatalogError(f"{owner}.applicability: expected a mapping")
+    conflicts = entry.get("conflicts", []) or []
+    if not isinstance(conflicts, list) or any(not isinstance(value, str) for value in conflicts):
+        raise SkillCatalogError(f"{owner}.conflicts: expected a list of skill ids")
+    return applicability, conflicts
+
+
+def _validate_portable(path: Path, owner: str, skill_id: str) -> None:
+    """Require provider-neutral name and description frontmatter for opted-in skills."""
+    frontmatter = _frontmatter(path, owner=owner)
+    if frontmatter.get("name") != skill_id:
+        raise SkillCatalogError(
+            f"{owner}: portable frontmatter name must equal skill id {skill_id}"
+        )
+    if not isinstance(frontmatter.get("description"), str) or not frontmatter["description"].strip():
+        raise SkillCatalogError(f"{owner}: portable frontmatter description is required")
+
+
 def _skill_record(
     asset_root: Path,
     entry: dict[str, Any],
@@ -99,22 +139,8 @@ def _skill_record(
     if not isinstance(skill_id, str) or not skill_id:
         raise SkillCatalogError(f"{owner}.id: non-empty string required")
     relative, path = _declared_file(asset_root, entry.get("path"), owner=f"{owner}.path")
-    raw_activation = entry.get("activation", {})
-    if raw_activation is None or isinstance(raw_activation, str):
-        activation: dict[str, Any] = {}
-    elif isinstance(raw_activation, dict):
-        activation = raw_activation
-    else:
-        raise SkillCatalogError(f"{owner}.activation: expected a mapping or legacy string")
-    mode = activation.get("mode", "governed")
-    level = activation.get("default_level", "available")
-    if mode not in ACTIVATION_MODES:
-        raise SkillCatalogError(f"{owner}.activation.mode: unsupported mode {mode}")
-    if level not in ACTIVATION_LEVELS:
-        raise SkillCatalogError(f"{owner}.activation.default_level: unsupported level {level}")
-    applicability = entry.get("applicability", {}) or {}
-    if not isinstance(applicability, dict):
-        raise SkillCatalogError(f"{owner}.applicability: expected a mapping")
+    mode, level = _activation(entry, owner)
+    applicability, conflicts = _selector_metadata(entry, owner)
     record = {
         "id": skill_id,
         "path": f"{RUNTIME_SKILL_ROOT}{relative}",
@@ -125,18 +151,13 @@ def _skill_record(
         "default_level": level,
         "capability_owner": entry.get("capability_owner"),
         "applicability": applicability,
+        "conflicts": conflicts,
         "references": _references(asset_root, entry, owner),
         "portable": entry.get("portable") is True,
         "router_for": [],
     }
     if record["portable"]:
-        frontmatter = _frontmatter(path, owner=owner)
-        if frontmatter.get("name") != skill_id:
-            raise SkillCatalogError(
-                f"{owner}: portable frontmatter name must equal skill id {skill_id}"
-            )
-        if not isinstance(frontmatter.get("description"), str) or not frontmatter["description"].strip():
-            raise SkillCatalogError(f"{owner}: portable frontmatter description is required")
+        _validate_portable(path, owner, skill_id)
     return record
 
 
