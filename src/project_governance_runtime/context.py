@@ -18,6 +18,8 @@ from typing import Any
 
 import yaml
 
+from .skill_catalog import SkillCatalogError, build_skill_index
+
 
 TOKEN_BYTES = 4
 DEFAULT_BUDGET = {
@@ -199,10 +201,19 @@ def _discover_skills(root: Path, router: dict[str, Any], route: dict[str, Any] |
     declared.extend(str(value) for value in (route or {}).get("skills", []) or [])
     found: list[dict[str, str]] = []
     missing: list[str] = []
+    try:
+        index = build_skill_index()
+    except SkillCatalogError as error:
+        raise ContextError(f"packaged skill catalog is invalid: {error}") from error
     for skill_id in _unique(declared):
         if SAFE_SKILL_ID.fullmatch(skill_id) is None:
             raise ContextError(f"context_router skill id is unsafe: {skill_id}")
-        relative = f".governance/runtime/skills/{skill_id}/SKILL.md"
+        record = index.get(skill_id)
+        relative = (
+            str(record["path"])
+            if record is not None
+            else f".governance/runtime/skills/{skill_id}/SKILL.md"
+        )
         content = _file_bytes(root, relative)
         if content is None:
             missing.append(skill_id)

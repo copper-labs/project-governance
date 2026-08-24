@@ -1,8 +1,6 @@
 ---
-id: skill.kmp-implementation
-title: KMP Implementation
-stage: Work
-provenance: package-default
+name: kmp-implementation
+description: Route Kotlin Multiplatform work by target shape, sharing posture, artifacts, device topology, and boundary pressure before choosing focused guidance.
 ---
 
 # KMP Implementation

@@ -19,9 +19,61 @@ from project_governance_runtime.context import (
 )
 
 
+SKILL_CONTEXT_FIELDS = {
+    "ecosystems",
+    "target_families",
+    "runtime_profiles",
+    "support_tiers",
+    "artifact_profiles",
+    "consumers",
+    "ui_posture",
+    "device_topology",
+    "boundary_pressure",
+}
+
+
 def router_is_configured(profile: dict[str, Any]) -> bool:
     """Return whether the target elected to configure context routing at all."""
     return "context_router" in profile
+
+
+def validate_skill_context(facts_document: dict[str, Any], errors: list[str]) -> None:
+    """Validate optional list-valued selection facts without requiring a router."""
+    facts = facts_document.get("facts", {})
+    if facts is None:
+        return
+    if not isinstance(facts, dict):
+        errors.append("facts.lock.yaml facts: expected a mapping")
+        return
+    skill_context = facts.get("skill_context")
+    if skill_context is None:
+        return
+    if not isinstance(skill_context, dict):
+        errors.append("facts.skill_context: expected a mapping")
+        return
+    for field in skill_context:
+        if field not in SKILL_CONTEXT_FIELDS:
+            errors.append(f"facts.skill_context.{field}: unsupported field")
+    for field in sorted(SKILL_CONTEXT_FIELDS & set(skill_context)):
+        values = skill_context[field]
+        if not isinstance(values, list):
+            errors.append(f"facts.skill_context.{field}: expected a list")
+            continue
+        seen: set[str] = set()
+        for index, value in enumerate(values):
+            if not isinstance(value, str) or not value.strip():
+                errors.append(
+                    f"facts.skill_context.{field}[{index}]: non-empty string required"
+                )
+                continue
+            normalized = value.strip()
+            if normalized != value:
+                errors.append(
+                    f"facts.skill_context.{field}[{index}]: surrounding whitespace is not allowed"
+                )
+            if normalized in seen:
+                errors.append(f"facts.skill_context.{field}: duplicate value {normalized}")
+            seen.add(normalized)
 
 
 def _report_context_error(owner: str, action: Any, errors: list[str]) -> None:

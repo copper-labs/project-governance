@@ -90,6 +90,48 @@ class RuntimeContextCheckerTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(json.loads(result.stdout), {"finding_count": 0, "findings": [], "status": "passed"})
 
+    def test_unconfigured_child_validates_optional_skill_context_facts(self) -> None:
+        """Validate fact-only configuration without forcing a profile or router into the child."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_yaml(
+                root / "config/governance/facts.lock.yaml",
+                {
+                    "schema_version": 1,
+                    "facts": {
+                        "skill_context": {
+                            "ecosystems": "kmp",
+                            "unknown_shape": ["phone"],
+                        }
+                    },
+                },
+            )
+            result = run_checker(root)
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 1)
+        self.assertTrue(any("ecosystems: expected a list" in item for item in payload["findings"]))
+        self.assertTrue(any("unknown_shape: unsupported field" in item for item in payload["findings"]))
+
+    def test_unconfigured_child_accepts_well_formed_optional_skill_context_facts(self) -> None:
+        """Keep the additive facts block independent from router adoption."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_yaml(
+                root / "config/governance/facts.lock.yaml",
+                {
+                    "schema_version": 1,
+                    "facts": {
+                        "skill_context": {
+                            "ecosystems": ["kmp"],
+                            "target_families": ["android", "apple"],
+                            "device_topology": ["companion"],
+                        }
+                    },
+                },
+            )
+            result = run_checker(root)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_configured_router_validates_direct_files_budgets_skills_and_packs(self) -> None:
         """Reject only unsafe or unresolved references from the active resolver shape."""
         with tempfile.TemporaryDirectory() as directory:

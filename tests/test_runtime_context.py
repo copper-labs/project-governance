@@ -19,6 +19,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from project_governance_runtime.cli import main  # noqa: E402
 from project_governance_runtime.context import resolve_context  # noqa: E402
+from project_governance_runtime.installation import materialize_skills  # noqa: E402
 
 
 def write_repository(root: Path, profile: dict[str, object]) -> None:
@@ -88,6 +89,28 @@ class RuntimeContextTests(unittest.TestCase):
                 materialized = root / result["materialization"]["root"] / item["materialized_path"]
                 self.assertTrue(materialized.is_file())
                 self.assertEqual(materialized.read_bytes(), (root / item["source_path"]).read_bytes())
+
+    def test_route_selection_resolves_a_manifest_owned_nested_skill_by_id(self) -> None:
+        """Use the catalog path for nested skills instead of assuming a top-level directory."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            guide = root / "docs/governance/guide.md"
+            guide.parent.mkdir(parents=True)
+            guide.write_text("Governance guide\n", encoding="utf-8")
+            materialize_skills(root)
+            profile = routing_profile(context=[])
+            profile["context_router"]["default_skills"] = []
+            profile["context_router"]["routes"][0]["skills"] = ["kotlin-testing-kmp"]
+            write_repository(root, profile)
+
+            result = resolve_context(root, "Review governance", [])
+
+            self.assertEqual(result["status"], "passed")
+            self.assertEqual([skill["id"] for skill in result["skills"]], ["kotlin-testing-kmp"])
+            self.assertEqual(
+                result["skills"][0]["path"],
+                ".governance/runtime/skills/stack-packs/kmp/upstream/kotlin-testing-kmp/SKILL.md",
+            )
 
     def test_materialization_refuses_a_symlinked_context_source(self) -> None:
         """Treat an escaping link as unavailable instead of copying external content."""

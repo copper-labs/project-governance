@@ -137,6 +137,7 @@ standard_skills:
   - id: kmp-implementation
     category: stack
     path: .governance/runtime/skills/kmp-implementation/SKILL.md
+    portable: true
     description: Implement or review Kotlin Multiplatform work with source-set and boundary discipline.
   - id: typescript-implementation
     category: stack
