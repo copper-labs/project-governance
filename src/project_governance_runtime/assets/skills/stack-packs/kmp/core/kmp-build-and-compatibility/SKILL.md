@@ -17,6 +17,8 @@ before changing the matrix.
    toolchains, target presets, and artifact tasks from current source and CI.
 2. Define the smallest coherent candidate matrix from current primary compatibility documents and
    repository constraints. Do not combine individually plausible versions without matrix proof.
+   Keep every wrapper, JDK, plugin, library, host, and target dimension unchanged unless the
+   requested change or verified compatibility evidence requires it to move.
 3. Identify host restrictions: Apple and watchOS binaries need an appropriate macOS/Xcode lane;
    native, JS/Wasm, server, desktop, and Android tasks have different runners and outputs.
 4. Change one owning version source and preserve repository policy, plugin order, hierarchy, target
@@ -29,6 +31,9 @@ before changing the matrix.
 Reject dynamic versions, unreviewed repositories, cache clearing as a claimed fix, or a single
 Android compile as KMP compatibility proof. If the matrix is undocumented or a target cannot run,
 mark that row conditional or unproved rather than inferring support.
+
+Do not prescribe commit grouping or a universal upgrade order. Sequence changes only after the
+target's actual compatibility edges identify which dimensions must move together or separately.
 
 ## Evidence
 

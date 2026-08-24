@@ -529,6 +529,23 @@ The legacy payload and advanced pack remain present. No activation was promoted 
 wheel was published, no adopter was changed, and no S5 wearable overlay was created. Those are the
 separately gated S4 and later decisions above.
 
+## Current S4 Evaluation-Only Result
+
+The frozen cross-provider behavior comparison is recorded in the
+[KMP Skill V0 Evaluation](../../reference/kmp-skill-v0-evaluation.md). It recommends promoting the
+seven-entry candidate during a separately authorized cutover:
+
+- all five scenarios passed no-skill, forced, and automatic comparison with Codex and Claude;
+- automatic routing tied or beat forced guidance and improved at least one material decision or
+  restraint over baseline for every V0 leaf;
+- the final run used `gpt-5.6-sol` at high reasoning and `claude-opus-5` at high effort with no
+  fallback; and
+- sharing, compatibility, and concurrency received one narrow correction pass before the final
+  candidate bytes were frozen.
+
+The legacy payload, advanced pack, activation modes, manifest provenance, and wheel contents have
+not been cut over. That destructive S4 remainder still requires explicit operator approval.
+
 ## Closeout
 
 At completion, move the plan to `docs/exec-plans/completed/` and record:

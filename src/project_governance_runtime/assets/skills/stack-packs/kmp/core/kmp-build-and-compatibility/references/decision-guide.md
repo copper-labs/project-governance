@@ -13,6 +13,11 @@ Version catalogs centralize values but do not prove compatibility. The matrix ne
 supported combinations and a repository-owned reason for any exception. Preserve one declared
 version owner; do not shadow it in convention plugins, samples, or publication scripts.
 
+Keep every matrix dimension unchanged unless the requested outcome or a verified compatibility
+edge requires it to move. There is no universal wrapper-first, Kotlin-first, or single-commit
+sequence; derive ordering and commit boundaries from the target's dependency edges and rollback
+needs.
+
 ## Proof order
 
 1. configuration and dependency resolution;

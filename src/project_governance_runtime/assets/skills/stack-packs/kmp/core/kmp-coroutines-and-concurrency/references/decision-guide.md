@@ -28,6 +28,10 @@ retain tombstones for callbacks already admitted outside the lock, join those jo
 shared session or native resource. This avoids stale callbacks, identifier-reuse races, and teardown
 that returns while host code is still executing.
 
+If cancel or close can be called reentrantly from an external callback, never join that same
+callback inline. Complete the drain from a safe owner or expose an awaitable completion result;
+choose the synchronous acknowledgement boundary only after the host contract is known.
+
 Use bounded timeout only in the test harness to keep a failed test finite. Production correctness
 must follow events, identities, state, or lifecycle—not sleeps or settle windows.
 

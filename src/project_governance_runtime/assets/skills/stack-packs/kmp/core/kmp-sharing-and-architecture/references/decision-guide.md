@@ -35,6 +35,11 @@ reconnect reconciliation; sensor provenance and freshness; background limits; po
 what still works without the phone. Missing data should become typed degraded state, not a crash or
 an invented healthy reading.
 
+Watch-owned execution is not the opposite default to phone-owned execution. If standalone
+behavior, offline mutations, or durability requirements are undeclared, present the viable
+authority topologies and stop before choosing an owner, queue, replay protocol, or persistence
+obligation.
+
 ## Primary sources
 
 - Kotlin project structure: https://kotlinlang.org/docs/multiplatform/multiplatform-discover-project.html

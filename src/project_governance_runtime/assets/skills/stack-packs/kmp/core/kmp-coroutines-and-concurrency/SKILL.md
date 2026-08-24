@@ -26,6 +26,11 @@ for stream and teardown choices.
 6. Treat `CancellationException` as control flow. Map other failures to stable public outcomes at
    the boundary; do not leak native exceptions or silently swallow terminal failure.
 
+Do not choose replace-versus-resume identity, synchronous-versus-asynchronous cancellation, or a
+callback-drain mechanism until reentrancy and callback-thread requirements are known. Close or
+cancel must not wait on the callback that invoked it; move joining or draining outside that callback
+or expose an asynchronous completion contract.
+
 ## Wearable and lifecycle pressure
 
 Model disconnect, reconnect, background suspension, process death, power constraints, and stale

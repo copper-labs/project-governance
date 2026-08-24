@@ -24,12 +24,18 @@ when comparing postures or device topologies.
 5. For companion or wearable systems, decide where authority lives while disconnected, which
    commands can be replayed, how conflicts resolve, and how stale or missing sensor context degrades.
 
+If authority or offline mutation requirements are undeclared, compare the viable ownership models
+and mark the design decision blocked. Companion topology does not imply phone authority, and
+disconnected operation does not imply watch authority. Do not prescribe durable queues, replay, or
+replication until the target declares which mutations must survive disconnection or process loss.
+
 ## Reject these shortcuts
 
 - universal `commonMain` placement without checking dependency and target constraints;
 - shared UI as a goal independent of native interaction, accessibility, performance, or staffing;
 - a host-local state mirror that can diverge from the shared owner;
-- phone-owned lifecycle or continuous connectivity as an undeclared wearable assumption; and
+- phone-owned lifecycle or continuous connectivity as an undeclared wearable assumption;
+- watch-owned authority or durable offline mutation as an undeclared wearable assumption; and
 - framework complexity introduced for a single consumer with no measured boundary pressure.
 
 ## Evidence

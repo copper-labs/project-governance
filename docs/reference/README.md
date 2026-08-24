@@ -24,3 +24,5 @@ it has no duplicate operator reference.
   leaf skills, source provenance, downloaded reference bundle, and known gaps.
 - [KMP skill quality audit](kmp-skill-quality-audit.md) evaluates whether each existing KMP skill
   has distinct whole-of-KMP value, sufficient depth, current evidence, and a clear future role.
+- [KMP skill V0 evaluation](kmp-skill-v0-evaluation.md) records the frozen cross-provider behavior
+  comparison, selected content digests, promotion recommendation, and residual proof boundary.
