@@ -132,6 +132,20 @@ class RuntimeContextCheckerTests(unittest.TestCase):
             result = run_checker(root)
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_skill_context_requires_normalized_fact_tokens(self) -> None:
+        """Reject prose and mixed-case facts that cannot exact-match manifest vocabulary."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_yaml(
+                root / "config/governance/facts.lock.yaml",
+                {"facts": {"skill_context": {"target_families": ["Wear OS"]}}},
+            )
+            result = run_checker(root)
+        self.assertEqual(result.returncode, 1)
+        self.assertTrue(
+            any("lowercase fact token" in item for item in json.loads(result.stdout)["findings"])
+        )
+
     def test_configured_router_validates_direct_files_budgets_skills_and_packs(self) -> None:
         """Reject only unsafe or unresolved references from the active resolver shape."""
         with tempfile.TemporaryDirectory() as directory:

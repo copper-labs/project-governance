@@ -6,6 +6,7 @@ configured router without producing a packet, generating documentation, or conta
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +31,7 @@ SKILL_CONTEXT_FIELDS = {
     "device_topology",
     "boundary_pressure",
 }
+SKILL_CONTEXT_VALUE = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 
 
 def router_is_configured(profile: dict[str, Any]) -> bool:
@@ -73,6 +75,10 @@ def validate_skill_context(facts_document: dict[str, Any], errors: list[str]) ->
                 )
             if normalized in seen:
                 errors.append(f"facts.skill_context.{field}: duplicate value {normalized}")
+            if SKILL_CONTEXT_VALUE.fullmatch(normalized) is None:
+                errors.append(
+                    f"facts.skill_context.{field}[{index}]: use a lowercase fact token"
+                )
             seen.add(normalized)
 
 

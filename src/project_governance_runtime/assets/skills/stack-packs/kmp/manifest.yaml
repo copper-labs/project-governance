@@ -7,6 +7,9 @@ source:
   license: Apache-2.0
   imported_on: 2026-07-05
   notice_path: .governance/runtime/skills/stack-packs/kmp/NOTICE.md
+candidate_source_policy: >-
+  Evaluation-only V0 core entries declare their dated primary and reusable-pattern sources per
+  entry. The legacy source block continues to describe only the retained upstream payload.
 router_skill: .governance/runtime/skills/kmp-implementation/SKILL.md
 default_status: included
 support_files:
@@ -15,6 +18,182 @@ support_files:
   - path: .governance/runtime/skills/stack-packs/kmp/NOTICE.md
     rationale: Preserve provenance and the target-governance boundary for the included upstream skill files.
 skills:
+  - id: kmp-sharing-and-architecture
+    path: .governance/runtime/skills/stack-packs/kmp/core/kmp-sharing-and-architecture/SKILL.md
+    status: included
+    category: architecture
+    portable: true
+    capability_owner: kmp-sharing-and-architecture
+    activation:
+      mode: evaluation-only
+      default_level: recommended
+    applicability:
+      require_facts:
+        ecosystems: [kmp]
+        target_families: [android, apple, desktop, server, web, native, wear-os, watchos]
+      task_terms: [architecture, sharing posture, companion flow, authority]
+      fact_terms:
+        boundary_pressure: [authority]
+      exclude_facts:
+        support_tiers: [unsupported]
+    references:
+      - path: .governance/runtime/skills/stack-packs/kmp/core/kmp-sharing-and-architecture/references/decision-guide.md
+    sources:
+      - kind: primary
+        url: https://kotlinlang.org/docs/multiplatform/multiplatform-discover-project.html
+        reviewed_on: 2026-08-24
+      - kind: reusable-pattern-extraction
+        topic: shared-runtime ownership, thin host shells, and explicit wearable authority
+        reviewed_on: 2026-08-24
+    rationale: Select a sharing and authority posture before module, UI, bridge, or wearable decisions.
+  - id: kmp-source-sets-and-platform-boundaries
+    path: .governance/runtime/skills/stack-packs/kmp/core/kmp-source-sets-and-platform-boundaries/SKILL.md
+    status: included
+    category: source-sets
+    portable: true
+    capability_owner: kmp-source-sets-and-platform-boundaries
+    activation:
+      mode: evaluation-only
+      default_level: recommended
+    applicability:
+      require_facts:
+        ecosystems: [kmp]
+        target_families: [android, apple, desktop, server, web, native, wear-os, watchos]
+      task_terms: [source set, commonMain, expect/actual, platform boundary, platform implementation]
+      path_globs:
+        - "**/src/*Main/**/Platform*.kt"
+        - "**/src/*Main/**/Actual*.kt"
+      fact_terms:
+        boundary_pressure: [platform-api]
+      exclude_facts:
+        support_tiers: [unsupported]
+    references:
+      - path: .governance/runtime/skills/stack-packs/kmp/core/kmp-source-sets-and-platform-boundaries/references/decision-guide.md
+    sources:
+      - kind: primary
+        url: https://kotlinlang.org/docs/multiplatform/multiplatform-hierarchy.html
+        reviewed_on: 2026-08-24
+      - kind: primary
+        url: https://kotlinlang.org/docs/multiplatform/multiplatform-discover-project.html
+        reviewed_on: 2026-08-24
+    rationale: Put behavior in the narrowest honest shared source set and isolate platform APIs.
+  - id: kmp-build-and-compatibility
+    path: .governance/runtime/skills/stack-packs/kmp/core/kmp-build-and-compatibility/SKILL.md
+    status: included
+    category: build
+    portable: true
+    capability_owner: kmp-build-and-compatibility
+    activation:
+      mode: evaluation-only
+      default_level: recommended
+    applicability:
+      require_facts:
+        ecosystems: [kmp]
+        target_families: [android, apple, desktop, server, web, native, wear-os, watchos]
+      task_terms: [upgrade, compatibility, toolchain, dependency, Gradle, Kotlin plugin, Xcode]
+      path_globs:
+        - "**/gradle/libs.versions.toml"
+        - "**/gradle-wrapper.properties"
+      fact_terms:
+        boundary_pressure: [toolchain-compatibility]
+      exclude_facts:
+        support_tiers: [unsupported]
+    references:
+      - path: .governance/runtime/skills/stack-packs/kmp/core/kmp-build-and-compatibility/references/decision-guide.md
+    sources:
+      - kind: primary
+        url: https://kotlinlang.org/docs/multiplatform/multiplatform-compatibility-guide.html
+        reviewed_on: 2026-08-24
+      - kind: primary
+        url: https://docs.gradle.org/current/userguide/compatibility.html
+        reviewed_on: 2026-08-24
+    rationale: Treat toolchain and target support as a verified matrix rather than independent versions.
+  - id: kmp-coroutines-and-concurrency
+    path: .governance/runtime/skills/stack-packs/kmp/core/kmp-coroutines-and-concurrency/SKILL.md
+    status: included
+    category: concurrency
+    portable: true
+    capability_owner: kmp-coroutines-and-concurrency
+    activation:
+      mode: evaluation-only
+      default_level: recommended
+    applicability:
+      require_facts:
+        ecosystems: [kmp]
+        boundary_pressure: [concurrency, event-delivery, lifecycle]
+      task_terms: [coroutine, Flow, event stream, callback, reconnect, cancellation, backpressure]
+      fact_terms:
+        boundary_pressure: [concurrency, event-delivery, lifecycle]
+      exclude_facts:
+        support_tiers: [unsupported]
+    references:
+      - path: .governance/runtime/skills/stack-packs/kmp/core/kmp-coroutines-and-concurrency/references/decision-guide.md
+    sources:
+      - kind: primary
+        url: https://kotlinlang.org/docs/native-memory-manager.html
+        reviewed_on: 2026-08-24
+      - kind: reusable-pattern-extraction
+        topic: generation guards, observation ownership, admission, cancellation, and teardown drains
+        reviewed_on: 2026-08-24
+    rationale: Make scope, cancellation, event semantics, backpressure, and lifecycle observable across targets.
+  - id: kmp-api-and-artifact-boundaries
+    path: .governance/runtime/skills/stack-packs/kmp/core/kmp-api-and-artifact-boundaries/SKILL.md
+    status: included
+    category: api-artifacts
+    portable: true
+    capability_owner: kmp-api-and-artifact-boundaries
+    activation:
+      mode: evaluation-only
+      default_level: recommended
+    applicability:
+      require_facts:
+        ecosystems: [kmp]
+        artifact_profiles: [library, shared-library, framework, xcframework, swift-package, klib]
+      task_terms: [public API, artifact, framework, XCFramework, Swift, export, ABI, binary compatibility]
+      fact_terms:
+        boundary_pressure: [language-interop, binary-compatibility]
+        consumers: [swift, objective-c, java, javascript, native-host]
+      exclude_facts:
+        support_tiers: [unsupported]
+    references:
+      - path: .governance/runtime/skills/stack-packs/kmp/core/kmp-api-and-artifact-boundaries/references/decision-guide.md
+    sources:
+      - kind: primary
+        url: https://kotlinlang.org/docs/multiplatform/multiplatform-build-native-binaries.html
+        reviewed_on: 2026-08-24
+      - kind: primary
+        url: https://kotlinlang.org/docs/native-swift-export.html
+        reviewed_on: 2026-08-24
+    rationale: Design from consumer-visible source, binary, lifecycle, and distribution contracts.
+  - id: kmp-test-and-evidence
+    path: .governance/runtime/skills/stack-packs/kmp/core/kmp-test-and-evidence/SKILL.md
+    status: included
+    category: testing
+    portable: true
+    capability_owner: kmp-test-and-evidence
+    activation:
+      mode: evaluation-only
+      default_level: recommended
+    applicability:
+      require_facts:
+        ecosystems: [kmp]
+        target_families: [android, apple, desktop, server, web, native, wear-os, watchos]
+      task_terms: [test, evidence, proof, parity, verification, regression]
+      fact_terms:
+        runtime_profiles: [wearable]
+        boundary_pressure: [test-parity]
+      exclude_facts:
+        support_tiers: [unsupported]
+    references:
+      - path: .governance/runtime/skills/stack-packs/kmp/core/kmp-test-and-evidence/references/decision-guide.md
+    sources:
+      - kind: primary
+        url: https://kotlinlang.org/docs/multiplatform/multiplatform-run-tests.html
+        reviewed_on: 2026-08-24
+      - kind: reusable-pattern-extraction
+        topic: shared contract fixtures, host parity, stale callbacks, reconnect, and honest proof tiers
+        reviewed_on: 2026-08-24
+    rationale: Match shared tests, target tests, bridge contracts, and device proof to the claim being made.
   - id: kotlin-build-kmp-gradle-governance
     path: .governance/runtime/skills/stack-packs/kmp/upstream/kotlin-build-kmp-gradle-governance/SKILL.md
     status: included
