@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-07-05
-updated: 2026-08-21
+updated: 2026-08-24
 summary: Entry point for the reusable, package-based project governance runtime.
 ---
 
@@ -31,6 +31,10 @@ lock.
   source-contributor journeys plus the shared agent catalog.
 - [Validation strategy](governance/validation-strategy.md) defines narrow proof by default and the
   few situations that require broader proof.
+- [KMP skill inventory](reference/kmp-skill-inventory.md) records the current Kotlin Multiplatform
+  capability surface, provenance, overlap, and known quality gaps.
+- [KMP skill quality audit](reference/kmp-skill-quality-audit.md) assesses the whole-of-KMP fit,
+  distinct value, depth, freshness, and disposition of every current KMP leaf.
 
 ## Reference Areas
 
@@ -39,6 +43,10 @@ lock.
 - [Specifications](specs/README.md) contain the active generic contracts.
 - [Guides](guides/README.md) provide task-oriented instructions for operators and agents.
 - [Decisions](decisions/README.md) records durable generic boundary decisions.
+- [KMP skill-library strategy](proposed/kmp-skill-library/README.md) proposes a provider-neutral,
+  evidence-backed path from the current pack to a cohesive Kotlin Multiplatform library.
+- [KMP capability and normalization map](proposed/kmp-skill-library/capability-map.md) defines what
+  the library needs, what must be normalized, the coverage gaps, and how each gap should be filled.
 - [Future knowledge-graph direction](proposed/knowledge-graph/README.md) is non-executable and
   requires a separately approved initiative before any implementation begins.
 

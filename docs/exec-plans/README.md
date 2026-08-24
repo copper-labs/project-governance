@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-02-16
-updated: 2026-08-21
+updated: 2026-08-24
 summary: Active and completed execution plans for the current source repository.
 ---
 
@@ -16,7 +16,10 @@ Git remains the implementation history and recovery mechanism.
 
 ## Active
 
-There are no active execution plans.
+- [KMP Skill Library V0](active/2026-08-24-kmp-skill-library-v0.md) is implementing the authorized
+  S0-S3 tranche: a frozen baseline, nested portable skill resolution, proactive matched-route
+  selection, exact materialization, and seven evaluation-only KMP entries. Cutover, publication,
+  adopter changes, and the wearable overlay remain separately gated.
 
 ## Completed
 
