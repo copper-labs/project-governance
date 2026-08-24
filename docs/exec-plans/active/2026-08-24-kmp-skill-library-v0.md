@@ -505,6 +505,30 @@ Approval of this plan may authorize S0-S3 source work only if the operator says 
 implementation. S4 payload deletion/cutover, wheel publication, adopter updates, S5 wearable work,
 remote telemetry, and later capability families each remain separate decisions.
 
+## Current Authorized Tranche
+
+S0-S3 completed locally on 2026-08-24:
+
+- `d7e864e` froze the historical router, 24 legacy leaves, eight supplied candidates, transition
+  dispositions, and five behavior-first scenario vectors.
+- `406c585` added catalog-and-manifest skill resolution, canonical path ownership, portable identity
+  validation, and independent optional fact validation.
+- `3df8c7b` added matched-route composition, evaluation gating, exact installed-byte verification,
+  the separate skill budget, deterministic packet identity, and materialization.
+- `1ff73b6` added the portable project-shape router and six progressively disclosed KMP leaves as
+  `evaluation-only` candidates, including bridge-performance and wearable decision pressure.
+
+Proof on the integrated S0-S3 snapshot:
+
+- all seven skill directories passed the skill static validator;
+- 34 focused catalog, context, checker, scenario, payload, and wheel-ownership tests passed;
+- the complete 275-test runtime suite passed with one existing skip; and
+- the two wheel reproducibility and payload-boundary tests passed.
+
+The legacy payload and advanced pack remain present. No activation was promoted to `governed`, no
+wheel was published, no adopter was changed, and no S5 wearable overlay was created. Those are the
+separately gated S4 and later decisions above.
+
 ## Closeout
 
 At completion, move the plan to `docs/exec-plans/completed/` and record:
