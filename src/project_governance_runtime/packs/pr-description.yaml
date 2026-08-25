@@ -1,0 +1,12 @@
+id: pr-description
+label: Pull request description
+implementation_status: active
+enforcement: blocking
+stages: [pre-pr, ci-pr]
+run_when: always
+impact_role: supplemental
+path_globs: []
+depends_on: []
+commands:
+  - builtin: pr-description
+    arguments: [pr_body_file]

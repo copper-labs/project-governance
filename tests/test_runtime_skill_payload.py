@@ -149,6 +149,34 @@ class RuntimeSkillPayloadTests(unittest.TestCase):
         ):
             self.assertIn(required, field_guide)
 
+    def test_change_narrative_guidance_stays_product_level(self) -> None:
+        """Keep commit and PR workflows conceptual, shared, and outside deep review."""
+        change_narrative = (
+            SKILLS_SOURCE / "resources" / "change-narrative.md"
+        ).read_text(encoding="utf-8").lower()
+        for required in (
+            "product impact",
+            "nature of change",
+            "code areas impacted",
+            "how the change surfaces",
+            "file-path inventory",
+            "perform code review",
+        ):
+            self.assertIn(required, change_narrative)
+        for workflow in (
+            "commit-message-workflow",
+            "pr-description-workflow",
+        ):
+            text = (
+                SKILLS_SOURCE
+                / "pattern-packs/delivery-quality"
+                / workflow
+                / "SKILL.md"
+            ).read_text(encoding="utf-8").lower()
+            self.assertIn("change-narrative.md", text)
+            self.assertIn("product impact", text)
+            self.assertIn("nature of change", text)
+
     def test_materialized_release_skill_defines_one_candidate_cycle(self) -> None:
         """Keep installed release review candidate-bound and free of retired profiles."""
         from project_governance_runtime.installation import materialize_skills

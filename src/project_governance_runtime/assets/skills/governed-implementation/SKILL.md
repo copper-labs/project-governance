@@ -19,6 +19,7 @@ repository generated from this template.
 - `AGENTS.md`
 - `docs/index.md`
 - The active plan or owning specification
+- `.governance/runtime/skills/resources/change-narrative.md` before any commit or pull request handoff
 - Route-selected packs or policies
 
 ## Workflow
@@ -54,7 +55,10 @@ repository generated from this template.
     explicitly added.
 14. If the clean integration snapshot advances, rerun only proof invalidated by that change. A
     snapshot advance alone does not authorize a broad matrix; name the invalidated claim first.
-15. Reconcile docs, traceability, observability proof or gap rationale, and closeout evidence
+15. Before any commit or pull request handoff, write the shared change narrative from the governing
+    intent and current evidence: outcome, product impact, conceptual change, code areas, why, and
+    validation. Do not substitute file paths or symbol lists for that explanation.
+16. Reconcile docs, traceability, observability proof or gap rationale, and closeout evidence
     before handoff.
 
 ## Validation
@@ -65,4 +69,5 @@ handoff. Use explicit `--pack` execution for focused diagnosis and repair.
 ## Evidence
 
 Report changed files, any delegation that occurred, integrated snapshot, validation commands and
-results, governing artifacts used, residual risks, and any follow-up work that remains.
+results, governing artifacts used, change narrative, residual risks, and any follow-up work that
+remains.

@@ -68,6 +68,8 @@ GitHub pull request body in CI. Editorial quality stays with the author and revi
   - Guidance leads with behavior and conceptual change, not file lists or code-review tooling.
   - Package-owned resource references resolve after materialization.
 - Focused proof: documentation, format, prose, and skill-payload tests
+- Proof state: portable resource and delivery guidance passed skill-payload and materialization
+  tests; staged documentation proof remains in the implementation checkpoint
 
 ## Slice 2: Enforce Commit Messages
 
@@ -83,6 +85,8 @@ GitHub pull request body in CI. Editorial quality stays with the author and revi
   - Merge, revert, fixup, squash, and amend messages pass without a labeled body.
   - The existing commit hook remains a thin runtime launcher.
 - Focused proof: change-narrative checker tests and commit-pack execution seam
+- Proof state: focused fixtures passed valid, missing, duplicate, ordering, placeholder, trailer,
+  Git-generated, and linked-worktree cases
 
 ## Slice 3: Enforce Pull Request Bodies
 
@@ -103,6 +107,8 @@ GitHub pull request body in CI. Editorial quality stays with the author and revi
   - Draft pull requests remain outside the blocking workflow until marked ready.
 - Focused proof: change-narrative checker tests, pack planning/execution tests, and workflow contract
   tests
+- Proof state: focused fixtures passed PR structure, template, Markdown fence, worktree, environment,
+  pack-selection, argv, and GitHub event-safety cases
 
 ## Slice 4: Review, Reconcile, And Close
 

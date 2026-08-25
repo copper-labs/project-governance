@@ -21,11 +21,12 @@ accurate, conceptual, and useful.
 
 ## Implementation State
 
-This approved contract is current. Runtime enforcement is not yet installed at the specification
-checkpoint; the active
-[implementation plan](../exec-plans/active/2026-08-24-change-narrative-enforcement.md) adds the
-portable guidance, commit check, local pull request check, and this repository's live GitHub body
-check before closeout.
+This approved contract is current. The source runtime installs the portable guidance, validates
+commit messages through the `commit-message` pack, and validates local and CI pull request bodies
+through the `pr-description` pack. This repository also checks the live GitHub pull request body.
+The active
+[implementation plan](../exec-plans/active/2026-08-24-change-narrative-enforcement.md) records the
+remaining review, reconciliation, and closeout work.
 
 ## Goals
 
@@ -85,9 +86,9 @@ Validation: <checks and observed outcome, or explicit reason not run>
 Risks or required action: <optional>
 ```
 
-The required labels appear once and in the order shown. Values must contain authored content, not a
-known placeholder-only value. Additional explanatory paragraphs and standard Git trailers may
-follow the required narrative.
+The required labels appear once and in the order shown. Each label and its compact value share one
+line. Values must contain authored content, not a known placeholder-only value. Additional
+explanatory paragraphs and standard Git trailers may follow the required narrative.
 
 Git-generated merge, revert, fixup, squash, and amend messages are exempt from the labeled body so
 Git workflows remain usable. Their subject must still be present and readable. A human-authored
@@ -123,9 +124,10 @@ Every ready-for-review pull request uses these sections in order:
 - <Check and observed outcome, or explicit reason not run>
 ```
 
-`## Risks or required action` is optional and follows validation when present. Product impact and
-code areas use bullets so multiple areas remain easy to scan. Each product-impact bullet uses an
-area followed by a colon and an explanation of how the change surfaces.
+`## Risks or required action` is optional and follows validation when present. Product impact,
+code areas, and validation use bullets so multiple areas and checks remain easy to scan. Each
+product-impact bullet uses an area followed by a colon and an explanation of how the change
+surfaces.
 
 The body evolves with the pull request. When scope, behavior, or evidence changes materially, the
 author updates the relevant section rather than leaving the opening narrative stale.

@@ -19,6 +19,7 @@ CHECKERS = {
     "test-quality": "check-test-quality.py",
     "context-router": "check-context-router.py",
     "commit-message": "check-commit-message.py",
+    "pr-description": "check-pr-description.py",
     "prose": "check-prose-style.py",
     "apple-dependencies": "check-apple-dependencies.py",
 }
