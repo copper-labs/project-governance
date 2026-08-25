@@ -275,8 +275,9 @@ def verify_change_narratives(root: Path, command: Path) -> None:
         expected=0,
     )
 
+    pr_title_path.write_text(VALID_PR_TITLE + "\n", encoding="utf-8")
     pr_path.write_text("", encoding="utf-8")
-    run(
+    empty_pr = run(
         [
             str(command),
             "check",
@@ -290,8 +291,9 @@ def verify_change_narratives(root: Path, command: Path) -> None:
         root=root,
         expected=1,
     )
+    if "pr-description.empty-body" not in empty_pr.stdout:
+        raise RuntimeError("installed pre-PR proof did not reject the empty body")
     pr_path.write_text(VALID_PR_BODY, encoding="utf-8")
-    pr_title_path.write_text(VALID_PR_TITLE + "\n", encoding="utf-8")
     run(
         [
             str(command),

@@ -123,8 +123,9 @@ rather than being repeated as prose in the reader-orientation narrative. A mater
 limitation or rollout consequence belongs in Product impact; the contract does not add a generic
 risk or action section.
 
-The body evolves with the pull request. When scope, behavior, or conceptual design changes materially, the
-author updates the relevant section rather than leaving the opening narrative stale.
+The body evolves with the pull request. When scope, behavior, or conceptual design changes
+materially, the author updates the relevant section rather than leaving the opening narrative
+stale.
 
 ## Enforcement Boundary
 
@@ -136,7 +137,8 @@ Blocking checks enforce only facts the runtime can determine consistently:
 - required content remains after comments and surrounding whitespace are removed;
 - list-shaped fields contain the required bullets;
 - product-impact bullets name an area and an explanation;
-- duplicate Outcome, dedicated Validation, and Risks or required action body fields are rejected;
+- duplicate Outcome, dedicated Validation, and Risks or required action body fields are rejected
+  across common casing, indentation, bullet, and Markdown-heading variants;
 - known placeholder-only values are rejected; and
 - ordinary commit subjects satisfy the existing minimum-length rule.
 
@@ -159,6 +161,11 @@ not perform code review.
 
 An adopter may add stricter deterministic policy through a target-owned pack. It must not copy the
 runtime checker or create a second shared narrative authority.
+
+A provider workflow runs the checker from its trusted base snapshot and passes the live title and
+body as untrusted data. This means the initial landing cannot claim CI enforcement from checker code
+introduced by the same pull request; enforcement begins after the trusted base contains the
+contract. Local commit and pre-PR enforcement remain available during that bootstrap boundary.
 
 ## Acceptance Criteria
 

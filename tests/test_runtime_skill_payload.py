@@ -170,6 +170,12 @@ class RuntimeSkillPayloadTests(unittest.TestCase):
         ).lower()
         self.assertNotIn("## validation", template)
         self.assertNotIn("risks or required action", template)
+        user_guide = (ROOT / "docs/guides/user-guide.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("git rev-parse --git-path PR_TITLE", user_guide)
+        self.assertIn("git rev-parse --git-path PR_DESCRIPTION.md", user_guide)
+        self.assertIn("fails closed", user_guide)
         for workflow in (
             "commit-message-workflow",
             "pr-description-workflow",

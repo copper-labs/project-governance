@@ -31,10 +31,14 @@ DISALLOWED_SECTIONS = (
     ("validation", "Validation"),
     ("risks-or-required-action", "Risks or required action"),
 )
-SECTION_IDS = {
-    title: section_id for section_id, title in (*REQUIRED_SECTIONS, *DISALLOWED_SECTIONS)
-}
+SECTION_IDS = {title: section_id for section_id, title in REQUIRED_SECTIONS}
 HEADING = re.compile(r"^##[ \t]+(.+?)[ \t]*$")
+DISALLOWED_HEADING = re.compile(
+    rf"^[ \t]*#{{1,6}}[ \t]+"
+    rf"({'|'.join(re.escape(title) for _, title in DISALLOWED_SECTIONS)})"
+    rf"[ \t]*:?(?:[ \t]+#+)?[ \t]*$",
+    re.IGNORECASE,
+)
 BULLET = re.compile(r"^[ \t]*[-*+][ \t]+(.+?)[ \t]*$")
 
 
@@ -48,29 +52,38 @@ def _body_path() -> Path:
     return git_metadata_path("PR_DESCRIPTION.md")
 
 
-def _title_input() -> tuple[Path, str | None]:
+def _title_input() -> tuple[Path, str | None, str]:
     """Resolve an explicit, provider-supplied, or worktree-local pull request title."""
     title_path = git_metadata_path("PR_TITLE")
     if len(sys.argv) > 2:
-        return title_path, sys.argv[2]
+        return Path("pull-request-title"), sys.argv[2], "argument"
     if "PROJECT_GOVERNANCE_PR_TITLE" in os.environ:
-        return title_path, os.environ["PROJECT_GOVERNANCE_PR_TITLE"]
+        return (
+            Path("pull-request-title"),
+            os.environ["PROJECT_GOVERNANCE_PR_TITLE"],
+            "provider",
+        )
     if not title_path.is_file():
-        return title_path, None
+        return title_path, None, "metadata"
     try:
-        return title_path, title_path.read_text(encoding="utf-8")
+        return title_path, title_path.read_text(encoding="utf-8"), "metadata"
     except (OSError, UnicodeError):
-        return title_path, None
+        return title_path, None, "metadata"
 
 
 def _title_findings() -> list[dict[str, object]]:
     """Require one compact outcome and reject only deterministic non-title shapes."""
-    path, raw_title = _title_input()
+    path, raw_title, source = _title_input()
     if raw_title is None:
+        remedy = (
+            "pass --pr-title with --pr-body-file"
+            if source != "metadata"
+            else f"pass --pr-title or create {path.as_posix()}"
+        )
         return [finding(
             "pr-description.title-missing",
             path,
-            "pull request title is missing; pass --pr-title or create this worktree's Git metadata title",
+            f"pull request title is missing; {remedy}",
         )]
     title = raw_title.strip()
     if len(title.splitlines()) != 1:
@@ -165,6 +178,41 @@ def _visible_section_text(content: str) -> str:
     return "\n".join(values)
 
 
+def _disallowed_section_findings(
+    path: Path,
+    text: str,
+) -> list[dict[str, object]]:
+    """Reject common Markdown heading variants of body sections outside the contract."""
+    findings: list[dict[str, object]] = []
+    fence: str | None = None
+    for line_number, line in enumerate(without_html_comments(text).splitlines(), 1):
+        marker = line.lstrip()[:3]
+        if marker in {"```", "~~~"}:
+            if fence is None:
+                fence = marker
+            elif marker == fence:
+                fence = None
+            continue
+        if fence is not None:
+            continue
+        match = DISALLOWED_HEADING.match(line)
+        if not match:
+            continue
+        title = match.group(1)
+        message = (
+            "put the pull request outcome in its title; remove the Outcome body section"
+            if title.casefold() == "outcome"
+            else f"remove the {title} body section; use checks or Product impact as appropriate"
+        )
+        findings.append(finding(
+            "pr-description.section-not-allowed",
+            path,
+            message,
+            line=line_number,
+        ))
+    return findings
+
+
 def _list_findings(
     path: Path,
     section_id: str,
@@ -194,7 +242,7 @@ def _list_findings(
     if section_id == "product-impact":
         for line_number, value in values:
             area, separator, impact = value.partition(":")
-            if not separator or is_placeholder(area) or is_placeholder(impact):
+            if not separator:
                 findings.append(finding(
                     "pr-description.product-impact-shape",
                     path,
@@ -202,12 +250,19 @@ def _list_findings(
                     "'<top-level area>: <how the change surfaces>'",
                     line=line_number,
                 ))
+            elif is_placeholder(area) or is_placeholder(impact):
+                findings.append(finding(
+                    "pr-description.field-placeholder",
+                    path,
+                    "Product impact needs an authored area and surface explanation",
+                    line=line_number,
+                ))
     return findings
 
 
 def _section_findings(path: Path, text: str) -> list[dict[str, object]]:
     """Validate PR section presence, order, uniqueness, shape, and authored content."""
-    findings: list[dict[str, object]] = []
+    findings = _disallowed_section_findings(path, text)
     sections = _sections(text)
     by_id: dict[str, list[dict[str, object]]] = {}
     for item in sections:
@@ -243,20 +298,6 @@ def _section_findings(path: Path, text: str) -> list[dict[str, object]]:
             ))
         if section_id in {"product-impact", "code-areas-impacted"}:
             findings.extend(_list_findings(path, section_id, title, found[0]))
-
-    for section_id, title in DISALLOWED_SECTIONS:
-        for item in by_id.get(section_id, []):
-            message = (
-                "put the pull request outcome in its title; do not repeat ## Outcome in the body"
-                if section_id == "outcome"
-                else f"keep ## {title} out of the reader narrative; use checks or Product impact as appropriate"
-            )
-            findings.append(finding(
-                "pr-description.section-not-allowed",
-                path,
-                message,
-                line=int(item["line"]),
-            ))
 
     if (
         len(required_positions) == len(REQUIRED_SECTIONS)

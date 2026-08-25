@@ -42,7 +42,8 @@ author and reviewer.
    clarity, infer intent, or invoke a model.
 6. Git-generated merge, revert, fixup, squash, and amend messages retain a narrow exemption.
 7. Local pre-PR validation reads an explicit `--pr-body-file` plus `--pr-title`, or the Git metadata
-   title and body drafts. CI validates the live provider title and body.
+   title and body drafts. CI validates the live provider title and body with checker code from the
+   trusted base snapshot.
 8. No changed-file map, sequence diagram, review estimate, reviewer suggestion, or deep-review
    subsystem is added.
 9. Dedicated Validation and Risks or required action fields are excluded and rejected. Check
@@ -113,11 +114,14 @@ author and reviewer.
     copying provider logic into the runtime.
   - Validate the live pull request title and body on open, edit, synchronization, reopening, and
     readiness.
+  - Run provider validation from trusted base code so a pull request cannot weaken its own gate.
 - Acceptance:
   - Local agents can prepare title and body drafts, run pre-PR validation, and supply the same
     values to their provider command.
   - Missing or malformed local drafts fail with an actionable path.
   - The GitHub workflow safely materializes event content without shell interpolation.
+  - The initial landing becomes CI-enforced only after the trusted base contains the checker; it
+    does not self-attest with code from the pull request head.
   - Draft pull requests remain outside the blocking workflow until marked ready.
 - Focused proof: change-narrative checker tests, pack planning/execution tests, and workflow contract
   tests
@@ -154,9 +158,11 @@ files, and no artifact write.
   the contract.
 - Made commit validation honor Git comments and scissors, including a configured comment marker.
 - Made PR section and bullet parsing ignore fenced examples and report the offending bullet line.
-- Changed GitHub checkout from the base snapshot to the pull request head so the workflow can use a
-  checker introduced by the candidate itself. The workflow retains read-only contents permission,
-  passes provider text as environment data, and exposes no secrets.
+- The first repair temporarily checked out the pull request head so the introducing candidate could
+  find its checker. The final reconciliation restores the trusted base snapshot: a pull request
+  cannot weaken its own gate, and the initial landing explicitly does not self-attest. The workflow
+  retains read-only contents permission, passes provider text as environment data, and exposes no
+  secrets.
 - Kept the built-in checker's fail-closed default metadata inputs. This intentionally differs from
   target command templates, whose omitted placeholder arguments make the command inapplicable.
 
@@ -164,7 +170,23 @@ After that review, operator feedback simplified the public narrative further: Va
 or required action were removed and are now rejected as legacy fields. Commit subjects and pull
 request titles now carry the outcome, obvious non-outcome titles fail, and the PR body no longer
 duplicates an Outcome section. The affected title, parser, hook, CLI, workflow, skill, and wheel
-seams require the final Opus 5 recheck.
+seams received a second audited Opus 5 recheck at frozen commit `857e3716a01b`. The audit again
+recorded high effort, fallback disabled, `repo_changed: false`, no changed files, and no artifact.
+
+The recheck reported one high and four medium findings. All five were accepted and repaired:
+
+- Recognize Git's `Reapply "..."` and nested older revert subjects without exempting ordinary
+  human-authored “Reapply” outcomes.
+- Reject common indented, bulleted, case-varied, and Markdown-heading forms of the removed fields.
+- Reject Outcome in commit bodies as well as pull request bodies.
+- Run the GitHub gate from the trusted base snapshot rather than checker code supplied by the pull
+  request.
+- Add the fail-closed title and body draft workflow to the adopter-facing user guide.
+
+The five low findings were also closed with more precise placeholder and inline-value diagnostics,
+provider-title finding paths, an isolated installed empty-body assertion, and direct `ci-pr` stage
+execution coverage. Per the bounded QA rule, these primary-owned repairs receive focused and broad
+source proof rather than a third general model review.
 
 ## Rollback
 

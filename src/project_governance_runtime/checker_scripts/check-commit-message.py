@@ -25,14 +25,19 @@ REQUIRED_FIELDS = (
     ("why", "Why"),
 )
 DISALLOWED_FIELDS = (
+    ("outcome", "Outcome"),
     ("validation", "Validation"),
     ("risks-or-required-action", "Risks or required action"),
 )
-LABELS = {
-    label: field_id for field_id, label in (*REQUIRED_FIELDS, *DISALLOWED_FIELDS)
-}
+LABELS = {label: field_id for field_id, label in REQUIRED_FIELDS}
 LABEL_PATTERN = re.compile(
     rf"^({'|'.join(re.escape(label) for label in LABELS)}):[ \t]*(.*)$"
+)
+DISALLOWED_PATTERN = re.compile(
+    rf"^[ \t]*(?:(?:[-*+]|#{{1,6}})[ \t]+)?(?:[*_]{{1,2}})?"
+    rf"({'|'.join(re.escape(label) for _, label in DISALLOWED_FIELDS)})"
+    rf"(?:[*_]{{1,2}})?[ \t]*:",
+    re.IGNORECASE,
 )
 QUOTED_REF = r"'[^'\n]+'"
 GENERATED_SUBJECTS = (
@@ -45,7 +50,7 @@ GENERATED_SUBJECTS = (
     re.compile(rf"^Merge tag {QUOTED_REF}(?: into .+)?$"),
     re.compile(r"^Merge commit '[0-9a-fA-F]{7,64}'(?: into .+)?$"),
     re.compile(r"^Merge pull request #[0-9]+ from .+$"),
-    re.compile(r'^Revert "[^"\n]+"$'),
+    re.compile(r'^(?:Revert|Reapply) ".+"$'),
     re.compile(r"^(?:fixup|squash|amend)![ \t]+.+$"),
 )
 SCISSORS = re.compile(r"^-+[ \t]*>8[ \t]*-+$")
@@ -110,6 +115,31 @@ def _field_occurrences(
     return matches
 
 
+def _disallowed_findings(
+    path: Path,
+    records: list[tuple[int, str]],
+) -> list[dict[str, object]]:
+    """Reject common body-field variants that would recreate reader boilerplate."""
+    findings: list[dict[str, object]] = []
+    for line_number, line in records:
+        match = DISALLOWED_PATTERN.match(line)
+        if not match:
+            continue
+        label = match.group(1)
+        message = (
+            "put the outcome in the commit subject; remove Outcome: from the body"
+            if label.casefold() == "outcome"
+            else f"remove {label}: from the reader narrative; use checks or Product impact as appropriate"
+        )
+        findings.append(finding(
+            "commit-message.field-not-allowed",
+            path,
+            message,
+            line=line_number,
+        ))
+    return findings
+
+
 def _field_findings(
     path: Path,
     records: list[tuple[int, str]],
@@ -143,18 +173,11 @@ def _field_findings(
             findings.append(finding(
                 "commit-message.field-placeholder",
                 path,
-                f"commit field needs authored content: {label}:",
+                f"put authored content on the same line as {label}:",
                 line=int(found[0]["line"]),
             ))
 
-    for field_id, label in DISALLOWED_FIELDS:
-        for item in by_id.get(field_id, []):
-            findings.append(finding(
-                "commit-message.field-not-allowed",
-                path,
-                f"keep {label}: out of the reader narrative; use checks or Product impact as appropriate",
-                line=int(item["line"]),
-            ))
+    findings.extend(_disallowed_findings(path, records))
 
     if (
         len(required_positions) == len(REQUIRED_FIELDS)

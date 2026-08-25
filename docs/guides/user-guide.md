@@ -74,6 +74,30 @@ project-governance plan --stage pre-pr --mode impacted --json
 If a pack fails, run that pack only, repair it, and run one impacted closeout. Do not use a broad
 run as a repair loop.
 
+## Prepare a Pull Request
+
+The pre-PR hook fails closed until the pull request title and body have been authored. Store the
+one-line outcome at the path returned by `git rev-parse --git-path PR_TITLE`, and store the body at
+the path returned by `git rev-parse --git-path PR_DESCRIPTION.md`. The body contains Product impact,
+Nature of the change, Code areas impacted, and Why; it does not repeat Outcome, Validation, or a
+generic risk section.
+
+Run the ordinary hook against those worktree-local drafts:
+
+```sh
+.githooks/pre-pr
+```
+
+For provider automation or another explicit draft location, supply the pair together:
+
+```sh
+project-governance check --stage pre-pr --mode impacted \
+  --pr-body-file <path> --pr-title "<plain-language outcome>"
+```
+
+Use the same title and body when creating the pull request. This keeps the locally checked draft
+and the visible provider content aligned.
+
 ## Upgrade Deliberately
 
 Preview an adoption:
