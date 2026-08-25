@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-02-16
-updated: 2026-08-21
+updated: 2026-08-24
 summary: Active and completed execution plans for the current source repository.
 ---
 
@@ -16,10 +16,17 @@ Git remains the implementation history and recovery mechanism.
 
 ## Active
 
-There are no active execution plans.
+No runtime implementation plan is currently active.
 
 ## Completed
 
+- [Skill utilization telemetry](completed/2026-08-24-skill-utilization-telemetry.md) delivered
+  bounded provider-neutral selection and closeout receipts, privacy-safe aggregation, proactive
+  context and Work guidance, and clean-wheel proof without Gateway or remote telemetry machinery.
+- [KMP Skill Library V0](completed/2026-08-24-kmp-skill-library-v0.md) delivered the governed
+  seven-entry provider-neutral core, proactive matched-route selection, exact materialization,
+  cross-provider evaluation, legacy-payload retirement, and clean-wheel proof. Publication,
+  adopter changes, and the wearable overlay remain separately gated.
 - [Reader-first authoring and on-demand developer documentation](completed/2026-08-21-on-demand-developer-documentation.md)
   delivered the minimal shared human and agent corpus, governed research handoff, exact routing,
   validation, telemetry, semantic pilots, Opus review reconciliation, and the `1.3.0` release.

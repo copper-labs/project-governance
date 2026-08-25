@@ -2,91 +2,250 @@ version: 1
 id: kmp-stack-pack
 display_name: KMP Stack Pack
 source:
-  repository: https://github.com/mmiani/kotlin-kmp-claude-agent-skills
-  source_path: skills
-  license: Apache-2.0
-  imported_on: 2026-07-05
+  type: normalized-mixed-provenance
+  normalized_on: 2026-08-24
   notice_path: .governance/runtime/skills/stack-packs/kmp/NOTICE.md
+  licensed_adaptation:
+    repository: https://github.com/mmiani/kotlin-kmp-claude-agent-skills
+    source_path: skills
+    license: Apache-2.0
+    imported_on: 2026-07-05
+    byte_preserved_in_v0: false
+  operator_authorized_input:
+    source: Philipp Lackner basic skill bundle supplied by the operator
+    decision: evaluated but no supplied bytes were selected for V0
+  original_synthesis:
+    owner: project-governance
+    reviewed_on: 2026-08-24
 router_skill: .governance/runtime/skills/kmp-implementation/SKILL.md
 default_status: included
 support_files:
   - path: .governance/runtime/skills/stack-packs/kmp/LICENSE
-    rationale: Preserve the Apache-2.0 license for the included upstream skill files.
+    rationale: Preserve the Apache-2.0 license for independently adapted upstream material.
   - path: .governance/runtime/skills/stack-packs/kmp/NOTICE.md
-    rationale: Preserve provenance and the target-governance boundary for the included upstream skill files.
+    rationale: Record mixed provenance, excluded supplied inputs, and the target-governance boundary.
 skills:
-  - id: kotlin-build-kmp-gradle-governance
-    path: .governance/runtime/skills/stack-packs/kmp/upstream/kotlin-build-kmp-gradle-governance/SKILL.md
+  - id: kmp-sharing-and-architecture
+    path: .governance/runtime/skills/stack-packs/kmp/core/kmp-sharing-and-architecture/SKILL.md
+    status: included
+    category: architecture
+    portable: true
+    capability_owner: kmp-sharing-and-architecture
+    activation:
+      mode: governed
+      default_level: recommended
+    applicability:
+      require_facts:
+        ecosystems: [kmp]
+        target_families: [android, apple, desktop, server, web, native, wear-os, watchos]
+      task_terms: [architecture, sharing posture, companion flow, authority]
+      fact_terms:
+        boundary_pressure: [authority]
+      exclude_facts:
+        support_tiers: [unsupported]
+    references:
+      - path: .governance/runtime/skills/stack-packs/kmp/core/kmp-sharing-and-architecture/references/decision-guide.md
+    sources:
+      - kind: original-synthesis
+        owner: project-governance
+        reviewed_on: 2026-08-24
+      - kind: licensed-independent-adaptation
+        repository: https://github.com/mmiani/kotlin-kmp-claude-agent-skills
+        license: Apache-2.0
+        byte_preserved: false
+        reviewed_on: 2026-08-24
+      - kind: primary
+        url: https://kotlinlang.org/docs/multiplatform/multiplatform-discover-project.html
+        reviewed_on: 2026-08-24
+      - kind: reusable-pattern-extraction
+        topic: shared-runtime ownership, thin host shells, and explicit wearable authority
+        reviewed_on: 2026-08-24
+    rationale: Select a sharing and authority posture before module, UI, bridge, or wearable decisions.
+  - id: kmp-source-sets-and-platform-boundaries
+    path: .governance/runtime/skills/stack-packs/kmp/core/kmp-source-sets-and-platform-boundaries/SKILL.md
+    status: included
+    category: source-sets
+    portable: true
+    capability_owner: kmp-source-sets-and-platform-boundaries
+    activation:
+      mode: governed
+      default_level: recommended
+    applicability:
+      require_facts:
+        ecosystems: [kmp]
+        target_families: [android, apple, desktop, server, web, native, wear-os, watchos]
+      task_terms: [source set, commonMain, expect/actual, platform boundary, platform implementation]
+      path_globs:
+        - "**/src/*Main/**/Platform*.kt"
+        - "**/src/*Main/**/Actual*.kt"
+      fact_terms:
+        boundary_pressure: [platform-api]
+      exclude_facts:
+        support_tiers: [unsupported]
+    references:
+      - path: .governance/runtime/skills/stack-packs/kmp/core/kmp-source-sets-and-platform-boundaries/references/decision-guide.md
+    sources:
+      - kind: original-synthesis
+        owner: project-governance
+        reviewed_on: 2026-08-24
+      - kind: licensed-independent-adaptation
+        repository: https://github.com/mmiani/kotlin-kmp-claude-agent-skills
+        license: Apache-2.0
+        byte_preserved: false
+        reviewed_on: 2026-08-24
+      - kind: primary
+        url: https://kotlinlang.org/docs/multiplatform/multiplatform-hierarchy.html
+        reviewed_on: 2026-08-24
+      - kind: primary
+        url: https://kotlinlang.org/docs/multiplatform/multiplatform-discover-project.html
+        reviewed_on: 2026-08-24
+    rationale: Put behavior in the narrowest honest shared source set and isolate platform APIs.
+  - id: kmp-build-and-compatibility
+    path: .governance/runtime/skills/stack-packs/kmp/core/kmp-build-and-compatibility/SKILL.md
     status: included
     category: build
-    rationale: Sound Gradle/KMP build governance with low conflict against repository profile-owned commands.
-  - id: kotlin-data-kmp-data-layer
-    path: .governance/runtime/skills/stack-packs/kmp/upstream/kotlin-data-kmp-data-layer/SKILL.md
+    portable: true
+    capability_owner: kmp-build-and-compatibility
+    activation:
+      mode: governed
+      default_level: recommended
+    applicability:
+      require_facts:
+        ecosystems: [kmp]
+        target_families: [android, apple, desktop, server, web, native, wear-os, watchos]
+      task_terms: [upgrade, compatibility, toolchain, dependency, Gradle, Kotlin plugin, Xcode]
+      path_globs:
+        - "**/gradle/libs.versions.toml"
+        - "**/gradle-wrapper.properties"
+      fact_terms:
+        boundary_pressure: [toolchain-compatibility]
+      exclude_facts:
+        support_tiers: [unsupported]
+    references:
+      - path: .governance/runtime/skills/stack-packs/kmp/core/kmp-build-and-compatibility/references/decision-guide.md
+    sources:
+      - kind: original-synthesis
+        owner: project-governance
+        reviewed_on: 2026-08-24
+      - kind: licensed-independent-adaptation
+        repository: https://github.com/mmiani/kotlin-kmp-claude-agent-skills
+        license: Apache-2.0
+        byte_preserved: false
+        reviewed_on: 2026-08-24
+      - kind: primary
+        url: https://kotlinlang.org/docs/multiplatform/multiplatform-compatibility-guide.html
+        reviewed_on: 2026-08-24
+      - kind: primary
+        url: https://docs.gradle.org/current/userguide/compatibility.html
+        reviewed_on: 2026-08-24
+    rationale: Treat toolchain and target support as a verified matrix rather than independent versions.
+  - id: kmp-coroutines-and-concurrency
+    path: .governance/runtime/skills/stack-packs/kmp/core/kmp-coroutines-and-concurrency/SKILL.md
     status: included
-    category: data
-    rationale: Strong repository/source-of-truth discipline that reinforces governance quality goals.
-  - id: kotlin-kmp-code-review
-    path: .governance/runtime/skills/stack-packs/kmp/upstream/kotlin-kmp-code-review/SKILL.md
+    category: concurrency
+    portable: true
+    capability_owner: kmp-coroutines-and-concurrency
+    activation:
+      mode: governed
+      default_level: recommended
+    applicability:
+      require_facts:
+        ecosystems: [kmp]
+        boundary_pressure: [concurrency, event-delivery, lifecycle]
+      task_terms: [coroutine, Flow, event stream, callback, reconnect, cancellation, backpressure]
+      fact_terms:
+        boundary_pressure: [concurrency, event-delivery, lifecycle]
+      exclude_facts:
+        support_tiers: [unsupported]
+    references:
+      - path: .governance/runtime/skills/stack-packs/kmp/core/kmp-coroutines-and-concurrency/references/decision-guide.md
+    sources:
+      - kind: original-synthesis
+        owner: project-governance
+        reviewed_on: 2026-08-24
+      - kind: licensed-independent-adaptation
+        repository: https://github.com/mmiani/kotlin-kmp-claude-agent-skills
+        license: Apache-2.0
+        byte_preserved: false
+        reviewed_on: 2026-08-24
+      - kind: primary
+        url: https://kotlinlang.org/docs/native-memory-manager.html
+        reviewed_on: 2026-08-24
+      - kind: reusable-pattern-extraction
+        topic: generation guards, observation ownership, admission, cancellation, and teardown drains
+        reviewed_on: 2026-08-24
+    rationale: Make scope, cancellation, event semantics, backpressure, and lifecycle observable across targets.
+  - id: kmp-api-and-artifact-boundaries
+    path: .governance/runtime/skills/stack-packs/kmp/core/kmp-api-and-artifact-boundaries/SKILL.md
     status: included
-    category: review
-    rationale: Broad implementation review guidance aligned with architecture, quality, security, and maintainability controls.
-  - id: kotlin-kmp-refactor-safety
-    path: .governance/runtime/skills/stack-packs/kmp/upstream/kotlin-kmp-refactor-safety/SKILL.md
-    status: included
-    category: refactor
-    rationale: Narrow refactor discipline that aligns with scoped changes, migration safety, and regression prevention.
-  - id: kotlin-navigation-compose-multiplatform
-    path: .governance/runtime/skills/stack-packs/kmp/upstream/kotlin-navigation-compose-multiplatform/SKILL.md
-    status: included
-    category: navigation
-    rationale: Useful for Compose navigation, with version-sensitive guidance requiring current-doc verification.
-  - id: kotlin-platform-app-links-and-deep-links
-    path: .governance/runtime/skills/stack-packs/kmp/upstream/kotlin-platform-app-links-and-deep-links/SKILL.md
-    status: included
-    category: android-platform
-    rationale: Useful for Android app/deep links, but applicable only when Android link handling is in scope.
-  - id: kotlin-platform-kmp-bridges
-    path: .governance/runtime/skills/stack-packs/kmp/upstream/kotlin-platform-kmp-bridges/SKILL.md
-    status: included
-    category: platform-bridge
-    rationale: Strong source-set and platform boundary guidance that reinforces KMP boundary checks.
-  - id: kotlin-project-architecture-review
-    path: .governance/runtime/skills/stack-packs/kmp/upstream/kotlin-project-architecture-review/SKILL.md
-    status: included
-    category: architecture
-    rationale: Solid KMP structural review guidance for module boundaries, source sets, layering, and long-term maintainability.
-  - id: kotlin-project-bugfix
-    path: .governance/runtime/skills/stack-packs/kmp/upstream/kotlin-project-bugfix/SKILL.md
-    status: included
-    category: bugfix
-    rationale: Methodical root-cause and minimal-fix workflow that fits governed implementation.
-  - id: kotlin-project-feature-implementation
-    path: .governance/runtime/skills/stack-packs/kmp/upstream/kotlin-project-feature-implementation/SKILL.md
-    status: included
-    category: implementation
-    rationale: Strong pre-coding inspection, source-set discipline, state/data ownership, and test guidance.
-  - id: kotlin-project-modularization
-    path: .governance/runtime/skills/stack-packs/kmp/upstream/kotlin-project-modularization/SKILL.md
-    status: included
-    category: architecture
-    rationale: Useful module-boundary guidance that complements platform profiles and boundary packs.
-  - id: kotlin-project-state-management
-    path: .governance/runtime/skills/stack-packs/kmp/upstream/kotlin-project-state-management/SKILL.md
-    status: included
-    category: state
-    rationale: Good state-holder and effect-handling guidance for KMP UI layers.
-  - id: kotlin-testing-kmp
-    path: .governance/runtime/skills/stack-packs/kmp/upstream/kotlin-testing-kmp/SKILL.md
+    category: api-artifacts
+    portable: true
+    capability_owner: kmp-api-and-artifact-boundaries
+    activation:
+      mode: governed
+      default_level: recommended
+    applicability:
+      require_facts:
+        ecosystems: [kmp]
+        artifact_profiles: [library, shared-library, framework, xcframework, swift-package, klib]
+      task_terms: [public API, artifact, framework, XCFramework, Swift, export, ABI, binary compatibility]
+      fact_terms:
+        boundary_pressure: [language-interop, binary-compatibility]
+        consumers: [swift, objective-c, java, javascript, native-host]
+      exclude_facts:
+        support_tiers: [unsupported]
+    references:
+      - path: .governance/runtime/skills/stack-packs/kmp/core/kmp-api-and-artifact-boundaries/references/decision-guide.md
+    sources:
+      - kind: original-synthesis
+        owner: project-governance
+        reviewed_on: 2026-08-24
+      - kind: licensed-independent-adaptation
+        repository: https://github.com/mmiani/kotlin-kmp-claude-agent-skills
+        license: Apache-2.0
+        byte_preserved: false
+        reviewed_on: 2026-08-24
+      - kind: primary
+        url: https://kotlinlang.org/docs/multiplatform/multiplatform-build-native-binaries.html
+        reviewed_on: 2026-08-24
+      - kind: primary
+        url: https://kotlinlang.org/docs/native-swift-export.html
+        reviewed_on: 2026-08-24
+    rationale: Design from consumer-visible source, binary, lifecycle, and distribution contracts.
+  - id: kmp-test-and-evidence
+    path: .governance/runtime/skills/stack-packs/kmp/core/kmp-test-and-evidence/SKILL.md
     status: included
     category: testing
-    rationale: Strong behavior-focused KMP testing guidance aligned with impact-aware validation.
-  - id: kotlin-ui-adaptive-resources
-    path: .governance/runtime/skills/stack-packs/kmp/upstream/kotlin-ui-adaptive-resources/SKILL.md
-    status: included
-    category: ui
-    rationale: Useful adaptive UI guidance for Compose targets, but optional for non-UI KMP libraries.
-  - id: kotlin-ui-compose-multiplatform
-    path: .governance/runtime/skills/stack-packs/kmp/upstream/kotlin-ui-compose-multiplatform/SKILL.md
-    status: included
-    category: ui
-    rationale: Useful shared Compose UI guidance when the target uses Compose Multiplatform.
+    portable: true
+    capability_owner: kmp-test-and-evidence
+    activation:
+      mode: governed
+      default_level: recommended
+    applicability:
+      require_facts:
+        ecosystems: [kmp]
+        target_families: [android, apple, desktop, server, web, native, wear-os, watchos]
+      task_terms: [test, evidence, proof, parity, verification, regression]
+      fact_terms:
+        runtime_profiles: [wearable]
+        boundary_pressure: [test-parity]
+      exclude_facts:
+        support_tiers: [unsupported]
+    references:
+      - path: .governance/runtime/skills/stack-packs/kmp/core/kmp-test-and-evidence/references/decision-guide.md
+    sources:
+      - kind: original-synthesis
+        owner: project-governance
+        reviewed_on: 2026-08-24
+      - kind: licensed-independent-adaptation
+        repository: https://github.com/mmiani/kotlin-kmp-claude-agent-skills
+        license: Apache-2.0
+        byte_preserved: false
+        reviewed_on: 2026-08-24
+      - kind: primary
+        url: https://kotlinlang.org/docs/multiplatform/multiplatform-run-tests.html
+        reviewed_on: 2026-08-24
+      - kind: reusable-pattern-extraction
+        topic: shared contract fixtures, host parity, stale callbacks, reconnect, and honest proof tiers
+        reviewed_on: 2026-08-24
+    rationale: Match shared tests, target tests, bridge contracts, and device proof to the claim being made.

@@ -28,3 +28,17 @@ capabilities:
       - AGENTS.md
       - src/project_governance_runtime/cli.py
       - tools/run-source-governance.sh
+  - id: inspect-skill-utilization
+    title: Select governed skills and inspect reported use
+    aliases: [skill-utilization, skill-telemetry]
+    tasks:
+      - understand proactive skill selection and exact materialization
+      - close out one context-bound skill selection
+      - inspect retained skill utilization without treating it as correctness proof
+    symbols: [project-governance context, project-governance skills closeout, project-governance telemetry status]
+    reference: docs/specs/skill-utilization.md
+    guides: [docs/guides/agent-setup-instructions.md]
+    sources:
+      - src/project_governance_runtime/context.py
+      - src/project_governance_runtime/skill_utilization.py
+      - src/project_governance_runtime/telemetry.py

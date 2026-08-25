@@ -1,0 +1,204 @@
+#!/usr/bin/env python3
+"""Prove generic catalog traversal and canonical nested-skill resolution."""
+
+from __future__ import annotations
+
+import hashlib
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+import yaml
+
+
+ROOT = Path(__file__).resolve().parents[1]
+ASSETS = ROOT / "src/project_governance_runtime/assets/skills"
+sys.path.insert(0, str(ROOT / "src"))
+
+from project_governance_runtime.installation import materialize_skills  # noqa: E402
+from project_governance_runtime.skill_catalog import (  # noqa: E402
+    SkillCatalogError,
+    build_skill_index,
+    canonical_skill_bytes,
+)
+
+
+def portable_skill(name: str) -> str:
+    """Return the smallest valid portable skill fixture."""
+    return f"---\nname: {name}\ndescription: Test {name}.\n---\n\n# {name}\n"
+
+
+def write_minimal_catalog(root: Path, skills: list[dict[str, object]]) -> None:
+    """Create a small catalog tree for rejection-path tests."""
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "catalog.yaml").write_text(
+        yaml.safe_dump({"standard_skills": skills, "stack_packs": [], "pattern_packs": []}),
+        encoding="utf-8",
+    )
+
+
+class RuntimeSkillCatalogTests(unittest.TestCase):
+    """Keep one catalog authority for top-level and nested package skills."""
+
+    def test_index_resolves_nested_skills_and_shared_router_attachments(self) -> None:
+        """Traverse the sole KMP manifest and attach its governed router once."""
+        index = build_skill_index(ASSETS)
+        self.assertNotIn("kotlin-testing-kmp", index)
+        self.assertNotIn("kmp-bridge-event-delivery", index)
+        router = index["kmp-implementation"]
+        self.assertEqual(router["router_for"], ["kmp-stack-pack"])
+        self.assertEqual(router["activation_mode"], "governed")
+        live_kmp = {
+            skill_id: record
+            for skill_id, record in index.items()
+            if skill_id == "kmp-implementation" or record["pack_id"] == "kmp-stack-pack"
+        }
+        self.assertEqual(
+            set(live_kmp),
+            {
+                "kmp-implementation",
+                "kmp-sharing-and-architecture",
+                "kmp-source-sets-and-platform-boundaries",
+                "kmp-build-and-compatibility",
+                "kmp-coroutines-and-concurrency",
+                "kmp-api-and-artifact-boundaries",
+                "kmp-test-and-evidence",
+            },
+        )
+        self.assertTrue(
+            all(record["activation_mode"] == "governed" for record in live_kmp.values())
+        )
+        self.assertFalse(
+            any(
+                segment in str(record["relative_path"])
+                for record in live_kmp.values()
+                for segment in ("/advanced-bridge/", "/upstream/")
+            )
+        )
+        self.assertEqual(
+            hashlib.sha256(canonical_skill_bytes(router)).hexdigest(),
+            hashlib.sha256((ASSETS / "kmp-implementation/SKILL.md").read_bytes()).hexdigest(),
+        )
+
+    def test_source_and_materialized_layouts_resolve_identical_skill_bytes(self) -> None:
+        """Prove package and bootstrapped copies share the same canonical identities."""
+        source = build_skill_index(ASSETS)
+        source_digests = {
+            skill_id: hashlib.sha256(canonical_skill_bytes(record)).hexdigest()
+            for skill_id, record in source.items()
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            materialize_skills(root)
+            installed = build_skill_index(root / ".governance/runtime/skills")
+            installed_digests = {
+                skill_id: hashlib.sha256(canonical_skill_bytes(record)).hexdigest()
+                for skill_id, record in installed.items()
+            }
+        self.assertEqual(source_digests, installed_digests)
+
+    def test_v0_core_is_portable_governed_and_progressively_disclosed(self) -> None:
+        """Keep exactly six live leaves bounded behind the sole KMP router."""
+        index = build_skill_index(ASSETS)
+        core = [
+            record
+            for record in index.values()
+            if str(record["relative_path"]).startswith("stack-packs/kmp/core/")
+            and str(record["relative_path"]).endswith("/SKILL.md")
+        ]
+        self.assertEqual(len(core), 6)
+        self.assertEqual(len({record["capability_owner"] for record in core}), 6)
+        for record in core:
+            self.assertIs(record["portable"], True)
+            self.assertEqual(record["activation_mode"], "governed")
+            self.assertEqual(record["default_level"], "recommended")
+            self.assertEqual(len(record["references"]), 1)
+            self.assertLess(len(canonical_skill_bytes(record)), 4_000)
+        manifest = yaml.safe_load(
+            (ASSETS / "stack-packs/kmp/manifest.yaml").read_text(encoding="utf-8")
+        )
+        core_entries = [entry for entry in manifest["skills"] if entry["id"] in {item["id"] for item in core}]
+        self.assertEqual(len(manifest["skills"]), 6)
+        self.assertEqual(manifest["source"]["type"], "normalized-mixed-provenance")
+        for entry in core_entries:
+            self.assertTrue(entry["sources"])
+            self.assertTrue(all(source.get("reviewed_on") for source in entry["sources"]))
+            self.assertIn("original-synthesis", {source["kind"] for source in entry["sources"]})
+
+    def test_index_rejects_duplicate_ids_escaping_paths_and_portable_name_mismatch(self) -> None:
+        """Fail closed on ambiguous or unsafe catalog ownership."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            skill = root / "one/SKILL.md"
+            skill.parent.mkdir(parents=True)
+            skill.write_text(portable_skill("wrong-name"), encoding="utf-8")
+            write_minimal_catalog(
+                root,
+                [
+                    {
+                        "id": "one",
+                        "path": ".governance/runtime/skills/one/SKILL.md",
+                        "portable": True,
+                    }
+                ],
+            )
+            with self.assertRaisesRegex(SkillCatalogError, "frontmatter name"):
+                build_skill_index(root)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            one = root / "one/SKILL.md"
+            two = root / "two/SKILL.md"
+            one.parent.mkdir(parents=True)
+            two.parent.mkdir(parents=True)
+            one.write_text(portable_skill("same"), encoding="utf-8")
+            two.write_text(portable_skill("same"), encoding="utf-8")
+            write_minimal_catalog(
+                root,
+                [
+                    {"id": "same", "path": ".governance/runtime/skills/one/SKILL.md"},
+                    {"id": "same", "path": ".governance/runtime/skills/two/SKILL.md"},
+                ],
+            )
+            with self.assertRaisesRegex(SkillCatalogError, "duplicate skill id"):
+                build_skill_index(root)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_minimal_catalog(
+                root,
+                [{"id": "escape", "path": ".governance/runtime/skills/../escape.md"}],
+            )
+            with self.assertRaisesRegex(SkillCatalogError, "stay inside"):
+                build_skill_index(root)
+
+    def test_index_rejects_multiple_capability_owners(self) -> None:
+        """Keep one active owner for each declared decision capability."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in ("one", "two"):
+                skill = root / name / "SKILL.md"
+                skill.parent.mkdir(parents=True)
+                skill.write_text(portable_skill(name), encoding="utf-8")
+            write_minimal_catalog(
+                root,
+                [
+                    {
+                        "id": "one",
+                        "path": ".governance/runtime/skills/one/SKILL.md",
+                        "capability_owner": "same-capability",
+                    },
+                    {
+                        "id": "two",
+                        "path": ".governance/runtime/skills/two/SKILL.md",
+                        "capability_owner": "same-capability",
+                    },
+                ],
+            )
+            with self.assertRaisesRegex(SkillCatalogError, "already owned"):
+                build_skill_index(root)
+
+
+if __name__ == "__main__":
+    unittest.main()

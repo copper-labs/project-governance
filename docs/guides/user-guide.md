@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-03-02
-updated: 2026-08-21
+updated: 2026-08-24
 summary: Task-oriented guide for installing and operating the package-based governance runtime.
 ---
 
@@ -71,6 +71,13 @@ Inspect selection without running checks:
 project-governance plan --stage pre-pr --mode impacted --json
 ```
 
+For agent work, the coordinator should run `project-governance context --task <description>
+--json-output .governance/runtime/context-result.json` before editing. Relevant governed skills are
+selected and materialized automatically from the repository route and facts. After work, the
+coordinator records one bounded per-skill closeout; the operator does not need to know or name the
+skill IDs. See
+[Skill selection and utilization](../specs/skill-utilization.md) for the internal contract.
+
 If a pack fails, run that pack only, repair it, and run one impacted closeout. Do not use a broad
 run as a repair loop.
 
@@ -98,9 +105,9 @@ artifacts from the dry-run list. Bootstrap then safely replaces the ignored loca
 the old runtime command has exited. Requesting the already locked immutable version returns
 `no-op`; the same version resolving to different bytes fails closed.
 
-Use `project-governance telemetry status` to inspect availability and outcomes. The underlying
-ignored JSONL retains bounded, redacted execution aggregates for trend analysis; it is diagnostic
-only and never authorizes a pass or policy change.
+Use `project-governance telemetry status` to inspect availability, validation outcomes, and
+retained self-reported skill utilization. The underlying ignored JSONL retains bounded, redacted
+aggregates for trend analysis; it is diagnostic only and never authorizes a pass or policy change.
 
 ## Configuration Ownership
 

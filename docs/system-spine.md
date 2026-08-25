@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-07-07
-updated: 2026-08-16
+updated: 2026-08-24
 summary: Top-level map of the package-based, project-neutral governance system.
 ---
 
@@ -28,6 +28,12 @@ its own policy choices and project checks. Markdown is the sole current policy a
 4. Commit the coherent change.
 5. Adopt a newer runtime only through `project-governance update`, after reviewing its dry run.
 
+For substantial agent work, the coordinator first runs the public context command. A matched
+target route selects and materializes the smallest exact skill set, while a bounded local selection
+event records only safe IDs, digests, and reason classes. After proof, the coordinator records one
+explicit per-skill closeout. The operator does not need to know the catalog or name skills, and the
+receipt remains advisory rather than becoming change authority.
+
 Optional delegated execution begins only when the operator explicitly runs `agent-route` and then
 `agent-dispatch start`. The current Codex or Claude Code session remains primary; the runtime
 returns same-provider launch entries but does not launch them. A missing or rejected route falls
@@ -47,6 +53,7 @@ explicit operator request. Routine product work stays narrow.
 ## Reading Path
 
 - [Runtime contract](specs/governance-kernel.md)
+- [Skill selection and utilization](specs/skill-utilization.md)
 - [Runtime architecture](architecture/governance-runtime.md)
 - [Bootstrap standards](governance/bootstrap-standards.md)
 - [Hook and check taxonomy](governance/hook-and-check-taxonomy.md)

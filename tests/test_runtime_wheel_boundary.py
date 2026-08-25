@@ -90,6 +90,15 @@ def declared_skill_files() -> set[str]:
                 for item in payload.get("skills", [])
                 if item.get("status") == "included"
             )
+            for item in payload.get("skills", []):
+                if item.get("status") != "included":
+                    continue
+                declared.update(
+                    _runtime_relative(
+                        reference["path"] if isinstance(reference, dict) else reference
+                    )
+                    for reference in item.get("references", [])
+                )
     return declared
 
 

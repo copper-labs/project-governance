@@ -10,7 +10,11 @@ from typing import Any
 
 import yaml
 
-from context_check_profile import router_is_configured, validate_router
+from context_check_profile import (
+    router_is_configured,
+    validate_router,
+    validate_skill_context,
+)
 
 
 ROOT = Path.cwd()
@@ -64,10 +68,12 @@ def main() -> int:
     """Check optional routing only when the child deliberately configured it."""
     errors: list[str] = []
     profile = load_mapping(PROFILE_PATH, errors, required=False)
-    if router_is_configured(profile):
-        facts = load_mapping(FACTS_LOCK_PATH, errors, required=True)
-        if not errors:
-            validate_router(ROOT, profile, facts, errors)
+    router_configured = router_is_configured(profile)
+    facts = load_mapping(FACTS_LOCK_PATH, errors, required=router_configured)
+    if not errors:
+        validate_skill_context(facts, errors)
+    if router_configured and not errors:
+        validate_router(ROOT, profile, facts, errors)
     emit_result(errors)
     if errors:
         for error in errors:
