@@ -25,9 +25,9 @@ This approved contract is current. The source runtime installs the portable guid
 commit messages through the `commit-message` pack, and validates local and CI pull request titles
 and bodies through the `pr-description` pack. This repository also checks the live GitHub pull
 request title and body.
-The active
-[implementation plan](../exec-plans/active/2026-08-24-change-narrative-enforcement.md) records the
-remaining review, reconciliation, and closeout work.
+The completed
+[implementation plan](../exec-plans/completed/2026-08-24-change-narrative-enforcement.md) records
+the implementation, independent review, reconciliation, and local proof.
 
 ## Goals
 

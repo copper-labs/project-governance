@@ -16,12 +16,13 @@ Git remains the implementation history and recovery mechanism.
 
 ## Active
 
-- [Commit and pull request change narratives](active/2026-08-24-change-narrative-enforcement.md)
-  installs and enforces one plain-language, conceptual narrative across local commits and ready pull
-  requests, followed by audited Claude Opus 5 review.
+No active source execution plan.
 
 ## Completed
 
+- [Commit and pull request change narratives](completed/2026-08-24-change-narrative-enforcement.md)
+  installed and enforced compact product-level narratives and useful titles across commits and
+  ready pull requests, followed by audited Claude Opus 5 reconciliation.
 - [Reader-first authoring and on-demand developer documentation](completed/2026-08-21-on-demand-developer-documentation.md)
   delivered the minimal shared human and agent corpus, governed research handoff, exact routing,
   validation, telemetry, semantic pilots, Opus review reconciliation, and the `1.3.0` release.
