@@ -1,0 +1,17 @@
+version: 2
+owner: project-governance
+records:
+  - name: actions/checkout
+    ecosystem: github-actions
+    version: 34e114876b0b11c390a56381ad16ebd13914f8d5
+    artifact_type: ci
+    evaluated_at: 2026-08-25T05:00:00Z
+    published_at: 2025-11-13T23:20:02Z
+    source_url: https://github.com/actions/checkout/commit/34e114876b0b11c390a56381ad16ebd13914f8d5
+  - name: actions/setup-python
+    ecosystem: github-actions
+    version: a26af69be951a213d495a4c3e4e4022e16d87065
+    artifact_type: ci
+    evaluated_at: 2026-08-25T05:00:00Z
+    published_at: 2025-04-24T02:42:27Z
+    source_url: https://github.com/actions/setup-python/commit/a26af69be951a213d495a4c3e4e4022e16d87065
