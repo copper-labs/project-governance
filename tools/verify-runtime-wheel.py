@@ -187,7 +187,20 @@ def initialize_target(root: Path, wheel: Path) -> tuple[Path, Path]:
     for relative in (
         ".governance/runtime/skills/catalog.yaml",
         ".governance/runtime/skills/resources/reader-first-authoring.md",
-        ".governance/runtime/skills/stack-packs/kmp/advanced-bridge/manifest.yaml",
+        ".governance/runtime/skills/kmp-implementation/SKILL.md",
+        ".governance/runtime/skills/stack-packs/kmp/manifest.yaml",
+        ".governance/runtime/skills/stack-packs/kmp/core/"
+        "kmp-sharing-and-architecture/SKILL.md",
+        ".governance/runtime/skills/stack-packs/kmp/core/"
+        "kmp-source-sets-and-platform-boundaries/SKILL.md",
+        ".governance/runtime/skills/stack-packs/kmp/core/"
+        "kmp-build-and-compatibility/SKILL.md",
+        ".governance/runtime/skills/stack-packs/kmp/core/"
+        "kmp-coroutines-and-concurrency/SKILL.md",
+        ".governance/runtime/skills/stack-packs/kmp/core/"
+        "kmp-api-and-artifact-boundaries/SKILL.md",
+        ".governance/runtime/skills/stack-packs/kmp/core/"
+        "kmp-test-and-evidence/SKILL.md",
     ):
         if not (root / relative).is_file():
             raise RuntimeError(f"installed wheel did not materialize {relative}")
