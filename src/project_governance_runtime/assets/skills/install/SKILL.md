@@ -35,8 +35,8 @@ reviewing a requested runtime update.
 
 ## Validation
 
-Run `project-governance doctor`, then
-`project-governance check --stage pre-pr --mode impacted` when integration files changed.
+Run `project-governance doctor`. A ready pull request later runs its pre-PR check with the authored
+body required by the change-narrative resource.
 
 ## Evidence
 

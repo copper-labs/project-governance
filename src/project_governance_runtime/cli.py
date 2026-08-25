@@ -62,6 +62,7 @@ def _parser() -> argparse.ArgumentParser:
     check.add_argument("--json-output", type=Path)
     check.add_argument("--commit-message-file", type=Path)
     check.add_argument("--pr-body-file", type=Path)
+    check.add_argument("--pr-title")
     plan = commands.add_parser("plan")
     _selection_arguments(plan, allow_pack=False)
     plan.add_argument("--json", action="store_true")
@@ -130,6 +131,10 @@ def _validate_selection_arguments(
         raise ConfigurationError("--staged cannot be combined with --base-ref")
     if mode == "all" and base_ref:
         raise ConfigurationError("--mode all cannot be combined with --base-ref")
+    pr_body_file = getattr(args, "pr_body_file", None)
+    pr_title = getattr(args, "pr_title", None)
+    if bool(pr_body_file) != bool(pr_title):
+        raise ConfigurationError("--pr-body-file and --pr-title must be supplied together")
     if not args.stage and mode != "explicit" and not args.changed_path and mode != "all":
         raise ConfigurationError("impacted mode requires --stage")
 
@@ -284,6 +289,7 @@ def _run_check_or_plan(args: argparse.Namespace, root: Path) -> int:
             command_arguments={
                 "commit_message_file": str(args.commit_message_file or ""),
                 "pr_body_file": str(args.pr_body_file or ""),
+                "pr_title": str(args.pr_title or ""),
             },
         )
     _emit(output, getattr(args, "json_output", None))

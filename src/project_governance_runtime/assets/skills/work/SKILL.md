@@ -20,6 +20,7 @@ after the work has been framed and scoped.
 - `CHARTER.md`
 - `docs/index.md`
 - The active plan or governing artifact
+- `.governance/runtime/skills/resources/change-narrative.md` before any commit or pull request handoff
 - The selected role contract when delegation is active
 - Route-selected pack manifests or policies
 
@@ -50,8 +51,11 @@ after the work has been framed and scoped.
     snapshot. Any delegated QA is a separate explicitly started assurance wave.
 11. Reconcile QA with one primary-owned repair and one affected recheck. If it fails, stop instead
     of starting another general QA, verifier, or broad-proof cycle.
-12. Update evidence artifacts as part of the slice, not after memory fades.
-13. When the coordinator supplies a skill-utilization identity, report one honest status for every
+12. Before any commit or pull request handoff, write the shared change narrative from the governing
+    intent: outcome, product impact, conceptual change, code areas, and why. Do not derive product
+    intent from file names alone or copy machine validation evidence into the narrative.
+13. Update evidence artifacts as part of the slice, not after memory fades.
+14. When the coordinator supplies a skill-utilization identity, report one honest status for every
     materialized skill after proof: `applied`, `consulted-no-change`, `declined`, `unavailable`, or
     `not-read`. For `applied`, name only the affected `decision`, `edit`, `validation`, or
     `restraint` categories. Return this bounded closeout to the coordinator; do not add task text,
@@ -65,5 +69,5 @@ pre-push sign-off on the stable candidate before publication.
 ## Evidence
 
 Report changed files, active role and scope, integrated snapshot, validation results,
-source-of-truth updates, the skill-utilization receipt ID when recorded, residual risk, and any
-deferred work.
+source-of-truth updates, change narrative, the skill-utilization receipt ID when recorded, residual
+risk, and any deferred work.

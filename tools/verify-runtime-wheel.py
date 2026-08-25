@@ -58,6 +58,33 @@ print(json.dumps({
 raise SystemExit(0 if valid else 1)
 """
 
+VALID_COMMIT_MESSAGE = """Explain changes before review
+
+Product impact: Contributor workflow — authors see missing context before review.
+Nature of change: Unified commit and pull request orientation around one shared narrative.
+Code areas impacted: Delivery governance, agent authoring workflows.
+Why: Reviewers had to reconstruct purpose and impact from file changes.
+"""
+
+VALID_PR_TITLE = "Make change context understandable before review"
+
+VALID_PR_BODY = """## Product impact
+
+- Contributor workflow: Authors see missing product context before review.
+
+## Nature of the change
+
+Unified commit and pull request orientation while keeping editorial judgment with people.
+
+## Code areas impacted
+
+- Delivery governance
+
+## Why
+
+Reviewers had to reconstruct purpose and impact from file changes.
+"""
+
 
 def run(
     arguments: list[str], *, root: Path, expected: int
@@ -187,6 +214,7 @@ def initialize_target(root: Path, wheel: Path) -> tuple[Path, Path]:
     for relative in (
         ".governance/runtime/skills/catalog.yaml",
         ".governance/runtime/skills/resources/reader-first-authoring.md",
+        ".governance/runtime/skills/resources/change-narrative.md",
         ".governance/runtime/skills/kmp-implementation/SKILL.md",
         ".governance/runtime/skills/stack-packs/kmp/manifest.yaml",
         ".governance/runtime/skills/stack-packs/kmp/core/"
@@ -212,6 +240,87 @@ def initialize_target(root: Path, wheel: Path) -> tuple[Path, Path]:
     run(["git", "add", "-A"], root=root, expected=0)
     run(["git", "commit", "-qm", "synthetic baseline"], root=root, expected=0)
     return python, command
+
+
+def git_metadata_path(root: Path, name: str) -> Path:
+    """Resolve one target-local Git metadata path without assuming a dot-git directory."""
+    raw = run(
+        ["git", "rev-parse", "--git-path", name], root=root, expected=0
+    ).stdout.strip()
+    path = Path(raw)
+    return path if path.is_absolute() else (root / path).resolve()
+
+
+def verify_change_narratives(root: Path, command: Path) -> None:
+    """Prove the installed wheel rejects empty input and accepts both authored narratives."""
+    commit_path = git_metadata_path(root, "COMMIT_EDITMSG")
+    pr_path = git_metadata_path(root, "PR_DESCRIPTION.md")
+    pr_title_path = git_metadata_path(root, "PR_TITLE")
+
+    commit_path.write_text("short\n", encoding="utf-8")
+    run(
+        [
+            str(command),
+            "check",
+            "--pack",
+            "commit-message",
+            "--base-ref",
+            "HEAD",
+            "--commit-message-file",
+            str(commit_path),
+        ],
+        root=root,
+        expected=1,
+    )
+    commit_path.write_text(VALID_COMMIT_MESSAGE, encoding="utf-8")
+    run(
+        [
+            str(command),
+            "check",
+            "--pack",
+            "commit-message",
+            "--base-ref",
+            "HEAD",
+            "--commit-message-file",
+            str(commit_path),
+        ],
+        root=root,
+        expected=0,
+    )
+
+    pr_title_path.write_text(VALID_PR_TITLE + "\n", encoding="utf-8")
+    pr_path.write_text("", encoding="utf-8")
+    empty_pr = run(
+        [
+            str(command),
+            "check",
+            "--stage",
+            "pre-pr",
+            "--mode",
+            "impacted",
+            "--base-ref",
+            "HEAD",
+        ],
+        root=root,
+        expected=1,
+    )
+    if "pr-description.empty-body" not in empty_pr.stdout:
+        raise RuntimeError("installed pre-PR proof did not reject the empty body")
+    pr_path.write_text(VALID_PR_BODY, encoding="utf-8")
+    run(
+        [
+            str(command),
+            "check",
+            "--stage",
+            "pre-pr",
+            "--mode",
+            "impacted",
+            "--base-ref",
+            "HEAD",
+        ],
+        root=root,
+        expected=0,
+    )
 
 
 def write_synthetic_changes(root: Path) -> None:
@@ -474,6 +583,7 @@ def main() -> int:
         root = Path(temporary) / "target"
         root.mkdir()
         python, command = initialize_target(root, wheel)
+        verify_change_narratives(root, command)
         write_synthetic_packs(root, python)
         write_synthetic_changes(root)
         verify_replacement_plan(root, command)

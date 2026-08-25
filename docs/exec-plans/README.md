@@ -20,6 +20,9 @@ No runtime implementation plan is currently active.
 
 ## Completed
 
+- [Commit and pull request change narratives](completed/2026-08-24-change-narrative-enforcement.md)
+  installed and enforced compact product-level narratives and useful titles across commits and
+  ready pull requests, followed by audited Claude Opus 5 reconciliation.
 - [Skill utilization telemetry](completed/2026-08-24-skill-utilization-telemetry.md) delivered
   bounded provider-neutral selection and closeout receipts, privacy-safe aggregation, proactive
   context and Work guidance, and clean-wheel proof without Gateway or remote telemetry machinery.

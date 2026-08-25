@@ -11,6 +11,8 @@ durable decisions and plans live under `docs/**`.
 - Do not write into another repository unless the operator explicitly asks.
 - Do not create compatibility shims, copied package code, or a second runtime authority.
 - Remote publication, pushes, tags, and releases require explicit authorization.
+- Before committing or preparing a pull request, follow the
+  [change narrative contract](docs/specs/change-narrative-contract.md).
 
 ## Start Here
 

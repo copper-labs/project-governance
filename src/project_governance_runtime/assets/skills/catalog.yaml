@@ -193,6 +193,9 @@ resources:
   - id: reader-first-authoring
     path: .governance/runtime/skills/resources/reader-first-authoring.md
     description: Portable reader framing, local grounding, public research, progressive explanation, and editorial review workflow.
+  - id: change-narrative
+    path: .governance/runtime/skills/resources/change-narrative.md
+    description: Plain-language product impact, conceptual change, code-area context, and shared commit and pull request templates.
   - id: review-finding-schema
     path: .governance/runtime/skills/review-finding.schema.yaml
     description: Shared finding fields and severities for converted review skills.

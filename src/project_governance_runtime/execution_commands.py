@@ -46,6 +46,7 @@ def formatted_argv(tokens: list[str], values: dict[str, str]) -> list[str] | Non
         "{stage}": values.get("stage", "explicit"),
         "{commit_message_file}": values.get("commit_message_file", ""),
         "{pr_body_file}": values.get("pr_body_file", ""),
+        "{pr_title}": values.get("pr_title", ""),
     }
     result: list[str] = []
     for token in tokens:
@@ -68,7 +69,7 @@ def builtin_argv(
     mode: str,
     command_arguments: dict[str, str],
 ) -> list[str]:
-    """Build the direct module invocation for one built-in checker."""
+    """Build a checker invocation; omitted overrides leave fail-closed defaults to the checker."""
     checker = str(entry["builtin"])
     argv = [sys.executable, "-m", "project_governance_runtime.checkers", checker]
     argv.extend(checker_selection_arguments(checker, stage, mode))

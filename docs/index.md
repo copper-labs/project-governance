@@ -33,6 +33,8 @@ lock.
   source-contributor journeys plus the shared agent catalog.
 - [Validation strategy](governance/validation-strategy.md) defines narrow proof by default and the
   few situations that require broader proof.
+- [Change narrative contract](specs/change-narrative-contract.md) defines the product-level and
+  conceptual context required before a reader opens a commit or pull request diff.
 - [KMP skill inventory](reference/kmp-skill-inventory.md) records the current Kotlin Multiplatform
   capability surface, provenance, overlap, and known quality gaps.
 - [Pre-V0 KMP skill quality audit](reference/kmp-skill-quality-audit.md) preserves the whole-of-KMP
