@@ -51,6 +51,11 @@ after the work has been framed and scoped.
 11. Reconcile QA with one primary-owned repair and one affected recheck. If it fails, stop instead
     of starting another general QA, verifier, or broad-proof cycle.
 12. Update evidence artifacts as part of the slice, not after memory fades.
+13. When the coordinator supplies a skill-utilization identity, report one honest status for every
+    materialized skill after proof: `applied`, `consulted-no-change`, `declined`, `unavailable`, or
+    `not-read`. For `applied`, name only the affected `decision`, `edit`, `validation`, or
+    `restraint` categories. Return this bounded closeout to the coordinator; do not add task text,
+    paths, source content, or private reasoning to telemetry.
 
 ## Validation
 
@@ -60,4 +65,5 @@ pre-push sign-off on the stable candidate before publication.
 ## Evidence
 
 Report changed files, active role and scope, integrated snapshot, validation results,
-source-of-truth updates, residual risk, and any deferred work.
+source-of-truth updates, the skill-utilization receipt ID when recorded, residual risk, and any
+deferred work.

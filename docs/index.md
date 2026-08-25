@@ -25,6 +25,8 @@ lock.
   wheel and what remains target-owned.
 - [Provider-aware agent orchestration](specs/provider-aware-agent-orchestration.md) defines
   conservative native-host routing for Codex and Claude using compact bounded work contracts.
+- [Skill selection and utilization](specs/skill-utilization.md) defines proactive exact skill
+  selection and bounded local receipts for examining reported use after work.
 - [Operator guide](guides/user-guide.md) explains bootstrap, routine checks, and deliberate
   upgrades.
 - [Developer documentation](developer/index.md) provides progressive evaluator/operator and

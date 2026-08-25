@@ -5,8 +5,8 @@ type: spec
 status: current
 owner: project-governance
 created: 2026-03-02
-updated: 2026-08-18
-summary: Contract for the package runtime, its configuration boundary, and its focused execution model.
+updated: 2026-08-24
+summary: Contract for the package runtime, its configuration boundary, focused execution model, and bounded local telemetry.
 ---
 
 # Governance Runtime Specification
@@ -23,7 +23,8 @@ project-governance check --stage <stage> --mode impacted
 project-governance check --pack <pack-id>
 project-governance check --stage pre-pr --mode all
 project-governance plan --stage <stage> --mode impacted --json
-project-governance context --task <description> --json
+project-governance context --task <description> --json-output <ignored-result.json>
+project-governance skills closeout --context-result <context-result.json> --outcomes <skill-outcomes.json>
 project-governance agent-route --task <envelope> --session <identity> --catalog <catalog> --json
 project-governance agent-dispatch start --request <route-request> --json
 project-governance agent-dispatch finish --authorization <digest> --results <result-bundle> --json
@@ -48,6 +49,12 @@ accepted hash.
 orchestration control-state write boundaries; they emit native launch instructions or close one
 previously authorized wave. Missing identity, catalog, readiness, or safe control state returns to
 the existing solo workflow.
+
+`context` selects and materializes exact route-owned context and skill bytes. When it delivers a
+skill, the public command also creates a content-free selection event and returns a utilization ID.
+`skills closeout` verifies the same context result and exact packet bytes before recording bounded
+per-skill outcomes. The [skill selection and utilization specification](skill-utilization.md) owns
+that provider-neutral contract.
 
 Stages remain command boundaries, not selectable profiles:
 
@@ -213,6 +220,13 @@ holds only runtime version, operation, terminal outcome, duration, dry-run state
 aggregate created, updated, unchanged, conflict, or match counts. It excludes route values,
 identifiers, paths, content, prompts, citations, research topics, model identity, and shared run
 fingerprints.
+
+A public context operation that delivers skills may add one `skill-selection` record. Its
+allowlist holds only a random utilization ID, content-addressed packet ID, safe skill IDs and
+digests, and selection classes reduced to route, task, path, or fact. A subsequent explicit
+`skills closeout` may add one `skill-utilization-terminal` record with fixed task outcome,
+per-skill utilization status, and decision, edit, validation, or restraint influence categories.
+It stores no free-form explanation and cannot observe work that bypasses either command.
 
 V1.1 records only bounded per-pack integer counters:
 `blocking_finding_count`, `advisory_finding_count`, `accepted_finding_count`,

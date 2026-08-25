@@ -20,6 +20,9 @@ No runtime implementation plan is currently active.
 
 ## Completed
 
+- [Skill utilization telemetry](completed/2026-08-24-skill-utilization-telemetry.md) delivered
+  bounded provider-neutral selection and closeout receipts, privacy-safe aggregation, proactive
+  context and Work guidance, and clean-wheel proof without Gateway or remote telemetry machinery.
 - [KMP Skill Library V0](completed/2026-08-24-kmp-skill-library-v0.md) delivered the governed
   seven-entry provider-neutral core, proactive matched-route selection, exact materialization,
   cross-provider evaluation, legacy-payload retirement, and clean-wheel proof. Publication,

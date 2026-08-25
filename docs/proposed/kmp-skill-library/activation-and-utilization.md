@@ -2,14 +2,20 @@
 id: proposed.kmp-skill-library.activation-utilization
 title: KMP Skill Activation and Utilization Contract
 type: specification
-status: draft
+status: superseded
 owner: project-governance
 created: 2026-08-24
 updated: 2026-08-24
-summary: Deterministic routing, composition, materialization, and outcome evidence that make KMP skills usable without explicit user invocation.
+summary: Historical KMP design packet superseded by the live generic skill selection and utilization contract.
 ---
 
 # KMP Skill Activation and Utilization Contract
+
+> This design packet justified the KMP V0 selection work and the later utilization slice. The live
+> generic authority is now the
+> [Skill Selection And Utilization Specification](../../specs/skill-utilization.md). Historical
+> gap statements and proposed implementation slices below are retained as design context, not as a
+> description of current runtime behavior.
 
 The library succeeds only if relevant skills reliably influence work. Native model discovery is a
 useful convenience, but it is not a sufficient governance mechanism: users should not need to know

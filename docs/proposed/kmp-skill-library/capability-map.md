@@ -231,8 +231,9 @@ promote, refresh, or retire a leaf. “Included in the wheel” must not imply �
 Resolve nested stack-pack leaves deterministically, compose the smallest capability set, materialize
 exact selected bytes, and bind selection reasons and digests to the normal task handoff. Measure
 missed and false activations in reviewed V0 evaluations instead of relying on model memory or
-explicit user invocation. A runtime utilization receipt remains post-V0 unless observed friction
-justifies a generic coordinator contract.
+explicit user invocation. Observed inspection friction subsequently justified the live generic
+receipt described by
+[Skill Selection And Utilization](../../specs/skill-utilization.md).
 
 ## How gaps will be filled
 

@@ -44,9 +44,9 @@ Target consumer builds, publication, adopter updates, and later overlays remain 
 - The [platform-bridge performance packet](bridge-performance-patterns.md) turns reusable
   high-cadence transport, lifecycle, UI-pressure, and measurement lessons into cross-cutting V0
   requirements without adding another broad leaf.
-- The [activation and utilization contract](activation-and-utilization.md) defines proactive
-  deterministic selection, capability composition, selected-skill packets, normal-handoff
-  evidence, and the post-V0 receipt boundary so users do not need to name skills manually.
+- The superseded [activation and utilization design](activation-and-utilization.md) records the KMP
+  rationale that led to proactive selection and the now-live generic
+  [skill utilization contract](../../specs/skill-utilization.md).
 - The [source corpus](source-corpus.md) records licensed, operator-authorized, original, and
   research-only inputs.
 

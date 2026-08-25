@@ -39,6 +39,9 @@ repository provides a generated context router.
    target-owned `config/governance/extensions/manifest.yaml`. Do not edit the derived target
    profile or generated route docs directly; compose the reviewed change through the template
    upgrade lifecycle.
+8. When `project-governance context` returns a `skill_utilization` identity, preserve that exact
+   JSON result under ignored runtime state and carry it through work and proof. Do not reconstruct
+   the selected skill set, its digests, or the utilization ID from memory.
 
 ## Validation
 
