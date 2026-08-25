@@ -14,22 +14,25 @@ from change_narrative import (
     finding,
     git_metadata_path,
     is_placeholder,
+    is_unhelpful_outcome,
     result_payload,
     without_html_comments,
 )
 
 
 REQUIRED_SECTIONS = (
-    ("outcome", "Outcome"),
     ("product-impact", "Product impact"),
     ("nature-of-change", "Nature of the change"),
     ("code-areas-impacted", "Code areas impacted"),
     ("why", "Why"),
-    ("validation", "Validation"),
 )
-OPTIONAL_SECTION = ("risks-or-required-action", "Risks or required action")
+DISALLOWED_SECTIONS = (
+    ("outcome", "Outcome"),
+    ("validation", "Validation"),
+    ("risks-or-required-action", "Risks or required action"),
+)
 SECTION_IDS = {
-    title: section_id for section_id, title in (*REQUIRED_SECTIONS, OPTIONAL_SECTION)
+    title: section_id for section_id, title in (*REQUIRED_SECTIONS, *DISALLOWED_SECTIONS)
 }
 HEADING = re.compile(r"^##[ \t]+(.+?)[ \t]*$")
 BULLET = re.compile(r"^[ \t]*[-*+][ \t]+(.+?)[ \t]*$")
@@ -43,6 +46,52 @@ def _body_path() -> Path:
     if environment_path:
         return Path(environment_path)
     return git_metadata_path("PR_DESCRIPTION.md")
+
+
+def _title_input() -> tuple[Path, str | None]:
+    """Resolve an explicit, provider-supplied, or worktree-local pull request title."""
+    title_path = git_metadata_path("PR_TITLE")
+    if len(sys.argv) > 2:
+        return title_path, sys.argv[2]
+    if "PROJECT_GOVERNANCE_PR_TITLE" in os.environ:
+        return title_path, os.environ["PROJECT_GOVERNANCE_PR_TITLE"]
+    if not title_path.is_file():
+        return title_path, None
+    try:
+        return title_path, title_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return title_path, None
+
+
+def _title_findings() -> list[dict[str, object]]:
+    """Require one compact outcome and reject only deterministic non-title shapes."""
+    path, raw_title = _title_input()
+    if raw_title is None:
+        return [finding(
+            "pr-description.title-missing",
+            path,
+            "pull request title is missing; pass --pr-title or create this worktree's Git metadata title",
+        )]
+    title = raw_title.strip()
+    if len(title.splitlines()) != 1:
+        return [finding(
+            "pr-description.title-multiline",
+            path,
+            "pull request title must be one line",
+        )]
+    if len(title) < 8:
+        return [finding(
+            "pr-description.title-short",
+            path,
+            "pull request title must contain at least eight characters",
+        )]
+    if is_unhelpful_outcome(title):
+        return [finding(
+            "pr-description.title-unhelpful",
+            path,
+            "pull request title must state a useful outcome, not a placeholder, generic label, or ticket alone",
+        )]
+    return []
 
 
 def _sections(text: str) -> list[dict[str, object]]:
@@ -79,14 +128,41 @@ def _sections(text: str) -> list[dict[str, object]]:
     return headings
 
 
-def _bullet_values(content: str) -> list[str]:
-    """Return visible Markdown bullet values from one section."""
-    values: list[str] = []
-    for line in without_html_comments(content).splitlines():
+def _bullet_values(content: str, *, first_line: int) -> list[tuple[int, str]]:
+    """Return visible Markdown bullets and source lines outside fenced examples."""
+    values: list[tuple[int, str]] = []
+    fence: str | None = None
+    for offset, line in enumerate(without_html_comments(content).splitlines()):
+        marker = line.lstrip()[:3]
+        if marker in {"```", "~~~"}:
+            if fence is None:
+                fence = marker
+            elif marker == fence:
+                fence = None
+            continue
+        if fence is not None:
+            continue
         match = BULLET.match(line)
         if match:
-            values.append(match.group(1))
+            values.append((first_line + offset, match.group(1)))
     return values
+
+
+def _visible_section_text(content: str) -> str:
+    """Return authored section prose while excluding hidden and fenced examples."""
+    values: list[str] = []
+    fence: str | None = None
+    for line in without_html_comments(content).splitlines():
+        marker = line.lstrip()[:3]
+        if marker in {"```", "~~~"}:
+            if fence is None:
+                fence = marker
+            elif marker == fence:
+                fence = None
+            continue
+        if fence is None:
+            values.append(line)
+    return "\n".join(values)
 
 
 def _list_findings(
@@ -95,8 +171,10 @@ def _list_findings(
     title: str,
     item: dict[str, object],
 ) -> list[dict[str, object]]:
-    """Validate the scan-friendly product, code-area, and validation lists."""
-    values = _bullet_values(str(item["content"]))
+    """Validate the scan-friendly product and code-area lists."""
+    values = _bullet_values(
+        str(item["content"]), first_line=int(item["line"]) + 1
+    )
     if not values:
         return [finding(
             "pr-description.bullets-missing",
@@ -105,16 +183,16 @@ def _list_findings(
             line=int(item["line"]),
         )]
     findings: list[dict[str, object]] = []
-    for value in values:
+    for line_number, value in values:
         if is_placeholder(value):
             findings.append(finding(
                 "pr-description.field-placeholder",
                 path,
                 f"pull request bullet needs authored content: ## {title}",
-                line=int(item["line"]),
+                line=line_number,
             ))
     if section_id == "product-impact":
-        for value in values:
+        for line_number, value in values:
             area, separator, impact = value.partition(":")
             if not separator or is_placeholder(area) or is_placeholder(impact):
                 findings.append(finding(
@@ -122,7 +200,7 @@ def _list_findings(
                     path,
                     "each Product impact bullet must use "
                     "'<top-level area>: <how the change surfaces>'",
-                    line=int(item["line"]),
+                    line=line_number,
                 ))
     return findings
 
@@ -155,7 +233,7 @@ def _section_findings(path: Path, text: str) -> list[dict[str, object]]:
                 f"pull request section must appear once: ## {title}",
                 line=int(found[1]["line"]),
             ))
-        content = str(found[0]["content"])
+        content = _visible_section_text(str(found[0]["content"]))
         if is_placeholder(content):
             findings.append(finding(
                 "pr-description.field-placeholder",
@@ -163,8 +241,22 @@ def _section_findings(path: Path, text: str) -> list[dict[str, object]]:
                 f"pull request section needs authored content: ## {title}",
                 line=int(found[0]["line"]),
             ))
-        elif section_id in {"product-impact", "code-areas-impacted", "validation"}:
+        if section_id in {"product-impact", "code-areas-impacted"}:
             findings.extend(_list_findings(path, section_id, title, found[0]))
+
+    for section_id, title in DISALLOWED_SECTIONS:
+        for item in by_id.get(section_id, []):
+            message = (
+                "put the pull request outcome in its title; do not repeat ## Outcome in the body"
+                if section_id == "outcome"
+                else f"keep ## {title} out of the reader narrative; use checks or Product impact as appropriate"
+            )
+            findings.append(finding(
+                "pr-description.section-not-allowed",
+                path,
+                message,
+                line=int(item["line"]),
+            ))
 
     if (
         len(required_positions) == len(REQUIRED_SECTIONS)
@@ -173,43 +265,19 @@ def _section_findings(path: Path, text: str) -> list[dict[str, object]]:
         findings.append(finding(
             "pr-description.section-order",
             path,
-            "pull request sections must follow Outcome, Product impact, Nature of the change, Code areas impacted, Why, then Validation",
+            "pull request sections must follow Product impact, Nature of the change, Code areas impacted, then Why",
             line=min(required_positions) + 1,
         ))
-
-    optional_id, optional_title = OPTIONAL_SECTION
-    optional = by_id.get(optional_id, [])
-    if len(optional) > 1:
-        findings.append(finding(
-            "pr-description.section-duplicate",
-            path,
-            f"pull request section must appear at most once: ## {optional_title}",
-            line=int(optional[1]["line"]),
-        ))
-    if optional:
-        if is_placeholder(str(optional[0]["content"])):
-            findings.append(finding(
-                "pr-description.field-placeholder",
-                path,
-                f"omit the optional section or provide authored content: ## {optional_title}",
-                line=int(optional[0]["line"]),
-            ))
-        validation = by_id.get("validation", [])
-        if validation and int(optional[0]["index"]) < int(validation[0]["index"]):
-            findings.append(finding(
-                "pr-description.section-order",
-                path,
-                f"## {optional_title} must follow ## Validation",
-                line=int(optional[0]["line"]),
-            ))
     return findings
 
 
 def main() -> int:
     """Validate the body that will orient a pull request reader."""
     path = _body_path()
-    findings: list[dict[str, object]] = []
+    findings = _title_findings()
+    body_readable = True
     if not path.is_file():
+        body_readable = False
         findings.append(finding(
             "pr-description.file-missing",
             path,
@@ -219,13 +287,14 @@ def main() -> int:
         try:
             text = path.read_text(encoding="utf-8")
         except (OSError, UnicodeError) as error:
+            body_readable = False
             findings.append(finding(
                 "pr-description.file-unreadable",
                 path,
                 f"pull request body could not be read as UTF-8: {error}",
             ))
             text = ""
-        if not findings:
+        if body_readable:
             if not authored_text(text):
                 findings.append(finding(
                     "pr-description.empty-body",

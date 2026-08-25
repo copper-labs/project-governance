@@ -9,4 +9,4 @@ path_globs: []
 depends_on: []
 commands:
   - builtin: pr-description
-    arguments: [pr_body_file]
+    arguments: [pr_body_file, pr_title]

@@ -52,8 +52,8 @@ after the work has been framed and scoped.
 11. Reconcile QA with one primary-owned repair and one affected recheck. If it fails, stop instead
     of starting another general QA, verifier, or broad-proof cycle.
 12. Before any commit or pull request handoff, write the shared change narrative from the governing
-    intent and current evidence: outcome, product impact, conceptual change, code areas, why, and
-    validation. Do not derive product intent from file names alone.
+    intent: outcome, product impact, conceptual change, code areas, and why. Do not derive product
+    intent from file names alone or copy machine validation evidence into the narrative.
 13. Update evidence artifacts as part of the slice, not after memory fades.
 
 ## Validation

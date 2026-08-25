@@ -14,9 +14,11 @@ summary: Install and enforce one plain-language, conceptual change narrative acr
 ## Target State
 
 Agents and people explain each ordinary commit and ready pull request through one predictable reader
-journey: outcome, product impact, nature of change, code areas impacted, why, and validation. The
-runtime blocks structurally incomplete narratives locally, and this repository validates its live
-GitHub pull request body in CI. Editorial quality stays with the author and reviewer.
+journey: outcome, product impact, nature of change, code areas impacted, and why. Commit subjects
+and pull request titles carry the outcome. The runtime blocks structurally incomplete narratives
+locally, and this repository validates its live GitHub pull request title and body in CI. Check
+results remain machine-visible evidence outside the narrative. Editorial quality stays with the
+author and reviewer.
 
 ## Baseline
 
@@ -31,16 +33,20 @@ GitHub pull request body in CI. Editorial quality stays with the author and revi
    change; implementation trivia stays in the diff.
 2. Product impact names adopter-owned top-level product areas and how a change surfaces. Code areas
    name stable human-recognizable capabilities or subsystems.
-3. Commit subjects carry the outcome. Required labeled body fields carry product impact, nature of
-   change, code areas, why, and validation.
-4. Pull requests use the same fields as ordered sections, with bullets for product and code areas.
+3. Commit subjects and pull request titles carry the outcome. Obvious generic labels, placeholders,
+   and ticket-only titles fail deterministic checks.
+4. Commit bodies use required labels for product impact, nature of change, code areas, and why.
+   Pull request bodies use the same fields as ordered sections, with bullets for product and code
+   areas; they do not duplicate an Outcome section.
 5. Blocking checks enforce deterministic structure and known placeholders only. They do not grade
    clarity, infer intent, or invoke a model.
 6. Git-generated merge, revert, fixup, squash, and amend messages retain a narrow exemption.
-7. Local pre-PR validation reads an explicit `--pr-body-file` or the Git metadata draft path. CI
-   validates the live provider body.
+7. Local pre-PR validation reads an explicit `--pr-body-file` plus `--pr-title`, or the Git metadata
+   title and body drafts. CI validates the live provider title and body.
 8. No changed-file map, sequence diagram, review estimate, reviewer suggestion, or deep-review
    subsystem is added.
+9. Dedicated Validation and Risks or required action fields are excluded and rejected. Check
+   results stay in machine evidence; material user-facing consequences belong in Product impact.
 
 ## Execution Rules
 
@@ -76,6 +82,10 @@ GitHub pull request body in CI. Editorial quality stays with the author and revi
 - Ownership: commit checker, existing commit pack, checker dispatch, and focused fixtures
 - Work:
   - Require the ordered body labels and authored values for ordinary commits.
+  - Require the subject to be a useful outcome rather than an obvious generic label, placeholder,
+    or ticket identifier alone.
+  - Reject legacy Validation and Risks or required action labels so agents do not append generic
+    boilerplate.
   - Preserve the subject check and narrow Git-generated exemptions.
   - Resolve the default commit-message path through Git so linked worktrees behave correctly.
   - Return normalized, actionable findings without reading changed source.
@@ -85,7 +95,7 @@ GitHub pull request body in CI. Editorial quality stays with the author and revi
   - Merge, revert, fixup, squash, and amend messages pass without a labeled body.
   - The existing commit hook remains a thin runtime launcher.
 - Focused proof: change-narrative checker tests and commit-pack execution seam
-- Proof state: focused fixtures passed valid, missing, duplicate, ordering, placeholder, trailer,
+- Proof state: focused fixtures passed valid, missing, duplicate, ordering, placeholder,
   Git-generated, and linked-worktree cases
 
 ## Slice 3: Enforce Pull Request Bodies
@@ -94,14 +104,18 @@ GitHub pull request body in CI. Editorial quality stays with the author and revi
   GitHub workflow, and focused fixtures
 - Work:
   - Add a blocking `pr-description` pack at `pre-pr` and `ci-pr`.
+  - Require one useful outcome in the pull request title and avoid a duplicated Outcome body
+    section.
   - Require ordered sections, meaningful non-placeholder content, list-shaped product and code
     areas, and area-plus-impact product bullets.
-  - Resolve an explicit body, environment-provided body, or Git metadata draft without copying
-    provider logic into the runtime.
-  - Validate the live pull request body on open, edit, synchronization, reopening, and readiness.
+  - Reject legacy Validation and Risks or required action sections.
+  - Resolve an explicit title and body, provider environment, or Git metadata drafts without
+    copying provider logic into the runtime.
+  - Validate the live pull request title and body on open, edit, synchronization, reopening, and
+    readiness.
 - Acceptance:
-  - Local agents can prepare one draft file, run pre-PR validation, and supply the same file to their
-    provider command.
+  - Local agents can prepare title and body drafts, run pre-PR validation, and supply the same
+    values to their provider command.
   - Missing or malformed local drafts fail with an actionable path.
   - The GitHub workflow safely materializes event content without shell interpolation.
   - Draft pull requests remain outside the blocking workflow until marked ready.
@@ -126,6 +140,31 @@ GitHub pull request body in CI. Editorial quality stays with the author and revi
   - Wrapper audit proves Claude made no repository writes.
   - No verified critical, high, or medium Claude finding remains open.
   - The branch is clean and contains local commits only.
+
+## Independent Review Reconciliation
+
+The first frozen candidate at `63c6ee1080c2` received an audited read-only Claude Opus 5 review at
+high effort with fallback disabled. The wrapper audit recorded `repo_changed: false`, no changed
+files, and no artifact write.
+
+- Retained missing-draft failure as intentional fail-closed enforcement. Removed the pre-PR command
+  from generic upgrade verification, allowed only paired narrative overrides through the hook, and
+  moved installed-wheel proof through the actual pre-PR stage.
+- Narrowed Git-generated subject exemptions so human outcomes beginning with “Merge” do not bypass
+  the contract.
+- Made commit validation honor Git comments and scissors, including a configured comment marker.
+- Made PR section and bullet parsing ignore fenced examples and report the offending bullet line.
+- Changed GitHub checkout from the base snapshot to the pull request head so the workflow can use a
+  checker introduced by the candidate itself. The workflow retains read-only contents permission,
+  passes provider text as environment data, and exposes no secrets.
+- Kept the built-in checker's fail-closed default metadata inputs. This intentionally differs from
+  target command templates, whose omitted placeholder arguments make the command inapplicable.
+
+After that review, operator feedback simplified the public narrative further: Validation and Risks
+or required action were removed and are now rejected as legacy fields. Commit subjects and pull
+request titles now carry the outcome, obvious non-outcome titles fail, and the PR body no longer
+duplicates an Outcome section. The affected title, parser, hook, CLI, workflow, skill, and wheel
+seams require the final Opus 5 recheck.
 
 ## Rollback
 

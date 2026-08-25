@@ -1,6 +1,6 @@
 ---
 name: commit-message-workflow
-description: Use when preparing commit messages. Explains outcome, product impact, conceptual change, affected code areas, reason, and validation before the diff.
+description: Use when preparing commit messages. Explains outcome, product impact, conceptual change, affected code areas, and reason before the diff.
 ---
 
 # Commit Message Workflow
@@ -19,15 +19,16 @@ Use this skill before creating or amending a commit, or when a commit-message ho
 
 ## Workflow
 
-1. Write the subject as one plain-language outcome at the commit's scope.
+1. Write the subject as one plain-language outcome at the commit's scope. Say what becomes
+   possible, changes, or is prevented rather than naming the coding activity, ticket, or path.
 2. Name the adopter's top-level product area and explain how the change surfaces there. State the
    intentional no-behavior-change boundary when relevant.
 3. Describe the nature of change through responsibilities, relationships, contracts, data flow,
    boundaries, or coupling; leave symbol-level mechanics to the diff.
 4. Name stable, human-recognizable code areas instead of file paths.
-5. Preserve why the work was necessary and the check plus observed validation result.
-6. Add risk or required action only when it gives the reader something material to watch or do.
-7. Recheck the staged diff, governing issue or plan, and evidence before finalizing the message.
+5. Preserve why the work was necessary.
+6. Recheck the staged diff and governing issue or plan before finalizing the message. Keep test and
+   build evidence in the checks that own it rather than copying it into the narrative.
 
 ## Validation
 
@@ -35,5 +36,5 @@ Run the commit-message validation pack or hook when available.
 
 ## Evidence
 
-Report the final outcome, product impact, nature of change, code areas, reason, validation, and
-commit-message check status.
+Report the final outcome, product impact, nature of change, code areas, reason, and commit-message
+check status.

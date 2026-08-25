@@ -24,6 +24,27 @@ PLACEHOLDER_VALUES = frozenset({
     "unknown",
     "various",
 })
+GENERIC_OUTCOMES = frozenset({
+    "bug fix",
+    "change",
+    "changes",
+    "cleanup",
+    "draft",
+    "fix",
+    "fixes",
+    "misc",
+    "misc changes",
+    "pr",
+    "pull request",
+    "refactor",
+    "test",
+    "testing",
+    "update",
+    "updates",
+    "wip",
+    "work in progress",
+})
+TICKET_ONLY = re.compile(r"(?:#[0-9]+|[A-Za-z][A-Za-z0-9_-]*-[0-9]+|[0-9]+)")
 
 
 def without_html_comments(value: str) -> str:
@@ -50,6 +71,16 @@ def is_placeholder(value: str) -> bool:
     )
 
 
+def is_unhelpful_outcome(value: str) -> bool:
+    """Reject only obvious non-outcomes while leaving editorial quality to people."""
+    normalized = re.sub(r"\s+", " ", authored_text(value)).strip(" .:;,-—–").lower()
+    return bool(
+        is_placeholder(value)
+        or normalized in GENERIC_OUTCOMES
+        or TICKET_ONLY.fullmatch(normalized)
+    )
+
+
 def git_metadata_path(name: str, *, cwd: Path | None = None) -> Path:
     """Resolve a file inside this checkout's Git metadata, including linked worktrees."""
     root = (cwd or Path.cwd()).resolve()
@@ -69,6 +100,22 @@ def git_metadata_path(name: str, *, cwd: Path | None = None) -> Path:
             candidate = root / candidate
         return candidate.resolve(strict=False)
     return (root / ".git" / name).resolve(strict=False)
+
+
+def git_config_value(name: str, *, cwd: Path | None = None) -> str:
+    """Read one optional local Git configuration value without making it authority."""
+    root = (cwd or Path.cwd()).resolve()
+    try:
+        result = subprocess.run(
+            ["git", "config", "--get", name],
+            cwd=root,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+    except OSError:
+        return ""
+    return result.stdout.rstrip("\r\n") if result.returncode == 0 else ""
 
 
 def finding(

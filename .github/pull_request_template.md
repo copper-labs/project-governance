@@ -1,6 +1,4 @@
-## Outcome
-
-<!-- What does this pull request accomplish in plain language? -->
+<!-- Title: state one useful outcome, not a generic activity, ticket identifier alone, or path summary. -->
 
 ## Product impact
 
@@ -19,10 +17,3 @@
 ## Why
 
 <!-- What problem, constraint, decision, or opportunity made this work necessary? -->
-
-## Validation
-
-<!-- Name each check and its observed outcome, or give a specific reason it was not run. -->
-- <Check and observed outcome, or explicit reason not run>
-
-<!-- Add "## Risks or required action" after Validation only when a reader needs to watch or do something. -->

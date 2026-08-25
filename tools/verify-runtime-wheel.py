@@ -64,14 +64,11 @@ Product impact: Contributor workflow — authors see missing context before revi
 Nature of change: Unified commit and pull request orientation around one shared narrative.
 Code areas impacted: Delivery governance, agent authoring workflows.
 Why: Reviewers had to reconstruct purpose and impact from file changes.
-Validation: Installed narrative checker passed the authored message.
 """
 
-VALID_PR_BODY = """## Outcome
+VALID_PR_TITLE = "Make change context understandable before review"
 
-Make change context understandable before a reader opens the diff.
-
-## Product impact
+VALID_PR_BODY = """## Product impact
 
 - Contributor workflow: Authors see missing product context before review.
 
@@ -86,10 +83,6 @@ Unified commit and pull request orientation while keeping editorial judgment wit
 ## Why
 
 Reviewers had to reconstruct purpose and impact from file changes.
-
-## Validation
-
-- Installed narrative checker passed the authored pull request body.
 """
 
 
@@ -249,6 +242,7 @@ def verify_change_narratives(root: Path, command: Path) -> None:
     """Prove the installed wheel rejects empty input and accepts both authored narratives."""
     commit_path = git_metadata_path(root, "COMMIT_EDITMSG")
     pr_path = git_metadata_path(root, "PR_DESCRIPTION.md")
+    pr_title_path = git_metadata_path(root, "PR_TITLE")
 
     commit_path.write_text("short\n", encoding="utf-8")
     run(
@@ -286,27 +280,28 @@ def verify_change_narratives(root: Path, command: Path) -> None:
         [
             str(command),
             "check",
-            "--pack",
-            "pr-description",
+            "--stage",
+            "pre-pr",
+            "--mode",
+            "impacted",
             "--base-ref",
             "HEAD",
-            "--pr-body-file",
-            str(pr_path),
         ],
         root=root,
         expected=1,
     )
     pr_path.write_text(VALID_PR_BODY, encoding="utf-8")
+    pr_title_path.write_text(VALID_PR_TITLE + "\n", encoding="utf-8")
     run(
         [
             str(command),
             "check",
-            "--pack",
-            "pr-description",
+            "--stage",
+            "pre-pr",
+            "--mode",
+            "impacted",
             "--base-ref",
             "HEAD",
-            "--pr-body-file",
-            str(pr_path),
         ],
         root=root,
         expected=0,

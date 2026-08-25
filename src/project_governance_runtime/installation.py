@@ -233,7 +233,7 @@ def update(root: Path, version: str, *, apply: bool) -> dict[str, Any]:
         },
         "verification_commands": [
             "python3 tools/governance-bootstrap.py",
-            ".governance/runtime/bin/project-governance check --stage pre-pr --mode impacted",
+            ".governance/runtime/bin/project-governance doctor",
         ],
         "upgrade_cleanup": cleanup,
         "migration_validation": migration_validation,

@@ -2,4 +2,11 @@
 set -eu
 root="$(git rev-parse --show-toplevel)"
 cd "$root"
-exec tools/run-source-governance.sh check --stage pre-pr --mode impacted
+case "$#:${1-}:${3-}" in
+  0::|4:--pr-body-file:--pr-title|4:--pr-title:--pr-body-file) ;;
+  *)
+    echo "usage: .githooks/pre-pr [--pr-body-file <path> --pr-title <title>]" >&2
+    exit 2
+    ;;
+esac
+exec tools/run-source-governance.sh check --stage pre-pr --mode impacted "$@"

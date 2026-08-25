@@ -90,7 +90,7 @@ and ignored runtime state remain untouched. Apply only after that review:
 ```sh
 project-governance update --to <version> --apply
 python3 tools/governance-bootstrap.py
-.governance/runtime/bin/project-governance check --stage pre-pr --mode impacted
+.governance/runtime/bin/project-governance doctor
 ```
 
 The apply command swaps the tracked lock and may remove only reviewed, hash-proven predecessor

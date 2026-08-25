@@ -28,14 +28,11 @@ Product impact: Contributor workflow — authors see missing context before revi
 Nature of change: Unified commit and pull request orientation around one shared narrative.
 Code areas impacted: Delivery governance, agent authoring workflows.
 Why: Reviewers had to reconstruct purpose and impact from file changes.
-Validation: Focused narrative checker fixtures passed with no findings.
 """
 
-VALID_PR = """## Outcome
+VALID_PR_TITLE = "Make change context understandable before review"
 
-Make change context understandable before a reader opens the diff.
-
-## Product impact
+VALID_PR = """## Product impact
 
 - Contributor workflow: Authors see missing product context before review.
 - Application behavior: Runtime product behavior is intentionally unchanged.
@@ -45,7 +42,7 @@ Make change context understandable before a reader opens the diff.
 Unified commit and pull request orientation while keeping editorial judgment with people.
 
 ```text
-## Outcome
+## Product impact
 This fenced example is not another section.
 ```
 
@@ -57,14 +54,6 @@ This fenced example is not another section.
 ## Why
 
 Reviewers had to reconstruct purpose and impact from file changes.
-
-## Validation
-
-- Focused narrative checker fixtures passed with no findings.
-
-## Risks or required action
-
-Adopters need the new runtime before the checks become active in their repositories.
 """
 
 
@@ -121,7 +110,12 @@ class RuntimeChangeNarrativeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "narrative.md"
             path.write_text(content, encoding="utf-8")
-            return self.run_checker(checker, path)
+            environment = (
+                {"PROJECT_GOVERNANCE_PR_TITLE": VALID_PR_TITLE}
+                if checker == "pr-description"
+                else None
+            )
+            return self.run_checker(checker, path, environment=environment)
 
     def assert_rule(self, payload: dict[str, object], rule_id: str) -> None:
         """Assert one normalized rule appears in the checker result."""
@@ -132,7 +126,7 @@ class RuntimeChangeNarrativeTests(unittest.TestCase):
         )
 
     def test_valid_commit_contains_the_shared_narrative(self) -> None:
-        """Accept one compact outcome, product impact, conceptual change, reason, and proof."""
+        """Accept one compact outcome, product impact, conceptual change, code area, and reason."""
         result, payload = self.write_and_run("commit-message", VALID_COMMIT)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(payload["status"], "passed")
@@ -142,6 +136,8 @@ class RuntimeChangeNarrativeTests(unittest.TestCase):
         """Do not break merge, revert, autosquash, or amend flows owned by Git."""
         subjects = (
             "Merge branch 'feature'",
+            "Merge branches 'one' and 'two'",
+            "Merge pull request #42 from example/feature",
             'Revert "Explain changes before review"',
             "fixup! Explain changes before review",
             "squash! Explain changes before review",
@@ -152,6 +148,20 @@ class RuntimeChangeNarrativeTests(unittest.TestCase):
                 result, payload = self.write_and_run("commit-message", subject + "\n")
                 self.assertEqual(result.returncode, 0, payload)
                 self.assertEqual(payload["status"], "passed")
+
+    def test_human_merge_outcomes_do_not_bypass_the_narrative(self) -> None:
+        """Exempt only canonical Git merge operands, not ordinary subjects beginning with Merge."""
+        subjects = (
+            "Merge branch protection rules into one policy",
+            "Merge commit narratives into the shared contract",
+            "Merge pull request guidance into the docs",
+            "Merge tag handling into the release pack",
+        )
+        for subject in subjects:
+            with self.subTest(subject=subject):
+                result, payload = self.write_and_run("commit-message", subject + "\n")
+                self.assertEqual(result.returncode, 1, payload)
+                self.assert_rule(payload, "commit-message.field-missing")
 
     def test_commit_failures_have_stable_actionable_rules(self) -> None:
         """Reject short, missing, duplicate, out-of-order, and placeholder content."""
@@ -167,16 +177,49 @@ class RuntimeChangeNarrativeTests(unittest.TestCase):
                 "Nature of change: Unified commit and pull request orientation around one shared narrative.",
                 "Nature of change: TBD",
             ), "commit-message.field-placeholder"),
-            "trailer-is-not-validation": (VALID_COMMIT.replace(
-                "Validation: Focused narrative checker fixtures passed with no findings.",
-                "Validation:\n\nSigned-off-by: Example <example@example.invalid>",
-            ), "commit-message.field-placeholder"),
+            "generic-subject": (
+                VALID_COMMIT.replace("Explain changes before review", "Work in progress", 1),
+                "commit-message.unhelpful-subject",
+            ),
+            "ticket-only-subject": (
+                VALID_COMMIT.replace("Explain changes before review", "GOV-12345", 1),
+                "commit-message.unhelpful-subject",
+            ),
+            "legacy-validation": (
+                VALID_COMMIT + "Validation: Focused fixtures passed.\n",
+                "commit-message.field-not-allowed",
+            ),
+            "legacy-risk": (
+                VALID_COMMIT + "Risks or required action: None.\n",
+                "commit-message.field-not-allowed",
+            ),
         }
         for name, (content, rule_id) in cases.items():
             with self.subTest(name=name):
                 result, payload = self.write_and_run("commit-message", content)
                 self.assertEqual(result.returncode, 1, payload)
                 self.assert_rule(payload, rule_id)
+
+    def test_commit_checks_only_content_git_retains_after_cleanup(self) -> None:
+        """Ignore configured comments and reject labels hidden below Git's scissors marker."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            git(root, "init", "-q")
+            git(root, "config", "core.commentChar", ";")
+            path = root / "message.txt"
+            path.write_text(
+                "Explain changes before review\n\n"
+                "Product impact: Contributor workflow — authors see missing context.\n"
+                "; Nature of change: This comment is not recorded.\n"
+                "; ------------------------ >8 ------------------------\n"
+                "Nature of change: This line is below the scissors marker.\n"
+                "Code areas impacted: Delivery governance.\n"
+                "Why: Reviewers need context.\n",
+                encoding="utf-8",
+            )
+            result, payload = self.run_checker("commit-message", path, cwd=root)
+        self.assertEqual(result.returncode, 1, payload)
+        self.assert_rule(payload, "commit-message.field-missing")
 
     def test_valid_pr_ignores_hidden_guidance_and_fenced_headings(self) -> None:
         """Accept ordered authored sections without treating examples as duplicate headings."""
@@ -185,21 +228,50 @@ class RuntimeChangeNarrativeTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(payload["status"], "passed")
 
+    def test_pr_title_must_be_a_useful_single_line_outcome(self) -> None:
+        """Reject obvious placeholders, generic labels, ticket-only titles, and multiline titles."""
+        cases = {
+            "short": ("WIP", "pr-description.title-short"),
+            "generic": ("Work in progress", "pr-description.title-unhelpful"),
+            "ticket-only": ("GOV-12345", "pr-description.title-unhelpful"),
+            "multiline": ("Make changes clear\nSecond line", "pr-description.title-multiline"),
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "body.md"
+            path.write_text(VALID_PR, encoding="utf-8")
+            for name, (title, rule_id) in cases.items():
+                with self.subTest(name=name):
+                    result, payload = self.run_checker(
+                        "pr-description",
+                        path,
+                        environment={"PROJECT_GOVERNANCE_PR_TITLE": title},
+                    )
+                    self.assertEqual(result.returncode, 1, payload)
+                    self.assert_rule(payload, rule_id)
+            result, payload = self.run_checker(
+                "pr-description", path, cwd=Path(directory)
+            )
+            self.assertEqual(result.returncode, 1, payload)
+            self.assert_rule(payload, "pr-description.title-missing")
+
     def test_pr_failures_have_stable_actionable_rules(self) -> None:
         """Reject missing, duplicate, reordered, placeholder, and malformed list content."""
         cases = {
             "missing": (VALID_PR.replace(
-                "## Why\n\nReviewers had to reconstruct purpose and impact from file changes.\n\n",
+                "## Why\n\nReviewers had to reconstruct purpose and impact from file changes.\n",
                 "",
             ), "pr-description.section-missing"),
-            "duplicate": (VALID_PR + "\n## Outcome\n\nA duplicate outcome.\n", "pr-description.section-duplicate"),
+            "duplicate": (
+                VALID_PR + "\n## Why\n\nA duplicate reason.\n",
+                "pr-description.section-duplicate",
+            ),
             "order": (VALID_PR.replace(
                 "## Product impact\n\n- Contributor workflow: Authors see missing product context before review.\n- Application behavior: Runtime product behavior is intentionally unchanged.\n\n## Nature of the change",
                 "## Nature of the change\n\nUnified orientation.\n\n## Product impact\n\n- Contributor workflow: Authors see missing product context before review.\n\n## Nature of the change",
             ), "pr-description.section-order"),
             "placeholder": (VALID_PR.replace(
-                "Make change context understandable before a reader opens the diff.",
-                "<One plain-language result for the pull request.>",
+                "Unified commit and pull request orientation while keeping editorial judgment with people.",
+                "<Conceptual change>",
             ), "pr-description.field-placeholder"),
             "impact-shape": (VALID_PR.replace(
                 "- Contributor workflow: Authors see missing product context before review.",
@@ -209,14 +281,18 @@ class RuntimeChangeNarrativeTests(unittest.TestCase):
                 "- Delivery governance\n- Agent authoring workflows",
                 "Delivery governance and agent authoring workflows.",
             ), "pr-description.bullets-missing"),
-            "validation-list": (VALID_PR.replace(
-                "- Focused narrative checker fixtures passed with no findings.",
-                "Focused narrative checker fixtures passed with no findings.",
-            ), "pr-description.bullets-missing"),
-            "empty-optional": (VALID_PR.replace(
-                "Adopters need the new runtime before the checks become active in their repositories.",
-                "None",
-            ), "pr-description.field-placeholder"),
+            "legacy-validation": (
+                VALID_PR + "\n## Validation\n\n- Focused fixtures passed.\n",
+                "pr-description.section-not-allowed",
+            ),
+            "legacy-risk": (
+                VALID_PR + "\n## Risks or required action\n\nNone.\n",
+                "pr-description.section-not-allowed",
+            ),
+            "duplicate-outcome": (
+                VALID_PR + "\n## Outcome\n\nMake change context understandable.\n",
+                "pr-description.section-not-allowed",
+            ),
         }
         for name, (content, rule_id) in cases.items():
             with self.subTest(name=name):
@@ -224,10 +300,30 @@ class RuntimeChangeNarrativeTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 1, payload)
                 self.assert_rule(payload, rule_id)
 
+    def test_pr_bullets_inside_fences_are_examples_not_narrative_values(self) -> None:
+        """Ignore fenced bullets both for placeholder findings and required-list satisfaction."""
+        with_example = VALID_PR.replace(
+            "- Contributor workflow: Authors see missing product context before review.",
+            "- Contributor workflow: Authors see missing product context before review.\n\n"
+            "```markdown\n- <Top-level area>: <how the change surfaces>\n```",
+        )
+        result, payload = self.write_and_run("pr-description", with_example)
+        self.assertEqual(result.returncode, 0, payload)
+
+        fenced_only = VALID_PR.replace(
+            "- Delivery governance\n- Agent authoring workflows",
+            "```text\n- Delivery governance\n- Agent authoring workflows\n```",
+        )
+        result, payload = self.write_and_run("pr-description", fenced_only)
+        self.assertEqual(result.returncode, 1, payload)
+        self.assert_rule(payload, "pr-description.bullets-missing")
+
     def test_untouched_source_pr_template_is_not_a_valid_body(self) -> None:
         """Require authors to replace comments and angle-bracket prompts with real context."""
         result, payload = self.run_checker(
-            "pr-description", ROOT / ".github/pull_request_template.md"
+            "pr-description",
+            ROOT / ".github/pull_request_template.md",
+            environment={"PROJECT_GOVERNANCE_PR_TITLE": VALID_PR_TITLE},
         )
         self.assertEqual(result.returncode, 1, payload)
         self.assert_rule(payload, "pr-description.field-placeholder")
@@ -241,7 +337,14 @@ class RuntimeChangeNarrativeTests(unittest.TestCase):
                 ("pr-description", "pr-description.file-missing"),
             ):
                 with self.subTest(checker=checker):
-                    result, payload = self.run_checker(checker, missing)
+                    environment = (
+                        {"PROJECT_GOVERNANCE_PR_TITLE": VALID_PR_TITLE}
+                        if checker == "pr-description"
+                        else None
+                    )
+                    result, payload = self.run_checker(
+                        checker, missing, environment=environment
+                    )
                     self.assertEqual(result.returncode, 1, payload)
                     self.assert_rule(payload, rule_id)
 
@@ -261,11 +364,15 @@ class RuntimeChangeNarrativeTests(unittest.TestCase):
 
             commit_path = Path(git(worktree, "rev-parse", "--git-path", "COMMIT_EDITMSG"))
             pr_path = Path(git(worktree, "rev-parse", "--git-path", "PR_DESCRIPTION.md"))
+            pr_title_path = Path(git(worktree, "rev-parse", "--git-path", "PR_TITLE"))
             self.assertTrue(commit_path.is_absolute())
             self.assertTrue(pr_path.is_absolute())
+            self.assertTrue(pr_title_path.is_absolute())
             self.assertIn("worktrees", commit_path.parts)
+            self.assertIn("worktrees", pr_title_path.parts)
             commit_path.write_text(VALID_COMMIT, encoding="utf-8")
             pr_path.write_text(VALID_PR, encoding="utf-8")
+            pr_title_path.write_text(VALID_PR_TITLE + "\n", encoding="utf-8")
 
             commit_result, commit_payload = self.run_checker("commit-message", cwd=worktree)
             pr_result, pr_payload = self.run_checker("pr-description", cwd=worktree)
@@ -280,7 +387,10 @@ class RuntimeChangeNarrativeTests(unittest.TestCase):
             result, payload = self.run_checker(
                 "pr-description",
                 cwd=Path(directory),
-                environment={"PROJECT_GOVERNANCE_PR_BODY_FILE": str(path)},
+                environment={
+                    "PROJECT_GOVERNANCE_PR_BODY_FILE": str(path),
+                    "PROJECT_GOVERNANCE_PR_TITLE": VALID_PR_TITLE,
+                },
             )
         self.assertEqual(result.returncode, 0, payload)
 
@@ -310,7 +420,10 @@ class RuntimeChangeNarrativeTests(unittest.TestCase):
             packs["pr-description"]["commands"][0],
             stage="pre-pr",
             mode="impacted",
-            command_arguments={"pr_body_file": body_path},
+            command_arguments={
+                "pr_body_file": body_path,
+                "pr_title": VALID_PR_TITLE,
+            },
         )
         self.assertEqual(
             argv,
@@ -320,8 +433,93 @@ class RuntimeChangeNarrativeTests(unittest.TestCase):
                 "project_governance_runtime.checkers",
                 "pr-description",
                 body_path,
+                VALID_PR_TITLE,
             ],
         )
+        default_argv = command_argv(
+            packs["pr-description"]["commands"][0],
+            stage="pre-pr",
+            mode="impacted",
+            command_arguments={"pr_body_file": "", "pr_title": ""},
+        )
+        self.assertEqual(
+            default_argv,
+            [
+                sys.executable,
+                "-m",
+                "project_governance_runtime.checkers",
+                "pr-description",
+            ],
+        )
+
+    def test_cli_keeps_explicit_pr_title_and_body_inputs_paired(self) -> None:
+        """Reject ambiguous partial overrides and execute one complete narrative pair."""
+        with tempfile.TemporaryDirectory() as directory:
+            body_path = Path(directory) / "body.md"
+            body_path.write_text(VALID_PR, encoding="utf-8")
+            base = [
+                sys.executable,
+                "-m",
+                "project_governance_runtime.cli",
+                "check",
+                "--pack",
+                "pr-description",
+                "--base-ref",
+                "HEAD",
+            ]
+            environment = {**os.environ, "PYTHONPATH": str(ROOT / "src")}
+            for partial in (
+                ["--pr-body-file", str(body_path)],
+                ["--pr-title", VALID_PR_TITLE],
+            ):
+                result = subprocess.run(
+                    [*base, *partial],
+                    cwd=ROOT,
+                    env=environment,
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
+                self.assertEqual(result.returncode, 1, result)
+                self.assertIn("must be supplied together", result.stdout)
+            result = subprocess.run(
+                [
+                    *base,
+                    "--pr-body-file",
+                    str(body_path),
+                    "--pr-title",
+                    VALID_PR_TITLE,
+                ],
+                cwd=ROOT,
+                env=environment,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+        self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_pre_pr_hooks_accept_only_the_title_and_body_override(self) -> None:
+        """Forward paired narrative inputs without allowing stage or mode replacement."""
+        hooks = (
+            ROOT / ".githooks/pre-pr",
+            ROOT / "src/project_governance_runtime/assets/.githooks/pre-pr",
+        )
+        for hook in hooks:
+            with self.subTest(hook=hook):
+                text = hook.read_text(encoding="utf-8")
+                self.assertIn("--pr-body-file <path> --pr-title <title>", text)
+                self.assertIn("4:--pr-body-file:--pr-title", text)
+                self.assertIn("4:--pr-title:--pr-body-file", text)
+                self.assertIn('impacted "$@"', text)
+        rejected = subprocess.run(
+            [str(hooks[0]), "--stage", "release"],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(rejected.returncode, 2, rejected)
+        self.assertIn("usage:", rejected.stderr)
 
     def test_github_workflow_binds_the_live_body_as_environment_data(self) -> None:
         """Run on body and scope changes without interpolating untrusted PR text into shell code."""
@@ -337,7 +535,7 @@ class RuntimeChangeNarrativeTests(unittest.TestCase):
         checkout = next(step for step in job["steps"] if "uses" in step)
         self.assertEqual(
             checkout["with"]["ref"],
-            "${{ github.event.pull_request.base.sha }}",
+            "${{ github.event.pull_request.head.sha }}",
         )
         materialize = next(
             step for step in job["steps"] if step.get("name") == "Materialize the live pull request body"
@@ -348,6 +546,11 @@ class RuntimeChangeNarrativeTests(unittest.TestCase):
             step for step in job["steps"] if step.get("name") == "Validate the change narrative"
         )
         self.assertIn("project_governance_runtime.checkers pr-description", validate["run"])
+        self.assertEqual(
+            validate["env"]["PROJECT_GOVERNANCE_PR_TITLE"],
+            "${{ github.event.pull_request.title }}",
+        )
+        self.assertNotIn("github.event.pull_request.title", validate["run"])
 
 
 if __name__ == "__main__":

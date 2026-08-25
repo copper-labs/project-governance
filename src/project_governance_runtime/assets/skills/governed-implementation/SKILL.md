@@ -56,8 +56,8 @@ repository generated from this template.
 14. If the clean integration snapshot advances, rerun only proof invalidated by that change. A
     snapshot advance alone does not authorize a broad matrix; name the invalidated claim first.
 15. Before any commit or pull request handoff, write the shared change narrative from the governing
-    intent and current evidence: outcome, product impact, conceptual change, code areas, why, and
-    validation. Do not substitute file paths or symbol lists for that explanation.
+    intent: outcome, product impact, conceptual change, code areas, and why. Do not substitute file
+    paths, symbol lists, or machine validation evidence for that explanation.
 16. Reconcile docs, traceability, observability proof or gap rationale, and closeout evidence
     before handoff.
 

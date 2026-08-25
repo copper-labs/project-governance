@@ -163,6 +163,13 @@ class RuntimeSkillPayloadTests(unittest.TestCase):
             "perform code review",
         ):
             self.assertIn(required, change_narrative)
+        self.assertNotIn("## validation", change_narrative)
+        self.assertNotIn("risks or required action", change_narrative)
+        template = (ROOT / ".github/pull_request_template.md").read_text(
+            encoding="utf-8"
+        ).lower()
+        self.assertNotIn("## validation", template)
+        self.assertNotIn("risks or required action", template)
         for workflow in (
             "commit-message-workflow",
             "pr-description-workflow",
