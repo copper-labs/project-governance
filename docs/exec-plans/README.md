@@ -16,13 +16,14 @@ Git remains the implementation history and recovery mechanism.
 
 ## Active
 
-- [KMP Skill Library V0](active/2026-08-24-kmp-skill-library-v0.md) is implementing the authorized
-  S0-S3 tranche: a frozen baseline, nested portable skill resolution, proactive matched-route
-  selection, exact materialization, and seven evaluation-only KMP entries. Cutover, publication,
-  adopter changes, and the wearable overlay remain separately gated.
+No runtime implementation plan is currently active.
 
 ## Completed
 
+- [KMP Skill Library V0](completed/2026-08-24-kmp-skill-library-v0.md) delivered the governed
+  seven-entry provider-neutral core, proactive matched-route selection, exact materialization,
+  cross-provider evaluation, legacy-payload retirement, and clean-wheel proof. Publication,
+  adopter changes, and the wearable overlay remain separately gated.
 - [Reader-first authoring and on-demand developer documentation](completed/2026-08-21-on-demand-developer-documentation.md)
   delivered the minimal shared human and agent corpus, governed research handoff, exact routing,
   validation, telemetry, semantic pilots, Opus review reconciliation, and the `1.3.0` release.
