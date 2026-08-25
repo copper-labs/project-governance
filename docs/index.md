@@ -43,6 +43,9 @@ lock.
 - [Specifications](specs/README.md) contain the active generic contracts.
 - [Guides](guides/README.md) provide task-oriented instructions for operators and agents.
 - [Decisions](decisions/README.md) records durable generic boundary decisions.
+- [Proposed Project Gateway](proposed/project-gateway/README.md) defines the work-in-progress
+  gateway-only architecture, requirements, protocol, subscription-host boundary, evidence model,
+  and implementation sequence. It does not authorize implementation.
 - [KMP skill-library strategy](proposed/kmp-skill-library/README.md) proposes a provider-neutral,
   evidence-backed path from the current pack to a cohesive Kotlin Multiplatform library.
 - [KMP capability and normalization map](proposed/kmp-skill-library/capability-map.md) defines what
