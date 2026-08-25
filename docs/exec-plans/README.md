@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-02-16
-updated: 2026-08-21
+updated: 2026-08-24
 summary: Active and completed execution plans for the current source repository.
 ---
 
@@ -16,7 +16,9 @@ Git remains the implementation history and recovery mechanism.
 
 ## Active
 
-There are no active execution plans.
+- [Commit and pull request change narratives](active/2026-08-24-change-narrative-enforcement.md)
+  installs and enforces one plain-language, conceptual narrative across local commits and ready pull
+  requests, followed by audited Claude Opus 5 review.
 
 ## Completed
 

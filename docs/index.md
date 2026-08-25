@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-07-05
-updated: 2026-08-21
+updated: 2026-08-24
 summary: Entry point for the reusable, package-based project governance runtime.
 ---
 
@@ -31,6 +31,8 @@ lock.
   source-contributor journeys plus the shared agent catalog.
 - [Validation strategy](governance/validation-strategy.md) defines narrow proof by default and the
   few situations that require broader proof.
+- [Change narrative contract](specs/change-narrative-contract.md) defines the product-level and
+  conceptual context required before a reader opens a commit or pull request diff.
 
 ## Reference Areas
 
