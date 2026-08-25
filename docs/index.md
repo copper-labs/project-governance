@@ -33,8 +33,10 @@ lock.
   few situations that require broader proof.
 - [KMP skill inventory](reference/kmp-skill-inventory.md) records the current Kotlin Multiplatform
   capability surface, provenance, overlap, and known quality gaps.
-- [KMP skill quality audit](reference/kmp-skill-quality-audit.md) assesses the whole-of-KMP fit,
-  distinct value, depth, freshness, and disposition of every current KMP leaf.
+- [Pre-V0 KMP skill quality audit](reference/kmp-skill-quality-audit.md) preserves the whole-of-KMP
+  assessment and disposition that informed the current seven-entry replacement.
+- [KMP V0 evaluation](reference/kmp-skill-v0-evaluation.md) records the cross-provider promotion
+  decision, selected-body digests, corrections, and residual consumer-proof risks.
 
 ## Reference Areas
 

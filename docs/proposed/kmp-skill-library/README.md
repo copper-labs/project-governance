@@ -11,18 +11,27 @@ summary: Proposed capability model, source policy, quality gates, and roadmap fo
 
 # Provider-Neutral KMP Skill-Library Strategy
 
-This proposal turns the current KMP stack pack into an extensive, cohesive library without making
+This strategy turns the KMP stack pack into an extensive, cohesive library without making
 Philipp Lackner, Claude, Codex, or any single framework the authority. It records the operator's
-authorization to adopt useful supplied Lackner skills, but does not itself implement an import,
-refresh, release, or external-content transcription.
+authorization to adopt useful supplied Lackner skills. The governed V0 core is implemented; later
+imports, overlays, publication, adopter rollout, and external-content transcription remain separate
+decisions.
+
+## Current implementation status
+
+The governed V0 wheel payload now contains one router and six core leaves. The legacy upstream and
+advanced-bridge payload has been removed after its distinct decisions were retained. Automatic
+selection, exact selected-byte materialization, and provider-conformance evaluation are complete.
+Target consumer builds, publication, adopter updates, and later overlays remain separately owned.
 
 ## Supporting maps
 
-- The [active V0 implementation plan](../../exec-plans/active/2026-08-24-kmp-skill-library-v0.md)
-  turns this strategy into ordered runtime, content, evaluation, cutover, and wearable slices with
-  proof and pause criteria.
+- The [completed V0 implementation plan](../../exec-plans/completed/2026-08-24-kmp-skill-library-v0.md)
+  records the runtime, content, evaluation, and cutover proof plus the separately gated wearable
+  slice.
 - The [current inventory](../../reference/kmp-skill-inventory.md) records what ships today.
-- The [quality audit](../../reference/kmp-skill-quality-audit.md) assesses every current leaf.
+- The [pre-V0 quality audit](../../reference/kmp-skill-quality-audit.md) preserves the disposition
+  of every superseded leaf.
 - The [capability and normalization map](capability-map.md) defines the required end state, gaps,
   fill method, and planning sequence.
 - The [architecture and vocabulary packet](architecture-and-vocabulary.md) proposes the
@@ -260,13 +269,8 @@ A leaf is ready to ship only when:
 - Codex and Claude consume the same canonical bytes; and
 - the skill specifies how it becomes stale, is refreshed, or is retired.
 
-## Decisions still required
+## Post-V0 decisions still required
 
-Before implementation, approve:
-
-- the portable metadata schema and provider-conformance contract;
-- the minimal manifest applicability fields, optional target-fact block, and selected-skill packet;
-- which approved third-party skills remain byte-preserved imports or are independently adapted;
-- the behavior-evaluation storage and runner design;
-- which KMP targets form the minimum supported matrix; and
-- the first wearable overlay boundary and the projects that will supply independent fixture proof.
+Before expanding the live core, approve the exact capability owner, source disposition, supported
+target matrix, consumer-proof source, and behavior-evaluation plan. The first planned expansion is
+the wearable architecture overlay and its independent Wear OS/watchOS fixture proof.

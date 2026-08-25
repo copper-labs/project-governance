@@ -2,7 +2,7 @@
 id: exec-plan.kmp-skill-library-v0
 title: KMP Skill Library V0 Implementation Plan
 type: exec-plan
-status: active
+status: completed
 owner: project-governance
 created: 2026-08-24
 updated: 2026-08-24
@@ -492,20 +492,21 @@ without losing the goals:
 | Live provider calls in CI | Deterministic selection runs in CI; manual frozen-candidate evaluation covers model behavior. |
 | Compiling multi-platform fixture fleet in this repo | V0 does not make product-runtime proof claims; later executable claims require separate consumer evidence. |
 | New router ID, aliases, and deprecation window | Replacing `kmp-implementation` in place preserves adopters and one authority. |
-| Shipping inactive Lackner and legacy candidates in a release | Authorized material remains research input until a capability passes admission; evaluation-only V0 files exist only on the unreleased implementation branch. |
+| Shipping inactive Lackner and legacy candidates in a release | Authorized material remains research input until a capability passes admission; the governed V0 wheel contains no inactive candidate payload. |
 | Standing implementation plan for every later family | A one-gap admission rule prevents roadmap ambition from becoming current delivery scope. |
 
-What remains is the irreducible path: resolve nested canonical skills, accept an optional target-fact
-block, select the smallest KMP composition, materialize exact bytes, author seven high-value
-entries, prove decision value, cut over once, and then add one wearable overlay only after approval.
+The completed irreducible path resolved nested canonical skills, accepted an optional target-fact
+block, selected the smallest KMP composition, materialized exact bytes, authored seven high-value
+entries, proved decision value, and cut over once. Any wearable overlay still requires separate
+approval.
 
 ## Authorization Boundaries
 
-Approval of this plan may authorize S0-S3 source work only if the operator says to begin
-implementation. S4 payload deletion/cutover, wheel publication, adopter updates, S5 wearable work,
-remote telemetry, and later capability families each remain separate decisions.
+The operator authorized S0-S3 implementation, the frozen Codex/Claude evaluation, and then the S4
+local payload cutover on 2026-08-24. Wheel publication, adopter updates, S5 wearable work, remote
+telemetry, and later capability families remain separate decisions.
 
-## Current Authorized Tranche
+## Implementation Record
 
 S0-S3 completed locally on 2026-08-24:
 
@@ -525,15 +526,8 @@ Proof on the integrated S0-S3 snapshot:
 - the complete 275-test runtime suite passed with one existing skip; and
 - the two wheel reproducibility and payload-boundary tests passed.
 
-The legacy payload and advanced pack remain present. No activation was promoted to `governed`, no
-wheel was published, no adopter was changed, and no S5 wearable overlay was created. Those are the
-separately gated S4 and later decisions above.
-
-## Current S4 Evaluation-Only Result
-
 The frozen cross-provider behavior comparison is recorded in the
-[KMP Skill V0 Evaluation](../../reference/kmp-skill-v0-evaluation.md). It recommends promoting the
-seven-entry candidate during a separately authorized cutover:
+[KMP Skill V0 Evaluation](../../reference/kmp-skill-v0-evaluation.md):
 
 - all five scenarios passed no-skill, forced, and automatic comparison with Codex and Claude;
 - automatic routing tied or beat forced guidance and improved at least one material decision or
@@ -543,15 +537,32 @@ seven-entry candidate during a separately authorized cutover:
 - sharing, compatibility, and concurrency received one narrow correction pass before the final
   candidate bytes were frozen.
 
-The legacy payload, advanced pack, activation modes, manifest provenance, and wheel contents have
-not been cut over. That destructive S4 remainder still requires explicit operator approval.
+S4 completed the authorized local cutover:
+
+- `kmp-implementation` and all six V0 leaves now use `activation.mode: governed`;
+- `stack-packs/kmp/manifest.yaml` is the sole KMP manifest and declares normalized mixed
+  provenance;
+- the catalog no longer declares `kmp-advanced-bridge-pack`;
+- all 15 upstream leaves, 9 advanced leaves, and the advanced manifest were removed from the wheel
+  after their transition dispositions and frozen digests were preserved;
+- the Apache-2.0 license and updated notice remain in the governed payload; and
+- current inventory documentation now distinguishes the live seven-entry core from the historical
+  audit and frozen legacy fixture.
 
 ## Closeout
 
-At completion, move the plan to `docs/exec-plans/completed/` and record:
+Validation on the integrated cutover snapshot:
 
-- the final seven-entry catalog and legacy transition map;
-- exact validation results on the integrated snapshot;
-- the reviewed promotion summary and residual consumer-proof risk;
-- removed and deferred capability families; and
-- any separately authorized publication or adopter status.
+- the router and six leaf directories passed the skill static validator;
+- all 13 selected skill/reference SHA256 values matched the frozen evaluation record;
+- 24 focused catalog, context, KMP selection, fixture, payload, and wheel-boundary tests passed;
+- the complete 275-test runtime suite passed with one existing skip;
+- the reproducible wheel boundary passed as part of the focused and full suites; and
+- a newly built development wheel installed into a clean temporary environment, resolved exactly
+  seven governed KMP entries from one manifest, materialized the same seven entries, and contained
+  no `advanced-bridge` or `upstream` payload.
+
+No wheel was published, no adopter repository was changed, and no S5 wearable overlay was created.
+The residual risk is unchanged: model scenarios prove routing and decision value, while real
+consumer builds and physical Wear OS/watchOS evidence remain required for adopter, artifact,
+performance, background, power, or device-support claims.

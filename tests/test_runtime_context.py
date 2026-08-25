@@ -100,7 +100,9 @@ class RuntimeContextTests(unittest.TestCase):
             materialize_skills(root)
             profile = routing_profile(context=[])
             profile["context_router"]["default_skills"] = []
-            profile["context_router"]["routes"][0]["skills"] = ["kmp-bridge-event-delivery"]
+            profile["context_router"]["routes"][0]["skills"] = [
+                "kmp-coroutines-and-concurrency"
+            ]
             profile["context_router"]["routes"][0]["token_budget"] = {
                 "primary_context_tokens": 100,
                 "active_plan_context_tokens": 100,
@@ -112,10 +114,13 @@ class RuntimeContextTests(unittest.TestCase):
             result = resolve_context(root, "Review governance", [])
 
             self.assertEqual(result["status"], "passed")
-            self.assertEqual([skill["id"] for skill in result["skills"]], ["kmp-bridge-event-delivery"])
+            self.assertEqual(
+                [skill["id"] for skill in result["skills"]],
+                ["kmp-coroutines-and-concurrency"],
+            )
             self.assertEqual(
                 result["skills"][0]["path"],
-                ".governance/runtime/skills/stack-packs/kmp/advanced-bridge/kmp-bridge-event-delivery/SKILL.md",
+                ".governance/runtime/skills/stack-packs/kmp/core/kmp-coroutines-and-concurrency/SKILL.md",
             )
 
     def test_materialization_refuses_a_symlinked_context_source(self) -> None:

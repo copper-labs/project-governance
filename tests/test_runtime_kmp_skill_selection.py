@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prove the evaluation-only KMP V0 pack selects and materializes by behavior."""
+"""Prove the governed KMP V0 pack selects and materializes by behavior."""
 
 from __future__ import annotations
 
@@ -73,7 +73,7 @@ def write_target(
 class RuntimeKmpSkillSelectionTests(unittest.TestCase):
     """Keep KMP routing proactive, restrained, exact, and deterministic."""
 
-    def test_frozen_scenarios_select_the_expected_minimal_evaluation_packets(self) -> None:
+    def test_frozen_scenarios_select_the_expected_minimal_governed_packets(self) -> None:
         """Exercise four general decisions and one conditional wearable topology."""
         fixture = yaml.safe_load(SCENARIOS.read_text(encoding="utf-8"))
         for scenario in fixture["scenarios"]:
@@ -85,7 +85,6 @@ class RuntimeKmpSkillSelectionTests(unittest.TestCase):
                     root,
                     scenario["task"],
                     scenario["changed_paths"],
-                    include_evaluation_skills=True,
                 )
 
                 expected = ["kmp-implementation", *scenario["expectations"]["automatic"]]
@@ -98,8 +97,8 @@ class RuntimeKmpSkillSelectionTests(unittest.TestCase):
                     installed = root / skill["path"]
                     self.assertEqual(packet.read_bytes(), installed.read_bytes())
 
-    def test_ordinary_selection_blocks_a_direct_evaluation_only_router(self) -> None:
-        """Prevent unreleased candidate content from leaking into normal coordination."""
+    def test_ordinary_selection_activates_the_governed_router(self) -> None:
+        """Make the promoted KMP core available to normal coordination."""
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             facts = {
@@ -111,11 +110,11 @@ class RuntimeKmpSkillSelectionTests(unittest.TestCase):
 
             result = resolve_context(root, "Upgrade the shared module", [])
 
-            self.assertEqual(result["status"], "blocked")
-            self.assertIn(
-                "skill-evaluation-only:kmp-implementation", result["blockers"]
+            self.assertEqual(result["status"], "passed", result["blockers"])
+            self.assertEqual(
+                [skill["id"] for skill in result["skills"]],
+                ["kmp-implementation", "kmp-build-and-compatibility"],
             )
-            self.assertEqual(result["skills"], [])
 
     def test_absent_kmp_facts_and_default_router_never_compose_leaves(self) -> None:
         """Require route-local enablement and explicit KMP facts without Android inference."""
@@ -123,9 +122,7 @@ class RuntimeKmpSkillSelectionTests(unittest.TestCase):
             root = Path(directory)
             write_target(root, kmp_profile(), None)
 
-            result = resolve_context(
-                root, "Upgrade the shared module", [], include_evaluation_skills=True
-            )
+            result = resolve_context(root, "Upgrade the shared module", [])
 
             self.assertEqual(result["status"], "passed")
             self.assertEqual([skill["id"] for skill in result["skills"]], ["kmp-implementation"])
@@ -145,9 +142,7 @@ class RuntimeKmpSkillSelectionTests(unittest.TestCase):
                 },
             )
 
-            default_only = resolve_context(
-                root, "Upgrade the shared module", [], include_evaluation_skills=True
-            )
+            default_only = resolve_context(root, "Upgrade the shared module", [])
 
             self.assertEqual(
                 [skill["id"] for skill in default_only["skills"]], ["kmp-implementation"]
@@ -166,9 +161,7 @@ class RuntimeKmpSkillSelectionTests(unittest.TestCase):
                 },
             )
 
-            result = resolve_context(
-                root, "Change the coroutine event stream", [], include_evaluation_skills=True
-            )
+            result = resolve_context(root, "Change the coroutine event stream", [])
 
             self.assertIn("boundary_pressure", result["skill_selection"]["unresolved_facts"])
             self.assertIn("skill-unresolved-fact:boundary_pressure", result["blockers"])
@@ -196,9 +189,7 @@ class RuntimeKmpSkillSelectionTests(unittest.TestCase):
                 },
             )
 
-            result = resolve_context(
-                root, "Upgrade dependencies", [], include_evaluation_skills=True
-            )
+            result = resolve_context(root, "Upgrade dependencies", [])
 
             self.assertEqual(result["route"]["outcome"], "ambiguous")
             self.assertEqual([skill["id"] for skill in result["skills"]], ["kmp-implementation"])
@@ -217,9 +208,7 @@ class RuntimeKmpSkillSelectionTests(unittest.TestCase):
             router = root / ".governance/runtime/skills/kmp-implementation/SKILL.md"
             router.write_text(router.read_text(encoding="utf-8") + "\nstale\n", encoding="utf-8")
 
-            stale = resolve_context(
-                root, "Upgrade the shared module", [], include_evaluation_skills=True
-            )
+            stale = resolve_context(root, "Upgrade the shared module", [])
 
             self.assertIn(
                 "skill-stale-materialization:kmp-implementation", stale["blockers"]
@@ -229,9 +218,7 @@ class RuntimeKmpSkillSelectionTests(unittest.TestCase):
             root = Path(directory)
             write_target(root, kmp_profile(total_tokens=100), facts)
 
-            bounded = resolve_context(
-                root, "Upgrade the shared module", [], include_evaluation_skills=True
-            )
+            bounded = resolve_context(root, "Upgrade the shared module", [])
 
             self.assertIn(
                 "skill-outside-byte-budget:kmp-implementation", bounded["blockers"]
@@ -250,12 +237,8 @@ class RuntimeKmpSkillSelectionTests(unittest.TestCase):
             root = Path(directory)
             write_target(root, kmp_profile(), facts)
 
-            first = resolve_context(
-                root, "Move code to commonMain", [], include_evaluation_skills=True
-            )
-            second = resolve_context(
-                root, "Move a source set to commonMain", [], include_evaluation_skills=True
-            )
+            first = resolve_context(root, "Move code to commonMain", [])
+            second = resolve_context(root, "Move a source set to commonMain", [])
 
             self.assertNotEqual(
                 first["skills"][1]["selection_reasons"],

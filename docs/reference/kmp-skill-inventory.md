@@ -6,161 +6,69 @@ status: current
 owner: project-governance
 created: 2026-08-24
 updated: 2026-08-24
-summary: Current Kotlin Multiplatform skill surface, provenance, overlaps, and quality gaps.
+summary: Governed Kotlin Multiplatform V0 skill surface, provenance, activation, and deferred capability families.
 ---
 
 # KMP Skill Inventory
 
-This inventory records what the wheel already ships before new Kotlin Multiplatform (KMP) skills
-are acquired or authored. It is a dated assessment, not a claim that every listed skill is mature
-or current.
+The wheel contains one governed provider-neutral KMP router and six progressively disclosed core
+leaves. This is the sole active KMP pack and capability authority.
 
-## Snapshot
+## Governed V0 surface
 
-As of 2026-08-24, the wheel contains one KMP router and 24 leaf skills:
-
-- 15 imported Apache-2.0 skills from `mmiani/kotlin-kmp-claude-agent-skills`;
-- 9 internally authored advanced bridge and implementation skills; and
-- 0 behavior-evaluation suites that demonstrate activation, correctness, or restraint.
-
-The current opportunity is therefore not merely to add prompts. It is to turn a broad but uneven
-collection into a governed capability system with explicit owners, authorized sources, measurable
-behavior, and one provider-neutral representation.
-
-## Current router
-
-`src/project_governance_runtime/assets/skills/kmp-implementation/SKILL.md` selects leaf skills from
-the KMP pack. Its body is provider-neutral, but its frontmatter uses the runtime's older
-`id`/`title`/`stage`/`provenance` schema instead of the portable `name`/`description` discovery
-fields used by current Agent Skills implementations. Direct discovery by Codex and Claude must be
-proved before calling the router provider-neutral.
-
-## Imported upstream skills
-
-These skills are declared in
-`src/project_governance_runtime/assets/skills/stack-packs/kmp/manifest.yaml`.
-
-| Capability | Current skill ID |
-| --- | --- |
-| Gradle and build governance | `kotlin-build-kmp-gradle-governance` |
-| Shared data layer | `kotlin-data-kmp-data-layer` |
-| Code review | `kotlin-kmp-code-review` |
-| Refactor safety | `kotlin-kmp-refactor-safety` |
-| Compose navigation | `kotlin-navigation-compose-multiplatform` |
-| App and deep links | `kotlin-platform-app-links-and-deep-links` |
-| Platform bridges | `kotlin-platform-kmp-bridges` |
-| Architecture review | `kotlin-project-architecture-review` |
-| Bug fixing | `kotlin-project-bugfix` |
-| Feature implementation | `kotlin-project-feature-implementation` |
-| Modularization | `kotlin-project-modularization` |
-| State management | `kotlin-project-state-management` |
-| Testing | `kotlin-testing-kmp` |
-| Adaptive UI and resources | `kotlin-ui-adaptive-resources` |
-| Compose Multiplatform UI | `kotlin-ui-compose-multiplatform` |
-
-The pack includes its upstream Apache-2.0 license and notice. Its manifest records repository,
-path, license, and import date, but not the exact upstream commit or content digest. A comparison
-against upstream `main` at commit `939786cb13b49daacea7d5fb0a10877b6005e6be` found all 15 local
-files had drifted by 2026-08-24. This is a refresh signal, not permission to overwrite local
-changes. One manifest-directory mismatch also exists: `kotlin-kmp-code-review` declares the
-internal name `kotlin-project-code-review`.
-
-## Internally authored advanced skills
-
-These skills are declared in the advanced bridge manifest.
-
-| Capability | Current skill ID |
-| --- | --- |
-| Cross-platform bridge architecture | `kmp-cross-platform-bridge-architecture` |
-| Bridge event delivery | `kmp-bridge-event-delivery` |
-| Multiple native UI hosts | `kmp-multi-host-ui-shell` |
-| Platform-native interop | `kmp-platform-native-interop` |
-| Cross-platform parity automation | `kmp-qa-parity-automation` |
-| Platform build governance | `kmp-build-platform-governance` |
-| Dependency-matrix governance | `kmp-matrix-dependency-governance` |
-| Compose Multiplatform implementation | `compose-multiplatform-implementation` |
-| React Native bridge development loop | `react-native-bridge-dev-loop` |
-
-The React Native skill is a specialized bridge consumer rather than a core KMP capability. Keep it
-as an optional integration leaf; do not let it define the KMP library's architecture.
-
-## Operator-supplied Lackner bundle
-
-The supplied bundle contains eight `SKILL.md` files plus a README:
-
-| Supplied skill | Relationship to current pack | Disposition |
+| Capability | Skill ID | Material decision |
 | --- | --- | --- |
-| Android module structure | Strong overlap with modularization, build, and architecture review | Direct-import candidate only if overlap evaluation shows distinct Android-overlay value |
-| Android data layer | Strong overlap with the existing KMP data-layer skill | Adapt or reject after behavior comparison with the normalized owner |
-| Android presentation MVI | Strong overlap with state, feature, and Compose skills | Direct-import candidate as an Android presentation overlay if restraint tests pass |
-| Android navigation | Strong overlap with Compose navigation | Direct-import candidate for Android-specific typed-route/result mechanics after freshness review |
-| Android DI with Koin | Material leaf gap | High-priority direct-import or light-adaptation candidate for a Koin overlay |
-| Android testing | Partial overlap with KMP testing and parity automation | Import distinct Android test mechanics; correct failing assumptions before activation |
-| Android Compose UI | Strong overlap; performance specialization remains thin | Import only sections or the whole leaf if it beats the consolidated Compose owner in evaluations |
-| Android error handling | Material cross-cutting gap | Adapt because the current fallback example has a correctness defect |
+| Project-shape routing | `kmp-implementation` | Establishes targets, runtime/device topology, consumers, artifacts, sharing posture, and boundary pressure before leaf selection. |
+| Sharing and architecture | `kmp-sharing-and-architecture` | Chooses shared logic, presentation, UI, headless runtime, host-shell, and wearable authority boundaries. |
+| Source sets and platform boundaries | `kmp-source-sets-and-platform-boundaries` | Places behavior in the narrowest honest source set and isolates forced platform mechanics. |
+| Build and compatibility | `kmp-build-and-compatibility` | Treats Kotlin, Gradle, JDK, AGP, Compose, Xcode, libraries, targets, and consumers as one verified matrix. |
+| Coroutines and concurrency | `kmp-coroutines-and-concurrency` | Owns scopes, state/events, bounded delivery, cancellation, stale-work rejection, reconnect, and teardown. |
+| API and artifact boundaries | `kmp-api-and-artifact-boundaries` | Designs consumer-visible APIs, DTOs, lifecycle, error, export, binary, and artifact contracts. |
+| Test and evidence | `kmp-test-and-evidence` | Matches common, target, bridge, host, artifact, device, performance, and wearable proof to the claim. |
 
-All eight leaf files use portable `name` and `description` frontmatter. The README is
-Claude-specific, documents only six skills, and instructs installation under a Claude-only path.
-The bundle contains no license file, source citations, version fields, or freshness metadata. The
-operator has explicitly authorized direct adoption or modification, so licensing is not a selection
-gate for these supplied skill files. Their
-contents are also predominantly Android-first: examples rely on Android application contexts,
-`SavedStateHandle`, resources, `BuildConfig`, WorkManager, and Android test machinery.
+All seven entries use portable `name` and `description` discovery, provider-neutral Markdown,
+manifest-owned canonical paths, exact installed-byte verification, and `activation.mode: governed`.
+An adopting repository must explicitly enable `kmp-implementation` on its selected target-owned
+route and provide KMP facts before automatic leaf composition occurs.
 
-They may be adopted byte-for-byte when useful. Android scope, technical correctness, overlap,
-freshness, provider-neutral discovery, and behavior evidence still determine whether a file should
-be active, adapted, kept as a target overlay, or rejected.
+## Provenance
 
-### Technical review cautions
+The V0 skill bodies are original Project Governance synthesis with dated primary sources,
+independent adaptation of useful Apache-2.0 material, and sanitized reusable implementation
+patterns. No legacy upstream skill or operator-supplied Philipp Lackner file remains byte-preserved
+in the live V0 payload. The packaged `LICENSE`, `NOTICE.md`, manifest records, and frozen historical
+fixture preserve the relevant provenance and transition evidence.
 
-The bundle should not be imported indiscriminately. Examples include:
+The [KMP V0 evaluation](kmp-skill-v0-evaluation.md) records the final selected-body digests and the
+Codex/Claude behavior comparison. The immutable historical inventory remains in
+`tests/fixtures/kmp-skills/legacy-2026-08-24.yaml`; Git history preserves the removed implementation.
 
-- an offline fallback that calls the local source inside `Result.onFailure` but discards the local
-  result;
-- a `StateFlow` test that appears to assert a loading state without first consuming the flow's
-  initial state; and
-- universal prescriptions about ViewModel ownership, validation errors, repository thresholds,
-  dispatchers, and test frameworks that need architectural context and KMP target qualification.
+## Removed and deferred surface
 
-These are useful evaluation cases: a mature skill should catch or avoid them.
+The cutover removed the 15 imported upstream leaves and 9 internal advanced-bridge leaves from the
+wheel. Their distinct V0 decisions were consolidated into the six core owners. Generic feature,
+bug-fix, refactor, review, and authoring process remains owned by generic governance skills.
 
-## Capability overlap and gaps
+These capability families remain deferred until separately admitted and proven:
 
-### Substantially covered
+- data, Ktor, persistence, synchronization, typed outcomes, and offline architecture;
+- Compose UI, state, navigation, adaptive resources, accessibility, and performance;
+- Android host overlays, including Koin, App Links, and Android-specific testing;
+- detailed Swift, Objective-C, JavaScript, C, JNI, framework, package, and publication mechanics;
+- transport-specific Flutter, React Native, WebView, browser, and native-host bridge mechanics;
+- security, privacy, observability, desktop, web, Wasm, and multi-target release operations; and
+- the first separately approved wearable architecture overlay.
 
-- project architecture and modularization;
-- feature, bug-fix, refactor, and review workflows;
-- Compose Multiplatform UI, state, navigation, resources, and adaptation;
-- data-layer structure and baseline testing;
-- Gradle, platform build, bridge, and parity concerns.
+The core already applies bridge pressure and wearable topology to shared decisions. It does not
+claim implementation-level coverage for every deferred target, host, or device mechanism.
 
-### Partially covered or unproved
+## Live controls
 
-- dependency injection and target-specific composition roots;
-- typed outcomes, error translation, cancellation, retry, and offline behavior;
-- Android-to-KMP migration and the decision about what should remain native;
-- Ktor client architecture, serialization, engine selection, and MockEngine tests;
-- persistence choices, schema migration, synchronization, and conflict behavior;
-- iOS-facing API design, Swift ergonomics, XCFramework/SwiftPM delivery, and ABI evolution;
-- concurrency and Flow correctness across native targets;
-- Compose performance, effects, component API design, focus, and animation;
-- security, authentication, secrets, telemetry, privacy, and release operations;
-- desktop, web, and Wasm target guidance; and
-- Wear OS, watchOS, standalone/companion/hybrid wearable topology, constrained lifecycle and power,
-  paired-device recovery, sensor provenance, and wearable target proof; and
-- skill behavior evaluation and provider-conformance proof.
-
-## Inventory controls to add
-
-Every KMP leaf should eventually have:
-
-- one stable capability ID and unambiguous owning router;
-- target scope, supported library versions, maturity, and review date;
-- exact provenance, license or operator authorization, upstream revision, and local content digest;
-- primary-source references separated from practitioner input;
-- activation, correctness, restraint, and integration evaluations; and
-- proof that Codex and Claude receive the same canonical skill bytes and supporting resources.
-
-The proposed delivery model and roadmap live in the
-[KMP skill-library strategy](../proposed/kmp-skill-library/README.md). The
-[KMP skill quality audit](kmp-skill-quality-audit.md) evaluates every current leaf individually.
+- Exactly one catalog entry and one manifest own the KMP pack.
+- Exactly seven KMP skills are shipped: one router and six leaves.
+- No `evaluation-only`, legacy upstream, advanced-pack, unmanifested, provider-specific, or
+  user-home-path KMP skill is releasable.
+- Selection and materialization are deterministic; target builds and physical-device evidence
+  remain adopter-owned.
+- Any selected-body, reference, matcher, scenario, or rubric change invalidates the affected
+  evaluation record and requires focused re-evaluation before release.

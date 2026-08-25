@@ -1,22 +1,26 @@
 ---
 id: reference.kmp-skill-quality-audit
-title: KMP Skill Quality Audit
+title: Pre-V0 KMP Skill Quality Audit
 type: reference
-status: current
+status: superseded
 owner: project-governance
 created: 2026-08-24
 updated: 2026-08-24
-summary: Whole-of-KMP scope, value, richness, freshness, and disposition audit for every current KMP leaf.
+summary: Historical audit of the 24-leaf KMP payload that informed the governed seven-entry V0 replacement.
 ---
 
-# KMP Skill Quality Audit
+# Pre-V0 KMP Skill Quality Audit
+
+> **Historical record:** This audit describes the 24-leaf payload that existed before the governed
+> V0 cutover. The current live surface is recorded in the [KMP skill inventory](kmp-skill-inventory.md),
+> and the promotion evidence is recorded in the [KMP V0 evaluation](kmp-skill-v0-evaluation.md).
 
 This audit asks a stricter question than “does the file contain useful advice?” It asks whether each
-current leaf adds distinct Kotlin Multiplatform value, applies at the right scope, changes an agent's
+then-current leaf added distinct Kotlin Multiplatform value, applied at the right scope, changed an agent's
 decisions, and can prove that value. It covers the 24 leaves recorded in the
 [KMP skill inventory](kmp-skill-inventory.md).
 
-## Verdict
+## Historical verdict
 
 The pack contains substantial useful material, but no current leaf is proven ready under the
 proposed library standard.

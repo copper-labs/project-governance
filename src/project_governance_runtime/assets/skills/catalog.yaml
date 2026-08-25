@@ -140,7 +140,7 @@ standard_skills:
     portable: true
     capability_owner: kmp-project-shape-routing
     activation:
-      mode: evaluation-only
+      mode: governed
       default_level: required
     description: Implement or review Kotlin Multiplatform work with source-set and boundary discipline.
   - id: typescript-implementation
@@ -156,11 +156,7 @@ stack_packs:
   - id: kmp-stack-pack
     category: kmp
     manifest: .governance/runtime/skills/stack-packs/kmp/manifest.yaml
-    description: Imported Apache-licensed Kotlin/KMP skills with local governance routing.
-  - id: kmp-advanced-bridge-pack
-    category: kmp
-    manifest: .governance/runtime/skills/stack-packs/kmp/advanced-bridge/manifest.yaml
-    description: Advanced KMP bridge, native interop, build matrix, QA parity, and host shell skills.
+    description: Governed provider-neutral KMP core with project-shape routing and six focused leaves.
   - id: web-cloud-control-plane-stack-pack
     category: web
     manifest: .governance/runtime/skills/stack-packs/web-cloud-control-plane/manifest.yaml

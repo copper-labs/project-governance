@@ -42,14 +42,40 @@ class RuntimeSkillCatalogTests(unittest.TestCase):
     """Keep one catalog authority for top-level and nested package skills."""
 
     def test_index_resolves_nested_skills_and_shared_router_attachments(self) -> None:
-        """Traverse manifests and treat repeated router references as attachments."""
+        """Traverse the sole KMP manifest and attach its governed router once."""
         index = build_skill_index(ASSETS)
-        self.assertIn("kotlin-testing-kmp", index)
+        self.assertNotIn("kotlin-testing-kmp", index)
+        self.assertNotIn("kmp-bridge-event-delivery", index)
         router = index["kmp-implementation"]
+        self.assertEqual(router["router_for"], ["kmp-stack-pack"])
+        self.assertEqual(router["activation_mode"], "governed")
+        live_kmp = {
+            skill_id: record
+            for skill_id, record in index.items()
+            if skill_id == "kmp-implementation" or record["pack_id"] == "kmp-stack-pack"
+        }
         self.assertEqual(
-            router["router_for"], ["kmp-stack-pack", "kmp-advanced-bridge-pack"]
+            set(live_kmp),
+            {
+                "kmp-implementation",
+                "kmp-sharing-and-architecture",
+                "kmp-source-sets-and-platform-boundaries",
+                "kmp-build-and-compatibility",
+                "kmp-coroutines-and-concurrency",
+                "kmp-api-and-artifact-boundaries",
+                "kmp-test-and-evidence",
+            },
         )
-        self.assertEqual(router["activation_mode"], "evaluation-only")
+        self.assertTrue(
+            all(record["activation_mode"] == "governed" for record in live_kmp.values())
+        )
+        self.assertFalse(
+            any(
+                segment in str(record["relative_path"])
+                for record in live_kmp.values()
+                for segment in ("/advanced-bridge/", "/upstream/")
+            )
+        )
         self.assertEqual(
             hashlib.sha256(canonical_skill_bytes(router)).hexdigest(),
             hashlib.sha256((ASSETS / "kmp-implementation/SKILL.md").read_bytes()).hexdigest(),
@@ -72,8 +98,8 @@ class RuntimeSkillCatalogTests(unittest.TestCase):
             }
         self.assertEqual(source_digests, installed_digests)
 
-    def test_v0_core_is_portable_evaluation_only_and_progressively_disclosed(self) -> None:
-        """Keep exactly six candidate leaves bounded until the separate promotion gate."""
+    def test_v0_core_is_portable_governed_and_progressively_disclosed(self) -> None:
+        """Keep exactly six live leaves bounded behind the sole KMP router."""
         index = build_skill_index(ASSETS)
         core = [
             record
@@ -85,7 +111,7 @@ class RuntimeSkillCatalogTests(unittest.TestCase):
         self.assertEqual(len({record["capability_owner"] for record in core}), 6)
         for record in core:
             self.assertIs(record["portable"], True)
-            self.assertEqual(record["activation_mode"], "evaluation-only")
+            self.assertEqual(record["activation_mode"], "governed")
             self.assertEqual(record["default_level"], "recommended")
             self.assertEqual(len(record["references"]), 1)
             self.assertLess(len(canonical_skill_bytes(record)), 4_000)
@@ -93,9 +119,12 @@ class RuntimeSkillCatalogTests(unittest.TestCase):
             (ASSETS / "stack-packs/kmp/manifest.yaml").read_text(encoding="utf-8")
         )
         core_entries = [entry for entry in manifest["skills"] if entry["id"] in {item["id"] for item in core}]
+        self.assertEqual(len(manifest["skills"]), 6)
+        self.assertEqual(manifest["source"]["type"], "normalized-mixed-provenance")
         for entry in core_entries:
             self.assertTrue(entry["sources"])
             self.assertTrue(all(source.get("reviewed_on") for source in entry["sources"]))
+            self.assertIn("original-synthesis", {source["kind"] for source in entry["sources"]})
 
     def test_index_rejects_duplicate_ids_escaping_paths_and_portable_name_mismatch(self) -> None:
         """Fail closed on ambiguous or unsafe catalog ownership."""
