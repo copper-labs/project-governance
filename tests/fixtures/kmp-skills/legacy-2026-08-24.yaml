@@ -1,0 +1,202 @@
+version: 1
+id: kmp-legacy-snapshot-2026-08-24
+captured_on: 2026-08-24
+historical: true
+purpose: >-
+  Immutable pre-V0 identity of the shipping KMP router and leaves plus the eight
+  operator-supplied Lackner candidates. This file is evidence, not a live digest registry.
+shipping_payload:
+  - id: kmp-implementation
+    path: kmp-implementation/SKILL.md
+    sha256: 5a239cadff27b8c3605a7a8bc7cd5c269c27dd3cc888c387ef11a256049b5077
+    bytes: 3853
+    kind: router
+    disposition: retain-in-v0
+  - id: kotlin-build-kmp-gradle-governance
+    path: stack-packs/kmp/upstream/kotlin-build-kmp-gradle-governance/SKILL.md
+    sha256: 1fdfefa0947a072e1c862c1afe8d24b9a00888d9e02c08c3cf1cae233278151b
+    bytes: 11607
+    kind: leaf
+    disposition: retain-in-v0
+  - id: kotlin-data-kmp-data-layer
+    path: stack-packs/kmp/upstream/kotlin-data-kmp-data-layer/SKILL.md
+    sha256: 62d80ae514075bce680bde67a4a8060e0fa052a238102e1c53714c37b1a54738
+    bytes: 11115
+    kind: leaf
+    disposition: defer
+  - id: kotlin-kmp-code-review
+    path: stack-packs/kmp/upstream/kotlin-kmp-code-review/SKILL.md
+    sha256: 10e1a72579d81789c271cdc653c260e89fa96520186ade7cc1ff04c7a6633075
+    bytes: 33792
+    kind: leaf
+    disposition: reject
+  - id: kotlin-kmp-refactor-safety
+    path: stack-packs/kmp/upstream/kotlin-kmp-refactor-safety/SKILL.md
+    sha256: 5484bcdafe6e096b9b1adcd3a3dde92e9516bedc06b4ed8639703f7f19d0f97e
+    bytes: 4876
+    kind: leaf
+    disposition: reject
+  - id: kotlin-navigation-compose-multiplatform
+    path: stack-packs/kmp/upstream/kotlin-navigation-compose-multiplatform/SKILL.md
+    sha256: 8a4ca4ee2e620d98a03f04605ecf1f002fa4b8e8f4a8c726fff295d23a935005
+    bytes: 16752
+    kind: leaf
+    disposition: defer
+  - id: kotlin-platform-app-links-and-deep-links
+    path: stack-packs/kmp/upstream/kotlin-platform-app-links-and-deep-links/SKILL.md
+    sha256: ce54bf12d0bce43f0d7b197e433978da60ba12f3733a0defcf9c09fd40e18988
+    bytes: 12935
+    kind: leaf
+    disposition: defer
+  - id: kotlin-platform-kmp-bridges
+    path: stack-packs/kmp/upstream/kotlin-platform-kmp-bridges/SKILL.md
+    sha256: 150dc109862b8538e8c14aa769ab45117c8fa97a49dbff5080d74934dea78805
+    bytes: 16337
+    kind: leaf
+    disposition: retain-in-v0
+  - id: kotlin-project-architecture-review
+    path: stack-packs/kmp/upstream/kotlin-project-architecture-review/SKILL.md
+    sha256: 4f2589072144647710fc658b6d3afd5211b96333b3f002551bed465d82b96577
+    bytes: 30257
+    kind: leaf
+    disposition: retain-in-v0
+  - id: kotlin-project-bugfix
+    path: stack-packs/kmp/upstream/kotlin-project-bugfix/SKILL.md
+    sha256: 7d57fa915b64acb0eddb189302e793d4bfb42b1e46953f94e739c0d9eb671a04
+    bytes: 12518
+    kind: leaf
+    disposition: reject
+  - id: kotlin-project-feature-implementation
+    path: stack-packs/kmp/upstream/kotlin-project-feature-implementation/SKILL.md
+    sha256: 44c3746258cebd7470fe1de884f8497543c857464d393f51bba14b6d5a5374db
+    bytes: 30459
+    kind: leaf
+    disposition: retain-in-v0
+  - id: kotlin-project-modularization
+    path: stack-packs/kmp/upstream/kotlin-project-modularization/SKILL.md
+    sha256: 0b426582c59e757c8398f345ed117435ff094e9571ddfaf7fcf242c4f3189567
+    bytes: 14405
+    kind: leaf
+    disposition: retain-in-v0
+  - id: kotlin-project-state-management
+    path: stack-packs/kmp/upstream/kotlin-project-state-management/SKILL.md
+    sha256: 5fc51cdc1108736ba4b420d76374909e7deca971c8e02b92b53c210b77e71231
+    bytes: 21167
+    kind: leaf
+    disposition: defer
+  - id: kotlin-testing-kmp
+    path: stack-packs/kmp/upstream/kotlin-testing-kmp/SKILL.md
+    sha256: 9dd0fa7c7ebf724ac7df719e4598596b0a35a34b9c067fd32e036f2dac23ec76
+    bytes: 18928
+    kind: leaf
+    disposition: retain-in-v0
+  - id: kotlin-ui-adaptive-resources
+    path: stack-packs/kmp/upstream/kotlin-ui-adaptive-resources/SKILL.md
+    sha256: 6beae1bbcd193cc3b95ab376d79c57ae805f8a8700a0dd8a39c77ea6990848b7
+    bytes: 18794
+    kind: leaf
+    disposition: defer
+  - id: kotlin-ui-compose-multiplatform
+    path: stack-packs/kmp/upstream/kotlin-ui-compose-multiplatform/SKILL.md
+    sha256: 3845cbb39cf71dc123e6128987a408983795463614c236450dd328deebd91495
+    bytes: 15881
+    kind: leaf
+    disposition: defer
+  - id: kmp-cross-platform-bridge-architecture
+    path: stack-packs/kmp/advanced-bridge/kmp-cross-platform-bridge-architecture/SKILL.md
+    sha256: 2e9ed00bc37f320d43588007b8a481c4bde814ae69e1bb913c62bbcf68c2b3e4
+    bytes: 2778
+    kind: leaf
+    disposition: retain-in-v0
+  - id: kmp-bridge-event-delivery
+    path: stack-packs/kmp/advanced-bridge/kmp-bridge-event-delivery/SKILL.md
+    sha256: 10745f4925a8f3088756e6eb0e1ecdc2d0ab5ab05d6c23748314f4435e8b9894
+    bytes: 2629
+    kind: leaf
+    disposition: retain-in-v0
+  - id: kmp-multi-host-ui-shell
+    path: stack-packs/kmp/advanced-bridge/kmp-multi-host-ui-shell/SKILL.md
+    sha256: 073d71cc279df772f7cb32352fe1fd5be41806045c58bad6121e3712d3363d28
+    bytes: 2322
+    kind: leaf
+    disposition: retain-in-v0
+  - id: kmp-platform-native-interop
+    path: stack-packs/kmp/advanced-bridge/kmp-platform-native-interop/SKILL.md
+    sha256: 611c137210f272943c8ef1859f282498f1d69e2c8d4657e0a106943ce1750a7c
+    bytes: 2383
+    kind: leaf
+    disposition: retain-in-v0
+  - id: kmp-qa-parity-automation
+    path: stack-packs/kmp/advanced-bridge/kmp-qa-parity-automation/SKILL.md
+    sha256: c9bc29dfab36e40b1403f7339c4d12f4f93c6827c71591a9af74dc1a0c362ab1
+    bytes: 2441
+    kind: leaf
+    disposition: retain-in-v0
+  - id: kmp-build-platform-governance
+    path: stack-packs/kmp/advanced-bridge/kmp-build-platform-governance/SKILL.md
+    sha256: de4194e26471b82d47317d5fbcbdae53e444e23000e4cb2117de8955cc289811
+    bytes: 2270
+    kind: leaf
+    disposition: retain-in-v0
+  - id: kmp-matrix-dependency-governance
+    path: stack-packs/kmp/advanced-bridge/kmp-matrix-dependency-governance/SKILL.md
+    sha256: a28af9b413e5c9657f717393063c54d2800b18606f795ded46369d2496a2bb39
+    bytes: 2030
+    kind: leaf
+    disposition: retain-in-v0
+  - id: compose-multiplatform-implementation
+    path: stack-packs/kmp/advanced-bridge/compose-multiplatform-implementation/SKILL.md
+    sha256: 2e91828514f25dd334c3740badbc8e26628e14b939a90655b0da20f94da0be48
+    bytes: 2013
+    kind: leaf
+    disposition: defer
+  - id: react-native-bridge-dev-loop
+    path: stack-packs/kmp/advanced-bridge/react-native-bridge-dev-loop/SKILL.md
+    sha256: 39d1818231ecda32216f730fad75d3efd47e49542443473012a753d9895af672
+    bytes: 2208
+    kind: leaf
+    disposition: defer
+supplied_candidates:
+  source_label: operator-supplied-lackner-basic-skills
+  package_bytes_copied: false
+  entries:
+    - id: android-compose-ui
+      file: android-compose-ui/SKILL.md
+      sha256: 231d26e2a82e3d03bc24506efa039a57d31e5de252eda1b5d322c5dc9d58976b
+      bytes: 8116
+      disposition: defer
+    - id: android-data-layer
+      file: android-data-layer/SKILL.md
+      sha256: 5f75db45347ec44e032c055a7259fceadad64f296b0c07d5db43ff55d3d97078
+      bytes: 6778
+      disposition: defer
+    - id: android-di-koin
+      file: android-di-koin/SKILL.md
+      sha256: d03bd695ab0f158e83c3b75c9fc153b98051abd718be4f2c8dc3425c206141e4
+      bytes: 4084
+      disposition: defer
+    - id: android-error-handling
+      file: android-error-handling/SKILL.md
+      sha256: 4272b11abcaeacf61b1f415d6c0762c10cef78106f8607a22ce336eb4825dda2
+      bytes: 8485
+      disposition: defer
+    - id: android-module-structure
+      file: android-module-structure/SKILL.md
+      sha256: 4257d6a05cccc76e229d1350379437f28aaab51ebd95e8285cae2e5091832429
+      bytes: 4819
+      disposition: defer
+    - id: android-navigation
+      file: android-navigation/SKILL.md
+      sha256: 2fd39ef235eb7b1ff7eb458fc26c02618edf697d6a8ac05af89a7a2f30bfa56c
+      bytes: 3767
+      disposition: defer
+    - id: android-presentation-mvi
+      file: android-presentation-mvi/SKILL.md
+      sha256: 9a350a5783919e388734c1235a1a8a0f64bdd461ad786057f408b0ee686e6884
+      bytes: 8247
+      disposition: defer
+    - id: android-testing
+      file: android-testing/SKILL.md
+      sha256: ad0d3c68331f62e16f423392ae95411048abfc184d762088bfc602e6d1933e8f
+      bytes: 6726
+      disposition: defer

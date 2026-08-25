@@ -1,0 +1,137 @@
+version: 1
+id: kmp-v0-selection-scenarios
+required_comparisons:
+  - no-skill
+  - forced
+  - automatic
+required_expectations:
+  - automatic
+  - restraint
+  - conflict
+  - missing-fact
+  - decision-value
+decision_rubric:
+  - changes-a-kmp-decision
+  - avoids-unsupported-target-assumptions
+  - selects-the-smallest-applicable-set
+  - names-target-owned-evidence
+  - blocks-on-missing-required-input
+capabilities:
+  - kmp-sharing-and-architecture
+  - kmp-source-sets-and-platform-boundaries
+  - kmp-build-and-compatibility
+  - kmp-coroutines-and-concurrency
+  - kmp-api-and-artifact-boundaries
+  - kmp-test-and-evidence
+scenarios:
+  - id: shared-domain-placement
+    kind: general
+    task: Move a shared domain API to commonMain and provide Apple and Android platform implementations.
+    changed_paths:
+      - shared/src/commonMain/kotlin/Domain.kt
+      - shared/src/iosMain/kotlin/PlatformDomain.kt
+    facts:
+      ecosystems: [kmp]
+      target_families: [android, apple]
+      runtime_profiles: [mobile]
+      support_tiers: [primary]
+      artifact_profiles: [shared-library]
+      consumers: [android-app, ios-app]
+      ui_posture: [native-ui]
+      device_topology: [standalone]
+      boundary_pressure: [platform-api]
+    expectations:
+      automatic: [kmp-source-sets-and-platform-boundaries]
+      restraint: [kmp-build-and-compatibility, kmp-coroutines-and-concurrency]
+      conflict: no-duplicate-capability-owner
+      missing-fact: router-only
+      decision-value: chooses-common-intermediate-or-platform-source-set
+  - id: target-matrix-upgrade
+    kind: general
+    task: Upgrade Kotlin, Gradle, and Compose dependencies across the KMP target matrix.
+    changed_paths:
+      - gradle/libs.versions.toml
+      - shared/build.gradle.kts
+    facts:
+      ecosystems: [kmp]
+      target_families: [android, apple, desktop]
+      runtime_profiles: [mobile, desktop]
+      support_tiers: [primary, conditional]
+      artifact_profiles: [shared-library]
+      consumers: [android-app, ios-app, desktop-app]
+      ui_posture: [shared-compose]
+      device_topology: [standalone]
+      boundary_pressure: [toolchain-compatibility]
+    expectations:
+      automatic: [kmp-build-and-compatibility]
+      restraint: [kmp-coroutines-and-concurrency, kmp-api-and-artifact-boundaries]
+      conflict: no-duplicate-capability-owner
+      missing-fact: unresolved-ecosystems
+      decision-value: requires-a-verified-compatibility-matrix
+  - id: native-event-stream
+    kind: general
+    task: Expose a coroutine event stream to Swift without duplicate or stale callbacks after reconnect.
+    changed_paths:
+      - shared/src/commonMain/kotlin/EventStream.kt
+      - shared/src/appleMain/kotlin/AppleEventBridge.kt
+    facts:
+      ecosystems: [kmp]
+      target_families: [apple]
+      runtime_profiles: [mobile]
+      support_tiers: [primary]
+      artifact_profiles: [framework]
+      consumers: [swift]
+      ui_posture: [native-ui]
+      device_topology: [companion]
+      boundary_pressure: [concurrency, event-delivery, language-interop]
+    expectations:
+      automatic: [kmp-coroutines-and-concurrency, kmp-api-and-artifact-boundaries]
+      restraint: [kmp-build-and-compatibility]
+      conflict: no-duplicate-capability-owner
+      missing-fact: unresolved-boundary-pressure
+      decision-value: defines-ownership-cancellation-and-stale-event-rejection
+  - id: published-framework-api
+    kind: general
+    task: Change the public KMP framework API consumed by Swift and publish a compatible artifact.
+    changed_paths:
+      - shared/src/commonMain/kotlin/PublicApi.kt
+      - shared/build.gradle.kts
+    facts:
+      ecosystems: [kmp]
+      target_families: [apple]
+      runtime_profiles: [mobile]
+      support_tiers: [primary]
+      artifact_profiles: [framework]
+      consumers: [swift]
+      ui_posture: [headless]
+      device_topology: [standalone]
+      boundary_pressure: [binary-compatibility, language-interop]
+    expectations:
+      automatic: [kmp-api-and-artifact-boundaries]
+      restraint: [kmp-coroutines-and-concurrency]
+      conflict: no-duplicate-capability-owner
+      missing-fact: unresolved-artifact-profiles
+      decision-value: separates-kotlin-source-api-from-consumer-artifact-contract
+  - id: wearable-companion-reconnect
+    kind: wearable-conditional
+    task: Design a Wear OS and watchOS companion flow that keeps authority clear through disconnect and reconnect.
+    changed_paths:
+      - shared/src/commonMain/kotlin/WearableSession.kt
+      - shared/src/watchosMain/kotlin/WatchSession.kt
+      - shared/src/wearMain/kotlin/WearSession.kt
+    facts:
+      ecosystems: [kmp]
+      target_families: [wear-os, watchos]
+      runtime_profiles: [wearable]
+      support_tiers: [conditional]
+      artifact_profiles: [shared-library]
+      consumers: [wearable-app, phone-companion]
+      ui_posture: [native-ui]
+      device_topology: [companion, intermittently-connected]
+      boundary_pressure: [authority, concurrency, event-delivery, lifecycle, power]
+    expectations:
+      automatic: [kmp-sharing-and-architecture, kmp-coroutines-and-concurrency, kmp-test-and-evidence]
+      restraint: [phone-owned-execution, continuous-connectivity-assumption]
+      conflict: one-authoritative-state-owner
+      missing-fact: unresolved-device-topology
+      decision-value: defines-authority-topology-reconnect-and-per-target-proof

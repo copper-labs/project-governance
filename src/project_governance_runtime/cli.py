@@ -29,6 +29,9 @@ from .documentation import (
 from .installation import InstallationError, initialize, load_lock, update
 from .planning import build_plan, public_plan
 from .runner import execute
+from .skill_utilization import SkillUtilizationError
+from .skill_utilization import begin as begin_skill_utilization
+from .skill_utilization import finish as finish_skill_utilization
 from .telemetry import append as telemetry_append
 from .telemetry import status as telemetry_status
 
@@ -68,6 +71,12 @@ def _parser() -> argparse.ArgumentParser:
     context.add_argument("--changed-path", action="append", default=[])
     context.add_argument("--include-expansion", action="store_true")
     context.add_argument("--json", action="store_true")
+    context.add_argument("--json-output", type=Path)
+    skills = commands.add_parser("skills")
+    skill_commands = skills.add_subparsers(dest="skills_command", required=True)
+    skill_closeout = skill_commands.add_parser("closeout")
+    skill_closeout.add_argument("--context-result", type=Path, required=True)
+    skill_closeout.add_argument("--outcomes", type=Path, required=True)
     agent_route = commands.add_parser("agent-route")
     agent_route.add_argument("--task", type=Path, required=True)
     agent_route.add_argument("--session", type=Path, required=True)
@@ -295,8 +304,11 @@ def _run_context(args: argparse.Namespace, root: Path) -> int:
         args.changed_path,
         include_expansion=args.include_expansion,
     )
-    if args.json:
-        _emit(output)
+    utilization = begin_skill_utilization(root, output, terminal_hook=telemetry_append)
+    if utilization is not None:
+        output["skill_utilization"] = utilization
+    if args.json or args.json_output:
+        _emit(output, args.json_output)
     else:
         print(
             f"route={output['route']['id']} "
@@ -304,6 +316,18 @@ def _run_context(args: argparse.Namespace, root: Path) -> int:
             f"status={output['status']}"
         )
         print(f"materialization={output['materialization']['root']}")
+    return _result_exit_code(output)
+
+
+def _run_skill_command(args: argparse.Namespace, root: Path) -> int:
+    """Record one explicit context-bound skill closeout without retaining task content."""
+    output = finish_skill_utilization(
+        root,
+        _load_json_object(args.context_result, label="--context-result"),
+        _load_json_object(args.outcomes, label="--outcomes"),
+        terminal_hook=telemetry_append,
+    )
+    _emit(output)
     return _result_exit_code(output)
 
 
@@ -453,6 +477,8 @@ def main() -> int:
             return _run_check_or_plan(args, root)
         if args.command == "context":
             return _run_context(args, root)
+        if args.command == "skills":
+            return _run_skill_command(args, root)
         if args.command in {"agent-route", "agent-dispatch"}:
             return _run_agent_command(args, root)
         if args.command == "docs":
@@ -465,6 +491,7 @@ def main() -> int:
         ContextError,
         DocumentationError,
         InstallationError,
+        SkillUtilizationError,
         OSError,
         ValueError,
     ) as error:

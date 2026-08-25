@@ -16,13 +16,20 @@ Git remains the implementation history and recovery mechanism.
 
 ## Active
 
-No active source execution plan.
+No runtime implementation plan is currently active.
 
 ## Completed
 
 - [Commit and pull request change narratives](completed/2026-08-24-change-narrative-enforcement.md)
   installed and enforced compact product-level narratives and useful titles across commits and
   ready pull requests, followed by audited Claude Opus 5 reconciliation.
+- [Skill utilization telemetry](completed/2026-08-24-skill-utilization-telemetry.md) delivered
+  bounded provider-neutral selection and closeout receipts, privacy-safe aggregation, proactive
+  context and Work guidance, and clean-wheel proof without Gateway or remote telemetry machinery.
+- [KMP Skill Library V0](completed/2026-08-24-kmp-skill-library-v0.md) delivered the governed
+  seven-entry provider-neutral core, proactive matched-route selection, exact materialization,
+  cross-provider evaluation, legacy-payload retirement, and clean-wheel proof. Publication,
+  adopter changes, and the wearable overlay remain separately gated.
 - [Reader-first authoring and on-demand developer documentation](completed/2026-08-21-on-demand-developer-documentation.md)
   delivered the minimal shared human and agent corpus, governed research handoff, exact routing,
   validation, telemetry, semantic pilots, Opus review reconciliation, and the `1.3.0` release.

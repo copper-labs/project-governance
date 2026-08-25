@@ -9,6 +9,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
+from .skill_utilization import MAX_TELEMETRY_SKILLS
+from .skill_utilization import sanitize_telemetry_entry as _sanitize_skill_entry
+from .skill_utilization import sanitize_telemetry_scalar
+from .skill_utilization import telemetry_status as _skill_status
 from .state_io import atomic_write_text, path_lock
 
 
@@ -55,6 +59,17 @@ _EVENT_FIELDS = {
         "conflict_count",
         "query_kind",
         "match_count",
+    },
+    "skill-selection": {
+        "usage_id",
+        "packet_id",
+        "skills",
+    },
+    "skill-utilization-terminal": {
+        "usage_id",
+        "packet_id",
+        "task_outcome",
+        "skills",
     },
 }
 _PACK_FIELDS = {
@@ -213,11 +228,15 @@ def _sanitize_event_scalar(event_name: str, key: str, value: Any) -> Any:
         return value if value in _DOCUMENTATION_QUERY_KINDS else None
     if key == "dry_run":
         return value if isinstance(value, bool) else None
+    if key in {"usage_id", "packet_id", "task_outcome"}:
+        return sanitize_telemetry_scalar(key, value)
     return _bounded_text(value)
 
 
-def _sanitize_event_collections(event: dict[str, Any], result: dict[str, Any]) -> None:
-    """Attach only the three explicitly bounded collection fields."""
+def _sanitize_event_collections(
+    event_name: str, event: dict[str, Any], result: dict[str, Any]
+) -> None:
+    """Attach only the explicitly bounded collection fields."""
     selected_packs = event.get("selected_packs")
     if isinstance(selected_packs, list):
         pack_ids = [item for item in (_bounded_text(item) for item in selected_packs) if item]
@@ -233,6 +252,25 @@ def _sanitize_event_collections(event: dict[str, Any], result: dict[str, Any]) -
             item for item in (_sanitize_orchestration_entry(item) for item in entries) if item
         ]
         result["entries"] = summaries[:3]
+    skills = event.get("skills")
+    if isinstance(skills, list):
+        summaries = [
+            item
+            for item in (
+                _sanitize_skill_entry(
+                    value, terminal=event_name == "skill-utilization-terminal"
+                )
+                for value in skills
+            )
+            if item
+        ]
+        skill_ids = [item["id"] for item in summaries]
+        if (
+            len(skills) <= MAX_TELEMETRY_SKILLS
+            and len(summaries) == len(skills)
+            and len(skill_ids) == len(set(skill_ids))
+        ):
+            result["skills"] = summaries
 
 
 def _valid_terminal_event(event_name: str, result: dict[str, Any]) -> bool:
@@ -247,6 +285,15 @@ def _valid_terminal_event(event_name: str, result: dict[str, Any]) -> bool:
             result.get("operation") in _DOCUMENTATION_OPERATIONS
             and result.get("outcome") in _DOCUMENTATION_OUTCOMES
         )
+    if event_name == "skill-selection":
+        return bool(result.get("usage_id") and result.get("packet_id") and result.get("skills"))
+    if event_name == "skill-utilization-terminal":
+        return bool(
+            result.get("usage_id")
+            and result.get("packet_id")
+            and sanitize_telemetry_scalar("task_outcome", result.get("task_outcome"))
+            and result.get("skills")
+        )
     return True
 
 
@@ -257,16 +304,17 @@ def _sanitize(event: Any) -> dict[str, Any] | None:
     event_name = event["event"]
     common = (
         {"event", "runtime_version"}
-        if event_name == "documentation-terminal"
+        if event_name
+        in {"documentation-terminal", "skill-selection", "skill-utilization-terminal"}
         else _COMMON_FIELDS
     )
     allowed = common | _EVENT_FIELDS[event_name]
     result: dict[str, Any] = {"schema_version": SCHEMA_VERSION, "event": event_name}
-    for key in allowed - {"event", "selected_packs", "packs", "entries"}:
+    for key in allowed - {"event", "selected_packs", "packs", "entries", "skills"}:
         value = _sanitize_event_scalar(event_name, key, event.get(key))
         if value is not None:
             result[key] = value
-    _sanitize_event_collections(event, result)
+    _sanitize_event_collections(event_name, event, result)
     return result if _valid_terminal_event(event_name, result) else None
 
 
@@ -312,6 +360,18 @@ def append(root: Path, event: dict[str, Any]) -> bool:
         path.parent.mkdir(parents=True, exist_ok=True)
         with _telemetry_lock(path):
             existing = _existing_records(path)
+            if sanitized["event"] in {"skill-selection", "skill-utilization-terminal"}:
+                usage_id = sanitized.get("usage_id")
+                for line in existing:
+                    previous = json.loads(line)
+                    if (
+                        previous.get("event") == sanitized["event"]
+                        and previous.get("usage_id") == usage_id
+                    ):
+                        comparable = {
+                            key: value for key, value in previous.items() if key != "recorded_at"
+                        }
+                        return comparable == sanitized
             rendered = json.dumps({"recorded_at": _now(), **sanitized}, sort_keys=True)
             records = [*existing[-(MAX_RECORDS - 1):], rendered]
             _atomic_write(path, "\n".join(records) + "\n")
@@ -557,5 +617,6 @@ def status(root: Path) -> dict[str, Any]:
         "validation": _validation_status(records),
         "orchestration": _orchestration_status(records),
         "documentation": _documentation_status(records),
+        "skills": _skill_status(records),
         "path": path.relative_to(root).as_posix(),
     }

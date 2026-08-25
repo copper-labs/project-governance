@@ -18,6 +18,13 @@ from typing import Any
 
 import yaml
 
+from .skill_catalog import (
+    SkillCatalogError,
+    build_skill_index,
+    canonical_skill_bytes,
+)
+from .skill_selection import select_attached_skills
+
 
 TOKEN_BYTES = 4
 DEFAULT_BUDGET = {
@@ -27,6 +34,7 @@ DEFAULT_BUDGET = {
     "total_context_tokens": 10000,
 }
 SAFE_SKILL_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+MAX_SKILL_BYTES = 16_000
 
 
 class ContextError(ValueError):
@@ -193,30 +201,258 @@ def _context_items(root: Path, groups: dict[str, list[str]], budget: dict[str, i
     return selected, omissions, limits
 
 
-def _discover_skills(root: Path, router: dict[str, Any], route: dict[str, Any] | None) -> tuple[list[dict[str, str]], list[str]]:
-    """Expose installed generic skills selected by target-owned route configuration."""
+def _canonical_skill(
+    root: Path,
+    record: dict[str, Any],
+    *,
+    selected_by: str,
+    reasons: list[str],
+    required: bool,
+) -> tuple[dict[str, Any] | None, str | None]:
+    """Load one installed package-owned skill and compare it with canonical bytes."""
+    relative = str(record["path"])
+    content = _file_bytes(root, relative)
+    if content is None:
+        return None, "unavailable"
+    if content != canonical_skill_bytes(record):
+        return None, "stale-materialization"
+    return (
+        {
+            "id": str(record["id"]),
+            "path": relative,
+            "sha256": hashlib.sha256(content).hexdigest(),
+            "activation_mode": str(record["activation_mode"]),
+            "activation_level": str(record["default_level"]),
+            "selected_by": selected_by,
+            "selection_reasons": reasons,
+            "_content": content,
+            "_required": required,
+        },
+        None,
+    )
+
+
+def _discover_skills(
+    root: Path,
+    router: dict[str, Any],
+    route: dict[str, Any] | None,
+    index: dict[str, dict[str, Any]],
+    *,
+    include_evaluation: bool,
+) -> tuple[list[dict[str, Any]], list[str], list[str], list[str]]:
+    """Resolve target-declared top-level or manifest-owned skill identifiers."""
     declared = [str(value) for value in router.get("default_skills", []) or []]
     declared.extend(str(value) for value in (route or {}).get("skills", []) or [])
-    found: list[dict[str, str]] = []
+    found: list[dict[str, Any]] = []
     missing: list[str] = []
+    evaluation_only: list[str] = []
+    stale: list[str] = []
     for skill_id in _unique(declared):
         if SAFE_SKILL_ID.fullmatch(skill_id) is None:
             raise ContextError(f"context_router skill id is unsafe: {skill_id}")
-        relative = f".governance/runtime/skills/{skill_id}/SKILL.md"
+        record = index.get(skill_id)
+        if (
+            record is not None
+            and record.get("activation_mode") == "evaluation-only"
+            and not include_evaluation
+        ):
+            evaluation_only.append(skill_id)
+            continue
+        relative = (
+            str(record["path"])
+            if record is not None
+            else f".governance/runtime/skills/{skill_id}/SKILL.md"
+        )
         content = _file_bytes(root, relative)
         if content is None:
             missing.append(skill_id)
             continue
+        package_owned = record is not None and bool(
+            record.get("pack_id") is not None or record.get("router_for")
+        )
+        if package_owned:
+            skill, error = _canonical_skill(
+                root,
+                record,
+                selected_by="route-declaration",
+                reasons=["declared-by-route"],
+                required=True,
+            )
+            if error == "stale-materialization":
+                stale.append(skill_id)
+            elif skill is not None:
+                found.append(skill)
+            continue
         found.append({"id": skill_id, "path": relative, "sha256": hashlib.sha256(content).hexdigest()})
-    return found, missing
+    return found, missing, evaluation_only, stale
 
 
-def _materialize(root: Path, items: list[dict[str, Any]]) -> tuple[str, list[dict[str, Any]]]:
+def _compose_skills(
+    root: Path,
+    selection: dict[str, Any],
+    existing: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[str], list[str]]:
+    """Load canonical bytes for automatically selected leaves without duplicates."""
+    existing_ids = {str(skill["id"]) for skill in existing}
+    composed: list[dict[str, Any]] = []
+    missing: list[str] = []
+    stale: list[str] = []
+    for record in selection["selected"]:
+        skill_id = str(record["id"])
+        if skill_id in existing_ids:
+            continue
+        skill, error = _canonical_skill(
+            root,
+            record,
+            selected_by="automatic-applicability",
+            reasons=list(record["selection_reasons"]),
+            required=record.get("default_level") == "required",
+        )
+        if error == "unavailable":
+            missing.append(skill_id)
+        elif error == "stale-materialization":
+            stale.append(skill_id)
+        elif skill is not None:
+            composed.append(skill)
+            existing_ids.add(skill_id)
+    return composed, missing, stale
+
+
+def _skill_context(facts: dict[str, Any]) -> dict[str, Any] | None:
+    """Read the optional validated selector facts from the Version 1 facts document."""
+    facts_mapping = facts.get("facts", {})
+    if facts_mapping is None:
+        facts_mapping = {}
+    if not isinstance(facts_mapping, dict):
+        raise ContextError("facts.lock.yaml facts: expected a mapping")
+    value = facts_mapping.get("skill_context")
+    if value is not None and not isinstance(value, dict):
+        raise ContextError("facts.skill_context: expected a mapping")
+    return value
+
+
+def _automatic_selection(
+    index: dict[str, dict[str, Any]],
+    decision: dict[str, Any],
+    route: dict[str, Any] | None,
+    task: str,
+    changed_paths: list[str],
+    facts: dict[str, Any] | None,
+    *,
+    include_evaluation: bool,
+) -> dict[str, Any]:
+    """Compose leaves only from a matched route's own attached router declarations."""
+    empty = {"selected": [], "exclusions": [], "unresolved_facts": [], "conflicts": []}
+    if decision["outcome"] != "matched" or route is None or facts is None:
+        return empty
+    route_skill_ids = [str(value) for value in route.get("skills", []) or []]
+    router_ids = [
+        skill_id
+        for skill_id in route_skill_ids
+        if skill_id in index and index[skill_id].get("router_for")
+    ]
+    return select_attached_skills(
+        index,
+        router_ids,
+        task,
+        changed_paths,
+        facts,
+        include_evaluation=include_evaluation,
+    )
+
+
+def _bounded_skill_items(
+    skills: list[dict[str, Any]], budget: dict[str, int]
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, int]]:
+    """Apply the separate selected-skill cap without changing context limits."""
+    limit = min(MAX_SKILL_BYTES, budget["total_context_tokens"] * TOKEN_BYTES // 2)
+    context_limit = budget["total_context_tokens"] * TOKEN_BYTES
+    used = 0
+    items: list[dict[str, Any]] = []
+    omissions: list[dict[str, Any]] = []
+    for skill in skills:
+        content = skill.get("_content")
+        if not isinstance(content, bytes):
+            continue
+        size = len(content)
+        if used + size > limit:
+            omissions.append(
+                {
+                    "id": skill["id"],
+                    "path": skill["path"],
+                    "reason": "outside-byte-budget",
+                    "required": bool(skill.get("_required")),
+                }
+            )
+            continue
+        items.append(
+            {
+                "id": skill["id"],
+                "source_path": skill["path"],
+                "content": content,
+                "sha256": skill["sha256"],
+                "exact_bytes": size,
+            }
+        )
+        used += size
+    return items, omissions, {"skill": limit, "combined": context_limit + limit, "skill_used": used}
+
+
+def _skill_blockers(
+    context_omissions: list[dict[str, Any]],
+    missing: list[str],
+    evaluation_only: list[str],
+    stale: list[str],
+    budget_omissions: list[dict[str, Any]],
+    selection: dict[str, Any],
+) -> list[str]:
+    """Normalize skill and context failures into stable coordinator blocker codes."""
+    blockers = [entry["reason"] for entry in context_omissions if entry["required"]]
+    blockers.extend(f"skill-unavailable:{skill_id}" for skill_id in missing)
+    blockers.extend(f"skill-evaluation-only:{skill_id}" for skill_id in evaluation_only)
+    blockers.extend(f"skill-stale-materialization:{skill_id}" for skill_id in stale)
+    blockers.extend(
+        f"skill-outside-byte-budget:{entry['id']}"
+        for entry in budget_omissions
+        if entry["required"]
+    )
+    blockers.extend(
+        f"skill-unresolved-fact:{field}" for field in selection["unresolved_facts"]
+    )
+    blockers.extend(f"skill-conflict:{conflict}" for conflict in selection["conflicts"])
+    return blockers
+
+
+def _public_skills(
+    skills: list[dict[str, Any]], materialized: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Remove in-memory bytes and attach packet paths to included canonical skills."""
+    materialized_by_id = {
+        str(item["id"]): str(item["materialized_path"]) for item in materialized
+    }
+    result: list[dict[str, Any]] = []
+    for skill in skills:
+        public = {key: value for key, value in skill.items() if not key.startswith("_")}
+        if str(skill["id"]) in materialized_by_id:
+            public["materialized_path"] = materialized_by_id[str(skill["id"])]
+        result.append(public)
+    return result
+
+
+def _materialize(
+    root: Path,
+    items: list[dict[str, Any]],
+    skill_items: list[dict[str, Any]],
+) -> tuple[str, list[dict[str, Any]], list[dict[str, Any]]]:
     """Atomically publish selected bytes below ignored runtime state without overwriting content."""
     identity = [
         {"id": item["id"], "group": item["group"], "path": item["source_path"], "sha256": item["sha256"]}
         for item in items
     ]
+    identity.extend(
+        {"id": item["id"], "group": "skill", "path": item["source_path"], "sha256": item["sha256"]}
+        for item in skill_items
+    )
     packet_id = hashlib.sha256(json.dumps(identity, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()[:16]
     runtime_root = root / ".governance/runtime/context"
     runtime_root.mkdir(parents=True, exist_ok=True)
@@ -229,15 +465,22 @@ def _materialize(root: Path, items: list[dict[str, Any]]) -> tuple[str, list[dic
     for index, item in enumerate(items, start=1):
         extension = Path(str(item["source_path"])).suffix
         materialized.append({**item, "materialized_path": f"items/{index:03d}-{item['id']}{extension}"})
+    materialized_skills = [
+        {
+            **item,
+            "materialized_path": f"skills/{index:03d}-{item['id']}/SKILL.md",
+        }
+        for index, item in enumerate(skill_items, start=1)
+    ]
     if destination.exists():
-        for item in materialized:
+        for item in [*materialized, *materialized_skills]:
             existing = destination / str(item["materialized_path"])
             if _file_bytes(destination, str(item["materialized_path"])) != item["content"]:
                 raise ContextError(f"existing materialization does not match: {existing}")
-        return destination.relative_to(root).as_posix(), materialized
+        return destination.relative_to(root).as_posix(), materialized, materialized_skills
     temporary = Path(tempfile.mkdtemp(prefix=".context-", dir=runtime_root))
     try:
-        for item in materialized:
+        for item in [*materialized, *materialized_skills]:
             output = temporary / str(item["materialized_path"])
             output.parent.mkdir(parents=True, exist_ok=True)
             output.write_bytes(item["content"])
@@ -245,14 +488,21 @@ def _materialize(root: Path, items: list[dict[str, Any]]) -> tuple[str, list[dic
             temporary.rename(destination)
         except FileExistsError:
             shutil.rmtree(temporary)
-            return _materialize(root, items)
+            return _materialize(root, items, skill_items)
     except BaseException:
         shutil.rmtree(temporary, ignore_errors=True)
         raise
-    return destination.relative_to(root).as_posix(), materialized
+    return destination.relative_to(root).as_posix(), materialized, materialized_skills
 
 
-def resolve_context(root: Path, task: str, changed_paths: list[str], *, include_expansion: bool = False) -> dict[str, Any]:
+def resolve_context(
+    root: Path,
+    task: str,
+    changed_paths: list[str],
+    *,
+    include_expansion: bool = False,
+    include_evaluation_skills: bool = False,
+) -> dict[str, Any]:
     """Resolve one route and materialize its bounded local packet for the coordinator."""
     profile = _load_mapping(root / "config/governance/profile.yaml")
     facts = _load_mapping(root / "config/governance/facts.lock.yaml")
@@ -265,15 +515,48 @@ def resolve_context(root: Path, task: str, changed_paths: list[str], *, include_
     normalized_paths = _unique([_relative_path(path, label="--changed-path") for path in changed_paths])
     decision = _select_route(router, task, normalized_paths)
     route_id, groups, route = _groups(router, decision, include_expansion)
-    items, omissions, limits = _context_items(root, groups, _budget(route))
-    skills, missing_skills = _discover_skills(root, router, route)
-    runtime_path, materialized = _materialize(root, items)
-    blockers = [entry["reason"] for entry in omissions if entry["required"]]
-    blockers.extend(f"skill-unavailable:{skill_id}" for skill_id in missing_skills)
+    route_budget = _budget(route)
+    items, omissions, limits = _context_items(root, groups, route_budget)
+    try:
+        index = build_skill_index()
+    except SkillCatalogError as error:
+        raise ContextError(f"packaged skill catalog is invalid: {error}") from error
+    skills, missing_skills, blocked_evaluation, stale_skills = _discover_skills(
+        root,
+        router,
+        route,
+        index,
+        include_evaluation=include_evaluation_skills,
+    )
+    selection = _automatic_selection(
+        index,
+        decision,
+        route,
+        task,
+        normalized_paths,
+        _skill_context(facts),
+        include_evaluation=include_evaluation_skills,
+    )
+    composed, composed_missing, composed_stale = _compose_skills(root, selection, skills)
+    skills.extend(composed)
+    missing_skills.extend(composed_missing)
+    stale_skills.extend(composed_stale)
+    skill_items, budget_omissions, skill_limits = _bounded_skill_items(skills, route_budget)
+    limits.update(skill_limits)
+    runtime_path, materialized, materialized_skills = _materialize(root, items, skill_items)
+    blockers = _skill_blockers(
+        omissions,
+        missing_skills,
+        blocked_evaluation,
+        stale_skills,
+        budget_omissions,
+        selection,
+    )
     outcome = str(decision["outcome"])
     if outcome in {"fallback", "ambiguous"}:
         blockers.append(f"route-{outcome}")
     public_items = [{key: value for key, value in item.items() if key != "content"} for item in materialized]
+    public_skills = _public_skills(skills, materialized_skills)
     return {
         "status": "blocked" if blockers else "passed",
         "route": {
@@ -290,8 +573,14 @@ def resolve_context(root: Path, task: str, changed_paths: list[str], *, include_
         "facts_loaded": True,
         "materialization": {"root": runtime_path, "items": public_items, "byte_limits": limits},
         "omissions": omissions,
-        "skills": skills,
-        "skill_omissions": missing_skills,
+        "skills": public_skills,
+        "skill_omissions": _unique([*missing_skills, *blocked_evaluation, *stale_skills]),
+        "skill_selection": {
+            "exclusions": selection["exclusions"],
+            "unresolved_facts": selection["unresolved_facts"],
+            "conflicts": selection["conflicts"],
+            "budget_omissions": budget_omissions,
+        },
         "external_content": "target-owned provider boundary" if router.get("external_provider") else None,
         "blockers": _unique(blockers),
     }

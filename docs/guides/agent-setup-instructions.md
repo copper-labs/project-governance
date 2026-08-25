@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-02-23
-updated: 2026-08-16
+updated: 2026-08-24
 summary: Concise setup guide for agents working on the runtime or an adopting repository.
 ---
 
@@ -30,6 +30,14 @@ Read its root agent instructions, `config/governance/runtime.lock.yaml`, profile
 smallest routed documents. Bootstrap the locked runtime before invoking its hooks. Generic skills
 may be read from ignored `.governance/runtime/skills/`; project skills remain tracked and
 repository-owned.
+
+For substantial governed work, resolve bounded context before editing with `context
+--json-output .governance/runtime/context-result.json`. When that result contains
+`skill_utilization`, read every materialized skill or record an honest non-applied status. After
+the task's relevant proof, provide one outcome for every selected skill and run the closeout
+command from the
+[skill utilization specification](../specs/skill-utilization.md). The coordinator owns these
+internal commands; the operator should not have to name individual skills or prepare receipt JSON.
 
 Use the smallest proof that covers the changed component and one affected seam. When a governance
 pack fails, repair it with `project-governance check --pack <pack-id>` and then run one impacted
