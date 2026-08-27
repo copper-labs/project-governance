@@ -92,6 +92,26 @@ class RuntimeSkillPayloadTests(unittest.TestCase):
         self.assertFalse((ROOT / ".claude/agent-profiles.json").exists())
         self.assertFalse((ROOT / ".codex/agent-profiles.json").exists())
 
+    def test_live_docs_do_not_claim_retired_runtime_commands(self) -> None:
+        """Keep current architecture and operating guidance on the public CLI surface."""
+        sources = []
+        for directory in (
+            ROOT / "docs/architecture",
+            ROOT / "docs/governance",
+            ROOT / "docs/guides",
+            ROOT / "docs/reference",
+            ROOT / "docs/specs",
+        ):
+            sources.extend(path for path in directory.rglob("*.md") if path.is_file())
+        combined = "\n".join(path.read_text(encoding="utf-8") for path in sources).lower()
+        for retired in (
+            "project-governance agent-dispatch",
+            "project-governance agent-route",
+            "project-governance skills closeout",
+            "generic skill closeout",
+        ):
+            self.assertNotIn(retired, combined)
+
     def test_work_and_review_skills_define_the_lean_loop(self) -> None:
         """Keep installed agent guidance proportional to changed behavior and risk."""
         skill_text = {

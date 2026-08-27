@@ -19,6 +19,7 @@ from .checker_scripts.finding_lifecycle import FINDING_STATES
 from .evidence_manifest import inspect_evidence_manifest
 from .execution_commands import command_argv, normalized_command
 from .processes import run_command
+from .state_io import path_lock
 
 
 PACKET_SHA256_ENV = "PROJECT_GOVERNANCE_CHANGE_PACKET_SHA256"
@@ -159,10 +160,12 @@ def execution_environment(
     resolved_run_id = run_id or str(uuid4())
     runs_root = root / ".governance/runtime/runs"
     run_root = runs_root / resolved_run_id
-    run_root.mkdir(parents=True, exist_ok=True)
     active = run_root / ACTIVE_RUN_MARKER
-    active.touch(exist_ok=False)
-    _prune_empty_evidence_scaffolding(runs_root)
+    runs_state = root / ".governance/runtime/.runs-state"
+    with path_lock(runs_state, timeout_seconds=None):
+        run_root.mkdir(parents=True, exist_ok=True)
+        active.touch(exist_ok=False)
+        _prune_empty_evidence_scaffolding(runs_root)
     try:
         with tempfile.TemporaryDirectory(prefix="project-governance-change-") as directory:
             temporary_root = Path(directory)
@@ -184,8 +187,9 @@ def execution_environment(
             environment["PROJECT_GOVERNANCE_RUN_ID"] = resolved_run_id
             yield environment
     finally:
-        active.unlink(missing_ok=True)
-        _prune_empty_evidence_scaffolding(runs_root)
+        with path_lock(runs_state, timeout_seconds=None):
+            active.unlink(missing_ok=True)
+            _prune_empty_evidence_scaffolding(runs_root)
 
 
 def execute_packs(

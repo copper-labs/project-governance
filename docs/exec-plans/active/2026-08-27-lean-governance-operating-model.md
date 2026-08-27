@@ -344,8 +344,9 @@ python3 -m unittest tests.test_runtime_package_planning
 - Make `doctor` understand source checkout mode and preserve advisory severity when an advisory pack
   resolves no command.
 - Materialize every selected skill inside the bounded context packet, cap source reads before
-  allocation, rebuild corrupted ignored packets, and let context coordination wait on the operating
-  system lock without a runtime deadline.
+  allocation, keep skill reads within the 16 KiB and configured context allowance, rebuild corrupted
+  ignored packets, and let context coordination wait on the operating system lock without a runtime
+  deadline.
 - Reclaim inactive empty evidence scaffolding, bound every telemetry scan to one mebibyte, validate
   candidate locks in memory, and replace the tracked lock atomically.
 - Remove stale provider profiles and role adapters plus the duplicated peer-dispatch resource; keep
@@ -356,10 +357,11 @@ python3 -m unittest tests.test_runtime_package_planning
 - The runtime has no persistent agent state, retry path, provider catalog, worker lease, or skill
   utilization ledger.
 - Context packets are capped at 256 KiB including skills and retain at most eight completed packets;
-  interrupted runtime staging is cleaned safely. Telemetry appends never rescan more than one
-  mebibyte.
+  required skills outside the documented skill allowance block explicitly, and interrupted runtime
+  staging is cleaned safely. Telemetry appends never rescan more than one mebibyte.
 - Corrupted ignored context state self-heals, lock contention cannot become an arbitrary two-second
-  failure, and old empty run directories do not accumulate or endanger active or target-owned data.
+  failure, and completed empty run directories do not accumulate or endanger active or target-owned
+  data. Run-marker setup and teardown are serialized without serializing validation itself.
 - Source adapters name only live shared skills and contain no provider/model availability catalog.
 - Update never edits or deletes project-owned configuration or historical target artifacts.
 - Source `doctor` passes without pretending the source repository is an installed adopter.

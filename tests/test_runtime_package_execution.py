@@ -26,6 +26,7 @@ from project_governance_runtime.changed_paths import (  # noqa: E402
     subject_digest,
 )
 from project_governance_runtime.execution_commands import command_argv  # noqa: E402
+from project_governance_runtime.execution_flow import execution_environment  # noqa: E402
 from project_governance_runtime.cli import _result_summary  # noqa: E402
 from project_governance_runtime.planning import build_plan  # noqa: E402
 from project_governance_runtime.runner import _telemetry_identity, execute  # noqa: E402
@@ -644,6 +645,22 @@ class RuntimeExecutionTests(unittest.TestCase):
             ],
         )
         self.assertTrue(evidence_roots[-1].name.startswith("pack-"))
+
+    def test_nested_execution_setup_cannot_prune_an_active_run(self) -> None:
+        """Serialize only run-marker maintenance while validations remain independent."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            plan = {"change_scope": all_change_scope()}
+            runs_root = root / ".governance/runtime/runs"
+            with execution_environment(root, plan, run_id="outer"):
+                outer = runs_root / "outer"
+                self.assertTrue((outer / ".active").is_file())
+                with execution_environment(root, plan, run_id="inner"):
+                    self.assertTrue((outer / ".active").is_file())
+                    self.assertTrue((runs_root / "inner/.active").is_file())
+                self.assertTrue((outer / ".active").is_file())
+                self.assertFalse((runs_root / "inner").exists())
+            self.assertFalse(runs_root.exists())
 
     def test_target_child_reads_the_staged_after_image_from_the_packet(self) -> None:
         """Prove a replacement command can analyze index bytes instead of dirty worktree bytes."""

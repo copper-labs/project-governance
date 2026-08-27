@@ -252,7 +252,22 @@ def _canonical_skill(
 ) -> tuple[dict[str, Any] | None, str | None]:
     """Load one installed package-owned skill and compare it with canonical bytes."""
     relative = str(record["path"])
-    content = _file_bytes(root, relative)
+    try:
+        content = _file_bytes(root, relative, max_bytes=MAX_SKILL_BYTES)
+    except _SourceOutsideBudget:
+        return (
+            {
+                "id": str(record["id"]),
+                "path": relative,
+                "activation_mode": str(record["activation_mode"]),
+                "activation_level": str(record["default_level"]),
+                "selected_by": selected_by,
+                "selection_reasons": reasons,
+                "_outside_budget": True,
+                "_required": required,
+            },
+            None,
+        )
     if content is None:
         return None, "unavailable"
     if content != canonical_skill_bytes(record):

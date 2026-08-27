@@ -312,6 +312,26 @@ class RuntimeContextTests(unittest.TestCase):
                 result["blockers"], ["skill-outside-byte-budget:custom"]
             )
 
+    def test_packaged_skill_reads_stop_at_the_skill_budget(self) -> None:
+        """Apply the same bounded read to indexed package-owned skill materializations."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            guide = root / "docs/governance/guide.md"
+            guide.parent.mkdir(parents=True)
+            guide.write_text("Governance guide\n", encoding="utf-8")
+            materialize_skills(root)
+            skill = root / ".governance/runtime/skills/work/SKILL.md"
+            skill.write_bytes(b"x" * (MAX_SKILL_BYTES + 1))
+            write_repository(root, routing_profile(context=[]))
+
+            with patch.object(Path, "read_bytes", side_effect=AssertionError("unbounded read")):
+                result = resolve_context(root, "Review governance", [])
+
+            self.assertEqual(result["status"], "blocked")
+            self.assertEqual(
+                result["blockers"], ["skill-outside-byte-budget:work"]
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

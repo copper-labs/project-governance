@@ -47,12 +47,13 @@ configuration migrations or predecessor-cleanup rules.
 
 `context` selects and materializes exact route-owned context and skill bytes. Every selected skill
 is canonicalized or explicitly target-declared, copied into the packet, and included in its budget.
-Each packet is capped at 256 KiB including skills, and target files are read only through their
-remaining byte allowance. The runtime retains at most eight ignored packets, rebuilds a corrupted
-cache entry, and removes interrupted staging under one blocking local materialization lock rather
-than imposing an elapsed-time policy. Delegation remains a host-agent concern: the wheel owns no
-launch state, provider catalog, writer lease, role receipt, retry loop, or per-skill closeout
-workflow.
+Each packet is capped at 256 KiB including skills. Selected skills use at most 16 KiB and at most
+half the configured total context allowance; a required skill outside that bound blocks explicitly.
+Target files and skills are read only through their remaining byte allowance. The runtime retains
+at most eight ignored packets, rebuilds a corrupted cache entry, and removes interrupted staging
+under one blocking local materialization lock rather than imposing an elapsed-time policy.
+Delegation remains a host-agent concern: the wheel owns no launch state, provider catalog, writer
+lease, role receipt, retry loop, or per-skill closeout workflow.
 
 Stages remain command boundaries, not selectable profiles:
 
