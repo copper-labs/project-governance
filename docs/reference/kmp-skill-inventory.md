@@ -70,7 +70,7 @@ claim implementation-level coverage for every deferred target, host, or device m
   user-home-path KMP skill is releasable.
 - Selection and materialization are deterministic; target builds and physical-device evidence
   remain adopter-owned.
-- The public context command returns bounded selection metadata without retaining KMP task text,
-  source paths or content, or utilization receipts.
+- The public context command materializes only selected bounded content and returns its selection
+  and packet metadata; it creates no utilization receipt or closeout record.
 - Any selected-body, reference, matcher, scenario, or rubric change invalidates the affected
   evaluation record and requires focused re-evaluation before release.

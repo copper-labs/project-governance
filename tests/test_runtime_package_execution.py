@@ -14,6 +14,7 @@ import time
 import unittest
 from contextlib import contextmanager
 from pathlib import Path
+from threading import Event, Thread
 from unittest.mock import patch
 
 
@@ -646,20 +647,61 @@ class RuntimeExecutionTests(unittest.TestCase):
         )
         self.assertTrue(evidence_roots[-1].name.startswith("pack-"))
 
-    def test_nested_execution_setup_cannot_prune_an_active_run(self) -> None:
-        """Serialize only run-marker maintenance while validations remain independent."""
+    def test_concurrent_execution_setup_cannot_prune_a_run_awaiting_its_marker(self) -> None:
+        """Close the original mkdir-to-marker race without serializing validation."""
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             plan = {"change_scope": all_change_scope()}
             runs_root = root / ".governance/runtime/runs"
-            with execution_environment(root, plan, run_id="outer"):
-                outer = runs_root / "outer"
-                self.assertTrue((outer / ".active").is_file())
-                with execution_environment(root, plan, run_id="inner"):
-                    self.assertTrue((outer / ".active").is_file())
-                    self.assertTrue((runs_root / "inner/.active").is_file())
-                self.assertTrue((outer / ".active").is_file())
-                self.assertFalse((runs_root / "inner").exists())
+            outer_marker = runs_root / "outer/.active"
+            outer_touch_started = Event()
+            allow_outer_touch = Event()
+            outer_entered = Event()
+            release_outer = Event()
+            inner_entered = Event()
+            errors: list[BaseException] = []
+            original_touch = Path.touch
+
+            def coordinated_touch(path: Path, *args: object, **kwargs: object) -> None:
+                if path == outer_marker:
+                    outer_touch_started.set()
+                    if not allow_outer_touch.wait(2):
+                        raise AssertionError("outer marker release was not signaled")
+                original_touch(path, *args, **kwargs)
+
+            def enter_outer() -> None:
+                try:
+                    with execution_environment(root, plan, run_id="outer"):
+                        outer_entered.set()
+                        release_outer.wait(2)
+                except BaseException as error:  # pragma: no cover - assertion reports details
+                    errors.append(error)
+
+            def enter_inner() -> None:
+                try:
+                    with execution_environment(root, plan, run_id="inner"):
+                        inner_entered.set()
+                except BaseException as error:  # pragma: no cover - assertion reports details
+                    errors.append(error)
+
+            with patch.object(Path, "touch", coordinated_touch):
+                outer_thread = Thread(target=enter_outer)
+                outer_thread.start()
+                self.assertTrue(outer_touch_started.wait(2))
+                inner_thread = Thread(target=enter_inner)
+                inner_thread.start()
+                entered_during_marker_gap = inner_entered.wait(0.2)
+                allow_outer_touch.set()
+                self.assertTrue(outer_entered.wait(2))
+                self.assertTrue(inner_entered.wait(2))
+                release_outer.set()
+                outer_thread.join(2)
+                inner_thread.join(2)
+
+            self.assertFalse(entered_during_marker_gap)
+            self.assertFalse(outer_thread.is_alive())
+            self.assertFalse(inner_thread.is_alive())
+            self.assertEqual(errors, [])
             self.assertFalse(runs_root.exists())
 
     def test_target_child_reads_the_staged_after_image_from_the_packet(self) -> None:
