@@ -116,6 +116,7 @@ def runtime_lock(wheel: Path) -> dict[str, object]:
         "python": ">=3.9,<4",
         "configuration_schema": 1,
         "release_base_url": wheel.parent.as_uri(),
+        "wheel_url": f"file://{wheel.as_posix()}",
     }
 
 
@@ -234,6 +235,11 @@ def initialize_target(root: Path, wheel: Path) -> tuple[Path, Path]:
             raise RuntimeError(f"installed wheel did not materialize {relative}")
     lock_path = root / "config/governance/runtime.lock.yaml"
     lock_path.write_text(json.dumps(runtime_lock(wheel), indent=2) + "\n", encoding="utf-8")
+    run(
+        [sys.executable, str(root / "tools/governance-bootstrap.py")],
+        root=root,
+        expected=0,
+    )
     run([str(command), "doctor"], root=root, expected=0)
     run(["git", "config", "user.email", "runtime@example.invalid"], root=root, expected=0)
     run(["git", "config", "user.name", "Runtime Wheel Verification"], root=root, expected=0)
