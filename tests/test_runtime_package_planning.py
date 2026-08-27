@@ -18,7 +18,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from project_governance_runtime.configuration import ConfigurationError, load_packs  # noqa: E402
 from project_governance_runtime.changed_paths import ChangedPathError, _base_commit  # noqa: E402
-from project_governance_runtime.cli import _doctor, _resolve_plan  # noqa: E402
+from project_governance_runtime.cli import _doctor, _parser, _resolve_plan  # noqa: E402
 from project_governance_runtime.planning import build_plan, public_plan  # noqa: E402
 
 
@@ -82,7 +82,7 @@ class RuntimePlanningTests(unittest.TestCase):
         plan = build_plan(
             packs,
             stage="pre-pr",
-            mode="explicit",
+            mode="impacted",
             changed_paths=[],
             explicit_pack_ids=["second"],
         )
@@ -91,7 +91,7 @@ class RuntimePlanningTests(unittest.TestCase):
         blocked = build_plan(
             packs,
             stage="pre-pr",
-            mode="explicit",
+            mode="impacted",
             changed_paths=[],
             explicit_pack_ids=["second"],
         )
@@ -243,7 +243,7 @@ class RuntimePlanningTests(unittest.TestCase):
                 "kind": "project-governance-change-packet",
                 "version": 1,
                 "scope": "changed",
-                "mode": "explicit",
+                "mode": "changed",
                 "base_ref": "base",
                 "records": [{
                     "status": "added",
@@ -256,7 +256,7 @@ class RuntimePlanningTests(unittest.TestCase):
             },
         ):
             plan, _ = _resolve_plan(arguments, ROOT / "tests/fixtures/empty-target")
-        self.assertEqual(plan["mode"], "explicit")
+        self.assertEqual(plan["mode"], "impacted")
         self.assertEqual(plan["changed_paths"], ["src/example.tsx"])
         self.assertEqual(
             plan["changed_records"],
@@ -304,7 +304,7 @@ class RuntimePlanningTests(unittest.TestCase):
         diagnostic = build_plan(
             packs,
             stage=None,
-            mode="explicit",
+            mode="impacted",
             changed_paths=[],
             explicit_pack_ids=["maintainability"],
         )
@@ -526,11 +526,60 @@ class PackStageCoverageTests(unittest.TestCase):
         plan = build_plan(
             self.lifecycle_pack(["pre-commit"]),
             stage=None,
-            mode="explicit",
+            mode="impacted",
             changed_paths=[],
             explicit_pack_ids=["target"],
         )
         self.assertEqual(plan["status"], "ready", plan["blockers"])
+
+    def test_named_pack_preserves_requested_stage(self) -> None:
+        """Keep named-pack selection independent from lifecycle command filtering."""
+        plan = build_plan(
+            self.lifecycle_pack(["pre-commit", "pre-push"]),
+            stage="pre-push",
+            mode="impacted",
+            changed_paths=["src/example.py"],
+            explicit_pack_ids=["target"],
+        )
+        self.assertEqual(plan["status"], "ready", plan["blockers"])
+        self.assertEqual(plan["stage"], "pre-push")
+        self.assertEqual(plan["mode"], "impacted")
+        self.assertEqual(plan["selected_packs"], ["target"])
+        self.assertEqual(plan["selection_reasons"], {"target": ["explicit"]})
+
+    def test_named_pack_must_be_available_at_requested_stage(self) -> None:
+        """Reject a named pack whose declared lifecycle excludes the requested stage."""
+        plan = build_plan(
+            self.lifecycle_pack(["pre-commit"]),
+            stage="ci-pr",
+            mode="impacted",
+            changed_paths=["src/example.py"],
+            explicit_pack_ids=["target"],
+        )
+        self.assertEqual(plan["status"], "blocked")
+        self.assertEqual(plan["selected_packs"], [])
+        self.assertEqual(plan["blockers"][0]["code"], "explicit-pack-unavailable")
+
+    def test_plan_cli_accepts_named_pack_with_stage_and_scope(self) -> None:
+        """Expose the same inspectable selection grammar for plan and check."""
+        arguments = _parser().parse_args(
+            [
+                "plan",
+                "--pack",
+                "target",
+                "--stage",
+                "pre-push",
+                "--mode",
+                "impacted",
+                "--base-ref",
+                "main",
+                "--json",
+            ]
+        )
+        self.assertEqual(arguments.pack, ["target"])
+        self.assertEqual(arguments.stage, "pre-push")
+        self.assertEqual(arguments.mode, "impacted")
+        self.assertEqual(arguments.base_ref, "main")
 
     def test_doctor_reports_stage_command_coverage(self) -> None:
         """Expose the configuration defect before an operator starts a check."""

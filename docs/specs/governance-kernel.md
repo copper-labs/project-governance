@@ -21,8 +21,10 @@ generic repository checks without absorbing product policy or duplicating build 
 ```text
 project-governance check --stage <stage> --mode impacted
 project-governance check --pack <pack-id>
+project-governance check --pack <pack-id> --stage <stage> --mode impacted
 project-governance check --stage pre-pr --mode all
 project-governance plan --stage <stage> --mode impacted --json
+project-governance plan --pack <pack-id> --stage <stage> --mode impacted --json
 project-governance context --task <description> --json-output <ignored-result.json>
 project-governance skills closeout --context-result <context-result.json> --outcomes <skill-outcomes.json>
 project-governance agent-route --task <envelope> --session <identity> --catalog <catalog> --json
@@ -119,9 +121,11 @@ claim is empty, and execution fails the pack if it still resolves to zero runnab
 
 ## Selection And Execution
 
-The planner accepts changed paths, an explicit pack, or an explicit all-files boundary. It resolves
-dependencies, rejects cycles, and emits one selector finding for an unmapped path. Normal work is
-changed-path based. A named pack uses the relevant changed scope so repair remains focused.
+The planner accepts changed paths, one or more named packs, or an explicit all-files boundary. It
+resolves dependencies, rejects cycles, and emits one selector finding for an unmapped path. Normal
+work is changed-path based. Named pack selection is independent from lifecycle stage and change
+scope, so focused repair can retain the same staged, branch-aware, explicit-path, or all subject
+without admitting unrelated packs or commands.
 
 The runner owns process groups, timeout, interruption, child cleanup, finding normalization, and
 JSON output. It does not maintain a second cache around a repository's build, test, device, or

@@ -43,6 +43,6 @@ scenarios:
     changed_paths: [unmapped/source.file]
     blocker: unknown-impact
   - id: explicit-pack
-    mode: explicit
+    mode: impacted
     packs: [naming]
     required_packs: [naming]

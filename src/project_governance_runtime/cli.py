@@ -42,15 +42,14 @@ def _root() -> Path:
     return Path.cwd().resolve()
 
 
-def _selection_arguments(parser: argparse.ArgumentParser, *, allow_pack: bool) -> None:
-    """Add the shared unambiguous selection arguments."""
+def _selection_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add the shared pack, lifecycle, and subject selection arguments."""
     parser.add_argument("--stage")
     parser.add_argument("--mode", choices=["impacted", "all"], default="impacted")
     parser.add_argument("--staged", action="store_true")
     parser.add_argument("--changed-path", action="append", default=[])
     parser.add_argument("--base-ref")
-    if allow_pack:
-        parser.add_argument("--pack", action="append", default=[])
+    parser.add_argument("--pack", action="append", default=[])
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -58,14 +57,14 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="project-governance")
     commands = parser.add_subparsers(dest="command", required=True)
     check = commands.add_parser("check")
-    _selection_arguments(check, allow_pack=True)
+    _selection_arguments(check)
     check.add_argument("--timeout-seconds", type=float, default=540.0)
     check.add_argument("--json-output", type=Path)
     check.add_argument("--commit-message-file", type=Path)
     check.add_argument("--pr-body-file", type=Path)
     check.add_argument("--pr-title")
     plan = commands.add_parser("plan")
-    _selection_arguments(plan, allow_pack=False)
+    _selection_arguments(plan)
     plan.add_argument("--json", action="store_true")
     context = commands.add_parser("context")
     context.add_argument("--task", required=True)
@@ -121,22 +120,24 @@ def _validate_selection_arguments(
     base_ref: str | None,
 ) -> None:
     """Reject combinations that would give one run competing scope authorities."""
-    pack_scope_conflict = any(
-        (bool(args.stage), args.staged, bool(args.changed_path), args.mode != "impacted")
-    )
-    if explicit and pack_scope_conflict:
-        raise ConfigurationError("--pack cannot be combined with stage or impact selectors")
     if args.staged and args.changed_path:
         raise ConfigurationError("--staged cannot be combined with --changed-path")
     if args.staged and base_ref:
         raise ConfigurationError("--staged cannot be combined with --base-ref")
-    if mode == "all" and base_ref:
-        raise ConfigurationError("--mode all cannot be combined with --base-ref")
+    if mode == "all":
+        if args.staged or args.changed_path:
+            raise ConfigurationError(
+                "--mode all cannot be combined with staged or changed-path scope"
+            )
+        if base_ref:
+            raise ConfigurationError("--mode all cannot be combined with --base-ref")
+        if not args.stage:
+            raise ConfigurationError("--mode all requires --stage")
     pr_body_file = getattr(args, "pr_body_file", None)
     pr_title = getattr(args, "pr_title", None)
     if bool(pr_body_file) != bool(pr_title):
         raise ConfigurationError("--pr-body-file and --pr-title must be supplied together")
-    if not args.stage and mode != "explicit" and not args.changed_path and mode != "all":
+    if not args.stage and not explicit and not args.changed_path and mode != "all":
         raise ConfigurationError("impacted mode requires --stage")
 
 
@@ -144,7 +145,7 @@ def _empty_change_scope(args: argparse.Namespace, mode: str) -> dict[str, Any]:
     """Retain a stable packet envelope when comparison resolution blocks planning."""
     if args.staged or args.stage == "pre-commit":
         packet_mode = "staged"
-    elif mode == "explicit" or args.changed_path:
+    elif args.changed_path:
         packet_mode = "explicit"
     else:
         packet_mode = "changed"
@@ -174,7 +175,7 @@ def _resolve_cli_change_scope(
             staged=args.staged or args.stage == "pre-commit",
             explicit_paths=list(args.changed_path),
             base_ref=base_ref,
-            packet_mode="explicit" if mode == "explicit" or args.changed_path else None,
+            packet_mode="explicit" if args.changed_path else None,
         ), ""
     except ChangedPathError as error:
         return _empty_change_scope(args, mode), str(error)
@@ -225,7 +226,7 @@ def _resolve_plan(args: argparse.Namespace, root: Path) -> tuple[dict[str, Any],
         packs["documentation"] = documentation_pack
     explicit = list(getattr(args, "pack", []))
     base_ref = getattr(args, "base_ref", None)
-    mode = "explicit" if explicit else args.mode
+    mode = args.mode
     _validate_selection_arguments(args, explicit=explicit, mode=mode, base_ref=base_ref)
     change_scope, resolution_error = _resolve_cli_change_scope(
         args, root, mode=mode, base_ref=base_ref

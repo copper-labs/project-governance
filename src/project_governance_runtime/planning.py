@@ -21,15 +21,15 @@ def _matches(path: str, patterns: list[Any]) -> bool:
 
 
 def _stage_candidates(
-    packs: dict[str, dict[str, Any]], stage: str | None, mode: str
+    packs: dict[str, dict[str, Any]], stage: str | None
 ) -> list[str]:
-    """Return active packs eligible for a stage or explicit selection."""
+    """Return active packs eligible for the requested stage, when one is present."""
     result = []
     for pack_id, pack in packs.items():
         if str(pack.get("implementation_status", "active")) != "active":
             continue
         stages = [str(value) for value in pack.get("stages", [])]
-        if mode == "explicit" or stage in stages:
+        if stage is None or stage in stages:
             result.append(pack_id)
     return sorted(result)
 
@@ -102,19 +102,28 @@ def _execution_order(prerequisites: dict[str, list[str]]) -> list[str]:
 
 
 def _explicit_selection(
-    packs: dict[str, dict[str, Any]], explicit: list[str]
+    packs: dict[str, dict[str, Any]],
+    candidates: set[str],
+    explicit: list[str],
+    stage: str | None,
 ) -> tuple[set[str], dict[str, list[str]], list[dict[str, Any]], dict[str, list[str]]]:
-    """Select named packs and report unknown identifiers once."""
+    """Select named stage-eligible packs and report unavailable identifiers once."""
     missing = sorted(set(explicit) - set(packs))
-    blockers = (
-        [{
+    unavailable = sorted((set(explicit) & set(packs)) - candidates)
+    blockers: list[dict[str, Any]] = []
+    if missing:
+        blockers.append({
             "code": "unknown-explicit-pack",
             "message": f"Unknown pack(s): {', '.join(missing)}",
-        }]
-        if missing
-        else []
-    )
-    selected = set(explicit) - set(missing)
+        })
+    if unavailable:
+        stage_suffix = f" at stage {stage}" if stage else ""
+        blockers.append({
+            "code": "explicit-pack-unavailable",
+            "pack_ids": unavailable,
+            "message": f"Pack(s) unavailable{stage_suffix}: {', '.join(unavailable)}",
+        })
+    selected = set(explicit) & candidates
     reasons = {pack_id: ["explicit"] for pack_id in selected}
     return selected, reasons, blockers, {}
 
@@ -214,11 +223,13 @@ def build_plan(
 ) -> dict[str, Any]:
     """Build one explainable plan without executing repository commands."""
     explicit = sorted(set(explicit_pack_ids or []))
-    candidates = _stage_candidates(packs, stage, mode)
+    candidates = _stage_candidates(packs, stage)
     candidate_set = set(candidates)
     replacements = _replacement_map(packs)
-    if mode == "explicit":
-        selected, reasons, blockers, path_matches = _explicit_selection(packs, explicit)
+    if explicit:
+        selected, reasons, blockers, path_matches = _explicit_selection(
+            packs, candidate_set, explicit, stage
+        )
     elif mode == "all":
         selected, reasons, blockers, path_matches = _all_selection(
             candidates, stage, replacements
@@ -245,7 +256,7 @@ def build_plan(
             continue
         omitted[pack_id] = (
             f"replaced by target pack {replacements[pack_id]}"
-            if mode != "explicit" and pack_id in replacements
+            if not explicit and pack_id in replacements
             else "not selected by the requested scope"
         )
     return {

@@ -702,6 +702,41 @@ class RuntimeExecutionTests(unittest.TestCase):
         self.assertEqual(item["integrity_failure_count"], 0)
         self.assertEqual(item["findings"][0]["rule_id"], "pack.no-applicable-command")
 
+    def test_named_stage_runs_only_its_applicable_pack_command(self) -> None:
+        """Execute the named pack without replaying commands from another lifecycle stage."""
+        passed = json.dumps({"status": "passed", "finding_count": 0, "findings": []})
+        packs = {
+            "target": {
+                "implementation_status": "active",
+                "enforcement": "blocking",
+                "stages": ["pre-commit", "pre-push"],
+                "path_globs": ["src/**"],
+                "depends_on": [],
+                "commands": [
+                    {
+                        "run": [sys.executable, "-c", "raise SystemExit(9)"],
+                        "stages": ["pre-commit"],
+                    },
+                    {
+                        "run": [sys.executable, "-c", f"print({passed!r})"],
+                        "stages": ["pre-push"],
+                    },
+                ],
+            }
+        }
+        plan = build_plan(
+            packs,
+            stage="pre-push",
+            mode="impacted",
+            changed_paths=["src/example.py"],
+            explicit_pack_ids=["target"],
+        )
+        plan["change_scope"] = all_change_scope()
+        with tempfile.TemporaryDirectory() as directory:
+            output = execute(Path(directory), packs, plan, timeout_seconds=2)
+        self.assertEqual(output["status"], "passed", output)
+        self.assertEqual(len(output["evidence"][0]["commands"]), 1)
+
     def test_advisory_pack_without_a_command_does_not_skip_later_packs(self) -> None:
         """Preserve pack enforcement while preventing an advisory false-green result."""
         passed = json.dumps({"status": "passed", "finding_count": 0, "findings": []})
