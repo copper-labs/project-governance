@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-03-02
-updated: 2026-08-24
+updated: 2026-08-27
 summary: Task-oriented guide for installing and operating the package-based governance runtime.
 ---
 
@@ -23,7 +23,8 @@ project-specific policy, packs, and commands.
 5. Run the generated bootstrap launcher. It verifies the hash and installs the locked wheel into
    ignored `.governance/runtime/`. For a private GitHub repository it reads `GH_TOKEN`,
    `GITHUB_TOKEN`, or the current `gh auth` credential; no credential enters the lock.
-6. Run `project-governance doctor` to confirm the runtime and configuration are usable.
+6. Run `project-governance --version`, then `project-governance doctor`, to confirm the running
+   package matches the tracked lock and the integration is usable.
 
 There is no separate source template or generator. The installed wheel's `init` command owns the
 base runtime integration and never invents an artifact lock. Optional module commands such as
@@ -124,17 +125,57 @@ project-governance update --to <version> --dry-run
 ```
 
 Review the old and new artifact hash, configuration-schema change, and verification commands. If
-the schema changes, update the repository-owned configuration first. Apply only after that review:
+the schema changes, update the repository-owned configuration first. An unchanged configuration
+schema means only that the runtime-owned configuration format is compatible; it does not certify
+adopter-owned pull request templates, workflows, or provider inputs. Apply only after that review:
 
 ```sh
 project-governance update --to <version> --apply
 python3 tools/governance-bootstrap.py
+.governance/runtime/bin/project-governance --version
 .governance/runtime/bin/project-governance doctor
 ```
 
 The apply command swaps only the tracked lock. Bootstrap then safely replaces the ignored local
 environment after the old runtime command has exited. Requesting the already locked version returns
 `no-op`; the same version resolving to different bytes fails closed.
+
+### Upgrade from 1.x to 2.x
+
+The update preview is produced by the version currently installed. Version 1.3.0 emitted an
+affected pre-PR check as a post-update verification command. Do not carry that command across the
+2.x bootstrap: pull request narrative validation requires live title and body inputs and is not an
+installation health check. Use the 2.x `--version` and `doctor` commands above for installation
+verification.
+
+Before the first ready pull request on 2.x, review two adopter-owned integration surfaces:
+
+- The pull request template contains Product impact, Nature of the change, Code areas impacted,
+  and Why in the order defined by the
+  [change narrative contract](../specs/change-narrative-contract.md).
+- Every `ci-pr` invocation supplies the provider's live pull request title and body. Pass
+  `--pr-body-file` and `--pr-title` together; a generic affected command without those inputs is
+  incomplete when the always-on `pr-description` pack is selected.
+
+For GitHub Actions, materialize the event body as data and pass both values explicitly:
+
+```yaml
+- name: Materialize the live pull request body
+  env:
+    PR_BODY: ${{ github.event.pull_request.body }}
+  run: printf '%s' "$PR_BODY" > "$RUNNER_TEMP/pr-body.md"
+- name: Run affected governance
+  env:
+    PR_TITLE: ${{ github.event.pull_request.title }}
+  run: |
+    .governance/runtime/bin/project-governance check \
+      --stage ci-pr --mode impacted \
+      --pr-body-file "$RUNNER_TEMP/pr-body.md" \
+      --pr-title "$PR_TITLE"
+```
+
+Other providers own the equivalent trusted event boundary. The runtime does not discover or edit a
+provider workflow or pull request template.
 
 Use `project-governance telemetry status` for routine efficiency inspection. The underlying ignored
 JSONL retains at most 1,000 records and one mebibyte. It contains validation lifecycle aggregates
