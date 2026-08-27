@@ -32,26 +32,17 @@ may be read from ignored `.governance/runtime/skills/`; project skills remain tr
 repository-owned.
 
 For substantial governed work, resolve bounded context before editing with `context
---json-output .governance/runtime/context-result.json`. When that result contains
-`skill_utilization`, read every materialized skill or record an honest non-applied status. After
-the task's relevant proof, provide one outcome for every selected skill and run the closeout
-command from the
-[skill utilization specification](../specs/skill-utilization.md). The coordinator owns these
-internal commands; the operator should not have to name individual skills or prepare receipt JSON.
+--json-output .governance/runtime/context-result.json` and read the selected materialized skills.
+The runtime records no per-skill utilization receipt.
 
 Use the smallest proof that covers the changed component and one affected seam. When a governance
 pack fails, use `project-governance check --pack <pack-id>` only when focused diagnosis needs it.
 After the final repair, use either the enclosing Git hook or one impacted closeout as the affected
 recheck; do not run both immediately against the unchanged subject.
 
-When the operator explicitly requests delegated execution, treat the current Codex or Claude Code
-session model as primary. An explicit request such as `Use delegation for this task`, `Use governed
-delegation for this task`, or `Delegate this task` is sufficient. Prepare a packet-ready slice and
-bounded context first, then handle the internal `agent-route` and
-`agent-dispatch` interfaces without asking the operator to prepare JSON. Review the route and run
-`start` once for that exact wave. The returned entries are launch instructions for the current host;
-the wheel does not start models. Finish the wave once with the authorization digest and bounded
-result bundle. Missing or unsafe inputs mean continue solo.
+When the operator explicitly requests delegated execution, use the host's native controls. Keep the
+current session primary, use at most one writer and two non-overlapping readers, and share the
+current checkout. Delegation does not authorize another worktree.
 
 ## Boundaries
 

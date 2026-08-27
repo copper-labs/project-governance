@@ -58,7 +58,7 @@ failed focused check into a broad replay.
 When focused proof passes, freeze the candidate and run one affected source sign-off:
 
 ```sh
-tools/run-source-governance.sh check --stage pre-push --mode impacted
+tools/run-source-governance.sh check --summary --stage pre-push --mode impacted
 ```
 
 The result should identify the branch comparison base, selected packs, normalized outcomes, and no

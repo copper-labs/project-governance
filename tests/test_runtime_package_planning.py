@@ -502,10 +502,10 @@ class RuntimePlanningTests(unittest.TestCase):
         """Keep full output as the default while allowing one compact projection."""
         check = _parser().parse_args(["check", "--pack", "format", "--summary"])
         plan = _parser().parse_args(["plan", "--pack", "format", "--summary"])
-        telemetry = _parser().parse_args(["telemetry", "status", "--compact"])
+        telemetry = _parser().parse_args(["telemetry", "status"])
         self.assertTrue(check.summary)
         self.assertTrue(plan.summary)
-        self.assertTrue(telemetry.compact)
+        self.assertEqual(telemetry.telemetry_command, "status")
 
 
 class NamedPackScopeTests(unittest.TestCase):
@@ -752,6 +752,17 @@ class PackStageCoverageTests(unittest.TestCase):
             (pack_root / "invalid.yaml").write_text("id: [\n", encoding="utf-8")
             result = _doctor(root)
         self.assertTrue(any("invalid YAML" in finding for finding in result["findings"]))
+
+    def test_doctor_treats_the_runtime_source_checkout_as_source_mode(self) -> None:
+        """Do not require an adopter lock or facts file from runtime source development."""
+        result = _doctor(ROOT)
+        self.assertEqual(result["mode"], "source")
+        self.assertFalse(
+            any("runtime.lock.yaml is missing" in finding for finding in result["findings"])
+        )
+        self.assertFalse(
+            any("facts.lock.yaml is missing" in finding for finding in result["findings"])
+        )
 
 
 if __name__ == "__main__":

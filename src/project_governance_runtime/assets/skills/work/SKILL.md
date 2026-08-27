@@ -21,7 +21,6 @@ after the work has been framed and scoped.
 - `docs/index.md`
 - The active plan or governing artifact
 - `.governance/runtime/skills/resources/change-narrative.md` before any commit or pull request handoff
-- The selected role contract when delegation is active
 - Route-selected pack manifests or policies
 
 ## Workflow
@@ -52,18 +51,13 @@ after the work has been framed and scoped.
    architectural judgment, not mechanical extraction: accept a cohesive narrow unit when justified,
    and reject helper extraction that only relocates related code without creating a meaningful owner.
 10. Run deterministic build commands under the harness and bind build evidence to the integrated
-    snapshot. Any delegated QA is a separate explicitly started assurance wave.
+    snapshot. Any delegated QA remains an explicit host-native assignment.
 11. Reconcile QA with one primary-owned repair and one affected recheck. If it fails, stop instead
     of starting another general QA, verifier, or broad-proof cycle.
 12. Before any commit or pull request handoff, write the shared change narrative from the governing
     intent: outcome, product impact, conceptual change, code areas, and why. Do not derive product
     intent from file names alone or copy machine validation evidence into the narrative.
 13. Update evidence artifacts as part of the slice, not after memory fades.
-14. When the coordinator supplies a skill-utilization identity, report one honest status for every
-    materialized skill after proof: `applied`, `consulted-no-change`, `declined`, `unavailable`, or
-    `not-read`. For `applied`, name only the affected `decision`, `edit`, `validation`, or
-    `restraint` categories. Return this bounded closeout to the coordinator; do not add task text,
-    paths, source content, or private reasoning to telemetry.
 
 ## Validation
 
@@ -74,6 +68,6 @@ automatically invoked pre-push hook as that sign-off.
 ## Evidence
 
 Report changed files, active role and scope, integrated snapshot, validation results,
-source-of-truth updates, change narrative, the skill-utilization receipt ID when recorded, residual
-risk, and any deferred work. If the operator authorized an additional worktree, report its path and
+source-of-truth updates, change narrative, residual risk, and any deferred work. If the operator
+authorized an additional worktree, report its path and
 whether it was retained or removed.

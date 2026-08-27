@@ -362,97 +362,8 @@ def verify_staged_outcomes(root: Path, command: Path) -> None:
         )
 
 
-def verify_agent_orchestration(root: Path, command: Path) -> None:
-    """Prove both installed native-host paths route and close without provider calls."""
-    fixture_root = root / "agent-fixtures"
-    fixture_root.mkdir()
-    task = {
-        "base_snapshot": "fixture-snapshot",
-        "delegated_token_ceiling": 1200,
-        "entries": [{
-            "task_id": "implementation-1",
-            "role": "implementation-worker",
-            "required_capability_tier": "economy",
-            "packet_ready": True,
-            "specialist_obligation": "implementation-write",
-            "objective": "Change one synthetic component",
-            "governing_refs": ["AGENTS.md"],
-            "base_snapshot": "fixture-snapshot",
-            "read_scope": ["synthetic/example.py"],
-            "write_scope": ["synthetic/example.py"],
-            "exclusions": ["unmapped/input.bin"],
-            "fixed_decisions": ["Keep the fixture local"],
-            "acceptance": ["Return one terminal result"],
-            "focused_proof": ["synthetic proof"],
-            "output_token_ceiling": 1000,
-            "escalate_or_stop_when": ["A new decision is required"],
-            "permission": "write",
-            "privacy": "same-provider",
-            "scope_valid": True,
-            "materialized_context": [],
-        }],
-    }
-    for provider in ("codex", "claude"):
-        task_path = fixture_root / f"{provider}-task.json"
-        session_path = fixture_root / f"{provider}-session.json"
-        catalog_path = fixture_root / f"{provider}-catalog.json"
-        results_path = fixture_root / f"{provider}-results.json"
-        task_path.write_text(json.dumps(task), encoding="utf-8")
-        session_path.write_text(json.dumps({
-            "provider": provider,
-            "profile_id": f"{provider}-primary",
-            "model": f"{provider}-primary-model",
-            "tier_rank": 3,
-        }), encoding="utf-8")
-        catalog_path.write_text(json.dumps({
-            "version": 1,
-            "provider": provider,
-            "profiles": [
-                {
-                    "id": f"{provider}-economy",
-                    "model": f"{provider}-economy-model",
-                    "tier": "economy",
-                    "tier_rank": 1,
-                    "effort": "high",
-                    "roles": ["implementation-worker"],
-                    "enabled": True,
-                },
-                {
-                    "id": f"{provider}-primary",
-                    "model": f"{provider}-primary-model",
-                    "tier": "primary",
-                    "tier_rank": 3,
-                    "effort": "high",
-                    "roles": [],
-                    "enabled": True,
-                },
-            ],
-        }), encoding="utf-8")
-        routed = run([
-            str(command), "agent-route", "--task", str(task_path), "--session",
-            str(session_path), "--catalog", str(catalog_path), "--json",
-        ], root=root, expected=0)
-        route_request = json.loads(routed.stdout)
-        if route_request.get("status") != "delegated":
-            raise RuntimeError(f"{provider} synthetic route did not delegate")
-        request_path = fixture_root / f"{provider}-request.json"
-        request_path.write_text(json.dumps(route_request), encoding="utf-8")
-        started = json.loads(run([
-            str(command), "agent-dispatch", "start", "--request", str(request_path), "--json",
-        ], root=root, expected=0).stdout)
-        results_path.write_text(json.dumps({
-            "entries": [{"task_id": "implementation-1", "status": "completed"}],
-        }), encoding="utf-8")
-        finished = json.loads(run([
-            str(command), "agent-dispatch", "finish", "--authorization",
-            started["authorization_digest"], "--results", str(results_path), "--json",
-        ], root=root, expected=0).stdout)
-        if finished.get("terminal_reason") != "completed":
-            raise RuntimeError(f"{provider} synthetic dispatch did not complete")
-
-
 def verify_documentation_system(root: Path, command: Path) -> None:
-    """Prove installed init, exact routes, validation, and content-free local telemetry."""
+    """Prove installed initialization, exact routes, and validation."""
     preview = json.loads(
         run([str(command), "docs", "init", "--dry-run"], root=root, expected=0).stdout
     )
@@ -515,14 +426,6 @@ def verify_documentation_system(root: Path, command: Path) -> None:
         root=root,
         expected=0,
     )
-    telemetry = (root / ".governance/telemetry/runs.jsonl").read_text(encoding="utf-8")
-    if any(value in telemetry for value in ("installed-runtime", "governed-check", "docs/developer")):
-        raise RuntimeError("documentation telemetry retained a route identifier or path")
-    status = json.loads(
-        run([str(command), "telemetry", "status"], root=root, expected=0).stdout
-    )
-    if status.get("documentation", {}).get("retained_operation_count", 0) < 5:
-        raise RuntimeError("documentation telemetry status omitted installed operations")
 
 
 def verify_custom_documentation_root(root: Path, command: Path) -> None:
@@ -582,7 +485,6 @@ def main() -> int:
         write_synthetic_changes(root)
         verify_replacement_plan(root, command)
         verify_staged_outcomes(root, command)
-        verify_agent_orchestration(root, command)
         verify_documentation_system(root, command)
         verify_custom_documentation_root(root, command)
         verify_documentation_conflict(root, command)

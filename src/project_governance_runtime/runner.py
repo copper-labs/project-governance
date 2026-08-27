@@ -42,7 +42,6 @@ def execute(
         "mode": telemetry_mode,
         "changed_path_count": changed_path_count,
         "selected_pack_count": selected_pack_count,
-        "selected_packs": plan["selected_packs"],
         "scope_fingerprint": retained_fingerprint,
         "subject_digest": retained_digest,
     })
@@ -128,32 +127,11 @@ def _record_terminal(
         "subject_digest": subject_digest,
         "changed_path_count": changed_path_count,
         "selected_pack_count": selected_pack_count,
+        "pack_duration_ms": round(
+            sum(item["duration_ms"] for item in evidence), 3
+        ),
         "packs": [
-            {
-                "id": item["pack_id"],
-                "status": item["status"],
-                "duration_ms": item["duration_ms"],
-                "finding_count": item["finding_count"],
-                "command_count": len(item["commands"]),
-                "blocking_finding_count": item["finding_counts"]["blocking"],
-                "advisory_finding_count": item["finding_counts"]["advisory"],
-                "accepted_finding_count": item["finding_counts"]["accepted"],
-                "waived_finding_count": item["finding_counts"]["waived"],
-                "suppressed_finding_count": item["finding_counts"]["suppressed"],
-                "process_failure_count": item["process_failure_count"],
-                "integrity_failure_count": item["integrity_failure_count"],
-                "evidence_manifest_count": item["evidence_manifest_count"],
-                "valid_evidence_manifest_count": item[
-                    "valid_evidence_manifest_count"
-                ],
-                "invalid_evidence_manifest_count": item[
-                    "invalid_evidence_manifest_count"
-                ],
-                "evidence_claim_count": item["evidence_claim_count"],
-                "evidence_artifact_digest_count": item[
-                    "evidence_artifact_digest_count"
-                ],
-            }
+            {"id": item["pack_id"], "duration_ms": item["duration_ms"]}
             for item in evidence
         ],
     })

@@ -14,10 +14,6 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote, unquote
 
-from .target_migrations import build_target_migrations, validate_target_migrations
-from .upgrade_cleanup import apply_upgrade_cleanup, build_upgrade_cleanup
-
-
 LOCK_PATH = Path("config/governance/runtime.lock.yaml")
 PROFILE_DEFAULT_TEXT = "schema_version: 1\nproject_extensions: []\n"
 REQUIRED_LOCK_KEYS = {
@@ -178,7 +174,7 @@ def _candidate_lock(current: dict[str, Any], version: str) -> dict[str, Any]:
 
 
 def update(root: Path, version: str, *, apply: bool) -> dict[str, Any]:
-    """Preview or apply one lock-only runtime update with migration disclosure."""
+    """Preview or apply one lock-only update without mutating project-owned configuration."""
     path = root / LOCK_PATH
     current = load_lock(path)
     candidate = _candidate_lock(current, version)
@@ -191,10 +187,7 @@ def update(root: Path, version: str, *, apply: bool) -> dict[str, Any]:
         candidate = load_lock(temporary)
     finally:
         temporary.unlink(missing_ok=True)
-    cleanup = {**build_target_migrations(root), **build_upgrade_cleanup(root)}
     if candidate == current:
-        if apply:
-            apply_upgrade_cleanup(root, cleanup)
         return {
             "status": "no-op",
             "old_version": current["version"],
@@ -206,23 +199,14 @@ def update(root: Path, version: str, *, apply: bool) -> dict[str, Any]:
                 "new": candidate["configuration_schema"],
             },
             "verification_commands": [],
-            "upgrade_cleanup": cleanup,
         }
     if candidate["version"] == current["version"]:
         raise InstallationError(
             "the current immutable runtime version resolves to different lock content"
         )
     schema_change = candidate["configuration_schema"] != current["configuration_schema"]
-    migration_validation = (
-        validate_target_migrations(root, candidate)
-        if schema_change
-        else {"status": "not-required", "reason": "configuration schema is unchanged"}
-    )
-    migration = cleanup["migration_required"] or (
-        schema_change and migration_validation["status"] != "complete"
-    )
     result = {
-        "status": "migration-required" if migration else ("applied" if apply else "dry-run"),
+        "status": "applied" if apply else ("migration-required" if schema_change else "dry-run"),
         "old_version": current["version"],
         "new_version": candidate["version"],
         "old_sha256": current["sha256"],
@@ -235,15 +219,15 @@ def update(root: Path, version: str, *, apply: bool) -> dict[str, Any]:
             "python3 tools/governance-bootstrap.py",
             ".governance/runtime/bin/project-governance doctor",
         ],
-        "upgrade_cleanup": cleanup,
-        "migration_validation": migration_validation,
     }
-    if migration:
-        result["required_target_migrations"] = candidate.get("required_target_migrations")
+    if schema_change and not apply:
+        result["reason"] = (
+            "configuration schema changed; review and update project-owned configuration, "
+            "then use --apply to accept the new lock deliberately"
+        )
         return result
     if apply:
         path.write_text(
             json.dumps(candidate, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
-        apply_upgrade_cleanup(root, cleanup)
     return result

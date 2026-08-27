@@ -139,10 +139,8 @@ Run the complete suite only for a runtime release, a configuration-schema migrat
 selection-contract change, a security/process-isolation boundary, scheduled reconciliation, or an
 explicit operator request.
 
-Provider-aware orchestration changes prove the pure routing table, command-entry clock, explicit
-start/finish lifecycle, writer lease, fail-solo behavior, terminal receipt sanitization, and both
-native catalogs before broad proof. Tests use synthetic catalogs and launch entries; they never
-call Codex or Claude.
+Delegation behavior belongs to the host agent. Runtime validation proves only repository checks,
+process ownership, explicit deadlines, and the bounded local telemetry it actually owns.
 
 ## Evidence
 
@@ -152,7 +150,7 @@ termination reason. The optional `--summary` projection keeps active findings wh
 successful command detail and changed-path inventories. Bounded local telemetry adds changed-path,
 selected-pack, executed-command, and per-pack duration/count aggregates plus one opaque digest for
 eligible content-bound subjects without retaining paths, commands, output, prompts, or source
-content. `project-governance telemetry status --compact` summarizes unmatched starts, runtime
+content. `project-governance telemetry status` summarizes unmatched starts, runtime
 overhead, retained repeated scopes, same-subject repetition, broad runs, and slow packs as advisory
 observations. It does not prove a repeat was unnecessary because invalidation reasons are not
 retained. It also excludes direct commands and

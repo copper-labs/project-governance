@@ -77,8 +77,8 @@ class RuntimeReleaseVersioningTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "dirty checkout"):
                 git_version(root)
 
-    def test_release_lock_matches_the_semantic_wheel_and_declares_schema_migrations(self) -> None:
-        """Publish one exact wheel identity and the current adopter migration contract."""
+    def test_release_lock_matches_the_semantic_wheel_without_migration_payloads(self) -> None:
+        """Publish one exact wheel identity without carrying historical target procedures."""
         with tempfile.TemporaryDirectory() as directory:
             wheel = fake_wheel(Path(directory), "1.0.0")
             lock = release_lock(wheel, "1.0.0", "a" * 40)
@@ -87,7 +87,7 @@ class RuntimeReleaseVersioningTests(unittest.TestCase):
         self.assertEqual(lock["version"], "1.0.0")
         self.assertEqual(lock["wheel"], wheel.name)
         self.assertEqual(lock["configuration_schema"], 2)
-        self.assertEqual(len(lock["required_target_migrations"]), 3)
+        self.assertNotIn("required_target_migrations", lock)
 
     def test_source_readiness_runs_once_at_candidate_boundaries(self) -> None:
         """Avoid complete release proof on every repair push and again after merge."""

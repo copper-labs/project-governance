@@ -1,8 +1,8 @@
 """Route and materialize a small, repository-local context packet.
 
-The runtime reads only child-owned profile and facts files.  It keeps route selection,
-skill discovery, and local file materialization deterministic without a generated profile,
-provider client, or persistent cache.
+The runtime reads only child-owned profile and facts files. It keeps route selection,
+skill discovery, and local file materialization deterministic without a generated profile or
+provider client. Ignored materializations are bounded by count.
 """
 
 from __future__ import annotations
@@ -35,6 +35,7 @@ DEFAULT_BUDGET = {
 }
 SAFE_SKILL_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 MAX_SKILL_BYTES = 16_000
+MAX_CONTEXT_PACKETS = 8
 
 
 class ContextError(ValueError):
@@ -477,6 +478,7 @@ def _materialize(
             existing = destination / str(item["materialized_path"])
             if _file_bytes(destination, str(item["materialized_path"])) != item["content"]:
                 raise ContextError(f"existing materialization does not match: {existing}")
+        _prune_materializations(runtime_root, destination)
         return destination.relative_to(root).as_posix(), materialized, materialized_skills
     temporary = Path(tempfile.mkdtemp(prefix=".context-", dir=runtime_root))
     try:
@@ -492,7 +494,25 @@ def _materialize(
     except BaseException:
         shutil.rmtree(temporary, ignore_errors=True)
         raise
+    _prune_materializations(runtime_root, destination)
     return destination.relative_to(root).as_posix(), materialized, materialized_skills
+
+
+def _prune_materializations(runtime_root: Path, current: Path) -> None:
+    """Keep only the current packet and the newest bounded runtime-owned predecessors."""
+    candidates: list[tuple[int, Path]] = []
+    for path in runtime_root.glob("context-*"):
+        if path == current or path.is_symlink() or not path.is_dir():
+            continue
+        try:
+            path.resolve().relative_to(runtime_root.resolve())
+            modified = path.stat().st_mtime_ns
+        except (OSError, ValueError):
+            continue
+        candidates.append((modified, path))
+    candidates.sort(key=lambda item: item[0], reverse=True)
+    for _, path in candidates[MAX_CONTEXT_PACKETS - 1 :]:
+        shutil.rmtree(path, ignore_errors=True)
 
 
 def resolve_context(

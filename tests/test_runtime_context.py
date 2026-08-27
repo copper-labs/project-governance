@@ -18,7 +18,10 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from project_governance_runtime.cli import main  # noqa: E402
-from project_governance_runtime.context import resolve_context  # noqa: E402
+from project_governance_runtime.context import (  # noqa: E402
+    MAX_CONTEXT_PACKETS,
+    resolve_context,
+)
 from project_governance_runtime.installation import materialize_skills  # noqa: E402
 
 
@@ -158,6 +161,26 @@ class RuntimeContextTests(unittest.TestCase):
                 self.assertEqual(main(), 0)
             self.assertIn('"route": {', output.getvalue())
             self.assertIn('"id": "governance"', output.getvalue())
+
+    def test_context_materializations_keep_only_eight_recent_packets(self) -> None:
+        """Prevent ordinary context selection from growing ignored state indefinitely."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            guide = root / "docs/governance/guide.md"
+            guide.parent.mkdir(parents=True)
+            skill = root / ".governance/runtime/skills/work/SKILL.md"
+            skill.parent.mkdir(parents=True)
+            skill.write_text("Work skill\n", encoding="utf-8")
+            write_repository(root, routing_profile(context=[]))
+            latest = None
+            for index in range(MAX_CONTEXT_PACKETS + 4):
+                guide.write_text(f"Governance guide {index}\n", encoding="utf-8")
+                latest = resolve_context(root, "Review governance", [])
+
+            packets = list((root / ".governance/runtime/context").glob("context-*"))
+            self.assertEqual(len(packets), MAX_CONTEXT_PACKETS)
+            self.assertIsNotNone(latest)
+            self.assertTrue((root / latest["materialization"]["root"]).is_dir())
 
 
 if __name__ == "__main__":

@@ -263,7 +263,9 @@ def execute_pack(
         status = "failed"
         applicability_findings.append({
             "rule_id": "pack.no-applicable-command",
-            "severity": "blocking",
+            "severity": (
+                "blocking" if pack.get("enforcement") == "blocking" else "advisory"
+            ),
             "pack_id": pack_id,
             "message": "selected pack resolved no runnable commands",
         })

@@ -16,7 +16,7 @@ its own policy choices and project checks. Markdown is the sole current policy a
 
 | Layer | Owner | Contents |
 | --- | --- | --- |
-| Runtime wheel | `project-governance` | CLI, changed-path planning, native-host agent routing and dispatch state, generic packs, process handling, finding normalization, generic skills, and small local telemetry |
+| Runtime wheel | `project-governance` | CLI, changed-path planning, generic packs, process handling, finding normalization, shared skills, and small local validation telemetry |
 | Repository configuration | Adopting repository | Runtime lock, profile, facts, target-owned packs, commands, and project documentation |
 | Product validation | Adopting repository | Builds, tests, linters, device checks, and product-specific policies |
 
@@ -31,17 +31,13 @@ its own policy choices and project checks. Markdown is the sole current policy a
    affected trust boundary.
 6. Adopt a newer runtime only through `project-governance update`, after reviewing its dry run.
 
-For substantial agent work, the coordinator first runs the public context command. A matched
-target route selects and materializes the smallest exact skill set, while a bounded local selection
-event records only safe IDs, digests, and reason classes. After proof, the coordinator records one
-explicit per-skill closeout. The operator does not need to know the catalog or name skills, and the
-receipt remains advisory rather than becoming change authority.
+For substantial agent work, the coordinator may run the public context command. A matched target
+route selects and materializes the smallest exact skill set. The runtime does not require a
+per-skill utilization receipt or retain task content.
 
-Optional delegated execution begins only when the operator explicitly runs `agent-route` and then
-`agent-dispatch start`. The current Codex or Claude Code session remains primary; the runtime
-returns same-provider launch entries but does not launch them. A missing or rejected route falls
-back to the normal solo flow. All roles use the current checkout by default; delegation does not
-authorize another worktree.
+Optional delegation uses the host's native agent controls. The primary remains responsible for
+planning and integration, all roles share the current checkout by default, and delegation never
+authorizes another worktree.
 
 The runner resolves changed scope once, supplies every selected pack the same immutable before/after
 packet, and gives each pack a run-scoped evidence directory. An unmapped path produces one selector
@@ -58,15 +54,8 @@ explicit operator request. Routine product work stays narrow.
 ## Reading Path
 
 - [Runtime contract](specs/governance-kernel.md)
-- [Skill selection and utilization](specs/skill-utilization.md)
 - [Runtime architecture](architecture/governance-runtime.md)
 - [Bootstrap standards](governance/bootstrap-standards.md)
 - [Hook and check taxonomy](governance/hook-and-check-taxonomy.md)
 - [Validation strategy](governance/validation-strategy.md)
 - [Agent setup](guides/agent-setup-instructions.md)
-
-## Future Direction
-
-Any future knowledge-graph initiative starts from a new, approved design. The only current record
-of that possibility is under [proposed/knowledge-graph](proposed/knowledge-graph/README.md); it
-does not affect the runtime, bootstrap, or authority model today.

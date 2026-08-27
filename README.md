@@ -24,7 +24,7 @@ the ignored local environment. Hooks never download or change the lock themselve
 python3 tools/governance-bootstrap.py
 project-governance doctor
 project-governance plan --stage pre-commit --mode impacted --json
-project-governance check --stage pre-commit --mode impacted
+project-governance check --summary --stage pre-commit --mode impacted
 project-governance check --pack naming
 project-governance docs init --dry-run
 project-governance docs route --capability <id> --json
@@ -38,9 +38,9 @@ project-governance update --to <version> --dry-run
 project-governance update --to <version> --apply
 ```
 
-An update changes the project lock only when its configuration schema remains compatible. A
-project-owned configuration decision is never inferred or overwritten. Publishing a wheel is a
-separate remote action and requires explicit authorization.
+An update dry-run stops on a configuration-schema change. After the project-owned configuration is
+ready, an explicit `--apply` changes only the tracked lock; it never infers or overwrites project
+policy. Publishing a wheel is a separate remote action and requires explicit authorization.
 
 Stable releases use matching semantic tags and package versions such as `1.0.0`, `1.1.0`, and
 `1.1.1`. Untagged source builds retain commit identity as development versions; hashes no longer
@@ -68,7 +68,7 @@ Source development supports Python `>=3.9,<4`.
 ```sh
 python3 -m pip install -r requirements-dev.txt
 tools/run-source-governance.sh plan --stage pre-commit --mode impacted --json
-tools/run-source-governance.sh check --stage pre-commit --mode impacted --staged
+tools/run-source-governance.sh check --summary --stage pre-commit --mode impacted --staged
 python3 -m pip wheel . --no-deps --wheel-dir dist
 python3 tools/verify-runtime-wheel.py dist/project_governance_runtime-*.whl
 ```
@@ -82,4 +82,3 @@ project hooks use their locked local wheel instead.
 - [Developer documentation](docs/developer/index.md)
 - [Charter](CHARTER.md)
 - [Execution plans](docs/exec-plans/README.md)
-- [Future knowledge-graph direction](docs/proposed/knowledge-graph/README.md)

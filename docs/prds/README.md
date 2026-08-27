@@ -14,6 +14,3 @@ summary: Product requirements for reusable, active template capabilities.
 | PRD | Purpose |
 | --- | --- |
 | [Reader-first technical authoring](technical-authoring-harness.md) | Grounded, progressive technical documentation for human and agent readers |
-
-Future knowledge-graph requirements are proposals under
-[proposed/knowledge-graph](../proposed/knowledge-graph/README.md), not current product scope.

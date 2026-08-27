@@ -21,7 +21,6 @@ authoring, or migration changes.
 - `.governance/runtime/skills/catalog.yaml`
 - `.governance/runtime/skills/review-finding.schema.yaml`
 - `.governance/runtime/skills/resources/peer-dispatch.yaml`
-- `.governance/runtime/skills/resources/execution-roles.yaml` when review is delegated
 - The changed diff or artifact under review
 
 ## Workflow
@@ -35,8 +34,8 @@ authoring, or migration changes.
    results, and exact questions.
 3. Require findings to use the shared severity, location, risk, and recommendation fields.
 4. Keep review separate from implementation: inspect the stable candidate first, report findings,
-   and prevent silent fixes. A delegated QA reviewer is a separate assurance wave with its own
-   explicit operator start; otherwise the primary performs the dedicated pass.
+   and prevent silent fixes. A delegated QA reviewer is a separate host-native assignment;
+   otherwise the primary performs the dedicated pass.
 5. Reconcile high and medium findings with code, docs, tests, or a recorded rationale, then recheck
    only the affected claim unless the patch invalidated broader evidence. Allow one primary-owned
    repair and one affected recheck. A failed recheck returns to focused diagnosis or the operator;

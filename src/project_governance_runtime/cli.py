@@ -6,18 +6,10 @@ import argparse
 import json
 import math
 import sys
-import time
 from pathlib import Path
 from typing import Any
 
 from . import __version__
-from .agent_orchestration import (
-    AgentOrchestrationError,
-    finish_dispatch,
-    load_control_state,
-    start_dispatch,
-)
-from .agent_routing import catalog_digest, route_task, solo_route
 from .changed_paths import ChangedPathError, resolve_change_scope
 from .configuration import ConfigurationError, load_packs
 from .context import ContextError, resolve_context
@@ -31,11 +23,6 @@ from .execution_commands import pack_stage_command_gaps
 from .installation import InstallationError, initialize, load_lock, update
 from .planning import build_plan, public_plan
 from .runner import execute
-from .skill_utilization import SkillUtilizationError
-from .skill_utilization import begin as begin_skill_utilization
-from .skill_utilization import finish as finish_skill_utilization
-from .telemetry import append as telemetry_append
-from .telemetry import compact_status as compact_telemetry_status
 from .telemetry import status as telemetry_status
 
 
@@ -79,29 +66,9 @@ def _parser() -> argparse.ArgumentParser:
     context.add_argument("--include-expansion", action="store_true")
     context.add_argument("--json", action="store_true")
     context.add_argument("--json-output", type=Path)
-    skills = commands.add_parser("skills")
-    skill_commands = skills.add_subparsers(dest="skills_command", required=True)
-    skill_closeout = skill_commands.add_parser("closeout")
-    skill_closeout.add_argument("--context-result", type=Path, required=True)
-    skill_closeout.add_argument("--outcomes", type=Path, required=True)
-    agent_route = commands.add_parser("agent-route")
-    agent_route.add_argument("--task", type=Path, required=True)
-    agent_route.add_argument("--session", type=Path, required=True)
-    agent_route.add_argument("--catalog", type=Path, required=True)
-    agent_route.add_argument("--json", action="store_true")
-    dispatch = commands.add_parser("agent-dispatch")
-    dispatch_commands = dispatch.add_subparsers(dest="dispatch_command", required=True)
-    dispatch_start = dispatch_commands.add_parser("start")
-    dispatch_start.add_argument("--request", type=Path, required=True)
-    dispatch_start.add_argument("--json", action="store_true")
-    dispatch_finish = dispatch_commands.add_parser("finish")
-    dispatch_finish.add_argument("--authorization", required=True)
-    dispatch_finish.add_argument("--results", type=Path, required=True)
-    dispatch_finish.add_argument("--json", action="store_true")
     commands.add_parser("doctor")
     telemetry = commands.add_parser("telemetry")
     telemetry.add_argument("telemetry_command", choices=["status"])
-    telemetry.add_argument("--compact", action="store_true")
     commands.add_parser("init")
     docs = commands.add_parser("docs")
     docs_commands = docs.add_subparsers(dest="docs_command", required=True)
@@ -267,15 +234,20 @@ def _resolve_plan(args: argparse.Namespace, root: Path) -> tuple[dict[str, Any],
 def _doctor(root: Path) -> dict[str, Any]:
     """Report actionable installation health without changing repository state."""
     findings: list[str] = []
-    lock_path = root / "config/governance/runtime.lock.yaml"
-    if not lock_path.exists():
-        findings.append("config/governance/runtime.lock.yaml is missing")
-    else:
-        try:
-            load_lock(lock_path)
-        except (InstallationError, OSError, json.JSONDecodeError) as error:
-            findings.append(str(error))
-    for relative in ("config/governance/profile.yaml", "config/governance/facts.lock.yaml"):
+    source_checkout = (root / "src/project_governance_runtime/cli.py").is_file()
+    if not source_checkout:
+        lock_path = root / "config/governance/runtime.lock.yaml"
+        if not lock_path.exists():
+            findings.append("config/governance/runtime.lock.yaml is missing")
+        else:
+            try:
+                load_lock(lock_path)
+            except (InstallationError, OSError, json.JSONDecodeError) as error:
+                findings.append(str(error))
+    required = ["config/governance/profile.yaml"]
+    if not source_checkout:
+        required.append("config/governance/facts.lock.yaml")
+    for relative in required:
         if not (root / relative).exists():
             findings.append(f"{relative} is missing")
     try:
@@ -290,7 +262,11 @@ def _doctor(root: Path) -> dict[str, Any]:
                     f"pack {pack_id} has no command for declared stage(s): "
                     + ", ".join(gaps)
                 )
-    return {"status": "failed" if findings else "passed", "findings": findings}
+    return {
+        "status": "failed" if findings else "passed",
+        "mode": "source" if source_checkout else "installed",
+        "findings": findings,
+    }
 
 
 def _emit(
@@ -481,9 +457,6 @@ def _run_context(args: argparse.Namespace, root: Path) -> int:
         args.changed_path,
         include_expansion=args.include_expansion,
     )
-    utilization = begin_skill_utilization(root, output, terminal_hook=telemetry_append)
-    if utilization is not None:
-        output["skill_utilization"] = utilization
     if args.json or args.json_output:
         _emit(output, args.json_output)
     else:
@@ -496,93 +469,8 @@ def _run_context(args: argparse.Namespace, root: Path) -> int:
     return _result_exit_code(output)
 
 
-def _run_skill_command(args: argparse.Namespace, root: Path) -> int:
-    """Record one explicit context-bound skill closeout without retaining task content."""
-    output = finish_skill_utilization(
-        root,
-        _load_json_object(args.context_result, label="--context-result"),
-        _load_json_object(args.outcomes, label="--outcomes"),
-        terminal_hook=telemetry_append,
-    )
-    _emit(output)
-    return _result_exit_code(output)
-
-
-def _load_json_object(path: Path, *, label: str) -> dict[str, Any]:
-    """Load one explicit CLI JSON object without scanning the repository."""
-    value = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(value, dict):
-        raise AgentOrchestrationError(f"{label} must contain one JSON object")
-    return value
-
-
-def _run_agent_command(args: argparse.Namespace, root: Path) -> int:
-    """Route or authorize one native-host wave without launching a provider."""
-    if args.command == "agent-route":
-        task = _load_json_object(args.task, label="--task")
-        session = _load_json_object(args.session, label="--session")
-        catalog = _load_json_object(args.catalog, label="--catalog")
-        expected_digest = catalog_digest(catalog)
-        if "digest" in catalog and catalog["digest"] != expected_digest:
-            raise AgentOrchestrationError("catalog-digest-mismatch")
-        catalog["digest"] = expected_digest
-        try:
-            state = load_control_state(root)
-        except (AgentOrchestrationError, OSError, ValueError, json.JSONDecodeError):
-            output = solo_route("control-state-unavailable")
-        else:
-            output = route_task(task, session, catalog, state)
-    elif args.dispatch_command == "start":
-        output = start_dispatch(
-            root, _load_json_object(args.request, label="--request")
-        )
-    else:
-        output = finish_dispatch(
-            root,
-            args.authorization,
-            _load_json_object(args.results, label="--results"),
-            terminal_hook=telemetry_append,
-        )
-    _emit(output)
-    return _result_exit_code(output)
-
-
-def _documentation_terminal_event(
-    args: argparse.Namespace, output: dict[str, Any], started: float
-) -> dict[str, Any]:
-    """Build one bounded terminal event without retaining a route query or local path."""
-    event = {
-        "event": "documentation-terminal",
-        "runtime_version": __version__,
-        "operation": args.docs_command,
-        "outcome": output["status"],
-        "duration_ms": (time.monotonic() - started) * 1000,
-    }
-    if args.docs_command == "init":
-        event.update(
-            {
-            "dry_run": bool(args.dry_run),
-            "created_count": len(output.get("created", [])),
-            "updated_count": len(output.get("updated", [])),
-            "unchanged_count": len(output.get("unchanged", [])),
-            "conflict_count": len(output.get("conflicts", [])),
-            }
-        )
-    else:
-        event.update(
-            {
-                "query_kind": output.get(
-                    "query_kind", "capability" if args.capability is not None else "symbol"
-                ),
-                "match_count": output.get("match_count", 0),
-            }
-        )
-    return event
-
-
 def _run_documentation_command(args: argparse.Namespace, root: Path) -> int:
-    """Install or resolve the minimal documentation module and record bounded telemetry."""
-    started = time.monotonic()
+    """Install or resolve the optional minimal documentation module."""
     try:
         if args.docs_command == "init":
             output = initialize_documentation(root, dry_run=args.dry_run)
@@ -618,8 +506,6 @@ def _run_documentation_command(args: argparse.Namespace, root: Path) -> int:
                     "match_count": 0,
                 }
             )
-    event = _documentation_terminal_event(args, output, started)
-    telemetry_append(root, event)
     if args.docs_command == "route" and not args.json:
         print(
             f"status={output['status']} "
@@ -636,7 +522,7 @@ def _run_administration(args: argparse.Namespace, root: Path) -> int:
     if args.command == "doctor":
         output = _doctor(root)
     elif args.command == "telemetry":
-        output = compact_telemetry_status(root) if args.compact else telemetry_status(root)
+        output = telemetry_status(root)
     elif args.command == "init":
         output = initialize(root)
     else:
@@ -654,21 +540,15 @@ def main() -> int:
             return _run_check_or_plan(args, root)
         if args.command == "context":
             return _run_context(args, root)
-        if args.command == "skills":
-            return _run_skill_command(args, root)
-        if args.command in {"agent-route", "agent-dispatch"}:
-            return _run_agent_command(args, root)
         if args.command == "docs":
             return _run_documentation_command(args, root)
         return _run_administration(args, root)
     except (
-        AgentOrchestrationError,
         ChangedPathError,
         ConfigurationError,
         ContextError,
         DocumentationError,
         InstallationError,
-        SkillUtilizationError,
         OSError,
         ValueError,
     ) as error:

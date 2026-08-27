@@ -32,6 +32,11 @@ FORBIDDEN_TEXT = (
     "telemetry lifecycle",
     "receipt invalidator",
     "duplicated proof cache",
+    "agent-dispatch",
+    "skills closeout",
+    "execution-roles.yaml",
+    "governed-implementation",
+    "implementation-quality-review",
 )
 
 
@@ -73,9 +78,7 @@ class RuntimeSkillPayloadTests(unittest.TestCase):
         skill_text = {
             name: (SKILLS_SOURCE / name / "SKILL.md").read_text(encoding="utf-8").lower()
             for name in (
-                "governed-implementation",
                 "work",
-                "implementation-quality-review",
                 "architecture-review",
             )
         }
@@ -88,16 +91,16 @@ class RuntimeSkillPayloadTests(unittest.TestCase):
         ):
             self.assertNotIn(retired, combined)
 
-        governed = skill_text["governed-implementation"]
+        governed = skill_text["work"]
         for required in (
             "one focused owner test",
             "one directly affected seam",
-            "one branch-aware impacted pre-push sign-off",
+            "branch-aware impacted pre-push sign-off",
             "do not run a separate manual pre-commit or pre-pr gate",
             "one primary-owned",
             "one affected recheck",
-            "do not start a fresh general review",
-            "second failure",
+            "starting another general qa",
+            "fails twice",
             "warnings",
         ):
             self.assertIn(required, governed)
@@ -117,10 +120,7 @@ class RuntimeSkillPayloadTests(unittest.TestCase):
         self.assertIn("one branch-aware impacted pre-push sign-off", plan_template)
         self.assertNotIn("one impacted pre-commit boundary", plan_template)
 
-        for review_skill in (
-            skill_text["implementation-quality-review"],
-            skill_text["architecture-review"],
-        ):
+        for review_skill in (skill_text["architecture-review"],):
             self.assertIn("over 500 lines", review_skill)
             self.assertIn("cohesive narrow unit may be accepted", review_skill)
             self.assertIn("helper extraction", review_skill)
@@ -130,10 +130,7 @@ class RuntimeSkillPayloadTests(unittest.TestCase):
             encoding="utf-8"
         ).lower()
         work = skill_text["work"]
-        roles = (SKILLS_SOURCE / "resources" / "execution-roles.yaml").read_text(
-            encoding="utf-8"
-        ).lower()
-        for instruction in (delegated, work, roles):
+        for instruction in (delegated, work):
             self.assertIn("current checkout", instruction)
             self.assertIn("delegation", instruction)
             self.assertIn("operator", instruction)

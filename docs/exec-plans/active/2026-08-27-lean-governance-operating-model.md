@@ -300,8 +300,8 @@ local advisory telemetry.
   compact projection.
 - Retain one validated SHA-256 subject digest on validation lifecycle events. Derive unmatched
   starts, runner overhead, same-subject repetition, and cross-stage repetition at status time.
-- Add `telemetry status --compact` so multi-project efficiency audits can read bounded aggregates
-  without loading explanatory sections or empty event families.
+- Make `telemetry status` the one compact inspection surface. Bound the JSONL by one mebibyte as
+  well as 1,000 records and retain only validation lifecycle data plus the ten slowest packs.
 
 **Acceptance:**
 
@@ -310,8 +310,9 @@ local advisory telemetry.
   untouched.
 - Compact passing receipts contain no command stdout, stderr, argv, changed-path list, or source
   records; compact failures retain their normalized findings.
-- Telemetry contains no paths, source content, command output, prompts, or free-text subject
-  identity, and continues to fail open with at most 1,000 retained records.
+- Telemetry contains no paths, source content, command output, findings, prompts, documentation,
+  skills, agent activity, or free-text subject identity. It fails open and stays within both 1,000
+  records and one mebibyte.
 - Status distinguishes an unmatched start from a terminal run without guessing a generic timeout
   or declaring the run hung.
 
@@ -323,6 +324,31 @@ python3 -m unittest tests.test_runtime_package_execution tests.test_runtime_tele
 python3 -m unittest tests.test_runtime_package_planning
 ```
 
+## Slice 7: Retire control-plane paperwork
+
+**Depends on:** Slice 6.
+
+**Changes:**
+
+- Remove provider routing, dispatch state, worker leases, role contracts, and per-skill closeout
+  receipts from the wheel. Delegation uses the host agent's native controls in the current checkout.
+- Bound ignored context materializations to the current packet plus seven recent packets.
+- Retire old target-migration and predecessor-cleanup engines. A schema-changing update stops at
+  dry-run until the operator deliberately applies the reviewed lock.
+- Remove stale proposal trees, dormant delegated-role skills, and overlapping implementation skills.
+- Make `doctor` understand source checkout mode and preserve advisory severity when an advisory pack
+  resolves no command.
+
+**Acceptance:**
+
+- The runtime has no persistent agent state, retry path, provider catalog, worker lease, or skill
+  utilization ledger.
+- Context and telemetry have explicit disk ceilings; telemetry appends never rescan more than one
+  mebibyte.
+- Update never edits or deletes project-owned configuration or historical target artifacts.
+- Source `doctor` passes without pretending the source repository is an installed adopter.
+- A no-command advisory pack reports an advisory finding and does not become a false blocker.
+
 ## Stable-Candidate Proof
 
 This plan changes selection and a shipped hook, so the final frozen candidate receives one broad
@@ -332,7 +358,7 @@ source proof after all focused suites pass. Do not run the broad suite between s
 python3 -m unittest discover -s tests -p 'test_runtime_*.py'
 python3 -m pip wheel . --no-deps --wheel-dir dist
 python3 tools/verify-runtime-wheel.py dist/project_governance_runtime-*.whl
-tools/run-source-governance.sh check --stage pre-push --mode impacted
+tools/run-source-governance.sh check --summary --stage pre-push --mode impacted
 ```
 
 One bounded independent review then checks only these questions against the frozen diff and existing
@@ -359,7 +385,8 @@ candidate and reruns the final broad proof once.
 4. Implement Slice 5 without adding a duration-policy schema or receipt cache.
 5. Implement Slice 6 as one bounded workspace and observability checkpoint.
 6. Freeze the candidate, run the single broad proof, and perform the bounded review.
-7. Prepare a release candidate only after explicit operator authorization.
+7. Retire the control-plane and stale historical surfaces from Slice 7.
+8. Prepare a release candidate only after explicit operator authorization.
 
 The plan is complete when every slice acceptance boundary passes and the final diff contains no
 machinery listed under Explicit Non-Goals.

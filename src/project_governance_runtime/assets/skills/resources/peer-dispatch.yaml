@@ -26,10 +26,6 @@ resources:
     skill: .governance/runtime/skills/docs-governance-review/SKILL.md
     finding_schema: .governance/runtime/skills/review-finding.schema.yaml
     fallback: current-model-dedicated-pass
-  - id: implementation-quality-review
-    skill: .governance/runtime/skills/implementation-quality-review/SKILL.md
-    finding_schema: .governance/runtime/skills/review-finding.schema.yaml
-    fallback: current-model-dedicated-pass
   - id: qa-review
     skill: .governance/runtime/skills/qa-review/SKILL.md
     finding_schema: .governance/runtime/skills/review-finding.schema.yaml

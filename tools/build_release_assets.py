@@ -15,22 +15,6 @@ from release_version import semantic_version
 
 
 RELEASE_BASE_URL = "https://github.com/copper-labs/project-governance/releases/download"
-TARGET_MIGRATIONS = [
-    {
-        "kind": "quality-dispositions-v2",
-        "path": "config/policies/code-quality-dispositions.yaml",
-    },
-    {
-        "kind": "dependency-freshness-evidence",
-        "path": "config/policies/dependency-freshness-evidence.yaml",
-    },
-    {
-        "kind": "dependency-freshness-overrides",
-        "path": "config/policies/dependency-freshness-overrides.yaml",
-    },
-]
-
-
 def wheel_identity(wheel: Path) -> tuple[str, str]:
     """Read the normalized project name and version from wheel metadata."""
     with zipfile.ZipFile(wheel) as archive:
@@ -63,7 +47,6 @@ def release_lock(wheel: Path, tag: str, source_commit: str) -> dict[str, object]
         "python": ">=3.9,<4",
         "configuration_schema": 2,
         "release_base_url": RELEASE_BASE_URL,
-        "required_target_migrations": TARGET_MIGRATIONS,
     }
 
 

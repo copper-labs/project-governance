@@ -165,9 +165,5 @@ A KMP leaf is rich enough only if it:
 - passes automatic activation, correctness, conflict, restraint, and independent-fixture
   evaluations.
 
-Automatic activation must be proven through the
-[activation and utilization contract](../proposed/kmp-skill-library/activation-and-utilization.md),
-not inferred from the existence of a good `description` field.
-
-The [capability and normalization map](../proposed/kmp-skill-library/capability-map.md) turns these
-findings into a sequenced planning backlog.
+Automatic activation must be proven by selection fixtures and independent task evaluation, not
+inferred from the existence of a good `description` field.

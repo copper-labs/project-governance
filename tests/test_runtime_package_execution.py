@@ -178,8 +178,8 @@ class RuntimeExecutionTests(unittest.TestCase):
         self.assertEqual(records[0]["selected_pack_count"], 1)
         self.assertEqual(records[-1]["changed_path_count"], 0)
         self.assertEqual(records[-1]["selected_pack_count"], 1)
-        self.assertEqual(records[-1]["packs"][0]["command_count"], 1)
-        self.assertEqual(records[-1]["packs"][0]["process_failure_count"], 0)
+        self.assertEqual(records[-1]["packs"][0]["id"], "target-check")
+        self.assertGreaterEqual(records[-1]["packs"][0]["duration_ms"], 0)
         self.assertNotIn(payload, rendered_summary)
         self.assertNotIn("stdout", rendered_summary)
         self.assertNotIn("argv", rendered_summary)
@@ -193,7 +193,9 @@ class RuntimeExecutionTests(unittest.TestCase):
         self.assertNotIn("subject_digest", records[0])
         self.assertNotIn("subject_digest", records[-1])
         self.assertEqual(output["evidence"][0]["evidence_manifest"]["status"], "absent")
-        self.assertEqual(records[-1]["packs"][0]["evidence_manifest_count"], 0)
+        self.assertEqual(
+            set(records[-1]["packs"][0]), {"id", "duration_ms"}
+        )
 
     def test_compact_failure_retains_bounded_normalized_findings(self) -> None:
         """Make a compact failure actionable without copying arbitrary process output."""
@@ -300,8 +302,7 @@ class RuntimeExecutionTests(unittest.TestCase):
         self.assertEqual(item["evidence_claim_count"], 1)
         self.assertEqual(item["evidence_artifact_digest_count"], 1)
         self.assertEqual(item["process_failure_count"], 0)
-        self.assertEqual(terminal["packs"][0]["valid_evidence_manifest_count"], 1)
-        self.assertEqual(terminal["packs"][0]["evidence_claim_count"], 1)
+        self.assertEqual(terminal["packs"][0]["id"], "target-check")
         self.assertNotIn("target.behavior", telemetry)
         self.assertNotIn("22222222", telemetry)
 
@@ -342,9 +343,7 @@ class RuntimeExecutionTests(unittest.TestCase):
         item = output["evidence"][0]
         self.assertEqual(item["status"], "passed")
         self.assertEqual(item["finding_count"], 3)
-        self.assertEqual(terminal["packs"][0]["accepted_finding_count"], 1)
-        self.assertEqual(terminal["packs"][0]["waived_finding_count"], 1)
-        self.assertEqual(terminal["packs"][0]["suppressed_finding_count"], 1)
+        self.assertEqual(set(terminal["packs"][0]), {"id", "duration_ms"})
 
     def test_advisory_pack_runtime_integrity_failures_still_fail_the_run(self) -> None:
         """Keep pack enforcement from downgrading process and envelope integrity."""
@@ -577,7 +576,7 @@ class RuntimeExecutionTests(unittest.TestCase):
         self.assertEqual(records[0]["run_id"], records[1]["run_id"])
         self.assertEqual(records[1]["status"], "failed")
         self.assertEqual(records[1]["termination_reason"], "runtime-exception")
-        self.assertEqual(records[1]["packs"], [])
+        self.assertNotIn("packs", records[1])
         self.assertNotIn("private packet", records_text)
 
     def test_each_pack_receives_one_run_scoped_evidence_root(self) -> None:
@@ -851,6 +850,7 @@ class RuntimeExecutionTests(unittest.TestCase):
         self.assertEqual(
             [item["pack_id"] for item in output["evidence"]], ["advisory", "later"]
         )
+        self.assertEqual(output["evidence"][0]["findings"][0]["severity"], "advisory")
 
     def test_blocking_failure_stops_later_packs(self) -> None:
         """Stop dependency-order execution when a blocking pack cannot complete."""
@@ -882,8 +882,7 @@ class RuntimeExecutionTests(unittest.TestCase):
             )
         self.assertEqual(output["status"], "failed")
         self.assertEqual([item["pack_id"] for item in output["evidence"]], ["first"])
-        self.assertEqual(terminal["packs"][0]["process_failure_count"], 1)
-        self.assertEqual(terminal["packs"][0]["integrity_failure_count"], 0)
+        self.assertEqual(terminal["packs"][0]["id"], "first")
 
 
 class RuntimeTelemetryModeTests(unittest.TestCase):
@@ -922,8 +921,6 @@ class RuntimeTelemetryModeTests(unittest.TestCase):
             summary = telemetry_status(root)["validation"]
         self.assertEqual(summary["mode_counts"], {"all": 1, "explicit": 2})
         self.assertEqual(summary["broad_run_count"], 1)
-        self.assertEqual(summary["fingerprinted_run_count"], 1)
-        self.assertEqual(summary["unfingerprinted_run_count"], 2)
         self.assertEqual(summary["repeated_scope_run_count"], 0)
 
 

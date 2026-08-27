@@ -73,10 +73,8 @@ project-governance plan --stage pre-push --mode impacted --json
 
 For agent work, the coordinator should run `project-governance context --task <description>
 --json-output .governance/runtime/context-result.json` before editing. Relevant governed skills are
-selected and materialized automatically from the repository route and facts. After work, the
-coordinator records one bounded per-skill closeout; the operator does not need to know or name the
-skill IDs. See
-[Skill selection and utilization](../specs/skill-utilization.md) for the internal contract.
+selected and materialized automatically from the repository route and facts. No utilization
+closeout is required.
 
 If a pack fails, use its named execution only when focused diagnosis needs it. After the final
 repair, run one affected recheck: either the enclosing hook or the impacted pre-push sign-off. Do
@@ -122,10 +120,8 @@ Preview an adoption:
 project-governance update --to <version> --dry-run
 ```
 
-Review the old and new artifact hash, exact configuration migrations, bounded predecessor cleanup
-inventory, required project decision, and verification commands. Automatic cleanup is limited to
-unchanged files proven runtime-owned by the predecessor manifest; modified, target-owned, unknown,
-and ignored runtime state remain untouched. Apply only after that review:
+Review the old and new artifact hash, configuration-schema change, and verification commands. If
+the schema changes, update the repository-owned configuration first. Apply only after that review:
 
 ```sh
 project-governance update --to <version> --apply
@@ -133,15 +129,13 @@ python3 tools/governance-bootstrap.py
 .governance/runtime/bin/project-governance doctor
 ```
 
-The apply command swaps the tracked lock and may remove only reviewed, hash-proven predecessor
-artifacts from the dry-run list. Bootstrap then safely replaces the ignored local environment after
-the old runtime command has exited. Requesting the already locked immutable version returns
+The apply command swaps only the tracked lock. Bootstrap then safely replaces the ignored local
+environment after the old runtime command has exited. Requesting the already locked version returns
 `no-op`; the same version resolving to different bytes fails closed.
 
-Use `project-governance telemetry status --compact` for routine efficiency inspection across
-projects. Use the unmodified status command only when its explanations and all event families are
-needed. The underlying ignored JSONL retains at most 1,000 bounded, redacted events for trend
-analysis; it is diagnostic only and never authorizes a pass or policy change.
+Use `project-governance telemetry status` for routine efficiency inspection. The underlying ignored
+JSONL retains at most 1,000 records and one mebibyte. It contains validation lifecycle aggregates
+only; it is diagnostic and never authorizes a pass or policy change.
 
 Use `--summary` on `plan` or `check` when a person or agent needs the outcome rather than a full
 machine receipt. Shipped hooks use this projection. Active failures remain visible, while changed

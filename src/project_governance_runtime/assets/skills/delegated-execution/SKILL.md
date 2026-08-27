@@ -1,78 +1,32 @@
 ---
 id: skill.delegated-execution
 title: Delegated Execution
-stage: Plan
+stage: Work
 provenance: package-default
 ---
 
 # Delegated Execution
 
-Select and operate a safe implementation topology without changing governance semantics between
-agent providers.
+Use the host's native delegation only when the operator requests it or one bounded specialist can
+materially reduce uncertainty or elapsed time.
 
-## Trigger
+## Rules
 
-Use this skill only when the operator explicitly asks to use `delegation`, says `Delegate this
-task`, or makes an equivalent direct request. `Use delegation for this task` is the standard short
-trigger. Skip it otherwise, including for a trivial direct edit.
-
-## Target Inputs
-
-- Read the target's `AGENTS.md`, governing artifact, and execution plan when present.
-- Read `.governance/runtime/skills/resources/execution-roles.yaml` only when a specialist obligation
-  is selected. Other target delegation policy is optional target input.
-
-## Workflow
-
-1. Classify scope, uncertainty, separability, validation cost, impact, and write-conflict risk from
-   repository evidence. Classify build/artifact behavior impact separately; validation cost alone
-   is not build-verifier evidence.
-2. Treat the semantic contract as unsettled when implementation can still discover or redefine
-   shared behavior, wire tokens, failure states, platform boundaries, safety or privacy rules, or
-   proof obligations. Keep that work with the primary for one consolidated architecture pass.
-   Route already-decided multiplatform synthesis to balanced; use economy only after those semantics
-   are settled and the remaining component or platform work is mechanical and independently proved.
-3. Choose the smallest safe topology from those signals. Across active waves, one repository may
-   contain at most one writer and two read-only specialists with non-overlapping scopes. Use the
-   current checkout for all roles. Delegation is not authority to create or move a worktree; each
-   additional worktree requires a direct operator request.
-4. If the result is `solo`, keep the coordinator as writer and do not load the role catalog or
-   delegation policy merely to confirm that no role was selected. Record the result in the plan.
-5. If the result is non-solo, read the role catalog, verify each specialist obligation, and remove
-   any role that does not have one.
-6. Record the obligation, role, non-overlapping scope, implementation owner, capability tier,
-   packet readiness, fallback, and any override in the implementation-plan slice.
-7. Create only the selected role work packets. Resolve the smallest useful context packet, retain
-   its identity in the host envelope, and project only the compact worker brief plus selected
-   materialized context to the specialist.
-8. Treat the operator's explicit governed-delegation request as authority for one exact launch wave.
-   Handle the internal route and start commands without asking the operator to prepare JSON. Do not
-   add writers, nested delegation, automatic specialist retries, or provider cascades. Launch
-   native-host agents only from the entries returned by the governed start command and close that
-   wave through finish. If the host cannot bind those entries, continue solo and report the
-   delegation gap instead of spawning an ungoverned substitute.
-9. Integrate results through the primary. Reject stale, scope-expanded, digest-mismatched, or
-   unidentified output.
-10. Rebaseline immediately when a clean integration snapshot advances. Retain exact subject-valid
-   evidence and discard stale integration mechanics.
-11. Run deterministic build commands under the harness. A selected post-integration QA review is a
-    separate optional assurance wave with its own explicit start.
-12. Fix or explicitly close high and medium findings. Permit one primary-owned repair and one
-    affected deterministic recheck. If that recheck fails, stop and return to focused diagnosis or
-    the operator; do not launch another QA reviewer, verifier, or broad proof cycle.
-13. Stop when the plan's proof budget and stop condition are satisfied. Require a recorded reason
-    before repeating an equivalent passed gate.
-14. If specialist dispatch is unavailable or returns `needs_primary_decision`, let the primary
-   execute the remaining work solo without another dispatch or authorization prompt.
-
-## Validation
-
-Run the validation packs selected by the governing plan against the integrated snapshot. Use a
-target's optional context-size tooling only when relevant; it is not a hook or continuous economics
-gate.
+1. The primary remains accountable for planning, integration, and closeout.
+2. Prefer solo execution. Delegate one clearly bounded read or write responsibility, not a workflow.
+3. Use the current checkout for every role. Delegation never authorizes another worktree; only a
+   direct operator request does.
+4. Use at most one writer and two non-overlapping read-only specialists at a time. The coordinator,
+   not this runtime, enforces that host lifecycle.
+5. Give each specialist the objective, governing references, read or write scope, fixed decisions,
+   expected result, and one focused proof. Do not require a runtime-specific envelope.
+6. Do not permit nested delegation, automatic retries, provider cascades, or an automatic second QA
+   wave.
+7. Integrate through the primary and reject stale, unidentified, or scope-expanded output.
+8. Reuse proof from the integrated subject. One finding permits one focused repair and one affected
+   recheck; it does not restart delegation or broad validation.
 
 ## Evidence
 
-Report the selected tier, active roles, writer count, integration evidence, context packet digest,
-verified snapshot, build results, QA findings and reconciliations, and residual risk. If the
-operator authorized an additional worktree, report its path and whether it was retained or removed.
+Report the roles used, their scopes, the integrated subject, relevant proof, unresolved findings,
+and any operator-authorized worktree path plus whether it was retained or removed.

@@ -27,13 +27,8 @@ project-governance check --stage pre-pr --mode all
 project-governance plan --stage <stage> --mode impacted --json
 project-governance plan --pack <pack-id> --stage <stage> --mode impacted --json
 project-governance context --task <description> --json-output <ignored-result.json>
-project-governance skills closeout --context-result <context-result.json> --outcomes <skill-outcomes.json>
-project-governance agent-route --task <envelope> --session <identity> --catalog <catalog> --json
-project-governance agent-dispatch start --request <route-request> --json
-project-governance agent-dispatch finish --authorization <digest> --results <result-bundle> --json
 project-governance doctor
 project-governance telemetry status
-project-governance telemetry status --compact
 project-governance init
 project-governance docs init --dry-run
 project-governance docs route --capability <id-or-alias> --json
@@ -46,21 +41,13 @@ packs without running them. Their optional `--summary` projection omits path inv
 lines, and process output while retaining bounded active findings; default output and
 `--json-output` remain full machine receipts. `doctor` reports a missing or invalid integration plainly. `init`
 creates only missing integration files. `update` advances the runtime lock only after required
-target-owned configuration migrations validate; it stops before a repository-owned decision. Its
-dry run reports exact legacy registry migrations and a bounded predecessor-artifact cleanup
-inventory. Apply may remove only a prior runtime-owned regular file whose bytes still match its
-accepted hash.
+target-owned configuration is ready; schema changes remain blocked in dry-run output until an
+operator deliberately applies the reviewed lock. The runtime does not carry historical
+configuration migrations or predecessor-cleanup rules.
 
-`agent-route` is read-only and never launches a model. The two `agent-dispatch` actions are the only
-orchestration control-state write boundaries; they emit native launch instructions or close one
-previously authorized wave. Missing identity, catalog, readiness, or safe control state returns to
-the existing solo workflow.
-
-`context` selects and materializes exact route-owned context and skill bytes. When it delivers a
-skill, the public command also creates a content-free selection event and returns a utilization ID.
-`skills closeout` verifies the same context result and exact packet bytes before recording bounded
-per-skill outcomes. The [skill selection and utilization specification](skill-utilization.md) owns
-that provider-neutral contract.
+`context` selects and materializes exact route-owned context and skill bytes. It retains at most
+eight ignored packets. Delegation remains a host-agent concern: the wheel owns no launch state,
+provider catalog, writer lease, role receipt, retry loop, or per-skill closeout workflow.
 
 Stages remain command boundaries, not selectable profiles:
 
@@ -223,45 +210,12 @@ normal pinned-wheel update path.
 
 ## Telemetry
 
-Telemetry is a bounded, ignored JSONL file retaining at most 1,000 start and terminal events. It
-records runtime/run identity, stage and mode, a non-reversible scope fingerprint, changed-path and
-selected-pack counts, one validated opaque subject digest for nonempty content-bound non-named
-runs, execution duration, status and termination, plus per-pack command, finding, status, and
-duration aggregates. It never retains paths, commands, process output, prompts, or source content.
-Writes are concurrency-safe and fail open; telemetry is advisory only and cannot weaken, approve,
-or delete a governance check. Status derives unmatched starts, runner overhead, repeated scopes,
-same-subject repeats, and cross-stage same-subject repeats without declaring a run hung or a repeat
-unnecessary. `telemetry status --compact` omits explanatory and empty event-family sections for
-low-token cross-project inspection. End-to-end shadow timing, including planning, is an adopter
-measurement rather than a runtime execution-duration claim.
-
-An accepted `agent-dispatch finish` may add one `orchestration-terminal` record. Its allowlist holds
-only role, native model/profile, terminal outcome, duration, optional provider-reported token
-totals, proof result, and fallback/repair booleans. Status reports retained entry counts, outcomes,
-and per-model percentages, explicitly excluding evicted receipts and control-state-only timeouts.
-It calculates no prices, spend, savings, or project-wide usage.
-
-An accepted documentation operation may add one `documentation-terminal` record. Its allowlist
-holds only runtime version, operation, terminal outcome, duration, dry-run state, query kind, and
-aggregate created, updated, unchanged, conflict, or match counts. It excludes route values,
-identifiers, paths, content, prompts, citations, research topics, model identity, and shared run
-fingerprints.
-
-A public context operation that delivers skills may add one `skill-selection` record. Its
-allowlist holds only a random utilization ID, content-addressed packet ID, safe skill IDs and
-digests, and selection classes reduced to route, task, path, or fact. A subsequent explicit
-`skills closeout` may add one `skill-utilization-terminal` record with fixed task outcome,
-per-skill utilization status, and decision, edit, validation, or restraint influence categories.
-It stores no free-form explanation and cannot observe work that bypasses either command.
-
-V1.1 records only bounded per-pack integer counters:
-`blocking_finding_count`, `advisory_finding_count`, `accepted_finding_count`,
-`waived_finding_count`, `suppressed_finding_count`, `process_failure_count`,
-`integrity_failure_count`, `evidence_manifest_count`, `valid_evidence_manifest_count`,
-`invalid_evidence_manifest_count`, `evidence_claim_count`, and
-`evidence_artifact_digest_count`. `process_failure_count` counts a child command with nonzero exit
-or a termination reason other than `completed`; `integrity_failure_count` counts malformed
-envelopes, unknown lifecycle state, or packet/materialization mismatch. Either category fails the
-run independently of pack enforcement. Evidence counters describe only the bounded optional
-manifest. Paths, detector messages, commands, prompts, evidence contents, and unbounded label maps
-remain forbidden.
+Telemetry is one ignored validation JSONL file bounded by both 1,000 records and one mebibyte. It
+records only run identity, runtime version, stage, mode, non-reversible scope and subject digests,
+changed-path and selected-pack counts, terminal status and reason, total duration, total pack
+duration, and the ten slowest pack IDs with durations. It never records paths, commands, output,
+findings, prompts, documentation activity, skill activity, agent activity, or source content.
+Writes are concurrency-safe and fail open; telemetry cannot weaken or approve a check. The single
+`telemetry status` view reports retained bytes, outcomes, durations, runner overhead, modes, broad
+runs, repeated scopes and subjects, unmatched starts, and slow packs. It does not declare a run
+hung or a repeat unnecessary.

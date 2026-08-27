@@ -33,7 +33,7 @@ project-governance plan --stage <stage> --mode impacted --json
 project-governance check --stage <stage> --mode impacted --summary
 project-governance check --pack <pack-id>
 project-governance update --to <version> --dry-run
-project-governance telemetry status --compact
+project-governance telemetry status
 ```
 
 During source development, install development dependencies once and run the checkout package:

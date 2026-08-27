@@ -132,7 +132,7 @@ pack-specific Python.
 
 ## Approval Transition
 
-This draft remains under `docs/proposed/` until the operator approves implementation. At that point,
+The original proposal was retired after implementation. Git history preserves it. At that point,
 move it to `docs/exec-plans/active/`, set `status: active`, and link it from
 `docs/exec-plans/README.md`. Do not treat the existence of this draft as implementation authority.
 
