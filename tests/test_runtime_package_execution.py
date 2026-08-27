@@ -27,7 +27,8 @@ from project_governance_runtime.changed_paths import (  # noqa: E402
 )
 from project_governance_runtime.execution_commands import command_argv  # noqa: E402
 from project_governance_runtime.planning import build_plan  # noqa: E402
-from project_governance_runtime.runner import execute  # noqa: E402
+from project_governance_runtime.runner import _telemetry_identity, execute  # noqa: E402
+from project_governance_runtime.telemetry import status as telemetry_status  # noqa: E402
 
 
 def all_change_scope() -> dict[str, object]:
@@ -797,6 +798,47 @@ class RuntimeExecutionTests(unittest.TestCase):
         self.assertEqual([item["pack_id"] for item in output["evidence"]], ["first"])
         self.assertEqual(terminal["packs"][0]["process_failure_count"], 1)
         self.assertEqual(terminal["packs"][0]["integrity_failure_count"], 0)
+
+
+class RuntimeTelemetryModeTests(unittest.TestCase):
+    """Keep named authoring runs out of broad and repeated-scope observations."""
+
+    def test_named_all_subject_run_is_recorded_as_explicit(self) -> None:
+        """Distinguish a named pack from an all-pack release without new receipt state."""
+        passed = json.dumps({"status": "passed", "finding_count": 0, "findings": []})
+        packs = {
+            "target": {
+                "enforcement": "blocking",
+                "commands": [[sys.executable, "-c", f"print({passed!r})"]],
+            }
+        }
+        named_plan = {
+            "stage": "pre-pr",
+            "mode": "all",
+            "changed_paths": [],
+            "change_scope": all_change_scope(),
+            "selected_packs": ["target"],
+            "selection_reasons": {"target": ["explicit"]},
+            "execution_order": ["target"],
+        }
+        release_plan = {
+            **named_plan,
+            "stage": "release",
+            "selection_reasons": {"target": ["mode:all"]},
+        }
+        mode, fingerprint = _telemetry_identity(named_plan, "sha256:named")
+        self.assertEqual((mode, fingerprint), ("explicit", None))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            execute(root, packs, named_plan, timeout_seconds=2)
+            execute(root, packs, named_plan, timeout_seconds=2)
+            execute(root, packs, release_plan, timeout_seconds=2)
+            summary = telemetry_status(root)["validation"]
+        self.assertEqual(summary["mode_counts"], {"all": 1, "explicit": 2})
+        self.assertEqual(summary["broad_run_count"], 1)
+        self.assertEqual(summary["fingerprinted_run_count"], 1)
+        self.assertEqual(summary["unfingerprinted_run_count"], 2)
+        self.assertEqual(summary["repeated_scope_run_count"], 0)
 
 
 if __name__ == "__main__":

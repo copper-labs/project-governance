@@ -104,7 +104,7 @@ def runtime_python(environment: Path) -> Path:
     return environment / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
 
 
-def runtime_lock(wheel: Path) -> dict[str, object]:
+def runtime_lock(wheel: Path, release_base: Path) -> dict[str, object]:
     """Describe the exact local artifact so doctor can validate the child integration surface."""
     return {
         "schema_version": 1,
@@ -114,9 +114,8 @@ def runtime_lock(wheel: Path) -> dict[str, object]:
         "sha256": hashlib.sha256(wheel.read_bytes()).hexdigest(),
         "source_commit": "0" * 40,
         "python": ">=3.9,<4",
-        "configuration_schema": 1,
-        "release_base_url": wheel.parent.as_uri(),
-        "wheel_url": f"file://{wheel.as_posix()}",
+        "configuration_schema": 2,
+        "release_base_url": release_base.as_uri(),
     }
 
 
@@ -233,8 +232,15 @@ def initialize_target(root: Path, wheel: Path) -> tuple[Path, Path]:
     ):
         if not (root / relative).is_file():
             raise RuntimeError(f"installed wheel did not materialize {relative}")
+    release_base = root.parent / "release-assets"
+    release_version = release_base / "source-ci"
+    release_version.mkdir(parents=True)
+    (release_version / wheel.name).write_bytes(wheel.read_bytes())
     lock_path = root / "config/governance/runtime.lock.yaml"
-    lock_path.write_text(json.dumps(runtime_lock(wheel), indent=2) + "\n", encoding="utf-8")
+    lock_path.write_text(
+        json.dumps(runtime_lock(wheel, release_base), indent=2) + "\n",
+        encoding="utf-8",
+    )
     run(
         [sys.executable, str(root / "tools/governance-bootstrap.py")],
         root=root,

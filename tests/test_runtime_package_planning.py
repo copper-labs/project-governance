@@ -488,21 +488,29 @@ class NamedPackScopeTests(unittest.TestCase):
             source.write_text("value = 2\n", encoding="utf-8")
 
             cases = (
-                ("changed", "pre-push", [], "HEAD", "changed"),
-                ("explicit", "pre-push", ["src/example.py"], "HEAD", "explicit"),
-                ("all", "release", [], None, "all"),
-                ("bare-named", None, [], "HEAD", "changed"),
+                (
+                    "changed",
+                    ["plan", "--pack", "secrets", "--stage", "pre-push", "--base-ref", "HEAD"],
+                    "changed",
+                ),
+                (
+                    "explicit",
+                    [
+                        "plan", "--pack", "secrets", "--stage", "pre-push",
+                        "--changed-path", "src/example.py", "--base-ref", "HEAD",
+                    ],
+                    "explicit",
+                ),
+                (
+                    "all",
+                    ["plan", "--pack", "secrets", "--stage", "release", "--mode", "all"],
+                    "all",
+                ),
+                ("bare-named", ["plan", "--pack", "secrets", "--base-ref", "HEAD"], "changed"),
             )
-            for case, stage, changed_path, base_ref, packet_mode in cases:
+            for case, command, packet_mode in cases:
                 with self.subTest(case=case):
-                    arguments = argparse.Namespace(
-                        pack=["secrets"],
-                        mode="all" if case == "all" else "impacted",
-                        stage=stage,
-                        staged=False,
-                        changed_path=changed_path,
-                        base_ref=base_ref,
-                    )
+                    arguments = _parser().parse_args(command)
                     plan, _ = _resolve_plan(arguments, root)
                     self.assertEqual(plan["status"], "ready", plan["blockers"])
                     self.assertEqual(plan["selected_packs"], ["secrets"])
@@ -514,13 +522,11 @@ class NamedPackScopeTests(unittest.TestCase):
                         )
 
             git("add", "src/example.py")
-            staged_arguments = argparse.Namespace(
-                pack=["secrets"],
-                mode="impacted",
-                stage="pre-commit",
-                staged=True,
-                changed_path=[],
-                base_ref=None,
+            staged_arguments = _parser().parse_args(
+                [
+                    "plan", "--pack", "secrets", "--stage", "pre-commit",
+                    "--mode", "impacted", "--staged",
+                ]
             )
             staged_plan, _ = _resolve_plan(staged_arguments, root)
             self.assertEqual(staged_plan["status"], "ready", staged_plan["blockers"])

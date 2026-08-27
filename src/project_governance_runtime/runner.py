@@ -30,16 +30,17 @@ def execute(
     fingerprint = scope_fingerprint(
         plan.get("stage"), plan["mode"], plan["changed_paths"], plan["selected_packs"]
     )
+    telemetry_mode, retained_fingerprint = _telemetry_identity(plan, fingerprint)
     append(root, {
         "event": "run-started",
         "run_id": run_id,
         "runtime_version": _runtime_version(),
         "stage": plan.get("stage"),
-        "mode": plan["mode"],
+        "mode": telemetry_mode,
         "changed_path_count": changed_path_count,
         "selected_pack_count": selected_pack_count,
         "selected_packs": plan["selected_packs"],
-        "scope_fingerprint": fingerprint,
+        "scope_fingerprint": retained_fingerprint,
     })
     try:
         with execution_environment(root, plan, run_id=run_id) as environment:
@@ -56,7 +57,8 @@ def execute(
             root,
             plan,
             run_id=run_id,
-            fingerprint=fingerprint,
+            fingerprint=retained_fingerprint,
+            telemetry_mode=telemetry_mode,
             changed_path_count=changed_path_count,
             selected_pack_count=selected_pack_count,
             status="failed",
@@ -79,7 +81,8 @@ def execute(
         root,
         plan,
         run_id=run_id,
-        fingerprint=fingerprint,
+        fingerprint=retained_fingerprint,
+        telemetry_mode=telemetry_mode,
         changed_path_count=changed_path_count,
         selected_pack_count=selected_pack_count,
         status=overall,
@@ -95,7 +98,8 @@ def _record_terminal(
     plan: dict[str, Any],
     *,
     run_id: str,
-    fingerprint: str,
+    fingerprint: str | None,
+    telemetry_mode: str,
     changed_path_count: int,
     selected_pack_count: int,
     status: str,
@@ -109,7 +113,7 @@ def _record_terminal(
         "run_id": run_id,
         "runtime_version": _runtime_version(),
         "stage": plan.get("stage"),
-        "mode": plan["mode"],
+        "mode": telemetry_mode,
         "status": status,
         "termination_reason": termination,
         "duration_ms": duration_ms,
@@ -145,6 +149,19 @@ def _record_terminal(
             for item in evidence
         ],
     })
+
+
+def _telemetry_identity(
+    plan: dict[str, Any], fingerprint: str
+) -> tuple[str, str | None]:
+    """Keep named repair and authoring checks out of broad repetition signals."""
+    reasons = plan.get("selection_reasons", {})
+    named = plan.get("mode") == "explicit" or any(
+        "explicit" in pack_reasons
+        for pack_reasons in reasons.values()
+        if isinstance(pack_reasons, list)
+    )
+    return ("explicit", None) if named else (str(plan["mode"]), fingerprint)
 
 
 def _runtime_version() -> str:
