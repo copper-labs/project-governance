@@ -104,12 +104,12 @@ def runtime_python(environment: Path) -> Path:
     return environment / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
 
 
-def runtime_lock(wheel: Path, release_base: Path) -> dict[str, object]:
+def runtime_lock(wheel: Path, release_base: Path, version: str) -> dict[str, object]:
     """Describe the exact local artifact so doctor can validate the child integration surface."""
     return {
         "schema_version": 1,
         "package": "project-governance-runtime",
-        "version": "source-ci",
+        "version": version,
         "wheel": wheel.name,
         "sha256": hashlib.sha256(wheel.read_bytes()).hexdigest(),
         "source_commit": "0" * 40,
@@ -199,6 +199,21 @@ def initialize_target(root: Path, wheel: Path) -> tuple[Path, Path]:
     run([str(python), "-m", "pip", "install", str(wheel)], root=root, expected=0)
     executable = "Scripts/project-governance.exe" if sys.platform == "win32" else "bin/project-governance"
     command = environment / executable
+    installed_version = run(
+        [
+            str(python),
+            "-c",
+            "from importlib.metadata import version; "
+            "print(version('project-governance-runtime'))",
+        ],
+        root=root,
+        expected=0,
+    ).stdout.strip()
+    reported_version = run(
+        [str(command), "--version"], root=root, expected=0
+    ).stdout.strip()
+    if reported_version != f"project-governance {installed_version}":
+        raise RuntimeError("installed CLI did not report its package version")
     run([str(command), "init"], root=root, expected=0)
     run(
         [
@@ -233,12 +248,12 @@ def initialize_target(root: Path, wheel: Path) -> tuple[Path, Path]:
         if not (root / relative).is_file():
             raise RuntimeError(f"installed wheel did not materialize {relative}")
     release_base = root.parent / "release-assets"
-    release_version = release_base / "source-ci"
+    release_version = release_base / installed_version
     release_version.mkdir(parents=True)
     (release_version / wheel.name).write_bytes(wheel.read_bytes())
     lock_path = root / "config/governance/runtime.lock.yaml"
     lock_path.write_text(
-        json.dumps(runtime_lock(wheel, release_base), indent=2) + "\n",
+        json.dumps(runtime_lock(wheel, release_base, installed_version), indent=2) + "\n",
         encoding="utf-8",
     )
     run(
