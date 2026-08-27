@@ -2,7 +2,7 @@
 id: exec-plan.lean-governance-operating-model
 title: Lean Governance Operating Model
 type: exec-plan
-status: active
+status: completed
 owner: project-governance
 created: 2026-08-27
 updated: 2026-08-27
@@ -408,3 +408,24 @@ candidate and reruns the final broad proof once.
 
 The plan is complete when every slice acceptance boundary passes and the final diff contains no
 machinery listed under Explicit Non-Goals.
+
+## Closeout
+
+- Implementation checkpoints: `5b771fb` through `fbf8290` on
+  `codex/governance-recovery-efficiency`.
+- Complete source proof: 285 runtime tests passed with one intentional skip after the final runtime
+  repair; the final documentation and deterministic concurrency-test closeout passed its 32 focused
+  tests and affected documentation check.
+- Installed proof: wheel
+  `project_governance_runtime-1.4.1.dev14+gfbf8290ae28d-py3-none-any.whl` passed the clean-adopter
+  verifier with SHA-256 `31dd52e569fd20d4ede8964222ac4eaa8b5a51995e9f03470a4b41bce1e6bb3d`.
+- Branch sign-off: impacted pre-push passed nine selected packs against
+  `canonical/main@d29f0e38e89043d241d35750db29b53f681ab863`.
+- Independent review: Claude Opus 5 high effort, fallback disabled, write mode `none`, reported no
+  actionable finding after focused reconciliation; wrapper audits recorded no repository changes.
+- Runtime outcome: routine work has one staged inner loop, one affected pre-push sign-off, a narrow
+  pull-request narrative check, independent CI, and a broad release boundary. Delegation creates no
+  worktree without direct operator authority, and the wheel contains no provider scheduler, retry
+  loop, worker lease, or skill-closeout ledger.
+- Publication boundary: the breaking simplification requires `2.0.0`; publication follows the
+  repository release process after explicit operator authorization.

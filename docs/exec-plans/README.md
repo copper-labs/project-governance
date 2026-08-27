@@ -16,12 +16,13 @@ Git remains the implementation history and recovery mechanism.
 
 ## Active
 
-- [Lean Governance Operating Model](active/2026-08-27-lean-governance-operating-model.md) aligns
-  runtime selection and shipped hooks with one affected local sign-off and one narrow pull-request
-  narrative check.
+No implementation plan is currently active.
 
 ## Completed
 
+- [Lean Governance Operating Model](completed/2026-08-27-lean-governance-operating-model.md)
+  removed the runtime control plane, bounded workspace and telemetry overhead, and aligned hooks
+  with one affected local sign-off plus one narrow pull-request narrative check.
 - [Commit and pull request change narratives](completed/2026-08-24-change-narrative-enforcement.md)
   installed and enforced compact product-level narratives and useful titles across commits and
   ready pull requests, followed by audited Claude Opus 5 reconciliation.
