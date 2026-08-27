@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from project_governance_runtime.cli import _doctor  # noqa: E402
+from project_governance_runtime import __version__  # noqa: E402
 from project_governance_runtime.installation import (  # noqa: E402
     InstallationError,
     initialize,
@@ -121,7 +122,7 @@ class RuntimeInstallationTests(unittest.TestCase):
             root = Path(directory)
             initialize(root)
             lock = valid_lock()
-            lock["version"] = "source-tree"
+            lock["version"] = __version__
             lock_path = root / "config/governance/runtime.lock.yaml"
             lock_path.write_text(json.dumps(lock), encoding="utf-8")
             hook = root / ".githooks/pre-pr"
