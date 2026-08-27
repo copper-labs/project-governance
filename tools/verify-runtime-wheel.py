@@ -256,6 +256,9 @@ def verify_change_narratives(root: Path, command: Path) -> None:
     commit_path = git_metadata_path(root, "COMMIT_EDITMSG")
     pr_path = git_metadata_path(root, "PR_DESCRIPTION.md")
     pr_title_path = git_metadata_path(root, "PR_TITLE")
+    pre_pr_hook = (root / ".githooks/pre-pr").read_text(encoding="utf-8")
+    if "--pack pr-description --stage pre-pr --mode impacted" not in pre_pr_hook:
+        raise RuntimeError("installed pre-PR hook is not narrative-only")
 
     commit_path.write_text("short\n", encoding="utf-8")
     run(
@@ -294,6 +297,8 @@ def verify_change_narratives(root: Path, command: Path) -> None:
         [
             str(command),
             "check",
+            "--pack",
+            "pr-description",
             "--stage",
             "pre-pr",
             "--mode",
@@ -311,6 +316,8 @@ def verify_change_narratives(root: Path, command: Path) -> None:
         [
             str(command),
             "check",
+            "--pack",
+            "pr-description",
             "--stage",
             "pre-pr",
             "--mode",

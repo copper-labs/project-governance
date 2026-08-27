@@ -599,7 +599,10 @@ class RuntimeChangeNarrativeIntegrationTests(ChangeNarrativeTestCase):
                 self.assertIn("--pr-body-file <path> --pr-title <title>", text)
                 self.assertIn("4:--pr-body-file:--pr-title", text)
                 self.assertIn("4:--pr-title:--pr-body-file", text)
-                self.assertIn('impacted "$@"', text)
+                self.assertIn(
+                    '--pack pr-description --stage pre-pr --mode impacted "$@"',
+                    text,
+                )
         rejected = subprocess.run(
             [str(hooks[0]), "--stage", "release"],
             cwd=ROOT,

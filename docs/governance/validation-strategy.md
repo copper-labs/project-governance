@@ -21,10 +21,10 @@ because they exist.
 3. Run one directly affected integration seam only when the change crosses that seam.
 4. Commit the coherent result.
 
-For a failed governance check, rerun only the failed pack:
+For a failed governance check, rerun only the failed pack at the same lifecycle stage and subject:
 
 ```sh
-project-governance check --pack <pack-id>
+project-governance check --pack <pack-id> --stage <failed-stage> --mode impacted
 ```
 
 After it passes, freeze the candidate and run one branch-aware local sign-off:
@@ -33,9 +33,16 @@ After it passes, freeze the candidate and run one branch-aware local sign-off:
 project-governance check --stage pre-push --mode impacted
 ```
 
-Pre-commit remains the staged changed-file hook; it is not a second completion boundary. Do not run
-a separate local pre-PR gate after the branch-aware pre-push sign-off. CI may run its own affected
-gate as an independent environment and trust boundary.
+Pre-commit remains the staged changed-file hook; it is not a second completion boundary. The shipped
+pre-PR hook names only the `pr-description` pack so authors can check the title and body without
+replaying code validation. Do not run a separate full local pre-PR gate after the branch-aware
+pre-push sign-off. CI may run its own affected gate as an independent environment and trust
+boundary.
+
+A routine local sign-off should complete within ten minutes. Treat a slower recurring pack as an
+ownership signal: move its product build, platform, device, or external-service execution into CI
+or a scheduled lane while preserving the required proof. This is an operating target interpreted
+through existing telemetry, not a runtime timeout or permission to skip validation.
 
 Freeze one candidate before a broad or cross-platform proof. An independent QA pass consumes that
 candidate and its existing proof; it does not replay the matrix. It adds one focused check only for
@@ -89,10 +96,11 @@ when its header or signature changes. Dependency freshness evaluates only coordi
 updated between the packet's before- and after-images. Existing comment debt and unchanged
 dependency tuples do not become implementation scope.
 
-Pre-commit secret proof deliberately includes bytes present only in the staged index. Pre-push,
-pre-PR, CI-PR, and release retain their declared live publishable worktree-and-index secret
-surfaces and report no pack digest. This difference is an explicit stage contract, not an
-inconsistency to normalize away.
+Pre-commit secret proof deliberately includes bytes present only in the staged index. When the
+secrets pack is selected, pre-push, deliberate full pre-PR, CI-PR, and release retain their declared
+live publishable worktree-and-index secret surfaces and report no pack digest. The shipped narrow
+pre-PR hook does not select the secrets pack. This difference is an explicit stage and selection
+contract, not an inconsistency to normalize away.
 
 ## V1.1 Proof Rules
 

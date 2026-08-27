@@ -23,10 +23,12 @@ its own policy choices and project checks. Markdown is the sole current policy a
 ## Normal Flow
 
 1. Bootstrap the wheel named by `config/governance/runtime.lock.yaml`.
-2. Run `project-governance check --stage <stage> --mode impacted` for normal work.
-3. If one pack fails, run that pack alone, repair it, then run one impacted closeout.
-4. Commit the coherent change.
-5. Adopt a newer runtime only through `project-governance update`, after reviewing its dry run.
+2. Change one owner, run its focused proof, and commit the coherent result through pre-commit.
+3. If one governance pack fails, rerun only that pack at the same stage and subject.
+4. Freeze the candidate and run one branch-aware impacted pre-push sign-off.
+5. Check only the pull-request title and body through the shipped pre-PR hook; CI owns its separate
+   affected trust boundary.
+6. Adopt a newer runtime only through `project-governance update`, after reviewing its dry run.
 
 For substantial agent work, the coordinator first runs the public context command. A matched
 target route selects and materializes the smallest exact skill set, while a bounded local selection

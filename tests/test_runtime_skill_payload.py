@@ -176,6 +176,18 @@ class RuntimeSkillPayloadTests(unittest.TestCase):
         self.assertIn("git rev-parse --git-path PR_TITLE", user_guide)
         self.assertIn("git rev-parse --git-path PR_DESCRIPTION.md", user_guide)
         self.assertIn("fails closed", user_guide)
+        self.assertIn("checks only the pull request title and body", user_guide)
+        self.assertIn("--pack pr-description --stage pre-pr", user_guide)
+        impact_planning = (
+            SKILLS_SOURCE / "impact-planning" / "SKILL.md"
+        ).read_text(encoding="utf-8").lower()
+        self.assertIn("plan --stage pre-push --mode impacted", impact_planning)
+        self.assertNotIn("plan --stage pre-pr --mode impacted", impact_planning)
+        hook_operation = (
+            SKILLS_SOURCE / "hook-check-operation" / "SKILL.md"
+        ).read_text(encoding="utf-8").lower()
+        self.assertIn("pre-pr hook names only `pr-description`", hook_operation)
+        self.assertNotIn("pre-pr aggregation", hook_operation)
         for workflow in (
             "commit-message-workflow",
             "pr-description-workflow",

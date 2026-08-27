@@ -72,6 +72,10 @@ Stages remain command boundaries, not selectable profiles:
 the current checkout across its declared full scope. It is not a lifecycle profile or a repair
 shortcut.
 
+The installed pre-PR hook composes `--pack pr-description` with `--stage pre-pr --mode impacted`.
+This keeps local pull-request authoring fail-closed without replaying the branch-aware pre-push
+sign-off. The generic stage remains available for a deliberate adopter-owned boundary.
+
 The later-stage built-in secret scan is also a deliberate live exhaustive surface. Its pack result
 has no `subject_digest`; it is never attributed to the branch-aware changed digest shared by the
 other selected packs.

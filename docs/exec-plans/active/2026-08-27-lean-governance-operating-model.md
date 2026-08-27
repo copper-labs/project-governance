@@ -131,7 +131,7 @@ python3 -m unittest tests.test_runtime_package_planning tests.test_runtime_packa
 project-governance check --pack <id>
 project-governance check --pack <id> --stage pre-push --mode impacted
 project-governance check --pack <id> --stage pre-commit --mode impacted --staged
-project-governance check --pack <id> --changed-path <path>
+project-governance check --pack <id> --changed-path <path> --base-ref <base>
 project-governance plan --pack <id> --stage <stage> --mode impacted --json
 ```
 

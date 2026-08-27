@@ -11,8 +11,8 @@ Install, check, or debug thin hooks and local validation stages.
 
 ## Trigger
 
-Use this skill when hook installation, pre-commit behavior, pre-push checks, pre-PR aggregation, or
-validation pack binding is changed or failing.
+Use this skill when hook installation, pre-commit behavior, pre-push checks, the pre-PR narrative
+check, or validation pack binding is changed or failing.
 
 ## Required Reads
 
@@ -26,9 +26,11 @@ validation pack binding is changed or failing.
 
 1. Inspect configured hook path, install command, and stage definitions.
 2. Verify each stage references known validation packs.
-3. Confirm critical stages remain blocking according to policy.
-4. Run the smallest failing hook stage directly when debugging.
-5. Preserve bypass policy and report any manual bypass as residual risk.
+3. Confirm the shipped pre-PR hook names only `pr-description`; a deliberate full pre-PR stage is a
+   separate adopter-owned boundary.
+4. Confirm critical stages remain blocking according to policy.
+5. Run the smallest failing hook or named pack directly when debugging.
+6. Preserve bypass policy and report any manual bypass as residual risk.
 
 ## Validation
 

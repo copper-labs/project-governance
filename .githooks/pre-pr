@@ -9,4 +9,4 @@ case "$#:${1-}:${3-}" in
     exit 2
     ;;
 esac
-exec tools/run-source-governance.sh check --stage pre-pr --mode impacted "$@"
+exec tools/run-source-governance.sh check --pack pr-description --stage pre-pr --mode impacted "$@"
