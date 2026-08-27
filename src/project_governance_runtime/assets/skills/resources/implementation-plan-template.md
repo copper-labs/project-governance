@@ -15,13 +15,9 @@ summary: <One-sentence final state.>
 
 <Observable outcome and explicit non-goals.>
 
-## Execution Rules
+## Delivery
 
-- The operator explicitly starts each delegated launch wave.
-- Across active waves, one repository contains at most one writer and two read-only specialists.
-- Ordinary specialist failure returns work to the primary without automatic re-dispatch.
-- Native-host launches use the governed route, start, and finish lifecycle.
-- One QA repair permits one affected recheck, not another general review or broad proof.
+- Delivery: local-only | PR <url> | merged <sha>
 
 ## Slice <N>: <Outcome>
 
@@ -29,14 +25,12 @@ summary: <One-sentence final state.>
 - Ownership: <one component or non-overlapping path set>
 - Execution: sequential | parallel with <slice IDs>
 - Semantic contract: settled | unresolved
-- Required capability: economy | balanced | primary
 - Fixed decisions: <facts workers must not revisit>
 - Acceptance: <observable completion claims>
 - Focused proof: <cheapest sufficient commands or inspection>
 - Invalidates prior proof when: <named subject or claim changes>
 - Proof state: not-run | passed on <snapshot> | invalidated by <reason>
 - Escalate or stop when: <bounded conditions>
-- Packet ready: yes | no
 
 ## Stable-Candidate Proof
 
