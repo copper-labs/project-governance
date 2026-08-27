@@ -3,20 +3,6 @@ kind: peer-dispatch-resources
 id: peer-dispatch
 agent_neutral: true
 finding_schema: .governance/runtime/skills/review-finding.schema.yaml
-default_review_model:
-  provider: operator-configured
-  role: peer-review
-  effort: high
-repeated_failure_consultation:
-  mode: read-only-second-opinion
-  steps:
-    - model: claude-opus-5
-      effort: high
-      when: first-attempt
-    - model: claude-fable-5
-      effort: xhigh
-      when: prior-failed-unavailable-or-inconclusive
-  automatic_max: prohibited
 resources:
   - id: architecture-review
     skill: .governance/runtime/skills/architecture-review/SKILL.md

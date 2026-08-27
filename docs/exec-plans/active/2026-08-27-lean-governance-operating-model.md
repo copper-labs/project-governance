@@ -332,6 +332,8 @@ python3 -m unittest tests.test_runtime_package_planning
 
 - Remove provider routing, dispatch state, worker leases, role contracts, and per-skill closeout
   receipts from the wheel. Delegation uses the host agent's native controls in the current checkout.
+- Remove provider- and model-specific peer-review ladders. Use the operator's selected model or the
+  current primary for one review pass; repeated failure returns to the owning check or operator.
 - Bound ignored context materializations to the current packet plus seven recent packets.
 - Retire old target-migration and predecessor-cleanup engines. A schema-changing update stops at
   dry-run until the operator deliberately applies the reviewed lock.
@@ -343,7 +345,8 @@ python3 -m unittest tests.test_runtime_package_planning
 
 - The runtime has no persistent agent state, retry path, provider catalog, worker lease, or skill
   utilization ledger.
-- Context and telemetry have explicit disk ceilings; telemetry appends never rescan more than one
+- Context packets are capped at 256 KiB including skills and retain at most eight completed packets;
+  interrupted runtime staging is cleaned safely. Telemetry appends never rescan more than one
   mebibyte.
 - Update never edits or deletes project-owned configuration or historical target artifacts.
 - Source `doctor` passes without pretending the source repository is an installed adopter.

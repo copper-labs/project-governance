@@ -27,9 +27,7 @@ authoring, or migration changes.
 
 1. Select the smallest sufficient lens set and one review pass. Use an explicitly assigned model
    when the operator names one; otherwise reuse the current primary in a dedicated clean pass.
-   For a repeated-failure second opinion, inspect the owning check first and follow
-   `repeated_failure_consultation` in the peer-dispatch resource. Stop after the first conclusive
-   response; do not skip a ladder step or escalate to max automatically.
+   A repeated failure returns to the owning check or operator; there is no automatic model ladder.
 2. Provide the review pass with scope, governing artifacts, integrated snapshot identity, validation
    results, and exact questions.
 3. Require findings to use the shared severity, location, risk, and recommendation fields.

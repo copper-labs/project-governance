@@ -19,7 +19,10 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from project_governance_runtime.cli import main  # noqa: E402
 from project_governance_runtime.context import (  # noqa: E402
+    ContextError,
+    MAX_CONTEXT_PACKET_BYTES,
     MAX_CONTEXT_PACKETS,
+    MAX_CONTEXT_TOKENS,
     resolve_context,
 )
 from project_governance_runtime.installation import materialize_skills  # noqa: E402
@@ -181,6 +184,67 @@ class RuntimeContextTests(unittest.TestCase):
             self.assertEqual(len(packets), MAX_CONTEXT_PACKETS)
             self.assertIsNotNone(latest)
             self.assertTrue((root / latest["materialization"]["root"]).is_dir())
+
+    def test_context_rejects_a_configured_packet_above_the_runtime_ceiling(self) -> None:
+        """Fail explicitly instead of materializing arbitrarily large target budgets."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            guide = root / "docs/governance/guide.md"
+            guide.parent.mkdir(parents=True)
+            guide.write_text("Governance guide\n", encoding="utf-8")
+            profile = routing_profile(context=[])
+            profile["context_router"]["routes"][0]["token_budget"][
+                "total_context_tokens"
+            ] = MAX_CONTEXT_TOKENS + 1
+            write_repository(root, profile)
+
+            with self.assertRaisesRegex(ContextError, "packet ceiling"):
+                resolve_context(root, "Review governance", [])
+
+    def test_context_packet_limits_include_skill_bytes(self) -> None:
+        """Keep the published combined ceiling within one runtime-owned disk bound."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            guide = root / "docs/governance/guide.md"
+            guide.parent.mkdir(parents=True)
+            guide.write_text("Governance guide\n", encoding="utf-8")
+            skill = root / ".governance/runtime/skills/work/SKILL.md"
+            skill.parent.mkdir(parents=True)
+            skill.write_text("Work skill\n", encoding="utf-8")
+            write_repository(root, routing_profile(context=[]))
+
+            result = resolve_context(root, "Review governance", [])
+
+            self.assertLessEqual(
+                result["materialization"]["byte_limits"]["combined"],
+                MAX_CONTEXT_PACKET_BYTES,
+            )
+
+    def test_context_removes_abandoned_staging_without_following_symlinks(self) -> None:
+        """Clean runtime-owned crash debris while preserving anything outside the cache root."""
+        with tempfile.TemporaryDirectory() as directory, tempfile.TemporaryDirectory() as outside:
+            root = Path(directory)
+            guide = root / "docs/governance/guide.md"
+            guide.parent.mkdir(parents=True)
+            guide.write_text("Governance guide\n", encoding="utf-8")
+            skill = root / ".governance/runtime/skills/work/SKILL.md"
+            skill.parent.mkdir(parents=True)
+            skill.write_text("Work skill\n", encoding="utf-8")
+            write_repository(root, routing_profile(context=[]))
+            runtime_root = root / ".governance/runtime/context"
+            abandoned = runtime_root / ".context-abandoned"
+            abandoned.mkdir(parents=True)
+            (abandoned / "partial.md").write_text("partial\n", encoding="utf-8")
+            outside_file = Path(outside) / "preserve.md"
+            outside_file.write_text("preserve\n", encoding="utf-8")
+            linked = runtime_root / ".context-linked"
+            linked.symlink_to(Path(outside), target_is_directory=True)
+
+            resolve_context(root, "Review governance", [])
+
+            self.assertFalse(abandoned.exists())
+            self.assertTrue(linked.is_symlink())
+            self.assertEqual(outside_file.read_text(encoding="utf-8"), "preserve\n")
 
 
 if __name__ == "__main__":

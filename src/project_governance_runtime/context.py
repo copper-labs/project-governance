@@ -24,6 +24,7 @@ from .skill_catalog import (
     canonical_skill_bytes,
 )
 from .skill_selection import select_attached_skills
+from .state_io import path_lock
 
 
 TOKEN_BYTES = 4
@@ -36,6 +37,9 @@ DEFAULT_BUDGET = {
 SAFE_SKILL_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 MAX_SKILL_BYTES = 16_000
 MAX_CONTEXT_PACKETS = 8
+MAX_CONTEXT_PACKET_BYTES = 256 * 1024
+MAX_CONTEXT_BYTES = MAX_CONTEXT_PACKET_BYTES - MAX_SKILL_BYTES
+MAX_CONTEXT_TOKENS = MAX_CONTEXT_BYTES // TOKEN_BYTES
 
 
 class ContextError(ValueError):
@@ -151,6 +155,11 @@ def _budget(route: dict[str, Any] | None) -> dict[str, int]:
         if not isinstance(value, int) or isinstance(value, bool) or value < 0:
             raise ContextError(f"context_router token_budget.{key}: expected a nonnegative integer")
         result[key] = value
+    if result["total_context_tokens"] > MAX_CONTEXT_TOKENS:
+        raise ContextError(
+            "context_router token_budget.total_context_tokens exceeds the runtime-owned "
+            f"packet ceiling of {MAX_CONTEXT_TOKENS} tokens"
+        )
     return result
 
 
@@ -446,6 +455,27 @@ def _materialize(
     skill_items: list[dict[str, Any]],
 ) -> tuple[str, list[dict[str, Any]], list[dict[str, Any]]]:
     """Atomically publish selected bytes below ignored runtime state without overwriting content."""
+    runtime_root = root / ".governance/runtime/context"
+    runtime_root.mkdir(parents=True, exist_ok=True)
+    try:
+        runtime_root.resolve().relative_to(root.resolve())
+    except ValueError as error:
+        raise ContextError(".governance/runtime/context resolves outside the repository") from error
+    try:
+        with path_lock(runtime_root / ".materialization-state"):
+            _prune_abandoned_temporaries(runtime_root)
+            return _materialize_locked(root, runtime_root, items, skill_items)
+    except TimeoutError as error:
+        raise ContextError("another context materialization is active") from error
+
+
+def _materialize_locked(
+    root: Path,
+    runtime_root: Path,
+    items: list[dict[str, Any]],
+    skill_items: list[dict[str, Any]],
+) -> tuple[str, list[dict[str, Any]], list[dict[str, Any]]]:
+    """Publish one packet while the runtime-owned context directory is locked."""
     identity = [
         {"id": item["id"], "group": item["group"], "path": item["source_path"], "sha256": item["sha256"]}
         for item in items
@@ -455,12 +485,6 @@ def _materialize(
         for item in skill_items
     )
     packet_id = hashlib.sha256(json.dumps(identity, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()[:16]
-    runtime_root = root / ".governance/runtime/context"
-    runtime_root.mkdir(parents=True, exist_ok=True)
-    try:
-        runtime_root.resolve().relative_to(root.resolve())
-    except ValueError as error:
-        raise ContextError(".governance/runtime/context resolves outside the repository") from error
     destination = runtime_root / f"context-{packet_id}"
     materialized: list[dict[str, Any]] = []
     for index, item in enumerate(items, start=1):
@@ -486,16 +510,24 @@ def _materialize(
             output = temporary / str(item["materialized_path"])
             output.parent.mkdir(parents=True, exist_ok=True)
             output.write_bytes(item["content"])
-        try:
-            temporary.rename(destination)
-        except FileExistsError:
-            shutil.rmtree(temporary)
-            return _materialize(root, items, skill_items)
+        temporary.rename(destination)
     except BaseException:
         shutil.rmtree(temporary, ignore_errors=True)
         raise
     _prune_materializations(runtime_root, destination)
     return destination.relative_to(root).as_posix(), materialized, materialized_skills
+
+
+def _prune_abandoned_temporaries(runtime_root: Path) -> None:
+    """Remove only staging directories left by interrupted runtime materializations."""
+    for path in runtime_root.glob(".context-*"):
+        if path.is_symlink() or not path.is_dir():
+            continue
+        try:
+            path.resolve().relative_to(runtime_root.resolve())
+        except (OSError, ValueError):
+            continue
+        shutil.rmtree(path, ignore_errors=True)
 
 
 def _prune_materializations(runtime_root: Path, current: Path) -> None:

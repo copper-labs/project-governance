@@ -37,6 +37,8 @@ FORBIDDEN_TEXT = (
     "execution-roles.yaml",
     "governed-implementation",
     "implementation-quality-review",
+    "claude-opus-5",
+    "claude-fable-5",
 )
 
 

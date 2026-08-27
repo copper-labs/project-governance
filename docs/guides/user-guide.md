@@ -74,7 +74,8 @@ project-governance plan --stage pre-push --mode impacted --json
 For agent work, the coordinator should run `project-governance context --task <description>
 --json-output .governance/runtime/context-result.json` before editing. Relevant governed skills are
 selected and materialized automatically from the repository route and facts. No utilization
-closeout is required.
+closeout is required. A materialized packet, including skills, cannot exceed 256 KiB; at most eight
+completed packets are retained, and interrupted runtime staging is cleaned on the next context run.
 
 If a pack fails, use its named execution only when focused diagnosis needs it. After the final
 repair, run one affected recheck: either the enclosing hook or the impacted pre-push sign-off. Do

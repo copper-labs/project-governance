@@ -45,8 +45,10 @@ target-owned configuration is ready; schema changes remain blocked in dry-run ou
 operator deliberately applies the reviewed lock. The runtime does not carry historical
 configuration migrations or predecessor-cleanup rules.
 
-`context` selects and materializes exact route-owned context and skill bytes. It retains at most
-eight ignored packets. Delegation remains a host-agent concern: the wheel owns no launch state,
+`context` selects and materializes exact route-owned context and skill bytes. Each packet is capped
+at 256 KiB including skills, and the runtime retains at most eight ignored packets. Interrupted
+runtime staging directories are removed under the same local materialization lock. Delegation
+remains a host-agent concern: the wheel owns no launch state,
 provider catalog, writer lease, role receipt, retry loop, or per-skill closeout workflow.
 
 Stages remain command boundaries, not selectable profiles:

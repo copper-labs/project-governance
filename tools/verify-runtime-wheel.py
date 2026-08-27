@@ -469,6 +469,69 @@ def verify_documentation_conflict(root: Path, command: Path) -> None:
         raise RuntimeError("installed documentation conflict reported or wrote profile changes")
 
 
+def verify_context_cache_boundary(root: Path, command: Path) -> None:
+    """Prove the installed context command bounds packets and removes interrupted staging."""
+    guide = root / "docs/governance/context-guide.md"
+    guide.parent.mkdir(parents=True, exist_ok=True)
+    guide.write_text("Installed context guide\n", encoding="utf-8")
+    profile_path = root / "config/governance/profile.yaml"
+    profile = {
+        "schema_version": 1,
+        "project_extensions": [],
+        "context_router": {
+            "default_context": [],
+            "default_skills": ["work"],
+            "routes": [
+                {
+                    "id": "governance",
+                    "match": {"prompt_terms": ["governance"]},
+                    "primary_context": ["docs/governance/context-guide.md"],
+                    "token_budget": {
+                        "primary_context_tokens": 100,
+                        "active_plan_context_tokens": 100,
+                        "expansion_context_tokens": 100,
+                        "total_context_tokens": 1000,
+                    },
+                }
+            ],
+        },
+    }
+    profile_path.write_text(json.dumps(profile, indent=2) + "\n", encoding="utf-8")
+    resolved = json.loads(
+        run(
+            [str(command), "context", "--task", "governance", "--json"],
+            root=root,
+            expected=0,
+        ).stdout
+    )
+    if resolved["materialization"]["byte_limits"]["combined"] > 256 * 1024:
+        raise RuntimeError("installed context packet exceeded its runtime-owned byte ceiling")
+    runtime_root = root / ".governance/runtime/context"
+    abandoned = runtime_root / ".context-interrupted"
+    abandoned.mkdir()
+    (abandoned / "partial").write_text("partial\n", encoding="utf-8")
+    run(
+        [str(command), "context", "--task", "governance", "--json"],
+        root=root,
+        expected=0,
+    )
+    if abandoned.exists():
+        raise RuntimeError("installed context command retained interrupted staging")
+    profile["context_router"]["routes"][0]["token_budget"][
+        "total_context_tokens"
+    ] = 70_000
+    profile_path.write_text(json.dumps(profile, indent=2) + "\n", encoding="utf-8")
+    rejected = json.loads(
+        run(
+            [str(command), "context", "--task", "governance", "--json"],
+            root=root,
+            expected=1,
+        ).stdout
+    )
+    if "packet ceiling" not in str(rejected.get("error", "")):
+        raise RuntimeError("installed context command did not explain the packet ceiling")
+
+
 def main() -> int:
     """Install the supplied wheel and prove its target-facing seams."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -488,6 +551,7 @@ def main() -> int:
         verify_documentation_system(root, command)
         verify_custom_documentation_root(root, command)
         verify_documentation_conflict(root, command)
+        verify_context_cache_boundary(root, command)
     return 0
 
 
