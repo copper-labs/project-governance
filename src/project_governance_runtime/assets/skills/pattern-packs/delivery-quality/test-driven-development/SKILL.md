@@ -21,13 +21,16 @@ Use this skill when implementing a behavior change, bug fix, parser, state machi
 1. Define the behavior in one or more small test cases, including edge cases and failure cases.
 2. Run the test to see it fail for the right reason when practical.
 3. Implement the smallest change that makes the test pass.
-4. Run the targeted test, then nearby tests, then impact-selected validation packs.
+4. Run the targeted test, then one nearby or integration seam only when it proves a distinct
+   affected claim. Let the final impact-selected sign-off own the enclosing validation boundary.
 5. Refactor for clarity while tests stay green.
 6. Add regression evidence to the closeout or PR notes.
 
 ## Validation
 
-Run targeted tests first, then impacted lint/format/code-quality/boundary checks, then broader tests when shared contracts or platform behavior changed.
+Run the targeted test first and one directly affected seam when shared contracts or platform
+behavior require it. Consume those results in the one impact-selected sign-off; broader tests
+remain target-declared release or explicit risk-boundary work.
 
 ## Evidence
 

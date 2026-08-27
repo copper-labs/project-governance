@@ -78,10 +78,16 @@ coordinator records one bounded per-skill closeout; the operator does not need t
 skill IDs. See
 [Skill selection and utilization](../specs/skill-utilization.md) for the internal contract.
 
-If a pack fails, run that pack only at the same stage and subject, repair it, and run one impacted
-pre-push closeout. Do not use a broad run as a repair loop. A recurring local sign-off above ten
-minutes indicates that product execution should move to CI or a scheduled lane; the runtime does
-not add another cache, scheduler, or retry system around it.
+If a pack fails, use its named execution only when focused diagnosis needs it. After the final
+repair, run one affected recheck: either the enclosing hook or the impacted pre-push sign-off. Do
+not automatically run the named pack and then replay it immediately inside an unchanged enclosing
+gate. When `git commit` or `git push` will invoke that gate, the hook is the recheck; do not run the
+same stage manually first. Do not use a broad run as a repair loop.
+
+The target repository owns its local-feedback objective and command or CI deadlines. The runtime
+has no default execution timeout. An explicitly supplied `--timeout-seconds` remains fail-closed;
+otherwise elapsed time is evidence, not a generic pass/fail policy. The runtime does not add
+another cache, scheduler, or retry system around target execution.
 
 ## Prepare a Pull Request
 

@@ -133,10 +133,12 @@ work is changed-path based. Named pack selection is independent from lifecycle s
 scope, so focused repair can retain the same staged, branch-aware, explicit-path, or all subject
 without admitting unrelated packs or commands.
 
-The runner owns process groups, timeout, interruption, child cleanup, finding normalization, and
-JSON output. It does not maintain a second cache around a repository's build, test, device, or
-language tool. It resolves one immutable change packet before execution and supplies one run ID and
-one isolated evidence root per selected pack.
+The runner owns process groups, interruption, child cleanup, finding normalization, and JSON
+output. Duration policy belongs to the target repository or operator. The runner imposes no default
+deadline, but an explicitly supplied timeout remains blocking and terminates the owned process
+group. It does not maintain a second cache around a repository's build, test, device, or language
+tool. It resolves one immutable change packet before execution and supplies one run ID and one
+isolated evidence root per selected pack.
 
 Every pack command emits exactly one JSON object with a string `status` and a `findings` array.
 Malformed or missing envelopes block; a target wraps an ordinary tool command in its own adapter.

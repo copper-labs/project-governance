@@ -40,8 +40,9 @@ command from the
 internal commands; the operator should not have to name individual skills or prepare receipt JSON.
 
 Use the smallest proof that covers the changed component and one affected seam. When a governance
-pack fails, repair it with `project-governance check --pack <pack-id>` and then run one impacted
-closeout.
+pack fails, use `project-governance check --pack <pack-id>` only when focused diagnosis needs it.
+After the final repair, use either the enclosing Git hook or one impacted closeout as the affected
+recheck; do not run both immediately against the unchanged subject.
 
 When the operator explicitly requests delegated execution, treat the current Codex or Claude Code
 session model as primary. An explicit request such as `Use delegation for this task`, `Use governed

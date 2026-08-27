@@ -39,5 +39,6 @@ state is a runtime failure and blocks regardless of the pack's advisory posture.
 Do not create a marketplace, compatibility layer, or alternate policy authority. If two packs own
 the same concern, consolidate them under the existing owner.
 
-When selectors, schemas, or extension registration change, run the affected pack and one impacted
-closeout. That is the correct scope for validation-conformance work.
+When selectors, schemas, or extension registration change, inspect the impacted plan and run one
+closeout that includes the affected pack. Use a named pack separately only for diagnosis or when it
+is not selected; add one seam only when it proves a distinct validation-conformance claim.

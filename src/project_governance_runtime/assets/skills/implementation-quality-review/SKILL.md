@@ -46,8 +46,9 @@ Use this skill when source code, scripts, build logic, or generated code changes
 
 ## Validation
 
-Run the focused quality owner and one directly affected seam. Use the impacted boundary once at
-closeout; replay only the failed owner during repair.
+Consume existing subject-valid quality proof. Run one focused owner or directly affected seam only
+for a named uncovered claim. After repair, use one affected recheck; do not replay the named owner
+and then an unchanged impacted boundary.
 
 ## Evidence
 

@@ -181,7 +181,7 @@ def execute_packs(
     packs: dict[str, dict[str, Any]],
     plan: dict[str, Any],
     *,
-    timeout_seconds: float,
+    timeout_seconds: float | None,
     environment: dict[str, str],
     command_arguments: dict[str, str],
 ) -> tuple[list[dict[str, Any]], str, str]:
@@ -221,7 +221,7 @@ def execute_pack(
     pack: dict[str, Any],
     plan: dict[str, Any],
     *,
-    timeout_seconds: float,
+    timeout_seconds: float | None,
     environment: dict[str, str],
     command_arguments: dict[str, str],
 ) -> tuple[dict[str, Any], str | None]:
@@ -312,7 +312,7 @@ def execute_command(
     entry: Any,
     plan: dict[str, Any],
     *,
-    timeout_seconds: float,
+    timeout_seconds: float | None,
     environment: dict[str, str],
     command_arguments: dict[str, str],
 ) -> tuple[dict[str, Any] | None, str | None, str | None]:

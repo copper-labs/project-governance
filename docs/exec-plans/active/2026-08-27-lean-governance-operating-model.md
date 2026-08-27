@@ -51,8 +51,9 @@ remote writes, tags, or a runtime release.
 7. Project build systems continue to own test selection, sharding, caching, devices, and retries.
    The governance runtime will not duplicate them.
 8. A selected blocking pack can never report success when it resolved no runnable command.
-9. A routine local sign-off should remain below ten minutes. This is an operating target observed
-   through existing telemetry, not a new blocking timer or policy engine.
+9. The adopting repository owns local-feedback objectives plus command and CI deadlines. The
+   runtime records duration, imposes no generic default timeout, and fails closed when a target or
+   operator explicitly supplies one.
 
 ## Explicit Non-Goals
 
@@ -216,8 +217,10 @@ normal lifecycle.
 
 - State one lifecycle consistently: focused owner check, one affected pre-push sign-off, narrow PR
   narrative check, independent CI, and broad release proof.
-- Describe the ten-minute local sign-off target as a signal to move product execution to CI or a
-  scheduled lane, never as permission to skip required proof.
+- Keep duration telemetry descriptive while leaving local-feedback objectives and execution
+  deadlines with the target repository or operator.
+- Use either a focused owner execution or the unchanged enclosing gate as an affected recheck; do
+  not automatically run both.
 - Remove examples that present a full impacted pre-PR run as routine work.
 - Do not add a new operating-model document; the validation strategy remains authoritative.
 
@@ -226,11 +229,43 @@ normal lifecycle.
 - A reader sees the same lifecycle in the system spine, operator guide, taxonomy, runtime contract,
   and installed skill.
 - No guidance asks for both a branch-aware pre-push sign-off and a full local pre-PR replay.
+- No guidance asks for a named owner and its unchanged enclosing gate as additive rechecks.
 - Documentation continues to separate governance orchestration from project-owned builds and tests.
 
 **Focused proof:**
 
 ```sh
+python3 -m unittest tests.test_runtime_skill_payload
+```
+
+## Slice 5: Return duration policy to the target
+
+**Depends on:** Slice 4.
+
+**Owner:** runner defaults, source-owned CI boundaries, tests, and the operating contract.
+
+**Changes:**
+
+- Remove the generic 540-second command default while retaining explicit fail-closed timeout and
+  process-group cancellation behavior.
+- Reject nonpositive or nonfinite explicit timeout values.
+- Give this repository's source-readiness, narrative, and release jobs target-owned job limits;
+  cancel superseded pull-request jobs without changing immutable release concurrency.
+- Reconcile installed review and workflow skills so existing proof is consumed before another
+  command is run.
+
+**Acceptance:**
+
+- A target command runs without a runtime deadline unless its target or operator supplies one.
+- An explicit timeout still terminates owned processes, exits nonzero, and reports `timeout`.
+- Git-hook retries and review skills do not instruct agents to replay an unchanged enclosing gate.
+- Source CI bounds belong to this repository's workflows, not the reusable wheel contract.
+
+**Focused proof:**
+
+```sh
+python3 -m unittest tests.test_runtime_package_execution tests.test_runtime_package_planning
+python3 -m unittest tests.test_runtime_change_narrative tests.test_runtime_release_versioning
 python3 -m unittest tests.test_runtime_skill_payload
 ```
 
@@ -253,6 +288,7 @@ proof:
 2. Does named-pack execution retain the requested stage and exact change scope?
 3. Does the shipped pre-PR hook execute only `pr-description`?
 4. Did the change introduce any cache, registry, scheduler, retry, or second authority?
+5. Does duration policy remain target- or operator-owned while explicit timeout stays fail-closed?
 
 One review finding permits one focused repair and one affected recheck. It does not restart the
 whole review or broad proof cycle. A repair that changes selection or hook behavior forms a new
@@ -263,8 +299,9 @@ candidate and reruns the final broad proof once.
 1. Reduce and commit Slice 1 as one correctness checkpoint.
 2. Implement and commit Slice 2 as one public selection-contract checkpoint.
 3. Implement Slices 3 and 4 together because hook behavior and user guidance are one contract.
-4. Freeze the candidate, run the single broad proof, and perform the bounded review.
-5. Prepare a release candidate only after explicit operator authorization.
+4. Implement Slice 5 without adding a duration-policy schema or receipt cache.
+5. Freeze the candidate, run the single broad proof, and perform the bounded review.
+6. Prepare a release candidate only after explicit operator authorization.
 
 The plan is complete when the four acceptance boundaries pass and the final diff contains no
 machinery listed under Explicit Non-Goals.

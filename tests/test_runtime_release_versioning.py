@@ -106,6 +106,16 @@ class RuntimeReleaseVersioningTests(unittest.TestCase):
             workflow["jobs"]["source-readiness"]["if"],
             "github.event.pull_request.draft == false",
         )
+        self.assertEqual(workflow["concurrency"]["cancel-in-progress"], "true")
+        self.assertEqual(
+            workflow["jobs"]["source-readiness"]["timeout-minutes"], "30"
+        )
+        release = yaml.load(
+            (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8"),
+            Loader=yaml.BaseLoader,
+        )
+        self.assertEqual(release["concurrency"]["cancel-in-progress"], "false")
+        self.assertEqual(release["jobs"]["release"]["timeout-minutes"], "30")
 
 
 if __name__ == "__main__":

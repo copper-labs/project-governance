@@ -641,6 +641,8 @@ class RuntimeChangeNarrativeIntegrationTests(ChangeNarrativeTestCase):
         )
         job = workflow["jobs"]["pr-description"]
         self.assertEqual(job["if"], "github.event.pull_request.draft == false")
+        self.assertEqual(workflow["concurrency"]["cancel-in-progress"], "true")
+        self.assertEqual(job["timeout-minutes"], "10")
         checkout = next(step for step in job["steps"] if "uses" in step)
         self.assertEqual(
             checkout["with"]["ref"],

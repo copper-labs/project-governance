@@ -31,7 +31,9 @@ governed artifact lifecycle states change.
 
 ## Validation
 
-Run the existing documentation pack and any project-owned extension selected for the change.
+Consume existing subject-valid documentation proof. Run the documentation pack or one
+project-owned extension only for a named uncovered claim; do not replay both after an unchanged
+impacted sign-off.
 
 ## Evidence
 

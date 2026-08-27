@@ -60,6 +60,18 @@ def empty_changed_scope() -> dict[str, object]:
 class RuntimeExecutionTests(unittest.TestCase):
     """Keep execution shell-free, bounded, and evidence-producing."""
 
+    def test_absent_timeout_leaves_duration_to_the_target(self) -> None:
+        """Complete normally when neither the target nor operator supplies a deadline."""
+        with tempfile.TemporaryDirectory() as directory:
+            result = run_command(
+                [sys.executable, "-c", "import time; time.sleep(0.02)"],
+                root=Path(directory),
+                timeout_seconds=None,
+                environment={},
+            )
+        self.assertEqual(result.exit_code, 0)
+        self.assertEqual(result.termination_reason, "completed")
+
     def test_timeout_terminates_the_owned_process(self) -> None:
         """Return the stable timeout code instead of leaving a child alive."""
         with tempfile.TemporaryDirectory() as directory:

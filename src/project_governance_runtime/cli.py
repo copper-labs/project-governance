@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 import time
 from pathlib import Path
@@ -58,7 +59,7 @@ def _parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command", required=True)
     check = commands.add_parser("check")
     _selection_arguments(check)
-    check.add_argument("--timeout-seconds", type=float, default=540.0)
+    check.add_argument("--timeout-seconds", type=float)
     check.add_argument("--json-output", type=Path)
     check.add_argument("--commit-message-file", type=Path)
     check.add_argument("--pr-body-file", type=Path)
@@ -121,6 +122,11 @@ def _validate_selection_arguments(
 ) -> None:
     """Reject combinations that would give one run competing scope authorities."""
 
+    timeout_seconds = getattr(args, "timeout_seconds", None)
+    if timeout_seconds is not None and (
+        not math.isfinite(timeout_seconds) or timeout_seconds <= 0
+    ):
+        raise ConfigurationError("--timeout-seconds must be a finite positive number")
     _validate_staged_scope(args, base_ref)
     if mode == "all":
         if args.staged or args.changed_path:

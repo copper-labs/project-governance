@@ -37,9 +37,11 @@ repository generated from this template.
 8. During implementation, run one focused owner test. Add one directly affected seam only when the
    change crosses that seam. On the stable candidate, run one branch-aware impacted pre-push
    sign-off; do not run a separate manual pre-commit or pre-PR gate.
-9. If a check fails, repair and replay that focused owner. After a second failure of the same
-   check, diagnose whether the owner is a product defect, evidence gap, or governance defect; do
-   not refresh every pack or widen the diagnosis loop.
+9. If a check fails, repair that focused owner. Use its named execution only when diagnosis needs
+   narrow feedback. On the final repair, let either the enclosing Git hook or the one impacted
+   pre-push sign-off serve as the affected recheck; do not immediately replay both on the unchanged
+   subject. After a second failure of the same check, diagnose whether the owner is a product
+   defect, evidence gap, or governance defect; do not refresh every pack or widen the loop.
 10. Treat warnings as advisory evidence, not instructions to expand the task.
 11. Review a new or directly changed source unit over 500 lines for cohesion, responsibility,
     coupling, navigability, readability, and testability. The threshold requires judgment, not
@@ -47,12 +49,11 @@ repository generated from this template.
     creating a meaningful owner is not remediation.
 12. Use independent QA or a second model only when selected risk or the operator requests it. Bound
     review to changed files, the active plan, the owning contract, and at most five directly
-    relevant supporting files or 20 minutes. Expand context only for a named uncertainty and return
-    at most five actionable findings by default. Reconcile those findings with one primary-owned
+    relevant supporting files. Expand context only for a named uncertainty and return at most five
+    actionable findings by default. Reconcile those findings with one primary-owned
     repair and one affected recheck; do not start a fresh general review after each repair.
-13. Keep deep threshold remediation to the highest-risk three classes or 30 minutes, helpful
-    adjacent comment cleanup to five comments or 20 minutes, and unrelated cleanup at zero unless
-    explicitly added.
+13. Keep deep threshold remediation to the highest-risk three classes, helpful adjacent comment
+    cleanup to five comments, and unrelated cleanup at zero unless explicitly added.
 14. If the clean integration snapshot advances, rerun only proof invalidated by that change. A
     snapshot advance alone does not authorize a broad matrix; name the invalidated claim first.
 15. Before any commit or pull request handoff, write the shared change narrative from the governing

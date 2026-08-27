@@ -47,3 +47,8 @@ drafts. The generic `pre-pr` stage remains available for a deliberate adopter-ow
 it is not the normal second local sign-off. Provider CI materializes its live PR body and supplies
 the live title. The normative fields and editorial boundary live in the
 [Change Narrative Contract](../specs/change-narrative-contract.md).
+
+Git invokes pre-commit again when a commit is retried and pre-push again when a push is retried.
+That automatic invocation is the affected recheck for the repaired candidate. Do not run the same
+stage manually immediately before the Git operation. Use a named pack first only when focused
+diagnosis needs faster or narrower feedback.

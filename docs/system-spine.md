@@ -24,8 +24,9 @@ its own policy choices and project checks. Markdown is the sole current policy a
 
 1. Bootstrap the wheel named by `config/governance/runtime.lock.yaml`.
 2. Change one owner, run its focused proof, and commit the coherent result through pre-commit.
-3. If one governance pack fails, rerun only that pack at the same stage and subject.
-4. Freeze the candidate and run one branch-aware impacted pre-push sign-off.
+3. If one governance pack fails, use its named execution only when focused diagnosis needs it.
+4. Freeze the repaired candidate and use one branch-aware impacted pre-push sign-off, or the
+   automatically invoked hook, as the affected recheck; do not immediately replay both.
 5. Check only the pull-request title and body through the shipped pre-PR hook; CI owns its separate
    affected trust boundary.
 6. Adopt a newer runtime only through `project-governance update`, after reviewing its dry run.

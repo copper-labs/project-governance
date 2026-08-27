@@ -39,7 +39,8 @@ telemetry status. These are optional target inputs.
 
 ## Validation
 
-Run the changed component's focused test and one impacted closeout check.
+Run the changed component's focused test and one distinct affected seam. When the impacted closeout
+selects the same owner and proves the same claim, use it as the recheck instead of running both.
 
 ## Evidence
 

@@ -21,17 +21,25 @@ because they exist.
 3. Run one directly affected integration seam only when the change crosses that seam.
 4. Commit the coherent result.
 
-For a failed governance check, rerun only the failed pack at the same lifecycle stage and subject:
+For a failed governance check, use the named pack at the same lifecycle stage and subject only when
+focused diagnosis needs it:
 
 ```sh
 project-governance check --pack <pack-id> --stage <failed-stage> --mode impacted
 ```
 
-After it passes, freeze the candidate and run one branch-aware local sign-off:
+After the final repair, freeze the candidate and run one branch-aware local sign-off as the affected
+recheck:
 
 ```sh
 project-governance check --stage pre-push --mode impacted
 ```
+
+Do not automatically run the named pack and then replay it immediately inside an unchanged
+enclosing gate. If retrying `git commit` or `git push` will invoke that gate, the hook is the one
+affected recheck; do not run the same stage manually first. A named pack remains available when its
+faster feedback is useful during diagnosis, but that deliberate extra execution needs a concrete
+diagnostic reason.
 
 Pre-commit remains the staged changed-file hook; it is not a second completion boundary. The shipped
 pre-PR hook names only the `pr-description` pack so authors can check the title and body without
@@ -39,10 +47,12 @@ replaying code validation. Do not run a separate full local pre-PR gate after th
 pre-push sign-off. CI may run its own affected gate as an independent environment and trust
 boundary.
 
-A routine local sign-off should complete within ten minutes. Treat a slower recurring pack as an
-ownership signal: move its product build, platform, device, or external-service execution into CI
-or a scheduled lane while preserving the required proof. This is an operating target interpreted
-through existing telemetry, not a runtime timeout or permission to skip validation.
+The adopting repository owns its local-feedback objective and every command or job deadline. The
+runtime records duration but does not infer failure from elapsed time or impose a generic default
+timeout. A target or operator may supply an explicit deadline; expiration fails closed with timeout
+evidence. When recurring local proof materially impairs the target's workflow, its owner decides
+whether product builds, platform, device, or external-service execution belongs in CI or a
+scheduled lane while preserving the required proof.
 
 Freeze one candidate before a broad or cross-platform proof. An independent QA pass consumes that
 candidate and its existing proof; it does not replay the matrix. It adds one focused check only for

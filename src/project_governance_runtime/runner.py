@@ -18,7 +18,7 @@ def execute(
     packs: dict[str, dict[str, Any]],
     plan: dict[str, Any],
     *,
-    timeout_seconds: float,
+    timeout_seconds: float | None,
     command_arguments: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Execute packs and time only materialization plus local orchestration."""

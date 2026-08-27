@@ -29,13 +29,15 @@ check, or validation pack binding is changed or failing.
 3. Confirm the shipped pre-PR hook names only `pr-description`; a deliberate full pre-PR stage is a
    separate adopter-owned boundary.
 4. Confirm critical stages remain blocking according to policy.
-5. Run the smallest failing hook or named pack directly when debugging.
+5. Run the smallest failing hook or named pack directly only when debugging needs it. For final
+   proof, use the affected hook or stage once; do not replay a passed named pack inside it on the
+   unchanged subject.
 6. Preserve bypass policy and report any manual bypass as residual risk.
 
 ## Validation
 
-Run `project-governance doctor` and the affected
-`project-governance check --stage <stage> --mode impacted` invocation.
+Run `project-governance doctor` and the affected hook or
+`project-governance check --stage <stage> --mode impacted` invocation once.
 
 ## Evidence
 

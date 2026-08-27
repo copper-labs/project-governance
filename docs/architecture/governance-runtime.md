@@ -15,8 +15,8 @@ The architecture intentionally has two owners.
 
 | Owner | Responsibilities |
 | --- | --- |
-| Runtime wheel | CLI, changed-path selection, built-in generic packs, dependency ordering, timeout and process ownership, normalized findings, native-host routing and dispatch state, minimal developer-doc installation and exact catalog routing, local telemetry, bootstrap/update commands, generic skills, and configuration schemas |
-| Adopting repository | Runtime lock, profile, facts, target packs, source mappings, tool commands, product documentation, root agent instructions, and product proof |
+| Runtime wheel | CLI, changed-path selection, built-in generic packs, dependency ordering, process ownership and cancellation, explicit-timeout enforcement, normalized findings, native-host routing and dispatch state, minimal developer-doc installation and exact catalog routing, local telemetry, bootstrap/update commands, generic skills, and configuration schemas |
+| Adopting repository | Runtime lock, profile, facts, target packs, source mappings, tool commands, duration and retry policy, product documentation, root agent instructions, and product proof |
 
 ## Design Rules
 

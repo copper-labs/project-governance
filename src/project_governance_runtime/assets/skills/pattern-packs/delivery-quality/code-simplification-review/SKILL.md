@@ -26,7 +26,9 @@ Use this skill when implementation is functionally complete and the goal is clea
 
 ## Validation
 
-Run the smallest relevant tests after changes, then the enclosing target profile checks for code quality, naming, lint, and impacted tests.
+Run the smallest relevant test after a simplification. Use one enclosing target-profile sign-off as
+the affected recheck; do not separately replay code quality, naming, lint, and impacted tests when
+that sign-off already owns them.
 
 ## Evidence
 

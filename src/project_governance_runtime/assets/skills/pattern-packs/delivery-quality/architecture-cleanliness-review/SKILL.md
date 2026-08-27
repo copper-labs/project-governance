@@ -27,7 +27,8 @@ Use this skill after a design or implementation changes modules, ownership bound
 
 ## Validation
 
-Run or require architecture, boundary, naming, code-smell, lint, and impacted tests from the target profile.
+Consume existing subject-valid proof. Run or require one target owner only for a named uncovered
+architecture claim; do not create a second boundary, naming, code-smell, lint, and test matrix.
 
 ## Evidence
 

@@ -35,6 +35,31 @@ class RuntimePlanningTests(unittest.TestCase):
             )
         )
 
+    def test_timeout_is_optional_and_explicit_values_are_positive(self) -> None:
+        """Leave duration to the target unless an operator supplies a valid deadline."""
+        default = _parser().parse_args(
+            ["check", "--pack", "format", "--base-ref", "HEAD"]
+        )
+        self.assertIsNone(default.timeout_seconds)
+        for value in ("0", "-1", "nan", "inf"):
+            with self.subTest(value=value), self.assertRaisesRegex(
+                ConfigurationError, "finite positive"
+            ):
+                _resolve_plan(
+                    _parser().parse_args(
+                        [
+                            "check",
+                            "--pack",
+                            "format",
+                            "--base-ref",
+                            "HEAD",
+                            "--timeout-seconds",
+                            value,
+                        ]
+                    ),
+                    ROOT / "tests/fixtures/empty-target",
+                )
+
     def replacement_packs(self, patterns: list[str] | None = None) -> dict[str, dict[str, object]]:
         """Add one valid target owner without mutating the shared built-in fixture."""
         packs = {pack_id: dict(pack) for pack_id, pack in self.packs.items()}

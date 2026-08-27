@@ -50,8 +50,9 @@ authoring, or migration changes.
 
 ## Validation
 
-Run the relevant validation packs before review when practical. For review-skill changes, run
-template validation and ensure provider adapters remain thin.
+Consume the candidate's existing subject-valid validation before review. Run one relevant pack
+only for a named uncovered claim. For review-skill changes, use template validation as that focused
+proof and ensure provider adapters remain thin.
 
 ## Evidence
 

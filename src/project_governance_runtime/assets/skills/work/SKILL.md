@@ -41,9 +41,11 @@ after the work has been framed and scoped.
 7. Run one focused owner test during implementation. Add one directly affected seam only when the
    change crosses that seam. On the stable candidate, run one branch-aware impacted pre-push
    sign-off; do not run a separate manual pre-commit or pre-PR gate.
-8. Repair and replay a failed focused owner. If the same check fails twice, diagnose its owner
-   instead of refreshing every pack or widening the loop. Warnings do not create implementation
-   scope.
+8. Repair a failed focused owner. Use its named execution when diagnosis needs narrow feedback; on
+   the final repair, let either the enclosing Git hook or the one impacted pre-push sign-off serve
+   as the affected recheck. Do not run both immediately on the unchanged subject. If the same check
+   fails twice, diagnose its owner instead of refreshing every pack or widening the loop. Warnings
+   do not create implementation scope.
 9. Review each new or directly changed source unit over 500 lines. The threshold requires
    architectural judgment, not mechanical extraction: accept a cohesive narrow unit when justified,
    and reject helper extraction that only relocates related code without creating a meaningful owner.
@@ -63,8 +65,9 @@ after the work has been framed and scoped.
 
 ## Validation
 
-Use `project-governance check --pack <pack>` for focused repair. Run one branch-aware impacted
-pre-push sign-off on the stable candidate before publication.
+Use `project-governance check --pack <pack>` only when focused repair needs it. Run one
+branch-aware impacted pre-push sign-off on the stable candidate before publication, counting an
+automatically invoked pre-push hook as that sign-off.
 
 ## Evidence
 

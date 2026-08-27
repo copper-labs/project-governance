@@ -50,8 +50,8 @@ appear in GitHub release names. See the [release process](docs/governance/releas
 
 - Impacted mode maps changed paths to the smallest applicable pack set and reports any unmapped
   path as one clear blocker.
-- Explicit pack execution, dependencies, timeouts, cancellation, normalized findings, stable exit
-  codes, JSON output, and bounded local telemetry are built in.
+- Explicit pack execution, dependencies, operator- or target-supplied timeouts, cancellation,
+  normalized findings, stable exit codes, JSON output, and bounded local telemetry are built in.
 - Built-in checks cover formatting, naming, maintainability, comments, documentation, secrets,
   dependencies, test quality, and commit messages. Projects add only their own extension packs.
 - Generic skills are materialized from the installed wheel into ignored local discovery state;

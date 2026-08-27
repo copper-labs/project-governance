@@ -31,7 +31,9 @@ Use this skill for any code-changing workflow before final closeout, commit, pus
 
 ## Validation
 
-Run code-smell, comment-quality, naming, lint, format, platform-boundary, and impacted tests from the target profile.
+Consume the candidate's existing subject-valid quality proof. Run one target owner only for a named
+uncovered claim; do not turn the review lens into a second code-smell, comment, naming, lint,
+format, boundary, and test matrix.
 
 ## Evidence
 

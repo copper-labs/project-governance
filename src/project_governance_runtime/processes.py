@@ -34,9 +34,13 @@ def _terminate(process: subprocess.Popen[str]) -> None:
 
 
 def run_command(
-    argv: list[str], *, root: Path, timeout_seconds: float, environment: dict[str, str]
+    argv: list[str],
+    *,
+    root: Path,
+    timeout_seconds: float | None,
+    environment: dict[str, str],
 ) -> CommandResult:
-    """Run one shell-free command with a deadline and owned child cleanup."""
+    """Run one shell-free command with optional caller-owned deadline and child cleanup."""
     process = subprocess.Popen(
         argv,
         cwd=root,

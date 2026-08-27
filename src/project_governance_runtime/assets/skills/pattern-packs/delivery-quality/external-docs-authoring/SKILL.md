@@ -27,7 +27,9 @@ Use this skill when creating or revising docs for people outside the implementat
 
 ## Validation
 
-Run docs-governance, link checks, prose/style checks where configured, command/example verification, and product-owner review for public claims.
+Consume existing docs, link, and prose proof. Run only the missing deterministic owner for a named
+gap, plus command/example verification or product-owner review when the public claim specifically
+requires it; do not replay every configured documentation check as a second matrix.
 
 ## Evidence
 
