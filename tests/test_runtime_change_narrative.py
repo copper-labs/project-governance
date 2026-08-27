@@ -562,12 +562,12 @@ class RuntimeChangeNarrativeIntegrationTests(ChangeNarrativeTestCase):
                         "-m",
                         "project_governance_runtime.cli",
                         "check",
+                        "--pack",
+                        "pr-description",
                         "--stage",
                         stage,
                         "--mode",
-                        "impacted",
-                        "--base-ref",
-                        "HEAD",
+                        "all",
                         "--pr-body-file",
                         str(body_path),
                         "--pr-title",
@@ -600,7 +600,7 @@ class RuntimeChangeNarrativeIntegrationTests(ChangeNarrativeTestCase):
                 self.assertIn("4:--pr-body-file:--pr-title", text)
                 self.assertIn("4:--pr-title:--pr-body-file", text)
                 self.assertIn(
-                    '--pack pr-description --stage pre-pr --mode impacted "$@"',
+                    '--pack pr-description --stage pre-pr --mode all "$@"',
                     text,
                 )
         rejected = subprocess.run(
@@ -612,6 +612,23 @@ class RuntimeChangeNarrativeIntegrationTests(ChangeNarrativeTestCase):
         )
         self.assertEqual(rejected.returncode, 2, rejected)
         self.assertIn("usage:", rejected.stderr)
+        with tempfile.TemporaryDirectory() as directory:
+            body_path = Path(directory) / "body.md"
+            body_path.write_text(VALID_PR, encoding="utf-8")
+            accepted = subprocess.run(
+                [
+                    str(hooks[0]),
+                    "--pr-body-file",
+                    str(body_path),
+                    "--pr-title",
+                    VALID_PR_TITLE,
+                ],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+        self.assertEqual(accepted.returncode, 0, accepted.stdout)
 
     def test_github_workflow_binds_the_live_body_as_environment_data(self) -> None:
         """Run on body and scope changes without interpolating untrusted PR text into shell code."""

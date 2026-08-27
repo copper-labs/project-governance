@@ -21,15 +21,18 @@ def _matches(path: str, patterns: list[Any]) -> bool:
 
 
 def _stage_candidates(
-    packs: dict[str, dict[str, Any]], stage: str | None
+    packs: dict[str, dict[str, Any]],
+    stage: str | None,
+    *,
+    named_selection: bool,
 ) -> list[str]:
-    """Return active packs eligible for the requested stage, when one is present."""
+    """Return active packs eligible for one stage or an explicit diagnostic."""
     result = []
     for pack_id, pack in packs.items():
         if str(pack.get("implementation_status", "active")) != "active":
             continue
         stages = [str(value) for value in pack.get("stages", [])]
-        if stage is None or stage in stages:
+        if (stage is None and named_selection) or stage in stages:
             result.append(pack_id)
     return sorted(result)
 
@@ -223,7 +226,7 @@ def build_plan(
 ) -> dict[str, Any]:
     """Build one explainable plan without executing repository commands."""
     explicit = sorted(set(explicit_pack_ids or []))
-    candidates = _stage_candidates(packs, stage)
+    candidates = _stage_candidates(packs, stage, named_selection=bool(explicit))
     candidate_set = set(candidates)
     replacements = _replacement_map(packs)
     if explicit:

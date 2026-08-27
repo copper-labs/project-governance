@@ -15,7 +15,8 @@ summary: Align runtime selection and shipped hooks with one affected local sign-
 
 Routine work has one fast staged check while editing, one branch-aware affected sign-off before
 push, and one independent CI boundary. Preparing a pull request checks only its title and body; it
-does not replay the affected local sign-off. Release remains the only ordinary broad boundary.
+does not replay the affected local sign-off. Release remains the only ordinary all-pack broad
+boundary.
 
 The runtime makes this model reliable by preventing a selected pack from passing without running a
 command and by allowing a named pack to retain an explicit lifecycle stage and change scope.
@@ -171,9 +172,11 @@ python3 -m unittest tests.test_runtime_package_planning tests.test_runtime_packa
 - Change the shipped and source pre-PR hooks to run:
 
 ```sh
-project-governance check --pack pr-description --stage pre-pr --mode impacted
+project-governance check --pack pr-description --stage pre-pr --mode all
 ```
 
+- Use the all-subject envelope because this named, unscoped checker needs no branch comparison; it
+  does not widen selection beyond `pr-description`.
 - Continue accepting only the existing paired title/body overrides.
 - Keep `pr-description` at `pre-pr` and `ci-pr`; do not change other built-in pack declarations.
 - Update the clean-wheel proof so it verifies that the installed pre-PR hook selects only

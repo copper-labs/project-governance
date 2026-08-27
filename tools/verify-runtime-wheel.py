@@ -257,7 +257,7 @@ def verify_change_narratives(root: Path, command: Path) -> None:
     pr_path = git_metadata_path(root, "PR_DESCRIPTION.md")
     pr_title_path = git_metadata_path(root, "PR_TITLE")
     pre_pr_hook = (root / ".githooks/pre-pr").read_text(encoding="utf-8")
-    if "--pack pr-description --stage pre-pr --mode impacted" not in pre_pr_hook:
+    if "--pack pr-description --stage pre-pr --mode all" not in pre_pr_hook:
         raise RuntimeError("installed pre-PR hook is not narrative-only")
 
     commit_path.write_text("short\n", encoding="utf-8")
@@ -293,41 +293,16 @@ def verify_change_narratives(root: Path, command: Path) -> None:
 
     pr_title_path.write_text(VALID_PR_TITLE + "\n", encoding="utf-8")
     pr_path.write_text("", encoding="utf-8")
-    empty_pr = run(
-        [
-            str(command),
-            "check",
-            "--pack",
-            "pr-description",
-            "--stage",
-            "pre-pr",
-            "--mode",
-            "impacted",
-            "--base-ref",
-            "HEAD",
-        ],
-        root=root,
-        expected=1,
-    )
+    empty_pr = run([str(root / ".githooks/pre-pr")], root=root, expected=1)
     if "pr-description.empty-body" not in empty_pr.stdout:
         raise RuntimeError("installed pre-PR proof did not reject the empty body")
     pr_path.write_text(VALID_PR_BODY, encoding="utf-8")
-    run(
-        [
-            str(command),
-            "check",
-            "--pack",
-            "pr-description",
-            "--stage",
-            "pre-pr",
-            "--mode",
-            "impacted",
-            "--base-ref",
-            "HEAD",
-        ],
-        root=root,
-        expected=0,
-    )
+    pr_title_path.write_text("short\n", encoding="utf-8")
+    short_title = run([str(root / ".githooks/pre-pr")], root=root, expected=1)
+    if "pr-description.title-short" not in short_title.stdout:
+        raise RuntimeError("installed pre-PR proof did not reject the short title")
+    pr_title_path.write_text(VALID_PR_TITLE + "\n", encoding="utf-8")
+    run([str(root / ".githooks/pre-pr")], root=root, expected=0)
 
 
 def write_synthetic_changes(root: Path) -> None:

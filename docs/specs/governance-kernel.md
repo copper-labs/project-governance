@@ -68,13 +68,15 @@ Stages remain command boundaries, not selectable profiles:
 | `pre-pr`, `ci-pr` | Branch-aware impacted subject; live publishable worktree-and-index secret scan |
 | `release` | Explicit all-mode checkout-wide subject |
 
-`--mode all` is the explicit exception to packet-only file reads: it authorizes a pack to inspect
-the current checkout across its declared full scope. It is not a lifecycle profile or a repair
-shortcut.
+`--mode all` is the explicit exception to packet-only file reads: it authorizes selected packs to
+inspect the current checkout across their declared full scope. It is not a lifecycle profile or a
+repair shortcut, and a named pack does not expand into all packs.
 
-The installed pre-PR hook composes `--pack pr-description` with `--stage pre-pr --mode impacted`.
-This keeps local pull-request authoring fail-closed without replaying the branch-aware pre-push
-sign-off. The generic stage remains available for a deliberate adopter-owned boundary.
+The installed pre-PR hook composes `--pack pr-description` with `--stage pre-pr --mode all`.
+Because that checker reads only its title and body inputs, the all-subject envelope removes an
+irrelevant branch-comparison dependency without widening pack selection. This keeps local
+pull-request authoring fail-closed without replaying the branch-aware pre-push sign-off. The
+generic stage remains available for a deliberate adopter-owned boundary.
 
 The later-stage built-in secret scan is also a deliberate live exhaustive surface. Its pack result
 has no `subject_digest`; it is never attributed to the branch-aware changed digest shared by the

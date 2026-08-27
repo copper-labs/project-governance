@@ -101,7 +101,7 @@ Run the ordinary hook against those worktree-local drafts:
 For provider automation or another explicit draft location, supply the pair together:
 
 ```sh
-project-governance check --pack pr-description --stage pre-pr --mode impacted \
+project-governance check --pack pr-description --stage pre-pr --mode all \
   --pr-body-file <path> --pr-title "<plain-language outcome>"
 ```
 

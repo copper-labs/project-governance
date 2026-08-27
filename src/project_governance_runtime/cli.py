@@ -120,10 +120,8 @@ def _validate_selection_arguments(
     base_ref: str | None,
 ) -> None:
     """Reject combinations that would give one run competing scope authorities."""
-    if args.staged and args.changed_path:
-        raise ConfigurationError("--staged cannot be combined with --changed-path")
-    if args.staged and base_ref:
-        raise ConfigurationError("--staged cannot be combined with --base-ref")
+
+    _validate_staged_scope(args, base_ref)
     if mode == "all":
         if args.staged or args.changed_path:
             raise ConfigurationError(
@@ -137,8 +135,18 @@ def _validate_selection_arguments(
     pr_title = getattr(args, "pr_title", None)
     if bool(pr_body_file) != bool(pr_title):
         raise ConfigurationError("--pr-body-file and --pr-title must be supplied together")
-    if not args.stage and not explicit and not args.changed_path and mode != "all":
+    if not args.stage and not explicit and mode != "all":
         raise ConfigurationError("impacted mode requires --stage")
+
+
+def _validate_staged_scope(args: argparse.Namespace, base_ref: str | None) -> None:
+    """Keep staged selection bound to the pre-commit index subject."""
+    if args.staged and args.changed_path:
+        raise ConfigurationError("--staged cannot be combined with --changed-path")
+    if args.staged and base_ref:
+        raise ConfigurationError("--staged cannot be combined with --base-ref")
+    if args.staged and args.stage != "pre-commit":
+        raise ConfigurationError("--staged requires --stage pre-commit")
 
 
 def _empty_change_scope(args: argparse.Namespace, mode: str) -> dict[str, Any]:

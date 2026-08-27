@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -460,6 +461,107 @@ class RuntimePlanningTests(unittest.TestCase):
         self.assertNotIn("records", rendered["change_scope"])
 
 
+class NamedPackScopeTests(unittest.TestCase):
+    """Prove named repair packs retain one honest selection subject."""
+
+    def test_named_pack_retains_real_scope_packets(self) -> None:
+        """Compose pack selection with staged, changed, explicit, and all Git subjects."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+
+            def git(*arguments: str) -> None:
+                subprocess.run(
+                    ["git", *arguments],
+                    cwd=root,
+                    check=True,
+                    capture_output=True,
+                )
+
+            git("init", "-q", "-b", "main")
+            git("config", "user.email", "runtime@example.invalid")
+            git("config", "user.name", "Runtime Planning Tests")
+            source = root / "src/example.py"
+            source.parent.mkdir()
+            source.write_text("value = 1\n", encoding="utf-8")
+            git("add", "src/example.py")
+            git("commit", "-qm", "baseline")
+            source.write_text("value = 2\n", encoding="utf-8")
+
+            cases = (
+                ("changed", "pre-push", [], "HEAD", "changed"),
+                ("explicit", "pre-push", ["src/example.py"], "HEAD", "explicit"),
+                ("all", "release", [], None, "all"),
+                ("bare-named", None, [], "HEAD", "changed"),
+            )
+            for case, stage, changed_path, base_ref, packet_mode in cases:
+                with self.subTest(case=case):
+                    arguments = argparse.Namespace(
+                        pack=["secrets"],
+                        mode="all" if case == "all" else "impacted",
+                        stage=stage,
+                        staged=False,
+                        changed_path=changed_path,
+                        base_ref=base_ref,
+                    )
+                    plan, _ = _resolve_plan(arguments, root)
+                    self.assertEqual(plan["status"], "ready", plan["blockers"])
+                    self.assertEqual(plan["selected_packs"], ["secrets"])
+                    self.assertEqual(plan["change_scope"]["mode"], packet_mode)
+                    if packet_mode != "all":
+                        self.assertEqual(
+                            [record["path"] for record in plan["change_scope"]["records"]],
+                            ["src/example.py"],
+                        )
+
+            git("add", "src/example.py")
+            staged_arguments = argparse.Namespace(
+                pack=["secrets"],
+                mode="impacted",
+                stage="pre-commit",
+                staged=True,
+                changed_path=[],
+                base_ref=None,
+            )
+            staged_plan, _ = _resolve_plan(staged_arguments, root)
+            self.assertEqual(staged_plan["status"], "ready", staged_plan["blockers"])
+            self.assertEqual(staged_plan["selected_packs"], ["secrets"])
+            self.assertEqual(staged_plan["change_scope"]["mode"], "staged")
+            self.assertEqual(
+                [record["path"] for record in staged_plan["change_scope"]["records"]],
+                ["src/example.py"],
+            )
+
+    def test_scope_validation_rejects_ambiguous_stage_combinations(self) -> None:
+        """Reject stage-less impacted and staged non-pre-commit subjects plainly."""
+        cases = (
+            ["plan", "--changed-path", "src/example.py", "--base-ref", "HEAD"],
+            ["plan", "--pack", "secrets", "--staged"],
+            ["plan", "--pack", "secrets", "--stage", "pre-push", "--staged"],
+        )
+        for arguments in cases:
+            with self.subTest(arguments=arguments), self.assertRaises(ConfigurationError):
+                _resolve_plan(
+                    _parser().parse_args(arguments),
+                    ROOT / "tests/fixtures/empty-target",
+                )
+
+    def test_all_mode_rejects_changed_subject_inputs(self) -> None:
+        """Keep all scope distinct from staged, explicit-path, and base comparisons."""
+        cases = (
+            ["--stage", "pre-commit", "--staged"],
+            ["--stage", "release", "--changed-path", "src/example.py"],
+            ["--stage", "release", "--base-ref", "HEAD"],
+        )
+        for options in cases:
+            with self.subTest(options=options), self.assertRaises(ConfigurationError):
+                _resolve_plan(
+                    _parser().parse_args(
+                        ["plan", "--pack", "secrets", "--mode", "all", *options]
+                    ),
+                    ROOT / "tests/fixtures/empty-target",
+                )
+
+
 class PackStageCoverageTests(unittest.TestCase):
     """Prove stage claims cannot turn into false-green pack results."""
 
@@ -532,6 +634,18 @@ class PackStageCoverageTests(unittest.TestCase):
         )
         self.assertEqual(plan["status"], "ready", plan["blockers"])
 
+    def test_stage_less_impacted_selection_does_not_cross_lifecycle_boundaries(self) -> None:
+        """Require a stage unless explicit pack selection makes the diagnostic bounded."""
+        plan = build_plan(
+            self.lifecycle_pack(["pre-commit"]),
+            stage=None,
+            mode="impacted",
+            changed_paths=["src/example.py"],
+        )
+        self.assertEqual(plan["status"], "blocked")
+        self.assertEqual(plan["selected_packs"], [])
+        self.assertEqual(plan["blockers"][0]["code"], "unknown-impact")
+
     def test_named_pack_preserves_requested_stage(self) -> None:
         """Keep named-pack selection independent from lifecycle command filtering."""
         plan = build_plan(
@@ -559,27 +673,6 @@ class PackStageCoverageTests(unittest.TestCase):
         self.assertEqual(plan["status"], "blocked")
         self.assertEqual(plan["selected_packs"], [])
         self.assertEqual(plan["blockers"][0]["code"], "explicit-pack-unavailable")
-
-    def test_plan_cli_accepts_named_pack_with_stage_and_scope(self) -> None:
-        """Expose the same inspectable selection grammar for plan and check."""
-        arguments = _parser().parse_args(
-            [
-                "plan",
-                "--pack",
-                "target",
-                "--stage",
-                "pre-push",
-                "--mode",
-                "impacted",
-                "--base-ref",
-                "main",
-                "--json",
-            ]
-        )
-        self.assertEqual(arguments.pack, ["target"])
-        self.assertEqual(arguments.stage, "pre-push")
-        self.assertEqual(arguments.mode, "impacted")
-        self.assertEqual(arguments.base_ref, "main")
 
     def test_doctor_reports_stage_command_coverage(self) -> None:
         """Expose the configuration defect before an operator starts a check."""
