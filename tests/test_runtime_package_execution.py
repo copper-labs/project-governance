@@ -607,6 +607,14 @@ class RuntimeExecutionTests(unittest.TestCase):
         }
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            stale = root / ".governance/runtime/runs/stale/pack"
+            stale.mkdir(parents=True)
+            retained = root / ".governance/runtime/runs/retained/pack"
+            retained.mkdir(parents=True)
+            (retained / "evidence.txt").write_text("target-owned\n", encoding="utf-8")
+            active = root / ".governance/runtime/runs/active"
+            (active / "pack").mkdir(parents=True)
+            (active / ".active").touch()
             output = execute(root, packs, plan, timeout_seconds=2)
             child_outputs = [
                 json.loads(item["commands"][0]["stdout"])
@@ -618,6 +626,9 @@ class RuntimeExecutionTests(unittest.TestCase):
             self.assertFalse(
                 (root / ".governance/runtime/runs" / output["run_id"]).exists()
             )
+            self.assertFalse(stale.parent.exists())
+            self.assertEqual((retained / "evidence.txt").read_text(), "target-owned\n")
+            self.assertTrue((active / "pack").is_dir())
         self.assertEqual({item["run_id"] for item in child_outputs}, {output["run_id"]})
         self.assertEqual(
             [item["pack_id"] for item in child_outputs],

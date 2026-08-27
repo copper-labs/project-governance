@@ -107,10 +107,25 @@ def _sanitize(event: Any) -> dict[str, Any] | None:
 
 
 def _existing_records(path: Path) -> list[str]:
-    """Re-sanitize retained records so removed fields disappear on the next write."""
+    """Re-sanitize only the bounded tail so removed fields disappear on the next write."""
     try:
-        lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+        if not path.exists():
+            return []
+        with path.open("rb") as handle:
+            handle.seek(0, 2)
+            size = handle.tell()
+            start = max(0, size - MAX_TELEMETRY_BYTES)
+            handle.seek(start)
+            payload = handle.read(MAX_TELEMETRY_BYTES)
     except (OSError, UnicodeError):
+        return []
+    if start:
+        _, separator, payload = payload.partition(b"\n")
+        if not separator:
+            return []
+    try:
+        lines = payload.decode("utf-8").splitlines()
+    except UnicodeError:
         return []
     records: list[str] = []
     for line in lines[-MAX_RECORDS:]:

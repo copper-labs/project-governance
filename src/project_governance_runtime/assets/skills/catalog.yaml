@@ -45,7 +45,7 @@ standard_skills:
   - id: review
     category: loop
     path: .governance/runtime/skills/review/SKILL.md
-    description: Run peer review through shared review skills, finding schema, and peer resources.
+    description: Run one bounded review through a catalog skill and the shared finding schema.
   - id: maintain
     category: loop
     path: .governance/runtime/skills/maintain/SKILL.md
@@ -148,9 +148,6 @@ resources:
   - id: loop-cycle
     path: .governance/runtime/skills/resources/loop-cycle.yaml
     description: Frame to Plan to Work to Review to Capture dry-run stage map.
-  - id: peer-dispatch
-    path: .governance/runtime/skills/resources/peer-dispatch.yaml
-    description: Agent-neutral peer review resources and shared finding schema binding.
   - id: implementation-plan-template
     path: .governance/runtime/skills/resources/implementation-plan-template.md
     description: Canonical packet-ready implementation plan slice template.

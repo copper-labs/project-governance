@@ -75,6 +75,23 @@ class RuntimeSkillPayloadTests(unittest.TestCase):
             self.assertNotIn(forbidden, text)
         self.assertNotIn("parallel governance runtime mode", text)
 
+    def test_source_provider_adapters_reference_only_live_shared_skills(self) -> None:
+        """Prevent thin source adapters from outliving the runtime skills they reference."""
+        sources = [ROOT / "CLAUDE.md", ROOT / "CODEX.md"]
+        for directory in (ROOT / ".claude/agents", ROOT / ".codex/agents"):
+            if directory.is_dir():
+                sources.extend(path for path in directory.iterdir() if path.is_file())
+        combined = "\n".join(path.read_text(encoding="utf-8") for path in sources)
+        for reference in INTERNAL_PATH.findall(combined):
+            relative = reference.removeprefix(RUNTIME_PREFIX)
+            self.assertTrue(
+                (SKILLS_SOURCE / relative).exists(),
+                f"source adapter names missing {reference}",
+            )
+        self.assertNotIn("role catalog", combined.lower())
+        self.assertFalse((ROOT / ".claude/agent-profiles.json").exists())
+        self.assertFalse((ROOT / ".codex/agent-profiles.json").exists())
+
     def test_work_and_review_skills_define_the_lean_loop(self) -> None:
         """Keep installed agent guidance proportional to changed behavior and risk."""
         skill_text = {

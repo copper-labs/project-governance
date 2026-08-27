@@ -54,8 +54,8 @@ In Codex or Claude Code, tell the primary agent:
 
 That is the operator interface. `Use governed delegation for this task` and `Delegate this task`
 are equivalent. The primary prepares the bounded plan, chooses solo when delegation would add
-overhead, and handles the internal route, authorization, launch, and finish commands. The operator
-does not prepare JSON files or run those commands manually.
+overhead, and uses only host-native controls available to the current operator. The runtime has no
+delegation commands, provider profiles, role state, or completion receipts.
 
 ## Routine Work
 

@@ -37,13 +37,16 @@ The architecture intentionally has two owners.
     through the explicit replacement contract. The target consumes the runtime's versioned change
     packet; the built-in remains available only when an operator names it directly for diagnosis.
 11. Change-sensitive packs consume one immutable before/after packet. Each run and pack receives an
-    isolated ignored evidence root. The runtime removes only empty scaffolding it created and does
-    not interpret or implicitly delete product evidence stored there.
+    isolated ignored evidence root. A temporary active marker prevents concurrent cleanup while the
+    runtime reclaims inactive empty scaffolding; it never interprets or deletes product evidence.
 12. Comment and dependency ratchets govern changed declarations and changed coordinates, not every
     old issue encountered in a touched file.
 13. Delegation uses the host agent's native controls in the current checkout. The wheel owns no
     provider routing, dispatch state, worker leases, or completion receipts.
-14. Developer documentation uses one repository-owned corpus and catalog. The runtime installs its
+14. Context source reads, selected skill bytes, retained packets, and telemetry scans have explicit
+    byte or count ceilings. Corrupted ignored packet state is rebuilt rather than becoming durable
+    authority or a permanent blocker.
+15. Developer documentation uses one repository-owned corpus and catalog. The runtime installs its
     minimal entry structure, resolves exact authored routes, and validates deterministic defects;
     the host agent owns prose generation and permitted public research.
 

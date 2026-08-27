@@ -20,13 +20,13 @@ authoring, or migration changes.
 - `docs/index.md`
 - `.governance/runtime/skills/catalog.yaml`
 - `.governance/runtime/skills/review-finding.schema.yaml`
-- `.governance/runtime/skills/resources/peer-dispatch.yaml`
 - The changed diff or artifact under review
 
 ## Workflow
 
-1. Select the smallest sufficient lens set and one review pass. Use an explicitly assigned model
-   when the operator names one; otherwise reuse the current primary in a dedicated clean pass.
+1. Select the smallest sufficient review skill from the catalog and run one review pass. Use an
+   explicitly assigned model when the operator names one; otherwise reuse the current primary in a
+   dedicated clean pass.
    A repeated failure returns to the owning check or operator; there is no automatic model ladder.
 2. Provide the review pass with scope, governing artifacts, integrated snapshot identity, validation
    results, and exact questions.

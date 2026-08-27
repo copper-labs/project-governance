@@ -1,8 +1,0 @@
-name = "qa-reviewer"
-description = "Independent read-only QA reviewer for the integrated snapshot."
-sandbox_mode = "read-only"
-model_reasoning_effort = "high"
-developer_instructions = """
-Follow .governance/runtime/skills/delegated-qa-review/SKILL.md and the compact worker brief.
-Use only supplied materialized context, do not fix findings, and do not delegate.
-"""

@@ -56,13 +56,16 @@ remote writes, tags, or a runtime release.
    operator explicitly supplies one.
 10. Agents share the current checkout by default. Delegation does not authorize another worktree;
     only a direct operator request does.
-11. The runtime removes only empty evidence directories that it created. Target-written evidence
-    remains target-owned and is never deleted implicitly.
+11. The runtime reclaims only inactive empty run and pack scaffolding that it owns. An active marker
+    protects concurrent work; target-written evidence remains target-owned and is never deleted.
 12. Full machine receipts remain available, while normal hooks and operator inspection use a
     compact projection that retains failures without embedding successful command output.
 13. Local telemetry remains bounded, ignored, content-free, and advisory. One opaque subject digest
     is enough to observe same-candidate repetition across lifecycle stages without retaining paths,
     content, or command output.
+14. Because `1.4.0` exposed the agent-routing and skill-closeout commands removed by this plan, the
+    next stable release is `2.0.0`. Do not restore compatibility shims or label the breaking
+    simplification as a minor release.
 
 ## Explicit Non-Goals
 
@@ -340,6 +343,13 @@ python3 -m unittest tests.test_runtime_package_planning
 - Remove stale proposal trees, dormant delegated-role skills, and overlapping implementation skills.
 - Make `doctor` understand source checkout mode and preserve advisory severity when an advisory pack
   resolves no command.
+- Materialize every selected skill inside the bounded context packet, cap source reads before
+  allocation, rebuild corrupted ignored packets, and let context coordination wait on the operating
+  system lock without a runtime deadline.
+- Reclaim inactive empty evidence scaffolding, bound every telemetry scan to one mebibyte, validate
+  candidate locks in memory, and replace the tracked lock atomically.
+- Remove stale provider profiles and role adapters plus the duplicated peer-dispatch resource; keep
+  only thin source adapters that resolve to live shared skills.
 
 **Acceptance:**
 
@@ -348,6 +358,9 @@ python3 -m unittest tests.test_runtime_package_planning
 - Context packets are capped at 256 KiB including skills and retain at most eight completed packets;
   interrupted runtime staging is cleaned safely. Telemetry appends never rescan more than one
   mebibyte.
+- Corrupted ignored context state self-heals, lock contention cannot become an arbitrary two-second
+  failure, and old empty run directories do not accumulate or endanger active or target-owned data.
+- Source adapters name only live shared skills and contain no provider/model availability catalog.
 - Update never edits or deletes project-owned configuration or historical target artifacts.
 - Source `doctor` passes without pretending the source repository is an installed adopter.
 - A no-command advisory pack reports an advisory finding and does not become a false blocker.

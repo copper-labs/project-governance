@@ -22,6 +22,7 @@ from .processes import run_command
 
 
 PACKET_SHA256_ENV = "PROJECT_GOVERNANCE_CHANGE_PACKET_SHA256"
+ACTIVE_RUN_MARKER = ".active"
 
 
 def _pack_directory_name(pack_id: str) -> str:
@@ -155,25 +156,36 @@ def execution_environment(
     root: Path, plan: dict[str, Any], *, run_id: str | None = None
 ) -> Iterator[dict[str, str]]:
     """Provide one read-only materialized change packet to every child command."""
-    with tempfile.TemporaryDirectory(prefix="project-governance-change-") as directory:
-        temporary_root = Path(directory)
-        packet = _wire_packet(root, plan, temporary_root)
-        packet_path = temporary_root / "change-packet.json"
-        packet_path.write_text(
-            json.dumps(packet, sort_keys=True, separators=(",", ":")),
-            encoding="utf-8",
-        )
-        packet_path.chmod(stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
-        environment = dict(os.environ)
-        environment["PROJECT_GOVERNANCE_ROOT"] = str(root)
-        environment["PROJECT_GOVERNANCE_CHANGE_PACKET"] = str(packet_path.resolve())
-        environment[PACKET_SHA256_ENV] = hashlib.sha256(packet_path.read_bytes()).hexdigest()
-        if packet["subject_digest"] is not None:
-            environment["PROJECT_GOVERNANCE_SUBJECT_DIGEST"] = packet["subject_digest"]
-        else:
-            environment.pop("PROJECT_GOVERNANCE_SUBJECT_DIGEST", None)
-        environment["PROJECT_GOVERNANCE_RUN_ID"] = run_id or str(uuid4())
-        yield environment
+    resolved_run_id = run_id or str(uuid4())
+    runs_root = root / ".governance/runtime/runs"
+    run_root = runs_root / resolved_run_id
+    run_root.mkdir(parents=True, exist_ok=True)
+    active = run_root / ACTIVE_RUN_MARKER
+    active.touch(exist_ok=False)
+    _prune_empty_evidence_scaffolding(runs_root)
+    try:
+        with tempfile.TemporaryDirectory(prefix="project-governance-change-") as directory:
+            temporary_root = Path(directory)
+            packet = _wire_packet(root, plan, temporary_root)
+            packet_path = temporary_root / "change-packet.json"
+            packet_path.write_text(
+                json.dumps(packet, sort_keys=True, separators=(",", ":")),
+                encoding="utf-8",
+            )
+            packet_path.chmod(stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
+            environment = dict(os.environ)
+            environment["PROJECT_GOVERNANCE_ROOT"] = str(root)
+            environment["PROJECT_GOVERNANCE_CHANGE_PACKET"] = str(packet_path.resolve())
+            environment[PACKET_SHA256_ENV] = hashlib.sha256(packet_path.read_bytes()).hexdigest()
+            if packet["subject_digest"] is not None:
+                environment["PROJECT_GOVERNANCE_SUBJECT_DIGEST"] = packet["subject_digest"]
+            else:
+                environment.pop("PROJECT_GOVERNANCE_SUBJECT_DIGEST", None)
+            environment["PROJECT_GOVERNANCE_RUN_ID"] = resolved_run_id
+            yield environment
+    finally:
+        active.unlink(missing_ok=True)
+        _prune_empty_evidence_scaffolding(runs_root)
 
 
 def execute_packs(
@@ -318,6 +330,40 @@ def _remove_empty_evidence_directories(evidence_root: Path) -> None:
         return
     try:
         evidence_root.parent.rmdir()
+    except OSError:
+        pass
+
+
+def _prune_empty_evidence_scaffolding(runs_root: Path) -> None:
+    """Reclaim only inactive empty run and pack directories owned by the runtime."""
+    try:
+        run_roots = list(runs_root.iterdir())
+    except OSError:
+        return
+    for run_root in run_roots:
+        if (
+            run_root.is_symlink()
+            or not run_root.is_dir()
+            or (run_root / ACTIVE_RUN_MARKER).exists()
+        ):
+            continue
+        try:
+            pack_roots = list(run_root.iterdir())
+        except OSError:
+            continue
+        for pack_root in pack_roots:
+            if pack_root.is_symlink() or not pack_root.is_dir():
+                continue
+            try:
+                pack_root.rmdir()
+            except OSError:
+                pass
+        try:
+            run_root.rmdir()
+        except OSError:
+            pass
+    try:
+        runs_root.rmdir()
     except OSError:
         pass
 

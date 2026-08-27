@@ -170,6 +170,29 @@ class RuntimeTelemetryTests(unittest.TestCase):
             self.assertLessEqual(path.stat().st_size, 520)
             self.assertEqual(records[-1]["run_id"], "run-7")
 
+    def test_append_reads_only_the_bounded_tail_of_legacy_telemetry(self) -> None:
+        """Keep a stale oversized file from turning one advisory append into a full-file scan."""
+        with tempfile.TemporaryDirectory() as directory, patch(
+            "project_governance_runtime.telemetry.MAX_TELEMETRY_BYTES", 512
+        ):
+            root = Path(directory)
+            path = root / ".governance/telemetry/runs.jsonl"
+            path.parent.mkdir(parents=True)
+            prefix = json.dumps(
+                {"event": "run-terminal", "run_id": "discarded", "status": "passed"}
+            ) + "\n"
+            retained = json.dumps(
+                {"event": "run-terminal", "run_id": "retained", "status": "passed"}
+            ) + "\n"
+            path.write_bytes(prefix.encode("utf-8") + b"x" * 700 + b"\n" + retained.encode("utf-8"))
+
+            self.assertTrue(
+                append(root, {"event": "run-terminal", "run_id": "new", "status": "passed"})
+            )
+            records = [json.loads(line) for line in path.read_text().splitlines()]
+
+        self.assertEqual([record["run_id"] for record in records], ["retained", "new"])
+
     def test_overlapping_process_writers_do_not_lose_events(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

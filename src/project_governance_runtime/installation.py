@@ -14,6 +14,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote, unquote
 
+from .state_io import atomic_write_text
+
 LOCK_PATH = Path("config/governance/runtime.lock.yaml")
 PROFILE_DEFAULT_TEXT = "schema_version: 1\nproject_extensions: []\n"
 REQUIRED_LOCK_KEYS = {
@@ -30,28 +32,34 @@ class InstallationError(RuntimeError):
     """Report a lock, bootstrap, or deliberate update failure."""
 
 
-def load_lock(path: Path) -> dict[str, Any]:
-    """Load the JSON-compatible YAML lock used by dependency-free bootstrap code."""
-    value = json.loads(path.read_text(encoding="utf-8"))
+def _validated_lock(value: Any, *, owner: str) -> dict[str, Any]:
+    """Validate one already decoded immutable runtime lock mapping."""
     if not isinstance(value, dict) or not REQUIRED_LOCK_KEYS.issubset(value):
-        raise InstallationError(f"{path}: runtime lock is incomplete")
+        raise InstallationError(f"{owner}: runtime lock is incomplete")
     if value.get("package") != "project-governance-runtime":
-        raise InstallationError(f"{path}: package must be project-governance-runtime")
+        raise InstallationError(f"{owner}: package must be project-governance-runtime")
     wheel = str(value["wheel"])
     if not wheel.endswith(".whl") or Path(wheel).name != wheel:
-        raise InstallationError(f"{path}: wheel must be one ordinary wheel filename")
+        raise InstallationError(f"{owner}: wheel must be one ordinary wheel filename")
     release_base = str(value["release_base_url"])
     if not release_base.startswith(("https://", "file://")):
-        raise InstallationError(f"{path}: release_base_url must use https:// or file://")
+        raise InstallationError(f"{owner}: release_base_url must use https:// or file://")
     source_commit = str(value["source_commit"])
     if SOURCE_COMMIT.fullmatch(source_commit) is None:
         raise InstallationError(
-            f"{path}: source_commit must be one full lowercase Git object id"
+            f"{owner}: source_commit must be one full lowercase Git object id"
         )
     digest = str(value["sha256"])
     if len(digest) != 64 or any(character not in "0123456789abcdef" for character in digest):
-        raise InstallationError(f"{path}: sha256 must be 64 lowercase hexadecimal characters")
+        raise InstallationError(f"{owner}: sha256 must be 64 lowercase hexadecimal characters")
     return value
+
+
+def load_lock(path: Path) -> dict[str, Any]:
+    """Load the JSON-compatible YAML lock used by dependency-free bootstrap code."""
+    return _validated_lock(
+        json.loads(path.read_text(encoding="utf-8")), owner=str(path)
+    )
 
 
 def sha256(path: Path) -> str:
@@ -177,16 +185,9 @@ def update(root: Path, version: str, *, apply: bool) -> dict[str, Any]:
     """Preview or apply one lock-only update without mutating project-owned configuration."""
     path = root / LOCK_PATH
     current = load_lock(path)
-    candidate = _candidate_lock(current, version)
-    temporary = root / ".governance/candidate-runtime.lock.yaml"
-    temporary.parent.mkdir(parents=True, exist_ok=True)
-    temporary.write_text(
-        json.dumps(candidate, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    candidate = _validated_lock(
+        _candidate_lock(current, version), owner="candidate runtime lock"
     )
-    try:
-        candidate = load_lock(temporary)
-    finally:
-        temporary.unlink(missing_ok=True)
     if candidate == current:
         return {
             "status": "no-op",
@@ -227,7 +228,7 @@ def update(root: Path, version: str, *, apply: bool) -> dict[str, Any]:
         )
         return result
     if apply:
-        path.write_text(
-            json.dumps(candidate, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        atomic_write_text(
+            path, json.dumps(candidate, indent=2, sort_keys=True) + "\n"
         )
     return result

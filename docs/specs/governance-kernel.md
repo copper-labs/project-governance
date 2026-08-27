@@ -45,11 +45,14 @@ target-owned configuration is ready; schema changes remain blocked in dry-run ou
 operator deliberately applies the reviewed lock. The runtime does not carry historical
 configuration migrations or predecessor-cleanup rules.
 
-`context` selects and materializes exact route-owned context and skill bytes. Each packet is capped
-at 256 KiB including skills, and the runtime retains at most eight ignored packets. Interrupted
-runtime staging directories are removed under the same local materialization lock. Delegation
-remains a host-agent concern: the wheel owns no launch state,
-provider catalog, writer lease, role receipt, retry loop, or per-skill closeout workflow.
+`context` selects and materializes exact route-owned context and skill bytes. Every selected skill
+is canonicalized or explicitly target-declared, copied into the packet, and included in its budget.
+Each packet is capped at 256 KiB including skills, and target files are read only through their
+remaining byte allowance. The runtime retains at most eight ignored packets, rebuilds a corrupted
+cache entry, and removes interrupted staging under one blocking local materialization lock rather
+than imposing an elapsed-time policy. Delegation remains a host-agent concern: the wheel owns no
+launch state, provider catalog, writer lease, role receipt, retry loop, or per-skill closeout
+workflow.
 
 Stages remain command boundaries, not selectable profiles:
 
@@ -99,8 +102,9 @@ records the implementation and clean-wheel release proof for this source contrac
   per-run/per-pack evidence root. The manifest is `subject_digest`-bound and contains bounded claim
   IDs, outcomes, and inert artifact-digest strings. The runtime will not resolve artifact paths,
   read artifact contents, compose evidence across packs, checkpoint work, resume results, or infer
-  proof relationships. After manifest inspection it removes only an empty pack directory and empty
-  run parent that it created. Any target-written file leaves that directory untouched.
+  proof relationships. A temporary active marker protects concurrent runs while the runtime
+  reclaims inactive empty pack and run scaffolding. Any target-written file leaves its directory
+  untouched.
 
 ## Built-In Packs
 
@@ -212,8 +216,10 @@ normal pinned-wheel update path.
 
 ## Telemetry
 
-Telemetry is one ignored validation JSONL file bounded by both 1,000 records and one mebibyte. It
-records only run identity, runtime version, stage, mode, non-reversible scope and subject digests,
+Telemetry is one ignored validation JSONL file bounded by both 1,000 records and one mebibyte. Each
+append reads at most the newest one mebibyte, including when stale or externally modified state is
+larger. It records only run identity, runtime version, stage, mode, non-reversible scope and subject
+digests,
 changed-path and selected-pack counts, terminal status and reason, total duration, total pack
 duration, and the ten slowest pack IDs with durations. It never records paths, commands, output,
 findings, prompts, documentation activity, skill activity, agent activity, or source content.

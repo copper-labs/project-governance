@@ -181,6 +181,24 @@ class RuntimeUpdateTests(unittest.TestCase):
                 "preserve through lock update\n",
             )
 
+    def test_update_rejects_an_incomplete_candidate_without_fixed_temporary_state(self) -> None:
+        """Validate downloaded lock content in memory before one atomic tracked-file update."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            lock_path, current, candidate, candidate_path = self._release_update(root)
+            del candidate["sha256"]
+            candidate_path.write_text(json.dumps(candidate), encoding="utf-8")
+
+            with self.assertRaisesRegex(
+                InstallationError, "candidate runtime lock.*incomplete"
+            ):
+                update(root, "0.2.0", apply=True)
+
+            self.assertEqual(load_lock(lock_path), current)
+            self.assertFalse(
+                (root / ".governance/candidate-runtime.lock.yaml").exists()
+            )
+
 
 class RuntimeSkillMaterializationTests(unittest.TestCase):
     """Prove generic skills remain ignored installed runtime material."""

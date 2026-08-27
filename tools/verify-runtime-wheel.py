@@ -490,7 +490,7 @@ def verify_context_cache_boundary(root: Path, command: Path) -> None:
                         "primary_context_tokens": 100,
                         "active_plan_context_tokens": 100,
                         "expansion_context_tokens": 100,
-                        "total_context_tokens": 1000,
+                        "total_context_tokens": 10000,
                     },
                 }
             ],
@@ -506,6 +506,14 @@ def verify_context_cache_boundary(root: Path, command: Path) -> None:
     )
     if resolved["materialization"]["byte_limits"]["combined"] > 256 * 1024:
         raise RuntimeError("installed context packet exceeded its runtime-owned byte ceiling")
+    selected_skills = [item for item in resolved.get("skills", []) if item.get("id") == "work"]
+    if len(selected_skills) != 1 or not selected_skills[0].get("materialized_path"):
+        raise RuntimeError("installed context packet omitted its declared standard skill")
+    packet_root = root / resolved["materialization"]["root"]
+    installed_skill = root / selected_skills[0]["path"]
+    packet_skill = packet_root / selected_skills[0]["materialized_path"]
+    if not packet_skill.is_file() or packet_skill.read_bytes() != installed_skill.read_bytes():
+        raise RuntimeError("installed context packet did not preserve exact standard skill bytes")
     runtime_root = root / ".governance/runtime/context"
     abandoned = runtime_root / ".context-interrupted"
     abandoned.mkdir()

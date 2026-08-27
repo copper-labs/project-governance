@@ -89,11 +89,10 @@ content and base. If either changes, the integrated snapshot is a new candidate.
 | --- | --- |
 | Applicable source file | Formatting, naming, maintainability, comments, test quality, and target-owned packs for that path |
 | Governed documentation | Documentation governance |
-| Context routes, agent catalog, or root instructions | Context routing |
+| Context routes, skill catalog, root instructions, or provider adapters | Context routing and adapter-reference validation |
 | Runtime lock, bootstrap, hooks, profile, facts, or extension registration | Installation validation |
 | Enabled documentation profile or capability catalog | Existing documentation validation |
 | Telemetry implementation or telemetry policy | Telemetry verification |
-| Agent contract, routing, dispatch state, or native profile catalog | Agent contract plus synthetic native-host routing |
 | Pack definitions, schemas, selectors, or extension registration | Validation conformance |
 | Source file at commit time | Secret detection for changed files |
 
@@ -147,10 +146,10 @@ process ownership, explicit deadlines, and the bounded local telemetry it actual
 Report the focused test, affected seam, selected packs, any intentionally omitted proof, and
 residual risk. The JSON result contains normalized findings, status, execution duration, and
 termination reason. The optional `--summary` projection keeps active findings while omitting
-successful command detail and changed-path inventories. Bounded local telemetry adds changed-path,
-selected-pack, executed-command, and per-pack duration/count aggregates plus one opaque digest for
-eligible content-bound subjects without retaining paths, commands, output, prompts, or source
-content. `project-governance telemetry status` summarizes unmatched starts, runtime
+successful command detail and changed-path inventories. Bounded local telemetry adds changed-path
+and selected-pack counts, total and slowest-pack durations, and one opaque digest for eligible
+content-bound subjects without retaining paths, commands, output, prompts, or source content.
+`project-governance telemetry status` summarizes unmatched starts, runtime
 overhead, retained repeated scopes, same-subject repetition, broad runs, and slow packs as advisory
 observations. It does not prove a repeat was unnecessary because invalidation reasons are not
 retained. It also excludes direct commands and

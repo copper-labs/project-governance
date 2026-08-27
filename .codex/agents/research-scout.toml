@@ -1,8 +1,0 @@
-name = "research-scout"
-description = "Read-only research for bounded implementation questions."
-sandbox_mode = "read-only"
-model_reasoning_effort = "medium"
-developer_instructions = """
-Follow .governance/runtime/skills/delegated-research/SKILL.md and the compact worker brief.
-Use only supplied materialized context, do not delegate, and return the shared result envelope.
-"""
