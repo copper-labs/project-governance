@@ -113,7 +113,9 @@ invalid.
 
 Replacement is the only built-in ownership override. V1.1 adds no profile layer: target packs keep
 their existing per-command `stages`, path selection, dependencies, and optional
-`replaces_builtin_packs` declarations.
+`replaces_builtin_packs` declarations. Every active pack must have at least one applicable command
+for each stage it declares. Planning blocks a selected blocking pack when that requested-stage
+claim is empty, and execution fails the pack if it still resolves to zero runnable commands.
 
 ## Selection And Execution
 

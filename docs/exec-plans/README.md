@@ -16,7 +16,9 @@ Git remains the implementation history and recovery mechanism.
 
 ## Active
 
-No runtime implementation plan is currently active.
+- [Lean Governance Operating Model](active/2026-08-27-lean-governance-operating-model.md) aligns
+  runtime selection and shipped hooks with one affected local sign-off and one narrow pull-request
+  narrative check.
 
 ## Completed
 

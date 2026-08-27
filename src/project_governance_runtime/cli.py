@@ -26,6 +26,7 @@ from .documentation import (
     initialize_documentation,
     route_documentation,
 )
+from .execution_commands import pack_stage_command_gaps
 from .installation import InstallationError, initialize, load_lock, update
 from .planning import build_plan, public_plan
 from .runner import execute
@@ -255,6 +256,18 @@ def _doctor(root: Path) -> dict[str, Any]:
     for relative in ("config/governance/profile.yaml", "config/governance/facts.lock.yaml"):
         if not (root / relative).exists():
             findings.append(f"{relative} is missing")
+    try:
+        packs = load_packs(root)
+    except (ConfigurationError, OSError) as error:
+        findings.append(str(error))
+    else:
+        for pack_id, pack in sorted(packs.items()):
+            gaps = pack_stage_command_gaps(pack)
+            if gaps:
+                findings.append(
+                    f"pack {pack_id} has no command for declared stage(s): "
+                    + ", ".join(gaps)
+                )
     return {"status": "failed" if findings else "passed", "findings": findings}
 
 

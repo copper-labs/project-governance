@@ -258,6 +258,15 @@ def execute_pack(
                 break
         if command_status == "warning" and status == "passed":
             status = "warning"
+    applicability_findings = []
+    if not commands:
+        status = "failed"
+        applicability_findings.append({
+            "rule_id": "pack.no-applicable-command",
+            "severity": "blocking",
+            "pack_id": pack_id,
+            "message": "selected pack resolved no runnable commands",
+        })
     manifest = inspect_evidence_manifest(
         evidence_root,
         pack_environment.get("PROJECT_GOVERNANCE_SUBJECT_DIGEST"),
@@ -265,13 +274,14 @@ def execute_pack(
     manifest_findings = [
         {**finding, "pack_id": pack_id} for finding in manifest["findings"]
     ]
-    if manifest_findings:
+    pack_findings = applicability_findings + manifest_findings
+    if pack_findings:
         status = "failed"
     finding_counts = {
         state: sum(
             command["finding_counts"].get(state, 0) for command in commands
         )
-        + sum(finding.get("severity") == state for finding in manifest_findings)
+        + sum(finding.get("severity") == state for finding in pack_findings)
         for state in FINDING_STATES
     }
     process_failure_count = sum(command["process_failure"] for command in commands)
@@ -286,7 +296,7 @@ def execute_pack(
         "process_failure_count": process_failure_count,
         "integrity_failure_count": integrity_failure_count,
         "subject_digest": pack_environment.get("PROJECT_GOVERNANCE_SUBJECT_DIGEST"),
-        "findings": manifest_findings,
+        "findings": pack_findings,
         "evidence_manifest": manifest,
         "evidence_manifest_count": int(manifest["status"] != "absent"),
         "valid_evidence_manifest_count": int(manifest["status"] == "valid"),

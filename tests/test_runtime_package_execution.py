@@ -678,6 +678,58 @@ class RuntimeExecutionTests(unittest.TestCase):
             )
         )
 
+    def test_selected_pack_with_no_resolved_command_fails_closed(self) -> None:
+        """Reject a clean pack result when stage or missing arguments omit every command."""
+        packs = {
+            "target": {
+                "enforcement": "blocking",
+                "commands": [{"run": "true {pr_body_file}", "stages": ["pre-pr"]}],
+            }
+        }
+        plan = {
+            "stage": "pre-pr",
+            "mode": "impacted",
+            "changed_paths": [],
+            "change_scope": all_change_scope(),
+            "selected_packs": ["target"],
+            "execution_order": ["target"],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            output = execute(Path(directory), packs, plan, timeout_seconds=2)
+        item = output["evidence"][0]
+        self.assertEqual(output["status"], "failed")
+        self.assertEqual(item["commands"], [])
+        self.assertEqual(item["integrity_failure_count"], 0)
+        self.assertEqual(item["findings"][0]["rule_id"], "pack.no-applicable-command")
+
+    def test_advisory_pack_without_a_command_does_not_skip_later_packs(self) -> None:
+        """Preserve pack enforcement while preventing an advisory false-green result."""
+        passed = json.dumps({"status": "passed", "finding_count": 0, "findings": []})
+        packs = {
+            "advisory": {
+                "enforcement": "advisory",
+                "commands": [{"run": "true {pr_body_file}"}],
+            },
+            "later": {
+                "enforcement": "blocking",
+                "commands": [[sys.executable, "-c", f"print({passed!r})"]],
+            },
+        }
+        plan = {
+            "stage": "pre-pr",
+            "mode": "impacted",
+            "changed_paths": [],
+            "change_scope": all_change_scope(),
+            "selected_packs": ["advisory", "later"],
+            "execution_order": ["advisory", "later"],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            output = execute(Path(directory), packs, plan, timeout_seconds=2)
+        self.assertEqual(output["status"], "warning")
+        self.assertEqual(
+            [item["pack_id"] for item in output["evidence"]], ["advisory", "later"]
+        )
+
     def test_blocking_failure_stops_later_packs(self) -> None:
         """Stop dependency-order execution when a blocking pack cannot complete."""
         packs = {

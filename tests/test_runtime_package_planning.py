@@ -18,7 +18,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from project_governance_runtime.configuration import ConfigurationError, load_packs  # noqa: E402
 from project_governance_runtime.changed_paths import ChangedPathError, _base_commit  # noqa: E402
-from project_governance_runtime.cli import _resolve_plan  # noqa: E402
+from project_governance_runtime.cli import _doctor, _resolve_plan  # noqa: E402
 from project_governance_runtime.planning import build_plan, public_plan  # noqa: E402
 
 
@@ -458,6 +458,105 @@ class RuntimePlanningTests(unittest.TestCase):
         rendered = public_plan(plan)
         self.assertEqual(rendered["change_scope"]["record_count"], 1)
         self.assertNotIn("records", rendered["change_scope"])
+
+
+class PackStageCoverageTests(unittest.TestCase):
+    """Prove stage claims cannot turn into false-green pack results."""
+
+    @staticmethod
+    def lifecycle_pack(command_stages: list[str] | None) -> dict[str, dict[str, object]]:
+        """Build one pack whose command either spans or narrows its declared lifecycle."""
+        command: dict[str, object] = {"run": "true"}
+        if command_stages is not None:
+            command["stages"] = command_stages
+        return {
+            "target": {
+                "id": "target",
+                "implementation_status": "active",
+                "stages": ["pre-commit", "pre-push"],
+                "path_globs": ["src/**"],
+                "commands": [command],
+                "enforcement": "blocking",
+                "depends_on": [],
+            }
+        }
+
+    def test_declared_stage_without_an_applicable_command_blocks_planning(self) -> None:
+        """Reject a lifecycle claim that would otherwise pass without running a command."""
+        plan = build_plan(
+            self.lifecycle_pack(["pre-commit"]),
+            stage="pre-push",
+            mode="impacted",
+            changed_paths=["src/example.py"],
+        )
+        self.assertEqual(plan["status"], "blocked")
+        self.assertEqual(plan["execution_order"], [])
+        self.assertEqual(plan["blockers"], [
+            {
+                "code": "pack-stage-without-command",
+                "pack_id": "target",
+                "uncovered_stages": ["pre-push"],
+            }
+        ])
+
+    def test_advisory_stage_gap_remains_nonblocking(self) -> None:
+        """Preserve an advisory pack's configured enforcement posture."""
+        packs = self.lifecycle_pack(["pre-commit"])
+        packs["target"]["enforcement"] = "advisory"
+        plan = build_plan(
+            packs,
+            stage="pre-push",
+            mode="impacted",
+            changed_paths=["src/example.py"],
+        )
+        self.assertEqual(plan["status"], "ready", plan["blockers"])
+
+    def test_unstaged_command_covers_every_declared_stage(self) -> None:
+        """Treat an unfiltered command as runnable throughout its pack lifecycle."""
+        plan = build_plan(
+            self.lifecycle_pack(None),
+            stage="pre-push",
+            mode="impacted",
+            changed_paths=["src/example.py"],
+        )
+        self.assertEqual(plan["status"], "ready", plan["blockers"])
+
+    def test_named_diagnostic_has_no_stage_coverage_false_positive(self) -> None:
+        """Keep direct pack repair runnable because explicit execution has no stage filter."""
+        plan = build_plan(
+            self.lifecycle_pack(["pre-commit"]),
+            stage=None,
+            mode="explicit",
+            changed_paths=[],
+            explicit_pack_ids=["target"],
+        )
+        self.assertEqual(plan["status"], "ready", plan["blockers"])
+
+    def test_doctor_reports_stage_command_coverage(self) -> None:
+        """Expose the configuration defect before an operator starts a check."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            pack_root = root / "config/validation/packs"
+            pack_root.mkdir(parents=True)
+            (pack_root / "target.yaml").write_text(
+                yaml.safe_dump(self.lifecycle_pack(["pre-commit"])["target"]),
+                encoding="utf-8",
+            )
+            result = _doctor(root)
+        self.assertIn(
+            "pack target has no command for declared stage(s): pre-push",
+            result["findings"],
+        )
+
+    def test_doctor_reports_invalid_pack_yaml_without_a_traceback(self) -> None:
+        """Keep doctor useful when the target manifest itself cannot be parsed."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            pack_root = root / "config/validation/packs"
+            pack_root.mkdir(parents=True)
+            (pack_root / "invalid.yaml").write_text("id: [\n", encoding="utf-8")
+            result = _doctor(root)
+        self.assertTrue(any("invalid YAML" in finding for finding in result["findings"]))
 
 
 if __name__ == "__main__":

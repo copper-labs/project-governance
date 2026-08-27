@@ -6,6 +6,8 @@ import fnmatch
 from collections import deque
 from typing import Any
 
+from .execution_commands import pack_stage_command_gaps
+
 
 def _matches(path: str, patterns: list[Any]) -> bool:
     """Match repository globs, treating a leading recursive segment as zero-or-more directories."""
@@ -30,6 +32,24 @@ def _stage_candidates(
         if mode == "explicit" or stage in stages:
             result.append(pack_id)
     return sorted(result)
+
+
+def _selected_stage_command_blockers(
+    packs: dict[str, dict[str, Any]], selected: set[str], stage: str | None
+) -> list[dict[str, Any]]:
+    """Block only selected packs that cannot execute at the requested lifecycle stage."""
+    if stage is None:
+        return []
+    return [
+        {
+            "code": "pack-stage-without-command",
+            "pack_id": pack_id,
+            "uncovered_stages": [stage],
+        }
+        for pack_id in sorted(selected)
+        if packs[pack_id].get("enforcement") == "blocking"
+        if stage in pack_stage_command_gaps(packs[pack_id])
+    ]
 
 
 def _replacement_map(packs: dict[str, dict[str, Any]]) -> dict[str, str]:
@@ -207,13 +227,14 @@ def build_plan(
         selected, reasons, blockers, path_matches = _impacted_selection(
             packs, candidates, changed_paths, replacements
         )
-
     prerequisites: dict[str, list[str]] = {}
     order: list[str] = []
     if not blockers:
         try:
             selected, prerequisites = _dependency_closure(selected, packs, candidate_set)
-            order = _execution_order(prerequisites)
+            blockers.extend(_selected_stage_command_blockers(packs, selected, stage))
+            if not blockers:
+                order = _execution_order(prerequisites)
         except ValueError as error:
             blockers.append({"code": "invalid-dependency-graph", "message": str(error)})
 
