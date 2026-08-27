@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -144,6 +145,25 @@ class RuntimeInstallationTests(unittest.TestCase):
             self.assertIn("Path(__file__).resolve().parents[1]", launcher)
             self.assertNotIn("Path(__file__).resolve().parents[2]", launcher)
             self.assertIn("PIP_DISABLE_PIP_VERSION_CHECK", launcher)
+
+    def test_cli_refuses_launcher_refresh_in_the_source_checkout(self) -> None:
+        """Keep adopter launchers from replacing source-development hooks."""
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "project_governance_runtime.cli",
+                "init",
+                "--refresh-launchers",
+            ],
+            cwd=ROOT,
+            env={**os.environ, "PYTHONPATH": str(ROOT / "src")},
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("not this source checkout", result.stdout)
 
     def test_bootstrap_rejects_an_ambiguous_source_revision_before_download(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

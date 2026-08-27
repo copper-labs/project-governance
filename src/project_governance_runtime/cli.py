@@ -568,6 +568,13 @@ def _run_administration(args: argparse.Namespace, root: Path) -> int:
     elif args.command == "telemetry":
         output = telemetry_status(root)
     elif args.command == "init":
+        if (
+            args.refresh_launchers
+            and (root / "src/project_governance_runtime/cli.py").is_file()
+        ):
+            raise InstallationError(
+                "launcher refresh is for adopting repositories, not this source checkout"
+            )
         output = initialize(root, refresh_launchers=args.refresh_launchers)
     else:
         output = update(root, args.to, apply=args.apply)
