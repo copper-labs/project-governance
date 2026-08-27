@@ -47,6 +47,11 @@ def _selection_arguments(parser: argparse.ArgumentParser) -> None:
 def _parser() -> argparse.ArgumentParser:
     """Build the lean public CLI without legacy aliases."""
     parser = argparse.ArgumentParser(prog="project-governance")
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
+    )
     commands = parser.add_subparsers(dest="command", required=True)
     check = commands.add_parser("check")
     _selection_arguments(check)
@@ -235,15 +240,27 @@ def _doctor(root: Path) -> dict[str, Any]:
     """Report actionable installation health without changing repository state."""
     findings: list[str] = []
     source_checkout = (root / "src/project_governance_runtime/cli.py").is_file()
+    lock_version: str | None = None
+    runtime_lock_match: bool | None = None
     if not source_checkout:
         lock_path = root / "config/governance/runtime.lock.yaml"
         if not lock_path.exists():
             findings.append("config/governance/runtime.lock.yaml is missing")
+            runtime_lock_match = False
         else:
             try:
-                load_lock(lock_path)
+                lock = load_lock(lock_path)
             except (InstallationError, OSError, json.JSONDecodeError) as error:
                 findings.append(str(error))
+                runtime_lock_match = False
+            else:
+                lock_version = str(lock["version"])
+                runtime_lock_match = lock_version == __version__
+                if not runtime_lock_match:
+                    findings.append(
+                        f"installed runtime version {__version__} does not match "
+                        f"lock version {lock_version}"
+                    )
     required = ["config/governance/profile.yaml"]
     if not source_checkout:
         required.append("config/governance/facts.lock.yaml")
@@ -265,6 +282,9 @@ def _doctor(root: Path) -> dict[str, Any]:
     return {
         "status": "failed" if findings else "passed",
         "mode": "source" if source_checkout else "installed",
+        "runtime_version": __version__,
+        "lock_version": lock_version,
+        "runtime_lock_match": runtime_lock_match,
         "findings": findings,
     }
 

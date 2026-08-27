@@ -5,7 +5,7 @@ type: governance
 status: current
 owner: project-governance
 created: 2026-08-15
-updated: 2026-08-21
+updated: 2026-08-27
 summary: Defines semantic release identity and the automated immutable wheel publication boundary.
 ---
 
@@ -18,6 +18,10 @@ Commit hashes never appear in a stable release name.
 - Increment `MAJOR` for an adopter-breaking runtime or configuration contract.
 - Increment `MINOR` for backward-compatible capabilities.
 - Increment `PATCH` for backward-compatible fixes.
+
+For a major release, the release notes name every known adopter-owned integration surface that
+requires manual review. The lock's `configuration_schema` describes only runtime-owned
+configuration compatibility; it is not a claim that provider workflows or templates need no work.
 
 Untagged source builds use the next patch as a PEP 440 development version with commit identity,
 such as `1.1.2.dev3+gabcdef123456`. They are CI or local artifacts, not GitHub releases.

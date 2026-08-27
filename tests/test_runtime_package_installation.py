@@ -145,6 +145,16 @@ class RuntimeUpdateTests(unittest.TestCase):
 
             preview = update(root, "0.2.0", apply=False)
             self.assertEqual(preview["status"], "dry-run")
+            self.assertEqual(
+                preview["verification_commands"],
+                [
+                    "python3 tools/governance-bootstrap.py",
+                    ".governance/runtime/bin/project-governance doctor",
+                ],
+            )
+            self.assertFalse(
+                any(" check " in command for command in preview["verification_commands"])
+            )
             self.assertEqual(load_lock(lock_path), current)
             applied = update(root, "0.2.0", apply=True)
             self.assertEqual(applied["status"], "applied")

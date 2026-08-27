@@ -5,7 +5,7 @@ type: spec
 status: current
 owner: project-governance
 created: 2026-03-02
-updated: 2026-08-24
+updated: 2026-08-27
 summary: Contract for the package runtime, its configuration boundary, focused execution model, and bounded local telemetry.
 ---
 
@@ -19,6 +19,7 @@ generic repository checks without absorbing product policy or duplicating build 
 ## Commands
 
 ```text
+project-governance --version
 project-governance check --stage <stage> --mode impacted
 project-governance check --stage <stage> --mode impacted --summary
 project-governance check --pack <pack-id>
@@ -39,8 +40,9 @@ project-governance update --to <version> --dry-run|--apply
 `check` emits normalized findings and a stable exit code. `plan` explains selected and omitted
 packs without running them. Their optional `--summary` projection omits path inventories, command
 lines, and process output while retaining bounded active findings; default output and
-`--json-output` remain full machine receipts. `doctor` reports a missing or invalid integration plainly. `init`
-creates only missing integration files. `update` advances the runtime lock only after required
+`--json-output` remain full machine receipts. `doctor` reports the running package version, locked
+version, their match state, and any missing or invalid integration plainly. `init` creates only
+missing integration files. `update` advances the runtime lock only after required
 target-owned configuration is ready; schema changes remain blocked in dry-run output until an
 operator deliberately applies the reviewed lock. The runtime does not carry historical
 configuration migrations or predecessor-cleanup rules.

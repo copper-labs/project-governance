@@ -22,6 +22,7 @@ the ignored local environment. Hooks never download or change the lock themselve
 
 ```sh
 python3 tools/governance-bootstrap.py
+project-governance --version
 project-governance doctor
 project-governance plan --stage pre-commit --mode impacted --json
 project-governance check --summary --stage pre-commit --mode impacted

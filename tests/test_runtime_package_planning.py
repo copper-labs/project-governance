@@ -4,10 +4,13 @@
 from __future__ import annotations
 
 import argparse
+import io
+import json
 import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
@@ -25,6 +28,7 @@ from project_governance_runtime.cli import (  # noqa: E402
     _plan_summary,
     _resolve_plan,
 )
+from project_governance_runtime.installation import initialize  # noqa: E402
 from project_governance_runtime.planning import build_plan, public_plan  # noqa: E402
 
 
@@ -39,6 +43,18 @@ class RuntimePlanningTests(unittest.TestCase):
                 encoding="utf-8"
             )
         )
+
+    def test_root_version_flag_reports_the_running_package(self) -> None:
+        """Let operators identify an installed runtime without selecting a command."""
+        output = io.StringIO()
+        with (
+            patch("project_governance_runtime.cli.__version__", "2.0.1"),
+            redirect_stdout(output),
+            self.assertRaises(SystemExit) as raised,
+        ):
+            _parser().parse_args(["--version"])
+        self.assertEqual(raised.exception.code, 0)
+        self.assertEqual(output.getvalue(), "project-governance 2.0.1\n")
 
     def test_timeout_is_optional_and_explicit_values_are_positive(self) -> None:
         """Leave duration to the target unless an operator supplies a valid deadline."""
@@ -757,12 +773,50 @@ class PackStageCoverageTests(unittest.TestCase):
         """Do not require an adopter lock or facts file from runtime source development."""
         result = _doctor(ROOT)
         self.assertEqual(result["mode"], "source")
+        self.assertIsNone(result["lock_version"])
+        self.assertIsNone(result["runtime_lock_match"])
         self.assertFalse(
             any("runtime.lock.yaml is missing" in finding for finding in result["findings"])
         )
         self.assertFalse(
             any("facts.lock.yaml is missing" in finding for finding in result["findings"])
         )
+
+    def test_installed_doctor_reports_matching_and_mismatched_runtime_versions(self) -> None:
+        """Make the installed wheel and tracked lock relationship directly observable."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            initialize(root)
+            lock_path = root / "config/governance/runtime.lock.yaml"
+            lock = {
+                "schema_version": 1,
+                "package": "project-governance-runtime",
+                "version": "2.0.1",
+                "wheel": "project_governance_runtime-2.0.1-py3-none-any.whl",
+                "sha256": "0" * 64,
+                "source_commit": "a" * 40,
+                "python": ">=3.9,<4",
+                "configuration_schema": 2,
+                "release_base_url": "https://example.invalid/releases/download",
+            }
+            lock_path.write_text(json.dumps(lock), encoding="utf-8")
+            with patch("project_governance_runtime.cli.__version__", "2.0.1"):
+                matched = _doctor(root)
+            self.assertEqual(matched["status"], "passed", matched["findings"])
+            self.assertEqual(matched["runtime_version"], "2.0.1")
+            self.assertEqual(matched["lock_version"], "2.0.1")
+            self.assertIs(matched["runtime_lock_match"], True)
+
+            lock["version"] = "2.0.0"
+            lock_path.write_text(json.dumps(lock), encoding="utf-8")
+            with patch("project_governance_runtime.cli.__version__", "2.0.1"):
+                mismatched = _doctor(root)
+            self.assertEqual(mismatched["status"], "failed")
+            self.assertIs(mismatched["runtime_lock_match"], False)
+            self.assertIn(
+                "installed runtime version 2.0.1 does not match lock version 2.0.0",
+                mismatched["findings"],
+            )
 
 
 if __name__ == "__main__":

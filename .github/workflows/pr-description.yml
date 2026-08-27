@@ -16,8 +16,6 @@ jobs:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    env:
-      PR_BODY_FILE: ${{ runner.temp }}/pr-body.md
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -28,9 +26,9 @@ jobs:
       - name: Materialize the live pull request body
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
-        run: printf '%s' "$PR_BODY" > "$PR_BODY_FILE"
+        run: printf '%s' "$PR_BODY" > "$RUNNER_TEMP/pr-body.md"
       - name: Validate the change narrative
         env:
           PYTHONPATH: src
           PROJECT_GOVERNANCE_PR_TITLE: ${{ github.event.pull_request.title }}
-        run: python3 -m project_governance_runtime.checkers pr-description "$PR_BODY_FILE"
+        run: python3 -m project_governance_runtime.checkers pr-description "$RUNNER_TEMP/pr-body.md"

@@ -653,6 +653,7 @@ class RuntimeChangeNarrativeIntegrationTests(ChangeNarrativeTestCase):
         )
         self.assertEqual(materialize["env"]["PR_BODY"], "${{ github.event.pull_request.body }}")
         self.assertNotIn("github.event.pull_request.body", materialize["run"])
+        self.assertIn('$RUNNER_TEMP/pr-body.md', materialize["run"])
         validate = next(
             step for step in job["steps"] if step.get("name") == "Validate the change narrative"
         )
@@ -662,6 +663,8 @@ class RuntimeChangeNarrativeIntegrationTests(ChangeNarrativeTestCase):
             "${{ github.event.pull_request.title }}",
         )
         self.assertNotIn("github.event.pull_request.title", validate["run"])
+        self.assertIn('$RUNNER_TEMP/pr-body.md', validate["run"])
+        self.assertNotIn("env", job)
 
 
 if __name__ == "__main__":
