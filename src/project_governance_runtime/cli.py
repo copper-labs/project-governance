@@ -351,8 +351,10 @@ def _plan_summary(plan: dict[str, Any]) -> dict[str, Any]:
         "mode": plan.get("mode"),
         "changed_path_count": len(plan.get("changed_paths", [])),
         "selected_packs": plan.get("selected_packs", []),
-        "execution_order": plan.get("execution_order", []),
     }
+    execution_order = plan.get("execution_order", [])
+    if execution_order != summary["selected_packs"]:
+        summary["execution_order"] = execution_order
     blockers = [
         _summary_blocker(item)
         for item in plan.get("blockers", [])
@@ -361,6 +363,53 @@ def _plan_summary(plan: dict[str, Any]) -> dict[str, Any]:
     if blockers:
         summary["blockers"] = blockers
     return summary
+
+
+def _nonpassing_pack_summary(item: dict[str, Any]) -> dict[str, Any] | None:
+    """Return bounded pack detail only when a compact receipt needs attention."""
+    active_counts = {
+        key: value
+        for key, value in item.get("finding_counts", {}).items()
+        if key in {"blocking", "advisory"} and value
+    }
+    failure_counts = {
+        key: item.get(key)
+        for key in (
+            "process_failure_count",
+            "integrity_failure_count",
+            "invalid_evidence_manifest_count",
+        )
+        if item.get(key)
+    }
+    if (
+        item.get("status") in {"passed", "not-applicable"}
+        and not active_counts
+        and not failure_counts
+    ):
+        return None
+    summary = {
+        "pack_id": item.get("pack_id"),
+        "status": item.get("status"),
+        "duration_ms": item.get("duration_ms"),
+        **failure_counts,
+    }
+    if active_counts:
+        summary["finding_counts"] = active_counts
+    return summary
+
+
+def _active_summary_findings(item: dict[str, Any]) -> list[dict[str, Any]]:
+    """Collect bounded active findings from one pack and its commands."""
+    findings = list(item.get("findings", []))
+    for command in item.get("commands", []):
+        if isinstance(command, dict):
+            findings.extend(command.get("findings", []))
+    return [
+        _bounded_summary_finding({**finding, "pack_id": item.get("pack_id")})
+        for finding in findings
+        if isinstance(finding, dict)
+        and finding.get("severity") in {"blocking", "advisory"}
+    ]
 
 
 def _result_summary(output: dict[str, Any]) -> dict[str, Any]:
@@ -378,39 +427,17 @@ def _result_summary(output: dict[str, Any]) -> dict[str, Any]:
         )
     }
     summary["plan"] = _plan_summary(output.get("plan", {}))
-    evidence_summary: list[dict[str, Any]] = []
+    nonpassing_packs: list[dict[str, Any]] = []
     active_findings: list[dict[str, Any]] = []
     for item in output.get("evidence", []):
         if not isinstance(item, dict):
             continue
-        evidence_summary.append({
-            key: item.get(key)
-            for key in (
-                "pack_id",
-                "status",
-                "duration_ms",
-                "finding_count",
-                "finding_counts",
-                "process_failure_count",
-                "integrity_failure_count",
-                "evidence_manifest_count",
-                "valid_evidence_manifest_count",
-                "invalid_evidence_manifest_count",
-            )
-        })
-        findings = list(item.get("findings", []))
-        for command in item.get("commands", []):
-            if isinstance(command, dict):
-                findings.extend(command.get("findings", []))
-        for finding in findings:
-            if not isinstance(finding, dict):
-                continue
-            if finding.get("severity") not in {"blocking", "advisory"}:
-                continue
-            active_findings.append(
-                _bounded_summary_finding({**finding, "pack_id": item.get("pack_id")})
-            )
-    summary["evidence"] = evidence_summary
+        pack_summary = _nonpassing_pack_summary(item)
+        if pack_summary is not None:
+            nonpassing_packs.append(pack_summary)
+        active_findings.extend(_active_summary_findings(item))
+    if nonpassing_packs:
+        summary["nonpassing_packs"] = nonpassing_packs
     if active_findings:
         summary["findings"] = active_findings
     return summary

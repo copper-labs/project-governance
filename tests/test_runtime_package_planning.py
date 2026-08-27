@@ -493,6 +493,7 @@ class RuntimePlanningTests(unittest.TestCase):
         summary = _plan_summary(rendered)
         self.assertEqual(summary["changed_path_count"], 1)
         self.assertEqual(summary["selected_packs"], rendered["selected_packs"])
+        self.assertNotIn("execution_order", summary)
         self.assertNotIn("changed_paths", summary)
         self.assertNotIn("path_matches", summary)
         self.assertNotIn("selection_reasons", summary)

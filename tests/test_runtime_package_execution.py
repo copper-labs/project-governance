@@ -183,6 +183,7 @@ class RuntimeExecutionTests(unittest.TestCase):
         self.assertNotIn(payload, rendered_summary)
         self.assertNotIn("stdout", rendered_summary)
         self.assertNotIn("argv", rendered_summary)
+        self.assertNotIn("nonpassing_packs", summary)
         self.assertNotIn("commands", records[-1]["packs"][0])
         self.assertNotIn("stdout", records[-1]["packs"][0])
         self.assertNotIn("paths", records[-1])
@@ -236,6 +237,10 @@ class RuntimeExecutionTests(unittest.TestCase):
         }
         summary = _result_summary(output)
         rendered = json.dumps(summary, sort_keys=True)
+        self.assertEqual(summary["nonpassing_packs"][0]["pack_id"], "tests")
+        self.assertEqual(
+            summary["nonpassing_packs"][0]["finding_counts"], {"blocking": 1}
+        )
         self.assertEqual(summary["findings"][0]["pack_id"], "tests")
         self.assertTrue(summary["findings"][0]["message_truncated"])
         self.assertEqual(len(summary["findings"][0]["message"]), 1000)
