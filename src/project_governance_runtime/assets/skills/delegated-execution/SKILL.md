@@ -33,7 +33,9 @@ trigger. Skip it otherwise, including for a trivial direct edit.
    Route already-decided multiplatform synthesis to balanced; use economy only after those semantics
    are settled and the remaining component or platform work is mechanical and independently proved.
 3. Choose the smallest safe topology from those signals. Across active waves, one repository may
-   contain at most one writer and two read-only specialists with non-overlapping scopes.
+   contain at most one writer and two read-only specialists with non-overlapping scopes. Use the
+   current checkout for all roles. Delegation is not authority to create or move a worktree; each
+   additional worktree requires a direct operator request.
 4. If the result is `solo`, keep the coordinator as writer and do not load the role catalog or
    delegation policy merely to confirm that no role was selected. Record the result in the plan.
 5. If the result is non-solo, read the role catalog, verify each specialist obligation, and remove
@@ -72,4 +74,5 @@ gate.
 ## Evidence
 
 Report the selected tier, active roles, writer count, integration evidence, context packet digest,
-verified snapshot, build results, QA findings and reconciliations, and residual risk.
+verified snapshot, build results, QA findings and reconciliations, and residual risk. If the
+operator authorized an additional worktree, report its path and whether it was retained or removed.

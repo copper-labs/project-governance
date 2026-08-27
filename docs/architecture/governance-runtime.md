@@ -37,7 +37,8 @@ The architecture intentionally has two owners.
     through the explicit replacement contract. The target consumes the runtime's versioned change
     packet; the built-in remains available only when an operator names it directly for diagnosis.
 11. Change-sensitive packs consume one immutable before/after packet. Each run and pack receives an
-    isolated ignored evidence root; the runtime does not interpret product evidence stored there.
+    isolated ignored evidence root. The runtime removes only empty scaffolding it created and does
+    not interpret or implicitly delete product evidence stored there.
 12. Comment and dependency ratchets govern changed declarations and changed coordinates, not every
     old issue encountered in a touched file.
 13. Provider-aware routing consumes explicit native session and catalog inputs, returns launch

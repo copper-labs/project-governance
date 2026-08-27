@@ -20,6 +20,7 @@ generic repository checks without absorbing product policy or duplicating build 
 
 ```text
 project-governance check --stage <stage> --mode impacted
+project-governance check --stage <stage> --mode impacted --summary
 project-governance check --pack <pack-id>
 project-governance check --pack <pack-id> --stage <stage> --mode impacted
 project-governance check --stage pre-pr --mode all
@@ -32,6 +33,7 @@ project-governance agent-dispatch start --request <route-request> --json
 project-governance agent-dispatch finish --authorization <digest> --results <result-bundle> --json
 project-governance doctor
 project-governance telemetry status
+project-governance telemetry status --compact
 project-governance init
 project-governance docs init --dry-run
 project-governance docs route --capability <id-or-alias> --json
@@ -40,7 +42,9 @@ project-governance update --to <version> --dry-run|--apply
 ```
 
 `check` emits normalized findings and a stable exit code. `plan` explains selected and omitted
-packs without running them. `doctor` reports a missing or invalid integration plainly. `init`
+packs without running them. Their optional `--summary` projection omits path inventories, command
+lines, and process output while retaining bounded active findings; default output and
+`--json-output` remain full machine receipts. `doctor` reports a missing or invalid integration plainly. `init`
 creates only missing integration files. `update` advances the runtime lock only after required
 target-owned configuration migrations validate; it stops before a repository-owned decision. Its
 dry run reports exact legacy registry migrations and a bounded predecessor-artifact cleanup
@@ -106,7 +110,8 @@ records the implementation and clean-wheel release proof for this source contrac
   per-run/per-pack evidence root. The manifest is `subject_digest`-bound and contains bounded claim
   IDs, outcomes, and inert artifact-digest strings. The runtime will not resolve artifact paths,
   read artifact contents, compose evidence across packs, checkpoint work, resume results, or infer
-  proof relationships.
+  proof relationships. After manifest inspection it removes only an empty pack directory and empty
+  run parent that it created. Any target-written file leaves that directory untouched.
 
 ## Built-In Packs
 
@@ -139,6 +144,9 @@ deadline, but an explicitly supplied timeout remains blocking and terminates the
 group. It does not maintain a second cache around a repository's build, test, device, or language
 tool. It resolves one immutable change packet before execution and supplies one run ID and one
 isolated evidence root per selected pack.
+
+The runtime owns no evidence-retention policy. It prunes only its empty directory scaffolding;
+nonempty evidence remains target-owned and must be retained or removed by target policy.
 
 Every pack command emits exactly one JSON object with a string `status` and a `findings` array.
 Malformed or missing envelopes block; a target wraps an ordinary tool command in its own adapter.
@@ -217,11 +225,15 @@ normal pinned-wheel update path.
 
 Telemetry is a bounded, ignored JSONL file retaining at most 1,000 start and terminal events. It
 records runtime/run identity, stage and mode, a non-reversible scope fingerprint, changed-path and
-selected-pack counts, execution duration, status and termination, plus per-pack command, finding,
-status, and duration aggregates. It never retains paths, commands, process output, prompts, or
-source content. Writes are concurrency-safe and fail open; telemetry is advisory only and cannot
-weaken, approve, or delete a governance check. End-to-end shadow timing, including planning, is an
-adopter measurement rather than a runtime execution-duration claim.
+selected-pack counts, one validated opaque subject digest for nonempty content-bound non-named
+runs, execution duration, status and termination, plus per-pack command, finding, status, and
+duration aggregates. It never retains paths, commands, process output, prompts, or source content.
+Writes are concurrency-safe and fail open; telemetry is advisory only and cannot weaken, approve,
+or delete a governance check. Status derives unmatched starts, runner overhead, repeated scopes,
+same-subject repeats, and cross-stage same-subject repeats without declaring a run hung or a repeat
+unnecessary. `telemetry status --compact` omits explanatory and empty event-family sections for
+low-token cross-project inspection. End-to-end shadow timing, including planning, is an adopter
+measurement rather than a runtime execution-duration claim.
 
 An accepted `agent-dispatch finish` may add one `orchestration-terminal` record. Its allowlist holds
 only role, native model/profile, terminal outcome, duration, optional provider-reported token

@@ -126,6 +126,22 @@ class RuntimeSkillPayloadTests(unittest.TestCase):
             self.assertIn("helper extraction", review_skill)
             self.assertIn("meaningful owner", review_skill)
 
+        delegated = (SKILLS_SOURCE / "delegated-execution" / "SKILL.md").read_text(
+            encoding="utf-8"
+        ).lower()
+        work = skill_text["work"]
+        roles = (SKILLS_SOURCE / "resources" / "execution-roles.yaml").read_text(
+            encoding="utf-8"
+        ).lower()
+        for instruction in (delegated, work, roles):
+            self.assertIn("current checkout", instruction)
+            self.assertIn("delegation", instruction)
+            self.assertIn("operator", instruction)
+            self.assertIn("worktree", instruction)
+        for instruction in (delegated, work):
+            self.assertIn("path", instruction)
+            self.assertIn("retained or removed", instruction)
+
         authoring = (SKILLS_SOURCE / "technical-authoring" / "SKILL.md").read_text(
             encoding="utf-8"
         ).lower()

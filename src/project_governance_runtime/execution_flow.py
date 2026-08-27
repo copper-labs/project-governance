@@ -271,6 +271,7 @@ def execute_pack(
         evidence_root,
         pack_environment.get("PROJECT_GOVERNANCE_SUBJECT_DIGEST"),
     )
+    _remove_empty_evidence_directories(evidence_root)
     manifest_findings = [
         {**finding, "pack_id": pack_id} for finding in manifest["findings"]
     ]
@@ -305,6 +306,18 @@ def execute_pack(
         "evidence_artifact_digest_count": manifest["artifact_digest_count"],
         "commands": commands,
     }, termination
+
+
+def _remove_empty_evidence_directories(evidence_root: Path) -> None:
+    """Prune only empty directories created for this pack and run."""
+    try:
+        evidence_root.rmdir()
+    except OSError:
+        return
+    try:
+        evidence_root.parent.rmdir()
+    except OSError:
+        pass
 
 
 def execute_command(

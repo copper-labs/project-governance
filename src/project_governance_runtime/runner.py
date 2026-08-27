@@ -31,6 +31,9 @@ def execute(
         plan.get("stage"), plan["mode"], plan["changed_paths"], plan["selected_packs"]
     )
     telemetry_mode, retained_fingerprint = _telemetry_identity(plan, fingerprint)
+    retained_digest = (
+        digest if telemetry_mode != "explicit" and changed_path_count > 0 else None
+    )
     append(root, {
         "event": "run-started",
         "run_id": run_id,
@@ -41,6 +44,7 @@ def execute(
         "selected_pack_count": selected_pack_count,
         "selected_packs": plan["selected_packs"],
         "scope_fingerprint": retained_fingerprint,
+        "subject_digest": retained_digest,
     })
     try:
         with execution_environment(root, plan, run_id=run_id) as environment:
@@ -65,6 +69,7 @@ def execute(
             termination="runtime-exception",
             duration_ms=round((monotonic() - started) * 1000, 3),
             evidence=[],
+            subject_digest=retained_digest,
         )
         raise
     output = {
@@ -89,6 +94,7 @@ def execute(
         termination=termination,
         duration_ms=output["duration_ms"],
         evidence=evidence,
+        subject_digest=retained_digest,
     )
     return output
 
@@ -106,6 +112,7 @@ def _record_terminal(
     termination: str,
     duration_ms: float,
     evidence: list[dict[str, Any]],
+    subject_digest: str | None,
 ) -> None:
     """Attempt one privacy-safe terminal lifecycle receipt."""
     append(root, {
@@ -118,6 +125,7 @@ def _record_terminal(
         "termination_reason": termination,
         "duration_ms": duration_ms,
         "scope_fingerprint": fingerprint,
+        "subject_digest": subject_digest,
         "changed_path_count": changed_path_count,
         "selected_pack_count": selected_pack_count,
         "packs": [

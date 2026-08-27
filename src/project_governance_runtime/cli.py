@@ -35,7 +35,11 @@ from .skill_utilization import SkillUtilizationError
 from .skill_utilization import begin as begin_skill_utilization
 from .skill_utilization import finish as finish_skill_utilization
 from .telemetry import append as telemetry_append
+from .telemetry import compact_status as compact_telemetry_status
 from .telemetry import status as telemetry_status
+
+
+MAX_SUMMARY_MESSAGE_LENGTH = 1000
 
 
 def _root() -> Path:
@@ -61,12 +65,14 @@ def _parser() -> argparse.ArgumentParser:
     _selection_arguments(check)
     check.add_argument("--timeout-seconds", type=float)
     check.add_argument("--json-output", type=Path)
+    check.add_argument("--summary", action="store_true")
     check.add_argument("--commit-message-file", type=Path)
     check.add_argument("--pr-body-file", type=Path)
     check.add_argument("--pr-title")
     plan = commands.add_parser("plan")
     _selection_arguments(plan)
     plan.add_argument("--json", action="store_true")
+    plan.add_argument("--summary", action="store_true")
     context = commands.add_parser("context")
     context.add_argument("--task", required=True)
     context.add_argument("--changed-path", action="append", default=[])
@@ -95,6 +101,7 @@ def _parser() -> argparse.ArgumentParser:
     commands.add_parser("doctor")
     telemetry = commands.add_parser("telemetry")
     telemetry.add_argument("telemetry_command", choices=["status"])
+    telemetry.add_argument("--compact", action="store_true")
     commands.add_parser("init")
     docs = commands.add_parser("docs")
     docs_commands = docs.add_subparsers(dest="docs_command", required=True)
@@ -286,13 +293,127 @@ def _doctor(root: Path) -> dict[str, Any]:
     return {"status": "failed" if findings else "passed", "findings": findings}
 
 
-def _emit(value: dict[str, Any], path: Path | None = None) -> None:
+def _emit(
+    value: dict[str, Any],
+    path: Path | None = None,
+    *,
+    stdout_value: dict[str, Any] | None = None,
+) -> None:
     """Render one deterministic JSON result and optional evidence file."""
     rendered = json.dumps(value, indent=2, sort_keys=True) + "\n"
     if path:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(rendered, encoding="utf-8")
-    sys.stdout.write(rendered)
+    if stdout_value is None:
+        sys.stdout.write(rendered)
+    else:
+        sys.stdout.write(json.dumps(stdout_value, indent=2, sort_keys=True) + "\n")
+
+
+def _bounded_summary_finding(finding: dict[str, Any]) -> dict[str, Any]:
+    """Keep one actionable finding without carrying unbounded process output."""
+    result = {
+        key: finding[key]
+        for key in ("rule_id", "severity", "path", "line", "column", "pack_id")
+        if key in finding
+    }
+    message = finding.get("message")
+    if isinstance(message, str):
+        result["message"] = message[:MAX_SUMMARY_MESSAGE_LENGTH]
+        if len(message) > MAX_SUMMARY_MESSAGE_LENGTH:
+            result["message_truncated"] = True
+    return result
+
+
+def _summary_blocker(blocker: dict[str, Any]) -> dict[str, Any]:
+    """Retain blocker identity and a bounded message without path inventories."""
+    result = {
+        key: blocker[key]
+        for key in ("code", "pack_id", "stage", "mode")
+        if key in blocker
+    }
+    message = blocker.get("message")
+    if isinstance(message, str):
+        result["message"] = message[:MAX_SUMMARY_MESSAGE_LENGTH]
+        if len(message) > MAX_SUMMARY_MESSAGE_LENGTH:
+            result["message_truncated"] = True
+    paths = blocker.get("paths")
+    if isinstance(paths, list):
+        result["path_count"] = len(paths)
+    return result
+
+
+def _plan_summary(plan: dict[str, Any]) -> dict[str, Any]:
+    """Project one plan without changed paths, match maps, or selection prose."""
+    summary: dict[str, Any] = {
+        "status": plan.get("status"),
+        "stage": plan.get("stage"),
+        "mode": plan.get("mode"),
+        "changed_path_count": len(plan.get("changed_paths", [])),
+        "selected_packs": plan.get("selected_packs", []),
+        "execution_order": plan.get("execution_order", []),
+    }
+    blockers = [
+        _summary_blocker(item)
+        for item in plan.get("blockers", [])
+        if isinstance(item, dict)
+    ]
+    if blockers:
+        summary["blockers"] = blockers
+    return summary
+
+
+def _result_summary(output: dict[str, Any]) -> dict[str, Any]:
+    """Project a validation result without command lines, output, or source inventories."""
+    if "evidence" not in output:
+        return _plan_summary(output)
+    summary: dict[str, Any] = {
+        key: output.get(key)
+        for key in (
+            "run_id",
+            "status",
+            "termination_reason",
+            "duration_ms",
+            "subject_digest",
+        )
+    }
+    summary["plan"] = _plan_summary(output.get("plan", {}))
+    evidence_summary: list[dict[str, Any]] = []
+    active_findings: list[dict[str, Any]] = []
+    for item in output.get("evidence", []):
+        if not isinstance(item, dict):
+            continue
+        evidence_summary.append({
+            key: item.get(key)
+            for key in (
+                "pack_id",
+                "status",
+                "duration_ms",
+                "finding_count",
+                "finding_counts",
+                "process_failure_count",
+                "integrity_failure_count",
+                "evidence_manifest_count",
+                "valid_evidence_manifest_count",
+                "invalid_evidence_manifest_count",
+            )
+        })
+        findings = list(item.get("findings", []))
+        for command in item.get("commands", []):
+            if isinstance(command, dict):
+                findings.extend(command.get("findings", []))
+        for finding in findings:
+            if not isinstance(finding, dict):
+                continue
+            if finding.get("severity") not in {"blocking", "advisory"}:
+                continue
+            active_findings.append(
+                _bounded_summary_finding({**finding, "pack_id": item.get("pack_id")})
+            )
+    summary["evidence"] = evidence_summary
+    if active_findings:
+        summary["findings"] = active_findings
+    return summary
 
 
 def _result_exit_code(output: dict[str, Any]) -> int:
@@ -320,7 +441,8 @@ def _run_check_or_plan(args: argparse.Namespace, root: Path) -> int:
                 "pr_title": str(args.pr_title or ""),
             },
         )
-    _emit(output, getattr(args, "json_output", None))
+    summary = _result_summary(output) if args.summary else None
+    _emit(output, getattr(args, "json_output", None), stdout_value=summary)
     return _result_exit_code(output)
 
 
@@ -487,7 +609,7 @@ def _run_administration(args: argparse.Namespace, root: Path) -> int:
     if args.command == "doctor":
         output = _doctor(root)
     elif args.command == "telemetry":
-        output = telemetry_status(root)
+        output = compact_telemetry_status(root) if args.compact else telemetry_status(root)
     elif args.command == "init":
         output = initialize(root)
     else:

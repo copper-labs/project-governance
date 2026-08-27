@@ -60,5 +60,8 @@ result bundle. Missing or unsafe inputs mean continue solo.
 - Hooks launch checks only; they do not download or upgrade the runtime.
 - Never infer or overwrite a repository-owned configuration decision during an upgrade.
 - Broader checks are release or contract-boundary work, not ordinary iteration.
+- Use the current checkout for the primary, read-only specialists, and the one bounded writer.
+  Delegation is not authority to create or move a worktree. An additional worktree requires a
+  direct operator request and its path and disposition must be reported at closeout.
 - Across active waves, one repository has at most one writer and two readers; QA assurance requires a separate
   explicit start, and builds remain deterministic harness commands.

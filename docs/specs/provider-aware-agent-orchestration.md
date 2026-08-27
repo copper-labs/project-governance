@@ -63,17 +63,20 @@ host identity or catalog data returns solo without machine scanning or provider 
 4. **One deterministic decision precedes delegation.** No agent decides whether to spawn an agent.
 5. **One delegated writer is the repository limit.** At most two independent read-only specialists
    may share the same launch wave.
-6. **One explicit operator action authorizes one launch wave.** Post-integration QA is a separate
+6. **The current checkout is the workspace.** The primary, readers, and bounded writer share it.
+   Delegation never authorizes creating or moving a worktree; each additional worktree requires a
+   direct operator request and must be identified at closeout.
+7. **One explicit operator action authorizes one launch wave.** Post-integration QA is a separate
    assurance task only when the operator chooses it; it is not an automatic approval loop.
-7. **A specialist never re-plans or retries.** A missing decision terminates that entry and the
+8. **A specialist never re-plans or retries.** A missing decision terminates that entry and the
    primary completes the remainder solo.
-8. **Critical safety failures suspend.** Ordinary cost, timeout, proof, or quality misses do not
+9. **Critical safety failures suspend.** Ordinary cost, timeout, proof, or quality misses do not
    create automatic review state or subjective equivalence analysis.
-9. **Telemetry writes once.** One terminal task receipt is advisory; control state owns replay and
+10. **Telemetry writes once.** One terminal task receipt is advisory; control state owns replay and
    critical suspension.
-10. **Builds remain deterministic.** The harness runs the build subprocess; the primary interprets
+11. **Builds remain deterministic.** The harness runs the build subprocess; the primary interprets
     bounded results. Version 1 enables no build agent.
-11. **Native tools do not bypass governance.** A host launches only entries returned by
+12. **Native tools do not bypass governance.** A host launches only entries returned by
     `agent-dispatch start` and closes them through `agent-dispatch finish`. Direct native spawning
     is outside governed delegation and must be reported as such rather than silently treated as an
     equivalent path.

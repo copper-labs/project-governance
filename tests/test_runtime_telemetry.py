@@ -19,9 +19,16 @@ sys.path.insert(0, str(ROOT / "src"))
 from project_governance_runtime.telemetry import (  # noqa: E402
     _telemetry_lock,
     append,
+    compact_status,
     scope_fingerprint,
     status,
 )
+
+
+DIGEST_A = "sha256:" + "a" * 64
+DIGEST_B = "sha256:" + "b" * 64
+FINGERPRINT_A = "sha256:" + "1" * 64
+FINGERPRINT_B = "sha256:" + "2" * 64
 
 
 class RuntimeTelemetryTests(unittest.TestCase):
@@ -53,7 +60,8 @@ class RuntimeTelemetryTests(unittest.TestCase):
                     "mode": "impacted",
                     "changed_path_count": 2,
                     "selected_packs": ["format", "tests"],
-                    "scope_fingerprint": "sha256:abc",
+                    "scope_fingerprint": FINGERPRINT_A,
+                    "subject_digest": DIGEST_A,
                     "absolute_path": "/private/adopter/source.py",
                     "prompt": "private prompt",
                 },
@@ -99,6 +107,7 @@ class RuntimeTelemetryTests(unittest.TestCase):
 
         self.assertEqual(records[0]["schema_version"], 1)
         self.assertEqual(records[0]["selected_pack_count"], 2)
+        self.assertEqual(records[0]["subject_digest"], DIGEST_A)
         self.assertEqual(records[1]["packs"][0]["command_count"], 2)
         self.assertEqual(records[1]["packs"][0]["blocking_finding_count"], 1)
         self.assertEqual(records[1]["packs"][0]["accepted_finding_count"], 2)
@@ -287,16 +296,18 @@ class RuntimeTelemetryTests(unittest.TestCase):
         """Expose bounded efficiency observations without claiming that a repeat was invalid."""
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            for run_id, mode, fingerprint, duration, pack_duration in (
-                ("run-1", "impacted", "sha256:private-a", 15, 10),
-                ("run-2", "impacted", "sha256:private-a", 25, 20),
-                ("run-3", "all", "sha256:private-b", 40, 30),
+            for run_id, stage, mode, fingerprint, subject, duration, pack_duration in (
+                ("run-1", "pre-commit", "impacted", FINGERPRINT_A, DIGEST_A, 15, 10),
+                ("run-2", "pre-push", "impacted", FINGERPRINT_A, DIGEST_A, 25, 20),
+                ("run-3", "release", "all", FINGERPRINT_B, None, 40, 30),
             ):
                 append(root, {
                     "event": "run-terminal",
                     "run_id": run_id,
+                    "stage": stage,
                     "mode": mode,
                     "scope_fingerprint": fingerprint,
+                    "subject_digest": subject,
                     "status": "passed",
                     "duration_ms": duration,
                     "packs": [{
@@ -305,8 +316,18 @@ class RuntimeTelemetryTests(unittest.TestCase):
                         "duration_ms": pack_duration,
                     }],
                 })
+            append(root, {
+                "event": "run-started",
+                "run_id": "interrupted-run",
+                "stage": "pre-push",
+                "mode": "impacted",
+                "scope_fingerprint": FINGERPRINT_B,
+                "subject_digest": DIGEST_B,
+            })
             summary = status(root)["validation"]
             rendered = json.dumps(summary, sort_keys=True)
+            compact = compact_status(root)
+            full = status(root)
 
         self.assertEqual(summary["retained_run_count"], 3)
         self.assertEqual(summary["mode_counts"], {"all": 1, "impacted": 2})
@@ -315,15 +336,25 @@ class RuntimeTelemetryTests(unittest.TestCase):
         self.assertEqual(summary["repeated_scope_run_count"], 1)
         self.assertEqual(summary["most_repeated_scope_run_count"], 2)
         self.assertEqual(summary["total_duration_ms"], 80)
+        self.assertEqual(summary["runner_overhead_ms"], 20)
+        self.assertEqual(summary["same_subject_repeat_run_count"], 1)
+        self.assertEqual(summary["cross_stage_same_subject_run_count"], 1)
+        self.assertEqual(summary["nonterminal_run_count"], 1)
         self.assertEqual(summary["slowest_packs"], [{
             "id": "tests",
             "run_count": 3,
             "total_duration_ms": 60,
             "max_duration_ms": 30,
         }])
-        self.assertNotIn("private-a", rendered)
+        self.assertNotIn(DIGEST_A, rendered)
         self.assertIn("not proof", summary["interpretation"])
         self.assertIn("direct commands outside the runtime", summary["excludes"])
+
+        self.assertEqual(compact["validation"]["same_subject_repeat_run_count"], 1)
+        self.assertEqual(compact["validation"]["nonterminal_run_count"], 1)
+        self.assertNotIn("orchestration", compact)
+        self.assertNotIn("documentation", compact)
+        self.assertLess(len(json.dumps(compact)), len(json.dumps(full)))
 
     def test_orchestration_values_cannot_retain_host_free_text(self) -> None:
         """Clamp outcome and proof fields to bounded enums instead of content-bearing strings."""

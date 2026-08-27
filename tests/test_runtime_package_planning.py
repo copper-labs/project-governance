@@ -19,7 +19,12 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from project_governance_runtime.configuration import ConfigurationError, load_packs  # noqa: E402
 from project_governance_runtime.changed_paths import ChangedPathError, _base_commit  # noqa: E402
-from project_governance_runtime.cli import _doctor, _parser, _resolve_plan  # noqa: E402
+from project_governance_runtime.cli import (  # noqa: E402
+    _doctor,
+    _parser,
+    _plan_summary,
+    _resolve_plan,
+)
 from project_governance_runtime.planning import build_plan, public_plan  # noqa: E402
 
 
@@ -484,6 +489,22 @@ class RuntimePlanningTests(unittest.TestCase):
         rendered = public_plan(plan)
         self.assertEqual(rendered["change_scope"]["record_count"], 1)
         self.assertNotIn("records", rendered["change_scope"])
+
+        summary = _plan_summary(rendered)
+        self.assertEqual(summary["changed_path_count"], 1)
+        self.assertEqual(summary["selected_packs"], rendered["selected_packs"])
+        self.assertNotIn("changed_paths", summary)
+        self.assertNotIn("path_matches", summary)
+        self.assertNotIn("selection_reasons", summary)
+
+    def test_summary_flags_are_additive(self) -> None:
+        """Keep full output as the default while allowing one compact projection."""
+        check = _parser().parse_args(["check", "--pack", "format", "--summary"])
+        plan = _parser().parse_args(["plan", "--pack", "format", "--summary"])
+        telemetry = _parser().parse_args(["telemetry", "status", "--compact"])
+        self.assertTrue(check.summary)
+        self.assertTrue(plan.summary)
+        self.assertTrue(telemetry.compact)
 
 
 class NamedPackScopeTests(unittest.TestCase):

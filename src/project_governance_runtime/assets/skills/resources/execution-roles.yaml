@@ -215,6 +215,8 @@ provider_contract:
     - Role permissions and result fields are provider-independent.
     - Assisted and coordinated modes use one implementation writer.
     - Across active waves, a repository contains at most one delegated writer and two read-only specialists.
+    - All roles use the current checkout unless the operator directly authorizes an additional worktree.
+    - Delegation alone never authorizes creating or moving a worktree.
     - Delegated roles receive bounded digest-bound context packets and may not delegate again.
     - Context providers are coordinator-side adapters; delegated roles receive normalized materialized items, not provider tools or storage handles.
     - Repository files, graph memory, and later context services preserve one packet and result contract.

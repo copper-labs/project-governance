@@ -40,12 +40,14 @@ receipt remains advisory rather than becoming change authority.
 Optional delegated execution begins only when the operator explicitly runs `agent-route` and then
 `agent-dispatch start`. The current Codex or Claude Code session remains primary; the runtime
 returns same-provider launch entries but does not launch them. A missing or rejected route falls
-back to the normal solo flow.
+back to the normal solo flow. All roles use the current checkout by default; delegation does not
+authorize another worktree.
 
 The runner resolves changed scope once, supplies every selected pack the same immutable before/after
 packet, and gives each pack a run-scoped evidence directory. An unmapped path produces one selector
 finding instead of triggering every pack. The runner does not duplicate build-system caching or
-store receipts for product checks.
+store receipts for product checks. It removes only empty evidence directories that it created and
+never deletes target-written evidence implicitly.
 
 ## What Is Broad On Purpose
 

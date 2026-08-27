@@ -138,9 +138,15 @@ artifacts from the dry-run list. Bootstrap then safely replaces the ignored loca
 the old runtime command has exited. Requesting the already locked immutable version returns
 `no-op`; the same version resolving to different bytes fails closed.
 
-Use `project-governance telemetry status` to inspect availability, validation outcomes, and
-retained self-reported skill utilization. The underlying ignored JSONL retains bounded, redacted
-aggregates for trend analysis; it is diagnostic only and never authorizes a pass or policy change.
+Use `project-governance telemetry status --compact` for routine efficiency inspection across
+projects. Use the unmodified status command only when its explanations and all event families are
+needed. The underlying ignored JSONL retains at most 1,000 bounded, redacted events for trend
+analysis; it is diagnostic only and never authorizes a pass or policy change.
+
+Use `--summary` on `plan` or `check` when a person or agent needs the outcome rather than a full
+machine receipt. Shipped hooks use this projection. Active failures remain visible, while changed
+path inventories, command lines, stdout, and stderr stay in the full default or `--json-output`
+receipt.
 
 ## Configuration Ownership
 

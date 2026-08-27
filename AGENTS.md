@@ -30,17 +30,17 @@ durable decisions and plans live under `docs/**`.
 project-governance init
 project-governance doctor
 project-governance plan --stage <stage> --mode impacted --json
-project-governance check --stage <stage> --mode impacted
+project-governance check --stage <stage> --mode impacted --summary
 project-governance check --pack <pack-id>
 project-governance update --to <version> --dry-run
-project-governance telemetry status
+project-governance telemetry status --compact
 ```
 
 During source development, install development dependencies once and run the checkout package:
 
 ```sh
 python3 -m pip install -r requirements-dev.txt
-tools/run-source-governance.sh check --stage pre-commit --mode impacted --staged
+tools/run-source-governance.sh check --summary --stage pre-commit --mode impacted --staged
 ```
 
 ## Validation

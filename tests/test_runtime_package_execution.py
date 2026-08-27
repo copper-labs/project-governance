@@ -26,6 +26,7 @@ from project_governance_runtime.changed_paths import (  # noqa: E402
     subject_digest,
 )
 from project_governance_runtime.execution_commands import command_argv  # noqa: E402
+from project_governance_runtime.cli import _result_summary  # noqa: E402
 from project_governance_runtime.planning import build_plan  # noqa: E402
 from project_governance_runtime.runner import _telemetry_identity, execute  # noqa: E402
 from project_governance_runtime.telemetry import status as telemetry_status  # noqa: E402
@@ -166,6 +167,8 @@ class RuntimeExecutionTests(unittest.TestCase):
                 .read_text(encoding="utf-8")
                 .splitlines()
             ]
+            summary = _result_summary(output)
+            rendered_summary = json.dumps(summary, sort_keys=True)
         self.assertEqual(output["status"], "passed")
         self.assertEqual(output["run_id"], records[0]["run_id"])
         self.assertEqual(output["run_id"], records[-1]["run_id"])
@@ -177,6 +180,9 @@ class RuntimeExecutionTests(unittest.TestCase):
         self.assertEqual(records[-1]["selected_pack_count"], 1)
         self.assertEqual(records[-1]["packs"][0]["command_count"], 1)
         self.assertEqual(records[-1]["packs"][0]["process_failure_count"], 0)
+        self.assertNotIn(payload, rendered_summary)
+        self.assertNotIn("stdout", rendered_summary)
+        self.assertNotIn("argv", rendered_summary)
         self.assertNotIn("commands", records[-1]["packs"][0])
         self.assertNotIn("stdout", records[-1]["packs"][0])
         self.assertNotIn("paths", records[-1])
@@ -187,6 +193,56 @@ class RuntimeExecutionTests(unittest.TestCase):
         self.assertNotIn("subject_digest", records[-1])
         self.assertEqual(output["evidence"][0]["evidence_manifest"]["status"], "absent")
         self.assertEqual(records[-1]["packs"][0]["evidence_manifest_count"], 0)
+
+    def test_compact_failure_retains_bounded_normalized_findings(self) -> None:
+        """Make a compact failure actionable without copying arbitrary process output."""
+        output = {
+            "run_id": "run-1",
+            "status": "failed",
+            "termination_reason": "exit",
+            "duration_ms": 12,
+            "subject_digest": "sha256:" + "a" * 64,
+            "plan": {
+                "status": "ready",
+                "stage": "pre-push",
+                "mode": "impacted",
+                "changed_paths": ["private/source.py"],
+                "selected_packs": ["tests"],
+                "execution_order": ["tests"],
+            },
+            "evidence": [{
+                "pack_id": "tests",
+                "status": "failed",
+                "duration_ms": 10,
+                "finding_count": 1,
+                "finding_counts": {"blocking": 1},
+                "process_failure_count": 1,
+                "integrity_failure_count": 0,
+                "evidence_manifest_count": 0,
+                "valid_evidence_manifest_count": 0,
+                "invalid_evidence_manifest_count": 0,
+                "findings": [],
+                "commands": [{
+                    "argv": ["private-tool"],
+                    "stdout": "private output",
+                    "stderr": "private error",
+                    "findings": [{
+                        "rule_id": "checker.command-failed",
+                        "severity": "blocking",
+                        "message": "x" * 1200,
+                    }],
+                }],
+            }],
+        }
+        summary = _result_summary(output)
+        rendered = json.dumps(summary, sort_keys=True)
+        self.assertEqual(summary["findings"][0]["pack_id"], "tests")
+        self.assertTrue(summary["findings"][0]["message_truncated"])
+        self.assertEqual(len(summary["findings"][0]["message"]), 1000)
+        self.assertNotIn("private/source.py", rendered)
+        self.assertNotIn("private-tool", rendered)
+        self.assertNotIn("private output", rendered)
+        self.assertNotIn("private error", rendered)
 
     def test_valid_pack_evidence_manifest_is_digest_indexed(self) -> None:
         """Index bounded claims without copying claim IDs or artifact data into telemetry."""
@@ -217,6 +273,13 @@ class RuntimeExecutionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             output = execute(root, packs, plan, timeout_seconds=2)
+            retained_root = (
+                root
+                / ".governance/runtime/runs"
+                / output["run_id"]
+                / "target-check"
+            )
+            self.assertTrue((retained_root / "evidence-manifest.json").is_file())
             telemetry = (
                 root / ".governance/telemetry/runs.jsonl"
             ).read_text(encoding="utf-8")
@@ -519,7 +582,9 @@ class RuntimeExecutionTests(unittest.TestCase):
             "print(json.dumps({'status':'passed','finding_count':0,'findings':[],"
             "'run_id':os.environ['PROJECT_GOVERNANCE_RUN_ID'],"
             "'pack_id':os.environ['PROJECT_GOVERNANCE_PACK_ID'],"
-            "'evidence_root':os.environ['PROJECT_GOVERNANCE_EVIDENCE_ROOT']}))"
+            "'evidence_root':os.environ['PROJECT_GOVERNANCE_EVIDENCE_ROOT'],"
+            "'evidence_root_exists':os.path.isdir("
+            "os.environ['PROJECT_GOVERNANCE_EVIDENCE_ROOT'])}))"
         )
         packs = {
             pack_id: {
@@ -544,7 +609,11 @@ class RuntimeExecutionTests(unittest.TestCase):
                 for item in output["evidence"]
             ]
             evidence_roots = [Path(item["evidence_root"]) for item in child_outputs]
-            self.assertTrue(all(path.is_dir() for path in evidence_roots))
+            self.assertTrue(all(item["evidence_root_exists"] for item in child_outputs))
+            self.assertTrue(all(not path.exists() for path in evidence_roots))
+            self.assertFalse(
+                (root / ".governance/runtime/runs" / output["run_id"]).exists()
+            )
         self.assertEqual({item["run_id"] for item in child_outputs}, {output["run_id"]})
         self.assertEqual(
             [item["pack_id"] for item in child_outputs],

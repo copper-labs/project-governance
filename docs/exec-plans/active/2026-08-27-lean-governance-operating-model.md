@@ -54,6 +54,15 @@ remote writes, tags, or a runtime release.
 9. The adopting repository owns local-feedback objectives plus command and CI deadlines. The
    runtime records duration, imposes no generic default timeout, and fails closed when a target or
    operator explicitly supplies one.
+10. Agents share the current checkout by default. Delegation does not authorize another worktree;
+    only a direct operator request does.
+11. The runtime removes only empty evidence directories that it created. Target-written evidence
+    remains target-owned and is never deleted implicitly.
+12. Full machine receipts remain available, while normal hooks and operator inspection use a
+    compact projection that retains failures without embedding successful command output.
+13. Local telemetry remains bounded, ignored, content-free, and advisory. One opaque subject digest
+    is enough to observe same-candidate repetition across lifecycle stages without retaining paths,
+    content, or command output.
 
 ## Explicit Non-Goals
 
@@ -65,6 +74,8 @@ remote writes, tags, or a runtime release.
 - No removal of the generic `pre-pr` stage; adopters may still use it deliberately. Only the
   runtime's shipped default hook becomes narrative-only.
 - No change to product test commands, platform matrices, or adopter-owned validation packs.
+- No automatic worktree creation, worktree cleanup command, evidence retention policy, or adopter
+  workspace mutation.
 
 ## Slice 1: Eliminate false-green pack execution
 
@@ -269,6 +280,49 @@ python3 -m unittest tests.test_runtime_change_narrative tests.test_runtime_relea
 python3 -m unittest tests.test_runtime_skill_payload
 ```
 
+## Slice 6: Bound workspace and observability overhead
+
+**Depends on:** Slice 5.
+
+**Owner:** installed execution guidance, evidence-root lifecycle, public receipt projection, and
+local advisory telemetry.
+
+**Changes:**
+
+- Make the current checkout the default shared workspace for the primary, read-only specialists,
+  and one bounded writer. Require direct operator authority for every additional worktree and
+  report any authorized path plus its disposition at closeout.
+- Remove a pack evidence directory and its run parent only when they are still empty after manifest
+  inspection. Preserve every nonempty target-owned directory without adding a retention daemon or
+  destructive cleanup command.
+- Add one common `--summary` projection for `plan` and `check`; use it in shipped hooks. Keep the
+  full result for default JSON output and `--json-output`, and retain non-passing findings in the
+  compact projection.
+- Retain one validated SHA-256 subject digest on validation lifecycle events. Derive unmatched
+  starts, runner overhead, same-subject repetition, and cross-stage repetition at status time.
+- Add `telemetry status --compact` so multi-project efficiency audits can read bounded aggregates
+  without loading explanatory sections or empty event families.
+
+**Acceptance:**
+
+- No installed instruction treats delegation as authority to create or move a worktree.
+- Empty runtime-created evidence directories do not accumulate, while target-written evidence is
+  untouched.
+- Compact passing receipts contain no command stdout, stderr, argv, changed-path list, or source
+  records; compact failures retain their normalized findings.
+- Telemetry contains no paths, source content, command output, prompts, or free-text subject
+  identity, and continues to fail open with at most 1,000 retained records.
+- Status distinguishes an unmatched start from a terminal run without guessing a generic timeout
+  or declaring the run hung.
+
+**Focused proof:**
+
+```sh
+python3 -m unittest tests.test_runtime_skill_payload
+python3 -m unittest tests.test_runtime_package_execution tests.test_runtime_telemetry
+python3 -m unittest tests.test_runtime_package_planning
+```
+
 ## Stable-Candidate Proof
 
 This plan changes selection and a shipped hook, so the final frozen candidate receives one broad
@@ -289,6 +343,9 @@ proof:
 3. Does the shipped pre-PR hook execute only `pr-description`?
 4. Did the change introduce any cache, registry, scheduler, retry, or second authority?
 5. Does duration policy remain target- or operator-owned while explicit timeout stays fail-closed?
+6. Can delegation create a checkout or worktree without direct operator authority?
+7. Do compact receipts retain actionable failures while omitting successful process output?
+8. Does telemetry expose only bounded digests and aggregate efficiency signals?
 
 One review finding permits one focused repair and one affected recheck. It does not restart the
 whole review or broad proof cycle. A repair that changes selection or hook behavior forms a new
@@ -300,8 +357,9 @@ candidate and reruns the final broad proof once.
 2. Implement and commit Slice 2 as one public selection-contract checkpoint.
 3. Implement Slices 3 and 4 together because hook behavior and user guidance are one contract.
 4. Implement Slice 5 without adding a duration-policy schema or receipt cache.
-5. Freeze the candidate, run the single broad proof, and perform the bounded review.
-6. Prepare a release candidate only after explicit operator authorization.
+5. Implement Slice 6 as one bounded workspace and observability checkpoint.
+6. Freeze the candidate, run the single broad proof, and perform the bounded review.
+7. Prepare a release candidate only after explicit operator authorization.
 
-The plan is complete when the four acceptance boundaries pass and the final diff contains no
+The plan is complete when every slice acceptance boundary passes and the final diff contains no
 machinery listed under Explicit Non-Goals.

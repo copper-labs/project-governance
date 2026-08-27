@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -28,6 +29,7 @@ _COMMON_FIELDS = {
     "stage",
     "mode",
     "scope_fingerprint",
+    "subject_digest",
 }
 _EVENT_FIELDS = {
     "run-started": {
@@ -126,6 +128,7 @@ _DOCUMENTATION_INTEGER_FIELDS = {
     "conflict_count",
     "match_count",
 }
+_SHA256_DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
 
 
 def _now() -> str:
@@ -148,6 +151,11 @@ def _bounded_text(value: Any) -> str | None:
     if not isinstance(value, str):
         return None
     return value[:MAX_ID_LENGTH]
+
+
+def _sha256_digest(value: Any) -> str | None:
+    """Retain only one opaque lowercase SHA-256 identity."""
+    return value if isinstance(value, str) and _SHA256_DIGEST.fullmatch(value) else None
 
 
 def _non_negative_number(value: Any) -> int | float | None:
@@ -218,6 +226,8 @@ def _sanitize_event_scalar(event_name: str, key: str, value: Any) -> Any:
         return _non_negative_integer(value)
     if key == "duration_ms":
         return _non_negative_number(value)
+    if key in {"scope_fingerprint", "subject_digest"}:
+        return _sha256_digest(value)
     if key == "terminal_outcome":
         return value if value in _ORCHESTRATION_OUTCOMES else None
     if key == "operation":
@@ -419,6 +429,8 @@ def _validation_status(records: list[dict[str, Any]]) -> dict[str, Any]:
     mode_counts: dict[str, int] = {}
     pack_totals: dict[str, dict[str, int | float]] = {}
     total_duration_ms: int | float = 0
+    total_pack_duration_ms: int | float = 0
+    subject_stages: dict[str, list[str]] = {}
 
     for record in terminal:
         fingerprint = record.get("scope_fingerprint")
@@ -429,6 +441,9 @@ def _validation_status(records: list[dict[str, Any]]) -> dict[str, Any]:
         duration_ms = record.get("duration_ms")
         if isinstance(duration_ms, (int, float)) and not isinstance(duration_ms, bool):
             total_duration_ms += duration_ms
+        subject = record.get("subject_digest")
+        if isinstance(subject, str) and record.get("mode") != "explicit":
+            subject_stages.setdefault(subject, []).append(str(record.get("stage", "unknown")))
         for pack in record.get("packs", []):
             if not isinstance(pack, dict) or not isinstance(pack.get("id"), str):
                 continue
@@ -438,19 +453,39 @@ def _validation_status(records: list[dict[str, Any]]) -> dict[str, Any]:
             summary["run_count"] += 1
             pack_duration = pack.get("duration_ms")
             if isinstance(pack_duration, (int, float)) and not isinstance(pack_duration, bool):
+                total_pack_duration_ms += pack_duration
                 summary["total_duration_ms"] += pack_duration
                 summary["max_duration_ms"] = max(summary["max_duration_ms"], pack_duration)
 
     repeated_scopes = [count for count in scope_counts.values() if count > 1]
+    repeated_subjects = [stages for stages in subject_stages.values() if len(stages) > 1]
+    terminal_run_ids = {
+        record.get("run_id") for record in terminal if isinstance(record.get("run_id"), str)
+    }
+    nonterminal_run_count = len({
+        record.get("run_id")
+        for record in records
+        if record.get("event") == "run-started"
+        and isinstance(record.get("run_id"), str)
+        and record.get("run_id") not in terminal_run_ids
+    })
     slowest_packs = [
-        {"id": pack_id, **summary}
+        {
+            "id": pack_id,
+            **summary,
+            "total_duration_ms": round(summary["total_duration_ms"], 3),
+            "max_duration_ms": round(summary["max_duration_ms"], 3),
+        }
         for pack_id, summary in sorted(
             pack_totals.items(), key=lambda item: (-item[1]["total_duration_ms"], item[0])
         )[:5]
     ]
     return {
         "retained_run_count": len(terminal),
-        "total_duration_ms": total_duration_ms,
+        "total_duration_ms": round(total_duration_ms, 3),
+        "runner_overhead_ms": round(
+            max(0, total_duration_ms - total_pack_duration_ms), 3
+        ),
         "mode_counts": dict(sorted(mode_counts.items())),
         "broad_run_count": mode_counts.get("all", 0),
         "fingerprinted_run_count": sum(scope_counts.values()),
@@ -458,12 +493,19 @@ def _validation_status(records: list[dict[str, Any]]) -> dict[str, Any]:
         "repeated_scope_count": len(repeated_scopes),
         "repeated_scope_run_count": sum(count - 1 for count in repeated_scopes),
         "most_repeated_scope_run_count": max(repeated_scopes, default=0),
+        "same_subject_repeat_run_count": sum(
+            len(stages) - 1 for stages in repeated_subjects
+        ),
+        "cross_stage_same_subject_run_count": sum(
+            len(stages) - 1 for stages in repeated_subjects if len(set(stages)) > 1
+        ),
+        "nonterminal_run_count": nonterminal_run_count,
         "slowest_packs": slowest_packs,
         "excludes": [
             "direct commands outside the runtime",
             "native-host launches outside agent dispatch",
             "evicted receipts",
-            "subject changes and invalidation reasons",
+            "invalidation reasons",
         ],
         "interpretation": (
             "best-effort retained repetition and duration observations, not proof that a rerun was "
@@ -620,3 +662,64 @@ def status(root: Path) -> dict[str, Any]:
         "skills": _skill_status(records),
         "path": path.relative_to(root).as_posix(),
     }
+
+
+def compact_status(root: Path) -> dict[str, Any]:
+    """Project the useful cross-project efficiency signals into one small receipt."""
+    full = status(root)
+    validation = full["validation"]
+    result: dict[str, Any] = {
+        "status": full["status"],
+        "record_count": full["record_count"],
+        "path": full["path"],
+        "validation": {
+            key: validation[key]
+            for key in (
+                "retained_run_count",
+                "total_duration_ms",
+                "runner_overhead_ms",
+                "mode_counts",
+                "broad_run_count",
+                "repeated_scope_run_count",
+                "same_subject_repeat_run_count",
+                "cross_stage_same_subject_run_count",
+                "nonterminal_run_count",
+                "slowest_packs",
+            )
+        },
+    }
+    orchestration = full["orchestration"]
+    if orchestration["retained_wave_count"]:
+        result["orchestration"] = {
+            key: orchestration[key]
+            for key in (
+                "retained_wave_count",
+                "delegated_entry_count",
+                "terminal_outcomes",
+                "model_mix",
+            )
+        }
+    documentation = full["documentation"]
+    if documentation["retained_operation_count"]:
+        result["documentation"] = {
+            "retained_operation_count": documentation["retained_operation_count"],
+            "operation_counts": documentation["operation_counts"],
+            "outcome_counts": documentation["outcome_counts"],
+            "total_duration_ms": documentation["total_duration_ms"],
+        }
+    skills = full["skills"]
+    if skills.get("retained_selection_count") or skills.get("retained_closeout_count"):
+        result["skills"] = {
+            key: skills[key]
+            for key in (
+                "retained_selection_count",
+                "retained_closeout_count",
+                "closed_selection_count",
+                "unclosed_selection_count",
+                "closeout_without_selection_count",
+                "utilization_counts",
+                "influence_counts",
+                "task_outcome_counts",
+            )
+        }
+    return result

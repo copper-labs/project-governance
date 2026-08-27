@@ -148,11 +148,14 @@ call Codex or Claude.
 
 Report the focused test, affected seam, selected packs, any intentionally omitted proof, and
 residual risk. The JSON result contains normalized findings, status, execution duration, and
-termination reason. Bounded local telemetry adds changed-path, selected-pack, executed-command,
-and per-pack duration/count aggregates without retaining paths, commands, output, prompts, or
-source content. `project-governance telemetry status` summarizes retained repeated scopes, broad
-runs, and slow packs as advisory observations. It does not prove a repeat was unnecessary because
-subject changes and invalidation reasons are not retained. It also excludes direct commands and
+termination reason. The optional `--summary` projection keeps active findings while omitting
+successful command detail and changed-path inventories. Bounded local telemetry adds changed-path,
+selected-pack, executed-command, and per-pack duration/count aggregates plus one opaque digest for
+eligible content-bound subjects without retaining paths, commands, output, prompts, or source
+content. `project-governance telemetry status --compact` summarizes unmatched starts, runtime
+overhead, retained repeated scopes, same-subject repetition, broad runs, and slow packs as advisory
+observations. It does not prove a repeat was unnecessary because invalidation reasons are not
+retained. It also excludes direct commands and
 native-host launches outside the runtime, so missing telemetry is never evidence that no work ran.
 
 Run deterministic builds through a target pack or the governed harness when one exists. If a

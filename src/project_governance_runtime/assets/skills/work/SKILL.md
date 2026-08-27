@@ -29,7 +29,9 @@ after the work has been framed and scoped.
 1. Inspect current files before editing and preserve unrelated user changes.
 2. Record delegation and its ownership boundaries only when delegation occurs. Across active waves,
    one repository may contain one writer and two non-overlapping readers; do not expand a scope
-   after authorization.
+   after authorization. All roles use the current checkout by default. Delegation does not
+   authorize creating or moving a worktree; each additional worktree requires a direct operator
+   request.
 3. Follow the plan's proof budget and stop condition. Reuse checks that prove the same claim on the
    same digest-bound subject; record a reason before deliberately repeating an equivalent passed
    gate.
@@ -73,4 +75,5 @@ automatically invoked pre-push hook as that sign-off.
 
 Report changed files, active role and scope, integrated snapshot, validation results,
 source-of-truth updates, change narrative, the skill-utilization receipt ID when recorded, residual
-risk, and any deferred work.
+risk, and any deferred work. If the operator authorized an additional worktree, report its path and
+whether it was retained or removed.
