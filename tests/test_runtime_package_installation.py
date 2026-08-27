@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -14,9 +15,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
+from project_governance_runtime.cli import _doctor  # noqa: E402
+from project_governance_runtime import __version__  # noqa: E402
 from project_governance_runtime.installation import (  # noqa: E402
     InstallationError,
     initialize,
+    launcher_drift,
     load_lock,
     materialize_skills,
     update,
@@ -82,6 +86,57 @@ class RuntimeInstallationTests(unittest.TestCase):
             )
             self.assertEqual(profile.read_text(encoding="utf-8"), "project-owned: true\n")
             self.assertEqual(second["created"], [])
+            self.assertEqual(second["refreshed"], [])
+
+    def test_init_reports_launcher_drift_and_refreshes_only_when_explicit(self) -> None:
+        """Keep target customizations intact until the operator requests replacement."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            initialize(root)
+            hook = root / ".githooks/pre-push"
+            hook.write_text("#!/bin/sh\necho custom\n", encoding="utf-8")
+
+            preview = initialize(root)
+            self.assertEqual(preview["refreshed"], [])
+            self.assertEqual(
+                preview["launcher_drift"]["modified"], [".githooks/pre-push"]
+            )
+            self.assertEqual(
+                hook.read_text(encoding="utf-8"), "#!/bin/sh\necho custom\n"
+            )
+
+            refreshed = initialize(root, refresh_launchers=True)
+            self.assertEqual(refreshed["refreshed"], [".githooks/pre-push"])
+            self.assertEqual(refreshed["launcher_drift"], {
+                "missing": [],
+                "modified": [],
+            })
+            self.assertEqual(launcher_drift(root), {
+                "missing": [],
+                "modified": [],
+            })
+
+    def test_doctor_reports_launcher_drift_without_rejecting_customization(self) -> None:
+        """Make tracked integration differences visible without assuming they are invalid."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            initialize(root)
+            lock = valid_lock()
+            lock["version"] = __version__
+            lock_path = root / "config/governance/runtime.lock.yaml"
+            lock_path.write_text(json.dumps(lock), encoding="utf-8")
+            hook = root / ".githooks/pre-pr"
+            hook.write_text("#!/bin/sh\necho custom\n", encoding="utf-8")
+
+            result = _doctor(root)
+
+        self.assertEqual(result["status"], "passed", result)
+        self.assertEqual(
+            result["launcher_drift"]["modified"], [".githooks/pre-pr"]
+        )
+        self.assertTrue(
+            any("--refresh-launchers" in item for item in result["notices"])
+        )
 
     def test_installed_bootstrap_resolves_the_child_repository_root(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -90,6 +145,26 @@ class RuntimeInstallationTests(unittest.TestCase):
             launcher = (root / "tools/governance-bootstrap.py").read_text(encoding="utf-8")
             self.assertIn("Path(__file__).resolve().parents[1]", launcher)
             self.assertNotIn("Path(__file__).resolve().parents[2]", launcher)
+            self.assertIn("PIP_DISABLE_PIP_VERSION_CHECK", launcher)
+
+    def test_cli_refuses_launcher_refresh_in_the_source_checkout(self) -> None:
+        """Keep adopter launchers from replacing source-development hooks."""
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "project_governance_runtime.cli",
+                "init",
+                "--refresh-launchers",
+            ],
+            cwd=ROOT,
+            env={**os.environ, "PYTHONPATH": str(ROOT / "src")},
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("not this source checkout", result.stdout)
 
     def test_bootstrap_rejects_an_ambiguous_source_revision_before_download(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -60,10 +60,8 @@ raise SystemExit(0 if valid else 1)
 
 VALID_COMMIT_MESSAGE = """Explain changes before review
 
-Product impact: Contributor workflow — authors see missing context before review.
-Nature of change: Unified commit and pull request orientation around one shared narrative.
-Code areas impacted: Delivery governance, agent authoring workflows.
-Why: Reviewers had to reconstruct purpose and impact from file changes.
+Reviewers previously had to reconstruct purpose from file changes alone. This commit keeps the
+deterministic gate small while giving authors stronger guidance for a useful explanation.
 """
 
 VALID_PR_TITLE = "Make change context understandable before review"
@@ -332,6 +330,22 @@ def verify_change_narratives(root: Path, command: Path) -> None:
     run([str(root / ".githooks/pre-pr")], root=root, expected=0)
 
 
+def verify_launcher_refresh(root: Path, command: Path) -> None:
+    """Prove installed diagnosis preserves drift until explicit launcher refresh."""
+    hook = root / ".githooks/pre-push"
+    hook.write_text("#!/bin/sh\necho custom\n", encoding="utf-8")
+    doctor = json.loads(run([str(command), "doctor"], root=root, expected=0).stdout)
+    if doctor.get("launcher_drift", {}).get("modified") != [".githooks/pre-push"]:
+        raise RuntimeError("installed doctor did not report tracked launcher drift")
+    run([str(command), "init"], root=root, expected=0)
+    if hook.read_text(encoding="utf-8") != "#!/bin/sh\necho custom\n":
+        raise RuntimeError("ordinary installed init overwrote a customized launcher")
+    run([str(command), "init", "--refresh-launchers"], root=root, expected=0)
+    repaired = json.loads(run([str(command), "doctor"], root=root, expected=0).stdout)
+    if repaired.get("launcher_drift") != {"missing": [], "modified": []}:
+        raise RuntimeError("explicit installed launcher refresh did not clear drift")
+
+
 def write_synthetic_changes(root: Path) -> None:
     """Create four independent target changes for pass, source, fail, and unmapped proof."""
     (root / "synthetic").mkdir()
@@ -567,6 +581,7 @@ def main() -> int:
         root.mkdir()
         python, command = initialize_target(root, wheel)
         verify_change_narratives(root, command)
+        verify_launcher_refresh(root, command)
         write_synthetic_packs(root, python)
         write_synthetic_changes(root)
         verify_replacement_plan(root, command)

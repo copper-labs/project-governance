@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate one commit change narrative and emit normalized evidence."""
+"""Validate one useful commit subject and authored body."""
 
 from __future__ import annotations
 
@@ -18,27 +18,6 @@ from change_narrative import (
 )
 
 
-REQUIRED_FIELDS = (
-    ("product-impact", "Product impact"),
-    ("nature-of-change", "Nature of change"),
-    ("code-areas-impacted", "Code areas impacted"),
-    ("why", "Why"),
-)
-DISALLOWED_FIELDS = (
-    ("outcome", "Outcome"),
-    ("validation", "Validation"),
-    ("risks-or-required-action", "Risks or required action"),
-)
-LABELS = {label: field_id for field_id, label in REQUIRED_FIELDS}
-LABEL_PATTERN = re.compile(
-    rf"^({'|'.join(re.escape(label) for label in LABELS)}):[ \t]*(.*)$"
-)
-DISALLOWED_PATTERN = re.compile(
-    rf"^[ \t]*(?:(?:[-*+]|#{{1,6}})[ \t]+)?(?:[*_]{{1,2}})?"
-    rf"({'|'.join(re.escape(label) for _, label in DISALLOWED_FIELDS)})"
-    rf"(?:[*_]{{1,2}})?[ \t]*:",
-    re.IGNORECASE,
-)
 QUOTED_REF = r"'[^'\n]+'"
 GENERATED_SUBJECTS = (
     re.compile(rf"^Merge branch {QUOTED_REF}(?: (?:into|of) .+)?$"),
@@ -54,6 +33,13 @@ GENERATED_SUBJECTS = (
     re.compile(r"^(?:fixup|squash|amend)![ \t]+.+$"),
 )
 SCISSORS = re.compile(r"^-+[ \t]*>8[ \t]*-+$")
+TRAILER = re.compile(
+    r"^(?:"
+    r"(?:signed-off|co-authored|reviewed|acked|tested|reported|suggested|helped|mentored)-by"
+    r"|change-id|depends-on|fixes|closes|refs|see-also"
+    r"):[ \t]+\S",
+    re.IGNORECASE,
+)
 
 
 def _message_path() -> Path:
@@ -97,99 +83,31 @@ def _clean_records(text: str) -> list[tuple[int, str]]:
     return records
 
 
-def _field_occurrences(
-    records: list[tuple[int, str]],
-) -> list[dict[str, object]]:
-    """Return recognized labels, their source lines, and their inline values."""
-    matches: list[dict[str, object]] = []
-    for index, (line_number, line) in enumerate(records):
-        match = LABEL_PATTERN.match(line)
-        if match:
-            matches.append({
-                "field_id": LABELS[match.group(1)],
-                "label": match.group(1),
-                "index": index,
-                "line": line_number,
-                "value": match.group(2),
-            })
-    return matches
-
-
-def _disallowed_findings(
+def _body_finding(
     path: Path,
     records: list[tuple[int, str]],
-) -> list[dict[str, object]]:
-    """Reject common body-field variants that would recreate reader boilerplate."""
-    findings: list[dict[str, object]] = []
-    for line_number, line in records:
-        match = DISALLOWED_PATTERN.match(line)
-        if not match:
-            continue
-        label = match.group(1)
-        message = (
-            "put the outcome in the commit subject; remove Outcome: from the body"
-            if label.casefold() == "outcome"
-            else f"remove {label}: from the reader narrative; use checks or Product impact as appropriate"
+) -> dict[str, object] | None:
+    """Require authored body text without imposing labels, order, or prose scoring."""
+    authored_records = [
+        (line_number, line)
+        for line_number, line in records
+        if line.strip() and TRAILER.match(line.strip()) is None
+    ]
+    body = "\n".join(line for _, line in authored_records).strip()
+    if not body:
+        return finding(
+            "commit-message.body-missing",
+            path,
+            "commit body needs a short authored explanation beyond Git trailers",
         )
-        findings.append(finding(
-            "commit-message.field-not-allowed",
+    if is_placeholder(body):
+        return finding(
+            "commit-message.body-placeholder",
             path,
-            message,
-            line=line_number,
-        ))
-    return findings
-
-
-def _field_findings(
-    path: Path,
-    records: list[tuple[int, str]],
-) -> list[dict[str, object]]:
-    """Validate required field presence, order, uniqueness, and authored values."""
-    findings: list[dict[str, object]] = []
-    occurrences = _field_occurrences(records)
-    by_id: dict[str, list[dict[str, object]]] = {}
-    for item in occurrences:
-        by_id.setdefault(str(item["field_id"]), []).append(item)
-
-    required_positions: list[int] = []
-    for field_id, label in REQUIRED_FIELDS:
-        found = by_id.get(field_id, [])
-        if not found:
-            findings.append(finding(
-                "commit-message.field-missing",
-                path,
-                f"required commit field is missing: {label}:",
-            ))
-            continue
-        required_positions.append(int(found[0]["index"]))
-        if len(found) > 1:
-            findings.append(finding(
-                "commit-message.field-duplicate",
-                path,
-                f"commit field must appear once: {label}:",
-                line=int(found[1]["line"]),
-            ))
-        if is_placeholder(str(found[0]["value"])):
-            findings.append(finding(
-                "commit-message.field-placeholder",
-                path,
-                f"put authored content on the same line as {label}:",
-                line=int(found[0]["line"]),
-            ))
-
-    findings.extend(_disallowed_findings(path, records))
-
-    if (
-        len(required_positions) == len(REQUIRED_FIELDS)
-        and required_positions != sorted(required_positions)
-    ):
-        findings.append(finding(
-            "commit-message.field-order",
-            path,
-            "commit fields must follow Product impact, Nature of change, Code areas impacted, then Why",
-            line=min(int(by_id[field_id][0]["line"]) for field_id, _ in REQUIRED_FIELDS),
-        ))
-    return findings
+            "replace the placeholder commit body with an authored explanation",
+            line=authored_records[0][0],
+        )
+    return None
 
 
 def main() -> int:
@@ -230,7 +148,9 @@ def main() -> int:
                 line=subject_line,
             ))
         if not findings and subject and not _generated(subject):
-            findings.extend(_field_findings(path, records[1:]))
+            body_finding = _body_finding(path, records[1:])
+            if body_finding is not None:
+                findings.append(body_finding)
     payload = result_payload("commit-message", findings)
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 1 if findings else 0

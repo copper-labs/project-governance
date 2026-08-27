@@ -1,6 +1,6 @@
 ---
 name: commit-message-workflow
-description: Use when preparing commit messages. Explains outcome, product impact, conceptual change, affected code areas, and reason before the diff.
+description: Use when preparing commit messages. Produces a useful subject and compact authored explanation without duplicating pull request structure.
 ---
 
 # Commit Message Workflow
@@ -19,16 +19,17 @@ Use this skill before creating or amending a commit, or when a commit-message ho
 
 ## Workflow
 
-1. Write the subject as one plain-language outcome at the commit's scope. Say what becomes
+1. Write the subject as one useful outcome at the commit's scope. Say what becomes
    possible, changes, or is prevented rather than naming the coding activity, ticket, or path.
-2. Name the adopter's top-level product area and explain how the change surfaces there. State the
-   intentional no-behavior-change boundary when relevant.
-3. Describe the nature of change through responsibilities, relationships, contracts, data flow,
-   boundaries, or coupling; leave symbol-level mechanics to the diff.
-4. Name stable, human-recognizable code areas instead of file paths.
-5. Preserve why the work was necessary.
-6. Recheck the staged diff and governing issue or plan before finalizing the message. Keep test and
-   build evidence in the checks that own it rather than copying it into the narrative.
+2. Follow it with a compact paragraph that lets a teammate understand the commit without opening
+   the diff. Explain the problem or intent, conceptual change, and any consequence, constraint, or
+   decision that matters.
+3. Name recognizable capabilities or components when useful, but do not inventory files, symbols,
+   or individual edits. Connect the ideas with complete sentences rather than a checklist.
+4. Do not repeat the subject, reproduce test output, narrate the implementation process, or copy
+   the pull request description. One informative sentence is enough for a small mechanical change.
+5. Split the work when the explanation becomes long or covers unrelated ideas.
+6. Recheck the staged diff and governing issue or plan before finalizing the message.
 
 ## Validation
 
@@ -36,5 +37,4 @@ Run the commit-message validation pack or hook when available.
 
 ## Evidence
 
-Report the final outcome, product impact, nature of change, code areas, reason, and commit-message
-check status.
+Report the final subject, body, and commit-message check status.

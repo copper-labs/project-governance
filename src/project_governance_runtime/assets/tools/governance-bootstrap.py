@@ -99,6 +99,7 @@ def main() -> int:
         result = subprocess.run(
             [str(python), "-m", "pip", "install", str(wheel)],
             cwd=ROOT,
+            env={**os.environ, "PIP_DISABLE_PIP_VERSION_CHECK": "1"},
             check=False,
         )
         if result.returncode != 0:

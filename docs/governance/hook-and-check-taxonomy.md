@@ -5,7 +5,7 @@ type: governance
 status: current
 owner: project-governance
 created: 2026-07-05
-updated: 2026-08-24
+updated: 2026-08-27
 summary: Defines thin hooks, their package CLI stages, and the narrative inputs they validate.
 ---
 
@@ -17,7 +17,7 @@ bootstrap message.
 
 | Boundary | Command | Scope |
 | --- | --- | --- |
-| Commit message | `project-governance check --stage commit-msg --mode impacted --commit-message-file <path>` | Commit change narrative only |
+| Commit message | `project-governance check --stage commit-msg --mode impacted --commit-message-file <path>` | Useful subject and authored body only |
 | Pre-commit | `project-governance check --stage pre-commit --mode impacted` | Staged changed paths and changed-file secrets |
 | Pre-push | `project-governance check --stage pre-push --mode impacted` | Branch-aware impacted checks; full tracked secret scan |
 | Pre-PR | `project-governance check --pack pr-description --stage pre-pr --mode all --pr-body-file <path> --pr-title <title>` | Pull-request title and body only; no branch comparison or code-validation replay |

@@ -5,19 +5,19 @@ type: spec
 status: current
 owner: project-governance
 created: 2026-08-24
-updated: 2026-08-24
+updated: 2026-08-27
 summary: Defines the plain-language context that commits and pull requests must provide before a reader opens the diff.
 ---
 
 # Change Narrative Contract
 
-A reader should be able to understand the outcome, affected experience, conceptual system change,
-and reason for a commit or pull request before opening the diff. File lists and generated diff
-summaries do not provide that orientation on their own.
+A reader should be able to understand the outcome and purpose of a commit or pull request before
+opening the diff. File lists and generated diff summaries do not provide that orientation on their
+own.
 
-This specification defines one shared narrative for commits and pull requests. The runtime enforces
-its deterministic shape. Authors and reviewers remain responsible for whether the words are
-accurate, conceptual, and useful.
+This specification keeps commit history lightweight while giving pull requests enough structure for
+review. The runtime enforces only deterministic minimums. Authors and reviewers remain responsible
+for whether the words are accurate, coherent, and useful.
 
 ## Implementation State
 
@@ -37,7 +37,7 @@ the implementation, independent review, reconciliation, and local proof.
   data flow, or coupling.
 - Name stable, human-recognizable code areas without turning the narrative into a path inventory.
 - Preserve the reason for the change without duplicating machine evidence in the narrative.
-- Give commits and pull requests the same mental model at different levels of scope.
+- Keep commit messages useful without duplicating the pull request template.
 - Keep the shared runtime project-neutral while allowing each adopter to own its vocabulary.
 
 ## Non-Goals
@@ -51,8 +51,8 @@ the implementation, independent review, reconciliation, and local proof.
 
 ## Narrative Fields
 
-The following fields form one reader journey. The commit subject or pull request title supplies the
-outcome; the body supplies the remaining context without repeating it.
+The following fields form the pull request reader journey. A commit may cover the same ideas in a
+short paragraph, but it does not reproduce the fields or their labels.
 
 | Field | Reader question | Expected content |
 | --- | --- | --- |
@@ -77,18 +77,33 @@ Every ordinary commit uses this shape:
 ```text
 <Outcome>
 
-Product impact: <top-level area and how the change surfaces>
-Nature of change: <conceptual system change>
-Code areas impacted: <stable capability or subsystem names>
-Why: <problem, constraint, or decision>
+<A short explanation of what changed or why it matters.>
 ```
 
 The subject states the useful result, not a generic activity such as “updates,” a ticket identifier
-alone, or the files touched. The required labels appear once and in the order shown. Each label and its compact value share one
-line. Values must contain authored content, not a known placeholder-only value. Additional
-explanatory paragraphs and standard Git trailers may follow the required narrative.
+alone, or the files touched. The body contains authored prose beyond Git trailers. It has no
+required prefix, label, field order, or template. Standard trailers may follow it.
 
-Git-generated merge, revert, fixup, squash, and amend messages are exempt from the labeled body so
+Write a compact paragraph that helps a teammate understand the commit without opening the diff.
+Explain the problem or intent, the conceptual change, and any consequence, constraint, or decision
+that matters. Name recognizable capabilities or components when useful, but do not inventory files,
+symbols, or individual edits. Use complete sentences and connect the ideas into a coherent
+explanation rather than a checklist. Do not repeat the subject, reproduce test output, narrate the
+implementation process, or copy the pull request description. For a small mechanical change, one
+informative sentence may be enough. If the explanation becomes long or covers unrelated ideas,
+split the work into separate commits.
+
+For example:
+
+```text
+Detect outdated governance launchers
+
+Older installations could retain outdated hook launchers after an upgrade and continue using the
+previous lifecycle. This change detects drift in runtime-owned launchers and provides an explicit
+refresh path while preserving project-owned customizations.
+```
+
+Git-generated merge, revert, fixup, squash, and amend messages are exempt from the authored body so
 Git workflows remain usable. Their subject must still be present and readable. A human-authored
 commit is not exempt merely because it changes only documentation, tests, or internal structure.
 
@@ -131,14 +146,15 @@ stale.
 
 Blocking checks enforce only facts the runtime can determine consistently:
 
-- required labels or headings exist once and in the expected order;
+- an ordinary commit has a useful subject and an authored body beyond Git trailers;
+- required pull request headings exist once and in the expected order;
 - the commit subject and pull request title are one-line outcomes rather than obvious generic or
   placeholder values;
 - required content remains after comments and surrounding whitespace are removed;
 - list-shaped fields contain the required bullets;
 - product-impact bullets name an area and an explanation;
-- duplicate Outcome, dedicated Validation, and Risks or required action body fields are rejected
-  across common casing, indentation, bullet, and Markdown-heading variants;
+- duplicate Outcome, dedicated Validation, and Risks or required action pull request sections are
+  rejected across common casing and Markdown-heading variants;
 - known placeholder-only values are rejected; and
 - ordinary commit subjects satisfy the existing minimum-length rule.
 
@@ -151,7 +167,7 @@ not perform code review.
 
 | Concern | Owner |
 | --- | --- |
-| Narrative fields, ordering, and generic examples | This specification |
+| Commit guidance, pull request fields, ordering, and generic examples | This specification |
 | Deterministic commit and pull request checks | Runtime wheel |
 | Portable templates and authoring workflow | Installed change-narrative resource and delivery skills |
 | Product-area and code-area vocabulary | Adopting repository |
@@ -171,7 +187,7 @@ contract. Local commit and pre-PR enforcement remain available during that boots
 
 | Criterion | Evidence | Verifier |
 | --- | --- | --- |
-| Ordinary commits provide the required narrative and Git-generated flows remain usable. | Checker fixtures exercise valid, missing, duplicate, placeholder, ordering, and generated-message cases. | Focused runtime test |
+| Ordinary commits provide a useful subject and authored body while Git-generated flows remain usable. | Checker fixtures exercise valid, missing, placeholder, trailer-only, and generated-message cases. | Focused runtime test |
 | Ready pull requests provide the same reader journey at PR scope. | Local pre-PR and GitHub event fixtures exercise valid and invalid titles and bodies. | Focused runtime and workflow tests |
 | The installed guidance explains product impact, conceptual change, and stable code areas without adopter vocabulary. | Skill payload inspection and clean-wheel verification. | Focused skill and wheel tests |
 | Semantic review is not disguised as deterministic enforcement. | Manual comparison of checker behavior with the enforcement boundary. | Source maintainer and independent reviewer |

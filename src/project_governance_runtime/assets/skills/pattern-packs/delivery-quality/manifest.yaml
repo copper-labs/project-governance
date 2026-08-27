@@ -81,7 +81,7 @@ skills:
     path: .governance/runtime/skills/pattern-packs/delivery-quality/pr-description-workflow/SKILL.md
     status: included
     category: delivery
-    rationale: Provides a reusable PR body structure with what, why, testing, risks, and review notes.
+    rationale: Provides a reusable reader-orientation structure without duplicating validation or generic review checklists.
   - id: docs-structure-migration
     path: .governance/runtime/skills/pattern-packs/delivery-quality/docs-structure-migration/SKILL.md
     status: included

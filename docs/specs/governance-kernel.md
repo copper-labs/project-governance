@@ -31,6 +31,7 @@ project-governance context --task <description> --json-output <ignored-result.js
 project-governance doctor
 project-governance telemetry status
 project-governance init
+project-governance init --refresh-launchers
 project-governance docs init --dry-run
 project-governance docs route --capability <id-or-alias> --json
 project-governance docs route --symbol <exact-symbol> --json
@@ -41,8 +42,10 @@ project-governance update --to <version> --dry-run|--apply
 packs without running them. Their optional `--summary` projection omits path inventories, command
 lines, and process output while retaining bounded active findings; default output and
 `--json-output` remain full machine receipts. `doctor` reports the running package version, locked
-version, their match state, and any missing or invalid integration plainly. `init` creates only
-missing integration files. `update` advances the runtime lock only after required
+version, their match state, invalid configuration, and tracked launcher drift plainly. `init`
+creates only missing integration files. `init --refresh-launchers` deliberately replaces only the
+tracked bootstrap and hook launchers with the installed wheel's versions; it does not change
+project configuration. `update` advances the runtime lock only after required
 target-owned configuration is ready; schema changes remain blocked in dry-run output until an
 operator deliberately applies the reviewed lock. The runtime does not carry historical
 configuration migrations or predecessor-cleanup rules.

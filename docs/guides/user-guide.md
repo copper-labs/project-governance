@@ -30,6 +30,17 @@ There is no separate source template or generator. The installed wheel's `init` 
 base runtime integration and never invents an artifact lock. Optional module commands such as
 `docs init` own only their declared extension and reuse the base profile seed.
 
+`doctor` reports a tracked bootstrap or hook launcher that differs from the installed wheel as a
+notice rather than assuming the project customization is invalid. Review the difference. To accept
+the wheel's current thin launchers deliberately, run:
+
+```sh
+project-governance init --refresh-launchers
+```
+
+That command replaces only the tracked bootstrap and hook launchers. It does not edit the profile,
+facts, target packs, workflows, or pull request template.
+
 The lock, profile, facts, and project extensions stay tracked. The virtual environment, installed
 skills, and telemetry stay local and ignored.
 
@@ -135,6 +146,10 @@ python3 tools/governance-bootstrap.py
 .governance/runtime/bin/project-governance --version
 .governance/runtime/bin/project-governance doctor
 ```
+
+If `doctor` reports launcher drift, review it and either preserve the project-owned customization
+or run `.governance/runtime/bin/project-governance init --refresh-launchers`, then run `doctor`
+again.
 
 The apply command swaps only the tracked lock. Bootstrap then safely replaces the ignored local
 environment after the old runtime command has exited. Requesting the already locked version returns

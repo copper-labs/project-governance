@@ -24,10 +24,8 @@ from project_governance_runtime.planning import build_plan  # noqa: E402
 
 VALID_COMMIT = """Explain changes before review
 
-Product impact: Contributor workflow — authors see missing context before review.
-Nature of change: Unified commit and pull request orientation around one shared narrative.
-Code areas impacted: Delivery governance, agent authoring workflows.
-Why: Reviewers had to reconstruct purpose and impact from file changes.
+Reviewers previously had to reconstruct purpose from file changes alone. This commit keeps the
+deterministic gate small while giving authors stronger guidance for a useful explanation.
 """
 
 VALID_PR_TITLE = "Make change context understandable before review"
@@ -129,8 +127,8 @@ class ChangeNarrativeTestCase(unittest.TestCase):
 class RuntimeChangeNarrativeTests(ChangeNarrativeTestCase):
     """Keep structural enforcement useful without pretending to grade prose."""
 
-    def test_valid_commit_contains_the_shared_narrative(self) -> None:
-        """Accept one compact outcome, product impact, conceptual change, code area, and reason."""
+    def test_valid_commit_has_a_useful_subject_and_authored_body(self) -> None:
+        """Accept one compact outcome followed by an authored explanation."""
         result, payload = self.write_and_run("commit-message", VALID_COMMIT)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(payload["status"], "passed")
@@ -168,22 +166,18 @@ class RuntimeChangeNarrativeTests(ChangeNarrativeTestCase):
             with self.subTest(subject=subject):
                 result, payload = self.write_and_run("commit-message", subject + "\n")
                 self.assertEqual(result.returncode, 1, payload)
-                self.assert_rule(payload, "commit-message.field-missing")
+                self.assert_rule(payload, "commit-message.body-missing")
 
     def test_commit_failures_have_stable_actionable_rules(self) -> None:
-        """Reject short, missing, duplicate, out-of-order, and placeholder content."""
+        """Reject unusable subjects and missing, placeholder, or trailer-only bodies."""
         cases = {
             "short": (VALID_COMMIT.replace("Explain changes before review", "Short", 1), "commit-message.short-subject"),
-            "missing": (VALID_COMMIT.replace("Why: Reviewers had to reconstruct purpose and impact from file changes.\n", ""), "commit-message.field-missing"),
-            "duplicate": (VALID_COMMIT + "Why: A second reason is not allowed.\n", "commit-message.field-duplicate"),
-            "order": (VALID_COMMIT.replace(
-                "Product impact: Contributor workflow — authors see missing context before review.\nNature of change: Unified commit and pull request orientation around one shared narrative.",
-                "Nature of change: Unified commit and pull request orientation around one shared narrative.\nProduct impact: Contributor workflow — authors see missing context before review.",
-            ), "commit-message.field-order"),
-            "placeholder": (VALID_COMMIT.replace(
-                "Nature of change: Unified commit and pull request orientation around one shared narrative.",
-                "Nature of change: TBD",
-            ), "commit-message.field-placeholder"),
+            "missing": ("Explain changes before review\n", "commit-message.body-missing"),
+            "placeholder": ("Explain changes before review\n\nTBD\n", "commit-message.body-placeholder"),
+            "trailer-only": (
+                "Explain changes before review\n\nSigned-off-by: Example <example@example.invalid>\n",
+                "commit-message.body-missing",
+            ),
             "generic-subject": (
                 VALID_COMMIT.replace("Explain changes before review", "Work in progress", 1),
                 "commit-message.unhelpful-subject",
@@ -192,26 +186,6 @@ class RuntimeChangeNarrativeTests(ChangeNarrativeTestCase):
                 VALID_COMMIT.replace("Explain changes before review", "GOV-12345", 1),
                 "commit-message.unhelpful-subject",
             ),
-            "legacy-validation": (
-                VALID_COMMIT + "Validation: Focused fixtures passed.\n",
-                "commit-message.field-not-allowed",
-            ),
-            "legacy-validation-indented": (
-                VALID_COMMIT + "  Validation: Focused fixtures passed.\n",
-                "commit-message.field-not-allowed",
-            ),
-            "legacy-validation-bullet": (
-                VALID_COMMIT + "- Validation: Focused fixtures passed.\n",
-                "commit-message.field-not-allowed",
-            ),
-            "legacy-risk": (
-                VALID_COMMIT + "Risks or required action: None.\n",
-                "commit-message.field-not-allowed",
-            ),
-            "duplicate-outcome": (
-                VALID_COMMIT + "Outcome: Explain changes before review.\n",
-                "commit-message.field-not-allowed",
-            ),
         }
         for name, (content, rule_id) in cases.items():
             with self.subTest(name=name):
@@ -219,8 +193,23 @@ class RuntimeChangeNarrativeTests(ChangeNarrativeTestCase):
                 self.assertEqual(result.returncode, 1, payload)
                 self.assert_rule(payload, rule_id)
 
+    def test_commit_body_has_no_required_prefixes_or_field_order(self) -> None:
+        """Accept prose and older labeled messages without preserving their rigid contract."""
+        bodies = (
+            "This reorganizes launcher checks so upgrades surface stale integration without overwriting custom hooks.",
+            "Why: Older installations could continue using the previous lifecycle.",
+            "Product impact: Contributor workflow remains stable.\n"
+            "Nature of change: Launcher drift becomes visible during diagnosis.",
+        )
+        for body in bodies:
+            with self.subTest(body=body):
+                result, payload = self.write_and_run(
+                    "commit-message", f"Explain changes before review\n\n{body}\n"
+                )
+                self.assertEqual(result.returncode, 0, payload)
+
     def test_commit_checks_only_content_git_retains_after_cleanup(self) -> None:
-        """Ignore configured comments and reject labels hidden below Git's scissors marker."""
+        """Ignore configured comments and content hidden below Git's scissors marker."""
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             git(root, "init", "-q")
@@ -228,32 +217,14 @@ class RuntimeChangeNarrativeTests(ChangeNarrativeTestCase):
             path = root / "message.txt"
             path.write_text(
                 "Explain changes before review\n\n"
-                "Product impact: Contributor workflow — authors see missing context.\n"
-                "; Nature of change: This comment is not recorded.\n"
+                "; This comment is not recorded.\n"
                 "; ------------------------ >8 ------------------------\n"
-                "Nature of change: This line is below the scissors marker.\n"
-                "Code areas impacted: Delivery governance.\n"
-                "Why: Reviewers need context.\n",
+                "This explanation is below the scissors marker.\n",
                 encoding="utf-8",
             )
             result, payload = self.run_checker("commit-message", path, cwd=root)
         self.assertEqual(result.returncode, 1, payload)
-        self.assert_rule(payload, "commit-message.field-missing")
-
-    def test_empty_inline_commit_field_names_the_same_line_contract(self) -> None:
-        """Tell the author to keep compact field content inline instead of calling it absent."""
-        content = VALID_COMMIT.replace(
-            "Why: Reviewers had to reconstruct purpose and impact from file changes.",
-            "Why:\nReviewers had to reconstruct purpose and impact from file changes.",
-        )
-        result, payload = self.write_and_run("commit-message", content)
-        self.assertEqual(result.returncode, 1, payload)
-        finding_item = next(
-            item
-            for item in payload["findings"]
-            if item["rule_id"] == "commit-message.field-placeholder"
-        )
-        self.assertIn("same line", finding_item["message"])
+        self.assert_rule(payload, "commit-message.body-missing")
 
     def test_valid_pr_ignores_hidden_guidance_and_fenced_headings(self) -> None:
         """Accept ordered authored sections without treating examples as duplicate headings."""

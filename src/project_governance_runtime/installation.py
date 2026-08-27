@@ -26,6 +26,13 @@ SOURCE_COMMIT = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
 GITHUB_RELEASE_ASSET = re.compile(
     r"^https://github\.com/([^/]+)/([^/]+)/releases/download/([^/]+)/([^/?#]+)$"
 )
+RUNTIME_LAUNCHERS = (
+    "tools/governance-bootstrap.py",
+    ".githooks/commit-msg",
+    ".githooks/pre-commit",
+    ".githooks/pre-push",
+    ".githooks/pre-pr",
+)
 
 
 class InstallationError(RuntimeError):
@@ -115,9 +122,33 @@ def _read_remote(location: str) -> bytes:
         return response.read()
 
 
-def initialize(root: Path) -> dict[str, Any]:
-    """Create only missing child-owned configuration and thin launch surfaces."""
+def launcher_drift(root: Path) -> dict[str, list[str]]:
+    """Compare tracked launch surfaces with this wheel without changing target state."""
+    missing: list[str] = []
+    modified: list[str] = []
+    for relative in RUNTIME_LAUNCHERS:
+        destination = root / relative
+        if destination.is_symlink():
+            modified.append(relative)
+            continue
+        if not destination.exists():
+            missing.append(relative)
+            continue
+        if not destination.is_file():
+            modified.append(relative)
+            continue
+        resource = files("project_governance_runtime").joinpath(
+            "assets", *Path(relative).parts
+        )
+        if destination.read_bytes() != resource.read_bytes():
+            modified.append(relative)
+    return {"missing": missing, "modified": modified}
+
+
+def initialize(root: Path, *, refresh_launchers: bool = False) -> dict[str, Any]:
+    """Create missing integration and optionally replace tracked launch surfaces."""
     created: list[str] = []
+    refreshed: list[str] = []
     defaults = {
         "config/governance/profile.yaml": PROFILE_DEFAULT_TEXT,
         "config/governance/facts.lock.yaml": "schema_version: 1\nfacts: {}\n",
@@ -130,21 +161,35 @@ def initialize(root: Path) -> dict[str, Any]:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
         created.append(relative)
-    for relative in (
-        "tools/governance-bootstrap.py", ".githooks/commit-msg", ".githooks/pre-commit",
-        ".githooks/pre-push", ".githooks/pre-pr",
-    ):
+    for relative in RUNTIME_LAUNCHERS:
         destination = root / relative
-        if destination.exists():
-            continue
         resource = files("project_governance_runtime").joinpath(
             "assets", *Path(relative).parts
         )
+        expected = resource.read_bytes()
+        if destination.is_symlink() or destination.exists():
+            if destination.is_symlink() or not destination.is_file():
+                if refresh_launchers:
+                    raise InstallationError(
+                        f"refusing to replace non-file runtime launcher: {relative}"
+                    )
+                continue
+            if not refresh_launchers or destination.read_bytes() == expected:
+                continue
+            destination.write_bytes(expected)
+            destination.chmod(0o755)
+            refreshed.append(relative)
+            continue
         destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_bytes(resource.read_bytes())
+        destination.write_bytes(expected)
         destination.chmod(0o755)
         created.append(relative)
-    return {"status": "initialized", "created": created}
+    return {
+        "status": "initialized",
+        "created": created,
+        "refreshed": refreshed,
+        "launcher_drift": launcher_drift(root),
+    }
 
 
 def materialize_skills(root: Path) -> list[str]:
