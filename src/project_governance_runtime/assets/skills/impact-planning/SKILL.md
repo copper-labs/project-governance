@@ -11,8 +11,8 @@ Decide which validation packs, CI checks, or release profiles a change requires.
 
 ## Trigger
 
-Use this skill before pre-PR, CI planning, release planning, or any change where broad validation
-would be expensive and targeted validation may be sufficient.
+Use this skill before an affected sign-off, CI planning, release planning, or any change where
+broad validation would be expensive and targeted validation may be sufficient.
 
 ## Required Reads
 
@@ -32,7 +32,8 @@ would be expensive and targeted validation may be sufficient.
 
 ## Validation
 
-Run `project-governance plan --stage pre-pr --mode impacted --changed-path <path> --json`.
+Run `project-governance plan --stage pre-push --mode impacted --changed-path <path> --base-ref
+<base> --json`.
 Verify every changed path maps to at least one validation pack or fails with one unmapped-path
 finding.
 

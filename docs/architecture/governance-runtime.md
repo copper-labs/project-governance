@@ -15,8 +15,8 @@ The architecture intentionally has two owners.
 
 | Owner | Responsibilities |
 | --- | --- |
-| Runtime wheel | CLI, changed-path selection, built-in generic packs, dependency ordering, timeout and process ownership, normalized findings, native-host routing and dispatch state, minimal developer-doc installation and exact catalog routing, local telemetry, bootstrap/update commands, generic skills, and configuration schemas |
-| Adopting repository | Runtime lock, profile, facts, target packs, source mappings, tool commands, product documentation, root agent instructions, and product proof |
+| Runtime wheel | CLI, changed-path selection, built-in generic packs, dependency ordering, process ownership and cancellation, explicit-timeout enforcement, normalized findings, minimal developer-doc installation and exact catalog routing, bounded local validation telemetry, bootstrap/update commands, generic skills, and configuration schemas |
+| Adopting repository | Runtime lock, profile, facts, target packs, source mappings, tool commands, duration and retry policy, product documentation, root agent instructions, and product proof |
 
 ## Design Rules
 
@@ -37,28 +37,18 @@ The architecture intentionally has two owners.
     through the explicit replacement contract. The target consumes the runtime's versioned change
     packet; the built-in remains available only when an operator names it directly for diagnosis.
 11. Change-sensitive packs consume one immutable before/after packet. Each run and pack receives an
-    isolated ignored evidence root; the runtime does not interpret product evidence stored there.
+    isolated ignored evidence root. A temporary active marker prevents concurrent cleanup while the
+    runtime reclaims inactive empty scaffolding; it never interprets or deletes product evidence.
 12. Comment and dependency ratchets govern changed declarations and changed coordinates, not every
     old issue encountered in a touched file.
-13. Provider-aware routing consumes explicit native session and catalog inputs, returns launch
-    instructions only, and never calls a model or discovers a provider.
-14. Developer documentation uses one repository-owned corpus and catalog. The runtime installs its
+13. Delegation uses the host agent's native controls in the current checkout. The wheel owns no
+    provider routing, dispatch state, worker leases, or completion receipts.
+14. Context source reads, selected skill bytes, retained packets, and telemetry scans have explicit
+    byte or count ceilings. Corrupted ignored packet state is rebuilt rather than becoming durable
+    authority or a permanent blocker.
+15. Developer documentation uses one repository-owned corpus and catalog. The runtime installs its
     minimal entry structure, resolves exact authored routes, and validates deterministic defects;
     the host agent owns prose generation and permitted public research.
-
-## Provider-Aware Dispatch Boundary
-
-The [provider-aware orchestration specification](../specs/provider-aware-agent-orchestration.md)
-adds one read-only route decision and two operator-invoked state transitions. `agent-route` maps a
-packet-ready tier to the same native host. `agent-dispatch start` records one launch wave and a
-repository writer lease; `finish` closes it and appends at most one advisory receipt. The host, not
-the wheel, launches the selected profile.
-
-The Version 4 role contract keeps context selection and materialization unchanged, then projects a
-compact worker brief. Across active waves, one repository contains at most one delegated writer and
-two readers. Build commands remain
-ordinary deterministic harness subprocesses. Local models, cross-provider fallback, parallel
-writers, nested delegation, retries, and build agents are outside the implemented boundary.
 
 ## V1.1 Integrity Boundary
 
@@ -77,9 +67,8 @@ cross-pack inputs, semantic proof graphs, or reusable cached verdicts. Telemetry
 numeric counters only and remains unable to approve a result.
 
 No V1.1 evidence-integrity component invokes a language model or carries prompts, product-risk
-categories, or adopter identities. Provider-aware dispatch is a separate explicit native-host
-control path and does not alter pack selection or finding semantics. A target that wants semantic
-review as a validation pack still registers an ordinary target-owned pack under existing stages.
+categories, or adopter identities. A target that wants semantic review as a validation pack still
+registers an ordinary target-owned pack under existing stages.
 
 ## Local Maintenance And Upstream Feedback
 
@@ -96,12 +85,11 @@ repository's instructions. No source checkout is needed to prepare or transfer a
 ## Deliberate Adoption
 
 The source repository may build a release candidate, but it never changes an adopter automatically.
-An adopter reviews `project-governance update --dry-run`, including exact schema migrations and the
-bounded predecessor-artifact cleanup list, applies its lock update, and proves the affected seam.
-Only unchanged hash-proven runtime-owned predecessor files are eligible for automatic removal. Git
-commit identity supplies source history; the artifact lock supplies installed identity. Bootstrap
-and an explicit update may contact the configured release distribution endpoint; neither operation
-discovers or edits a source checkout.
+An adopter reviews `project-governance update --dry-run`. A configuration-schema change stops there
+until the repository-owned configuration is ready and an operator deliberately uses `--apply`.
+The update changes only the tracked lock; Git supplies source history and retirement recovery.
+Bootstrap and an explicit update may contact the configured release distribution endpoint; neither
+operation discovers or edits a source checkout.
 
 ## Out Of Scope
 

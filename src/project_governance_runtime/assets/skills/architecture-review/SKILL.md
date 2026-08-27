@@ -42,15 +42,16 @@ platform source sets, contracts, dependency direction, or cross-product behavior
 7. Write the review record with work id, exact source snapshot, reviewed paths, findings, and
    disposition. It records evidence, not reviewer independence or semantic truth.
 8. Bound review to changed files, the active plan, the owning contract, and at most five directly
-   relevant supporting files or 20 minutes. Expand context only to resolve a named uncertainty and
-   return at most five actionable findings by default. Use independent QA or a second model only
+   relevant supporting files. Expand context only to resolve a named uncertainty and return at most
+   five actionable findings by default. Use independent QA or a second model only
    when selected risk or the operator requests it.
 9. Escalate to a spec or decision update when the code changes architecture policy.
 
 ## Validation
 
-Run the focused architecture owner and one affected seam. Replay only a failed owner during repair,
-then run the impacted boundary once at closeout.
+Consume existing subject-valid proof. Run one focused architecture owner or affected seam only for
+a named uncovered claim. If repair changes the candidate, use one affected recheck; do not run the
+named owner and an unchanged enclosing gate as additive ceremonies.
 
 ## Evidence
 

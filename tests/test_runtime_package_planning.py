@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -18,7 +19,12 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from project_governance_runtime.configuration import ConfigurationError, load_packs  # noqa: E402
 from project_governance_runtime.changed_paths import ChangedPathError, _base_commit  # noqa: E402
-from project_governance_runtime.cli import _resolve_plan  # noqa: E402
+from project_governance_runtime.cli import (  # noqa: E402
+    _doctor,
+    _parser,
+    _plan_summary,
+    _resolve_plan,
+)
 from project_governance_runtime.planning import build_plan, public_plan  # noqa: E402
 
 
@@ -33,6 +39,31 @@ class RuntimePlanningTests(unittest.TestCase):
                 encoding="utf-8"
             )
         )
+
+    def test_timeout_is_optional_and_explicit_values_are_positive(self) -> None:
+        """Leave duration to the target unless an operator supplies a valid deadline."""
+        default = _parser().parse_args(
+            ["check", "--pack", "format", "--base-ref", "HEAD"]
+        )
+        self.assertIsNone(default.timeout_seconds)
+        for value in ("0", "-1", "nan", "inf"):
+            with self.subTest(value=value), self.assertRaisesRegex(
+                ConfigurationError, "finite positive"
+            ):
+                _resolve_plan(
+                    _parser().parse_args(
+                        [
+                            "check",
+                            "--pack",
+                            "format",
+                            "--base-ref",
+                            "HEAD",
+                            "--timeout-seconds",
+                            value,
+                        ]
+                    ),
+                    ROOT / "tests/fixtures/empty-target",
+                )
 
     def replacement_packs(self, patterns: list[str] | None = None) -> dict[str, dict[str, object]]:
         """Add one valid target owner without mutating the shared built-in fixture."""
@@ -82,7 +113,7 @@ class RuntimePlanningTests(unittest.TestCase):
         plan = build_plan(
             packs,
             stage="pre-pr",
-            mode="explicit",
+            mode="impacted",
             changed_paths=[],
             explicit_pack_ids=["second"],
         )
@@ -91,7 +122,7 @@ class RuntimePlanningTests(unittest.TestCase):
         blocked = build_plan(
             packs,
             stage="pre-pr",
-            mode="explicit",
+            mode="impacted",
             changed_paths=[],
             explicit_pack_ids=["second"],
         )
@@ -243,7 +274,7 @@ class RuntimePlanningTests(unittest.TestCase):
                 "kind": "project-governance-change-packet",
                 "version": 1,
                 "scope": "changed",
-                "mode": "explicit",
+                "mode": "changed",
                 "base_ref": "base",
                 "records": [{
                     "status": "added",
@@ -256,7 +287,7 @@ class RuntimePlanningTests(unittest.TestCase):
             },
         ):
             plan, _ = _resolve_plan(arguments, ROOT / "tests/fixtures/empty-target")
-        self.assertEqual(plan["mode"], "explicit")
+        self.assertEqual(plan["mode"], "impacted")
         self.assertEqual(plan["changed_paths"], ["src/example.tsx"])
         self.assertEqual(
             plan["changed_records"],
@@ -304,7 +335,7 @@ class RuntimePlanningTests(unittest.TestCase):
         diagnostic = build_plan(
             packs,
             stage=None,
-            mode="explicit",
+            mode="impacted",
             changed_paths=[],
             explicit_pack_ids=["maintainability"],
         )
@@ -458,6 +489,280 @@ class RuntimePlanningTests(unittest.TestCase):
         rendered = public_plan(plan)
         self.assertEqual(rendered["change_scope"]["record_count"], 1)
         self.assertNotIn("records", rendered["change_scope"])
+
+        summary = _plan_summary(rendered)
+        self.assertEqual(summary["changed_path_count"], 1)
+        self.assertEqual(summary["selected_packs"], rendered["selected_packs"])
+        self.assertNotIn("execution_order", summary)
+        self.assertNotIn("changed_paths", summary)
+        self.assertNotIn("path_matches", summary)
+        self.assertNotIn("selection_reasons", summary)
+
+    def test_summary_flags_are_additive(self) -> None:
+        """Keep full output as the default while allowing one compact projection."""
+        check = _parser().parse_args(["check", "--pack", "format", "--summary"])
+        plan = _parser().parse_args(["plan", "--pack", "format", "--summary"])
+        telemetry = _parser().parse_args(["telemetry", "status"])
+        self.assertTrue(check.summary)
+        self.assertTrue(plan.summary)
+        self.assertEqual(telemetry.telemetry_command, "status")
+
+
+class NamedPackScopeTests(unittest.TestCase):
+    """Prove named repair packs retain one honest selection subject."""
+
+    def test_named_pack_retains_real_scope_packets(self) -> None:
+        """Compose pack selection with staged, changed, explicit, and all Git subjects."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+
+            def git(*arguments: str) -> None:
+                subprocess.run(
+                    ["git", *arguments],
+                    cwd=root,
+                    check=True,
+                    capture_output=True,
+                )
+
+            git("init", "-q", "-b", "main")
+            git("config", "user.email", "runtime@example.invalid")
+            git("config", "user.name", "Runtime Planning Tests")
+            source = root / "src/example.py"
+            source.parent.mkdir()
+            source.write_text("value = 1\n", encoding="utf-8")
+            git("add", "src/example.py")
+            git("commit", "-qm", "baseline")
+            source.write_text("value = 2\n", encoding="utf-8")
+
+            cases = (
+                (
+                    "changed",
+                    ["plan", "--pack", "secrets", "--stage", "pre-push", "--base-ref", "HEAD"],
+                    "changed",
+                ),
+                (
+                    "explicit",
+                    [
+                        "plan", "--pack", "secrets", "--stage", "pre-push",
+                        "--changed-path", "src/example.py", "--base-ref", "HEAD",
+                    ],
+                    "explicit",
+                ),
+                (
+                    "all",
+                    ["plan", "--pack", "secrets", "--stage", "release", "--mode", "all"],
+                    "all",
+                ),
+                ("bare-named", ["plan", "--pack", "secrets", "--base-ref", "HEAD"], "changed"),
+            )
+            for case, command, packet_mode in cases:
+                with self.subTest(case=case):
+                    arguments = _parser().parse_args(command)
+                    plan, _ = _resolve_plan(arguments, root)
+                    self.assertEqual(plan["status"], "ready", plan["blockers"])
+                    self.assertEqual(plan["selected_packs"], ["secrets"])
+                    self.assertEqual(plan["change_scope"]["mode"], packet_mode)
+                    if packet_mode != "all":
+                        self.assertEqual(
+                            [record["path"] for record in plan["change_scope"]["records"]],
+                            ["src/example.py"],
+                        )
+
+            git("add", "src/example.py")
+            staged_arguments = _parser().parse_args(
+                [
+                    "plan", "--pack", "secrets", "--stage", "pre-commit",
+                    "--mode", "impacted", "--staged",
+                ]
+            )
+            staged_plan, _ = _resolve_plan(staged_arguments, root)
+            self.assertEqual(staged_plan["status"], "ready", staged_plan["blockers"])
+            self.assertEqual(staged_plan["selected_packs"], ["secrets"])
+            self.assertEqual(staged_plan["change_scope"]["mode"], "staged")
+            self.assertEqual(
+                [record["path"] for record in staged_plan["change_scope"]["records"]],
+                ["src/example.py"],
+            )
+
+    def test_scope_validation_rejects_ambiguous_stage_combinations(self) -> None:
+        """Reject stage-less impacted and staged non-pre-commit subjects plainly."""
+        cases = (
+            ["plan", "--changed-path", "src/example.py", "--base-ref", "HEAD"],
+            ["plan", "--pack", "secrets", "--staged"],
+            ["plan", "--pack", "secrets", "--stage", "pre-push", "--staged"],
+        )
+        for arguments in cases:
+            with self.subTest(arguments=arguments), self.assertRaises(ConfigurationError):
+                _resolve_plan(
+                    _parser().parse_args(arguments),
+                    ROOT / "tests/fixtures/empty-target",
+                )
+
+    def test_all_mode_rejects_changed_subject_inputs(self) -> None:
+        """Keep all scope distinct from staged, explicit-path, and base comparisons."""
+        cases = (
+            ["--stage", "pre-commit", "--staged"],
+            ["--stage", "release", "--changed-path", "src/example.py"],
+            ["--stage", "release", "--base-ref", "HEAD"],
+        )
+        for options in cases:
+            with self.subTest(options=options), self.assertRaises(ConfigurationError):
+                _resolve_plan(
+                    _parser().parse_args(
+                        ["plan", "--pack", "secrets", "--mode", "all", *options]
+                    ),
+                    ROOT / "tests/fixtures/empty-target",
+                )
+
+
+class PackStageCoverageTests(unittest.TestCase):
+    """Prove stage claims cannot turn into false-green pack results."""
+
+    @staticmethod
+    def lifecycle_pack(command_stages: list[str] | None) -> dict[str, dict[str, object]]:
+        """Build one pack whose command either spans or narrows its declared lifecycle."""
+        command: dict[str, object] = {"run": "true"}
+        if command_stages is not None:
+            command["stages"] = command_stages
+        return {
+            "target": {
+                "id": "target",
+                "implementation_status": "active",
+                "stages": ["pre-commit", "pre-push"],
+                "path_globs": ["src/**"],
+                "commands": [command],
+                "enforcement": "blocking",
+                "depends_on": [],
+            }
+        }
+
+    def test_declared_stage_without_an_applicable_command_blocks_planning(self) -> None:
+        """Reject a lifecycle claim that would otherwise pass without running a command."""
+        plan = build_plan(
+            self.lifecycle_pack(["pre-commit"]),
+            stage="pre-push",
+            mode="impacted",
+            changed_paths=["src/example.py"],
+        )
+        self.assertEqual(plan["status"], "blocked")
+        self.assertEqual(plan["execution_order"], [])
+        self.assertEqual(plan["blockers"], [
+            {
+                "code": "pack-stage-without-command",
+                "pack_id": "target",
+                "uncovered_stages": ["pre-push"],
+            }
+        ])
+
+    def test_advisory_stage_gap_remains_nonblocking(self) -> None:
+        """Preserve an advisory pack's configured enforcement posture."""
+        packs = self.lifecycle_pack(["pre-commit"])
+        packs["target"]["enforcement"] = "advisory"
+        plan = build_plan(
+            packs,
+            stage="pre-push",
+            mode="impacted",
+            changed_paths=["src/example.py"],
+        )
+        self.assertEqual(plan["status"], "ready", plan["blockers"])
+
+    def test_unstaged_command_covers_every_declared_stage(self) -> None:
+        """Treat an unfiltered command as runnable throughout its pack lifecycle."""
+        plan = build_plan(
+            self.lifecycle_pack(None),
+            stage="pre-push",
+            mode="impacted",
+            changed_paths=["src/example.py"],
+        )
+        self.assertEqual(plan["status"], "ready", plan["blockers"])
+
+    def test_named_diagnostic_has_no_stage_coverage_false_positive(self) -> None:
+        """Keep direct pack repair runnable because explicit execution has no stage filter."""
+        plan = build_plan(
+            self.lifecycle_pack(["pre-commit"]),
+            stage=None,
+            mode="impacted",
+            changed_paths=[],
+            explicit_pack_ids=["target"],
+        )
+        self.assertEqual(plan["status"], "ready", plan["blockers"])
+
+    def test_stage_less_impacted_selection_does_not_cross_lifecycle_boundaries(self) -> None:
+        """Require a stage unless explicit pack selection makes the diagnostic bounded."""
+        plan = build_plan(
+            self.lifecycle_pack(["pre-commit"]),
+            stage=None,
+            mode="impacted",
+            changed_paths=["src/example.py"],
+        )
+        self.assertEqual(plan["status"], "blocked")
+        self.assertEqual(plan["selected_packs"], [])
+        self.assertEqual(plan["blockers"][0]["code"], "unknown-impact")
+
+    def test_named_pack_preserves_requested_stage(self) -> None:
+        """Keep named-pack selection independent from lifecycle command filtering."""
+        plan = build_plan(
+            self.lifecycle_pack(["pre-commit", "pre-push"]),
+            stage="pre-push",
+            mode="impacted",
+            changed_paths=["src/example.py"],
+            explicit_pack_ids=["target"],
+        )
+        self.assertEqual(plan["status"], "ready", plan["blockers"])
+        self.assertEqual(plan["stage"], "pre-push")
+        self.assertEqual(plan["mode"], "impacted")
+        self.assertEqual(plan["selected_packs"], ["target"])
+        self.assertEqual(plan["selection_reasons"], {"target": ["explicit"]})
+
+    def test_named_pack_must_be_available_at_requested_stage(self) -> None:
+        """Reject a named pack whose declared lifecycle excludes the requested stage."""
+        plan = build_plan(
+            self.lifecycle_pack(["pre-commit"]),
+            stage="ci-pr",
+            mode="impacted",
+            changed_paths=["src/example.py"],
+            explicit_pack_ids=["target"],
+        )
+        self.assertEqual(plan["status"], "blocked")
+        self.assertEqual(plan["selected_packs"], [])
+        self.assertEqual(plan["blockers"][0]["code"], "explicit-pack-unavailable")
+
+    def test_doctor_reports_stage_command_coverage(self) -> None:
+        """Expose the configuration defect before an operator starts a check."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            pack_root = root / "config/validation/packs"
+            pack_root.mkdir(parents=True)
+            (pack_root / "target.yaml").write_text(
+                yaml.safe_dump(self.lifecycle_pack(["pre-commit"])["target"]),
+                encoding="utf-8",
+            )
+            result = _doctor(root)
+        self.assertIn(
+            "pack target has no command for declared stage(s): pre-push",
+            result["findings"],
+        )
+
+    def test_doctor_reports_invalid_pack_yaml_without_a_traceback(self) -> None:
+        """Keep doctor useful when the target manifest itself cannot be parsed."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            pack_root = root / "config/validation/packs"
+            pack_root.mkdir(parents=True)
+            (pack_root / "invalid.yaml").write_text("id: [\n", encoding="utf-8")
+            result = _doctor(root)
+        self.assertTrue(any("invalid YAML" in finding for finding in result["findings"]))
+
+    def test_doctor_treats_the_runtime_source_checkout_as_source_mode(self) -> None:
+        """Do not require an adopter lock or facts file from runtime source development."""
+        result = _doctor(ROOT)
+        self.assertEqual(result["mode"], "source")
+        self.assertFalse(
+            any("runtime.lock.yaml is missing" in finding for finding in result["findings"])
+        )
+        self.assertFalse(
+            any("facts.lock.yaml is missing" in finding for finding in result["findings"])
+        )
 
 
 if __name__ == "__main__":

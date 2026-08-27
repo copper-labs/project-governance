@@ -7,10 +7,15 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: governance-pr-description-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   pr-description:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     env:
       PR_BODY_FILE: ${{ runner.temp }}/pr-body.md
     steps:

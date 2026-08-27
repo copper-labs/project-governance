@@ -77,8 +77,8 @@ class RuntimeReleaseVersioningTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "dirty checkout"):
                 git_version(root)
 
-    def test_release_lock_matches_the_semantic_wheel_and_declares_schema_migrations(self) -> None:
-        """Publish one exact wheel identity and the current adopter migration contract."""
+    def test_release_lock_matches_the_semantic_wheel_without_migration_payloads(self) -> None:
+        """Publish one exact wheel identity without carrying historical target procedures."""
         with tempfile.TemporaryDirectory() as directory:
             wheel = fake_wheel(Path(directory), "1.0.0")
             lock = release_lock(wheel, "1.0.0", "a" * 40)
@@ -87,7 +87,7 @@ class RuntimeReleaseVersioningTests(unittest.TestCase):
         self.assertEqual(lock["version"], "1.0.0")
         self.assertEqual(lock["wheel"], wheel.name)
         self.assertEqual(lock["configuration_schema"], 2)
-        self.assertEqual(len(lock["required_target_migrations"]), 3)
+        self.assertNotIn("required_target_migrations", lock)
 
     def test_source_readiness_runs_once_at_candidate_boundaries(self) -> None:
         """Avoid complete release proof on every repair push and again after merge."""
@@ -106,6 +106,16 @@ class RuntimeReleaseVersioningTests(unittest.TestCase):
             workflow["jobs"]["source-readiness"]["if"],
             "github.event.pull_request.draft == false",
         )
+        self.assertEqual(workflow["concurrency"]["cancel-in-progress"], "true")
+        self.assertEqual(
+            workflow["jobs"]["source-readiness"]["timeout-minutes"], "30"
+        )
+        release = yaml.load(
+            (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8"),
+            Loader=yaml.BaseLoader,
+        )
+        self.assertEqual(release["concurrency"]["cancel-in-progress"], "false")
+        self.assertEqual(release["jobs"]["release"]["timeout-minutes"], "30")
 
 
 if __name__ == "__main__":

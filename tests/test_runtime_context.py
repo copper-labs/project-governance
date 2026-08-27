@@ -18,7 +18,14 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from project_governance_runtime.cli import main  # noqa: E402
-from project_governance_runtime.context import resolve_context  # noqa: E402
+from project_governance_runtime.context import (  # noqa: E402
+    ContextError,
+    MAX_CONTEXT_PACKET_BYTES,
+    MAX_CONTEXT_PACKETS,
+    MAX_CONTEXT_TOKENS,
+    MAX_SKILL_BYTES,
+    resolve_context,
+)
 from project_governance_runtime.installation import materialize_skills  # noqa: E402
 
 
@@ -46,10 +53,10 @@ def routing_profile(*, context: list[str]) -> dict[str, object]:
                     "match": {"prompt_terms": ["governance"], "path_globs": ["docs/governance/**"]},
                     "primary_context": ["docs/governance/guide.md"],
                     "token_budget": {
-                        "primary_context_tokens": 20,
-                        "active_plan_context_tokens": 20,
-                        "expansion_context_tokens": 20,
-                        "total_context_tokens": 40,
+                        "primary_context_tokens": 100,
+                        "active_plan_context_tokens": 100,
+                        "expansion_context_tokens": 100,
+                        "total_context_tokens": 10000,
                     },
                 },
                 {
@@ -73,9 +80,7 @@ class RuntimeContextTests(unittest.TestCase):
             guide = root / "docs/governance/guide.md"
             guide.parent.mkdir(parents=True)
             guide.write_text("Governance guide\n", encoding="utf-8")
-            skill = root / ".governance/runtime/skills/work/SKILL.md"
-            skill.parent.mkdir(parents=True)
-            skill.write_text("Work skill\n", encoding="utf-8")
+            materialize_skills(root)
             write_repository(root, routing_profile(context=["AGENTS.md"]))
 
             result = resolve_context(root, "Review the governance rules", ["docs/governance/guide.md"])
@@ -83,6 +88,15 @@ class RuntimeContextTests(unittest.TestCase):
             self.assertEqual(result["status"], "passed")
             self.assertEqual(result["route"]["id"], "governance")
             self.assertEqual([skill["id"] for skill in result["skills"]], ["work"])
+            materialized_skill = (
+                root
+                / result["materialization"]["root"]
+                / result["skills"][0]["materialized_path"]
+            )
+            self.assertEqual(
+                materialized_skill.read_bytes(),
+                (root / result["skills"][0]["path"]).read_bytes(),
+            )
             items = result["materialization"]["items"]
             self.assertEqual([item["source_path"] for item in items], ["AGENTS.md", "docs/governance/guide.md"])
             for item in items:
@@ -130,7 +144,9 @@ class RuntimeContextTests(unittest.TestCase):
             outside = Path(outside_directory) / "outside.md"
             outside.write_text("do not read\n", encoding="utf-8")
             (root / "link.md").symlink_to(outside)
-            write_repository(root, routing_profile(context=["link.md"]))
+            profile = routing_profile(context=["link.md"])
+            profile["context_router"]["default_skills"] = []
+            write_repository(root, profile)
 
             result = resolve_context(root, "Review governance", [])
 
@@ -147,9 +163,7 @@ class RuntimeContextTests(unittest.TestCase):
             guide = root / "docs/governance/guide.md"
             guide.parent.mkdir(parents=True)
             guide.write_text("Governance guide\n", encoding="utf-8")
-            skill = root / ".governance/runtime/skills/work/SKILL.md"
-            skill.parent.mkdir(parents=True)
-            skill.write_text("Work skill\n", encoding="utf-8")
+            materialize_skills(root)
             write_repository(root, routing_profile(context=["AGENTS.md"]))
             output = io.StringIO()
             with patch("project_governance_runtime.cli._root", return_value=root), patch.object(
@@ -158,6 +172,165 @@ class RuntimeContextTests(unittest.TestCase):
                 self.assertEqual(main(), 0)
             self.assertIn('"route": {', output.getvalue())
             self.assertIn('"id": "governance"', output.getvalue())
+
+    def test_context_materializations_keep_only_eight_recent_packets(self) -> None:
+        """Prevent ordinary context selection from growing ignored state indefinitely."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            guide = root / "docs/governance/guide.md"
+            guide.parent.mkdir(parents=True)
+            materialize_skills(root)
+            write_repository(root, routing_profile(context=[]))
+            latest = None
+            for index in range(MAX_CONTEXT_PACKETS + 4):
+                guide.write_text(f"Governance guide {index}\n", encoding="utf-8")
+                latest = resolve_context(root, "Review governance", [])
+
+            packets = list((root / ".governance/runtime/context").glob("context-*"))
+            self.assertEqual(len(packets), MAX_CONTEXT_PACKETS)
+            self.assertIsNotNone(latest)
+            self.assertTrue((root / latest["materialization"]["root"]).is_dir())
+
+    def test_context_rejects_a_configured_packet_above_the_runtime_ceiling(self) -> None:
+        """Fail explicitly instead of materializing arbitrarily large target budgets."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            guide = root / "docs/governance/guide.md"
+            guide.parent.mkdir(parents=True)
+            guide.write_text("Governance guide\n", encoding="utf-8")
+            profile = routing_profile(context=[])
+            profile["context_router"]["routes"][0]["token_budget"][
+                "total_context_tokens"
+            ] = MAX_CONTEXT_TOKENS + 1
+            write_repository(root, profile)
+
+            with self.assertRaisesRegex(ContextError, "packet ceiling"):
+                resolve_context(root, "Review governance", [])
+
+    def test_context_packet_limits_include_skill_bytes(self) -> None:
+        """Keep the published combined ceiling within one runtime-owned disk bound."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            guide = root / "docs/governance/guide.md"
+            guide.parent.mkdir(parents=True)
+            guide.write_text("Governance guide\n", encoding="utf-8")
+            materialize_skills(root)
+            write_repository(root, routing_profile(context=[]))
+
+            result = resolve_context(root, "Review governance", [])
+
+            self.assertLessEqual(
+                result["materialization"]["byte_limits"]["combined"],
+                MAX_CONTEXT_PACKET_BYTES,
+            )
+
+    def test_context_removes_abandoned_staging_without_following_symlinks(self) -> None:
+        """Clean runtime-owned crash debris while preserving anything outside the cache root."""
+        with tempfile.TemporaryDirectory() as directory, tempfile.TemporaryDirectory() as outside:
+            root = Path(directory)
+            guide = root / "docs/governance/guide.md"
+            guide.parent.mkdir(parents=True)
+            guide.write_text("Governance guide\n", encoding="utf-8")
+            materialize_skills(root)
+            write_repository(root, routing_profile(context=[]))
+            runtime_root = root / ".governance/runtime/context"
+            abandoned = runtime_root / ".context-abandoned"
+            abandoned.mkdir(parents=True)
+            (abandoned / "partial.md").write_text("partial\n", encoding="utf-8")
+            outside_file = Path(outside) / "preserve.md"
+            outside_file.write_text("preserve\n", encoding="utf-8")
+            linked = runtime_root / ".context-linked"
+            linked.symlink_to(Path(outside), target_is_directory=True)
+
+            resolve_context(root, "Review governance", [])
+
+            self.assertFalse(abandoned.exists())
+            self.assertTrue(linked.is_symlink())
+            self.assertEqual(outside_file.read_text(encoding="utf-8"), "preserve\n")
+
+    def test_context_rejects_an_oversized_source_without_an_unbounded_read(self) -> None:
+        """Use the remaining packet budget as the source read ceiling."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            guide = root / "docs/governance/guide.md"
+            guide.parent.mkdir(parents=True)
+            guide.write_text("outside the four-byte budget\n", encoding="utf-8")
+            profile = routing_profile(context=[])
+            profile["context_router"]["default_skills"] = []
+            profile["context_router"]["routes"][0]["token_budget"] = {
+                "primary_context_tokens": 1,
+                "active_plan_context_tokens": 1,
+                "expansion_context_tokens": 1,
+                "total_context_tokens": 1,
+            }
+            write_repository(root, profile)
+
+            with patch.object(Path, "read_bytes", side_effect=AssertionError("unbounded read")):
+                result = resolve_context(root, "Review governance", [])
+
+            self.assertEqual(result["status"], "blocked")
+            self.assertEqual(result["omissions"][0]["reason"], "outside-byte-budget")
+
+    def test_context_rebuilds_a_corrupted_runtime_owned_packet(self) -> None:
+        """Recover ignored cache state instead of preserving a permanent poison packet."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            guide = root / "docs/governance/guide.md"
+            guide.parent.mkdir(parents=True)
+            guide.write_text("Governance guide\n", encoding="utf-8")
+            materialize_skills(root)
+            write_repository(root, routing_profile(context=[]))
+            first = resolve_context(root, "Review governance", [])
+            packet = root / first["materialization"]["root"]
+            selected = packet / first["skills"][0]["materialized_path"]
+            selected.write_text("corrupted\n", encoding="utf-8")
+
+            second = resolve_context(root, "Review governance", [])
+
+            rebuilt = root / second["materialization"]["root"] / second["skills"][0]["materialized_path"]
+            self.assertEqual(second["status"], "passed")
+            self.assertEqual(rebuilt.read_bytes(), (root / second["skills"][0]["path"]).read_bytes())
+
+    def test_target_declared_skill_reads_stop_at_the_skill_budget(self) -> None:
+        """Block a large unindexed skill without loading it beyond the runtime ceiling."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            guide = root / "docs/governance/guide.md"
+            guide.parent.mkdir(parents=True)
+            guide.write_text("Governance guide\n", encoding="utf-8")
+            skill = root / ".governance/runtime/skills/custom/SKILL.md"
+            skill.parent.mkdir(parents=True)
+            skill.write_bytes(b"x" * (MAX_SKILL_BYTES + 1))
+            profile = routing_profile(context=[])
+            profile["context_router"]["default_skills"] = ["custom"]
+            write_repository(root, profile)
+
+            result = resolve_context(root, "Review governance", [])
+
+            self.assertEqual(result["status"], "blocked")
+            self.assertEqual(
+                result["blockers"], ["skill-outside-byte-budget:custom"]
+            )
+
+    def test_packaged_skill_reads_stop_at_the_skill_budget(self) -> None:
+        """Apply the same bounded read to indexed package-owned skill materializations."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            guide = root / "docs/governance/guide.md"
+            guide.parent.mkdir(parents=True)
+            guide.write_text("Governance guide\n", encoding="utf-8")
+            materialize_skills(root)
+            skill = root / ".governance/runtime/skills/work/SKILL.md"
+            skill.write_bytes(b"x" * (MAX_SKILL_BYTES + 1))
+            write_repository(root, routing_profile(context=[]))
+
+            with patch.object(Path, "read_bytes", side_effect=AssertionError("unbounded read")):
+                result = resolve_context(root, "Review governance", [])
+
+            self.assertEqual(result["status"], "blocked")
+            self.assertEqual(
+                result["blockers"], ["skill-outside-byte-budget:work"]
+            )
 
 
 if __name__ == "__main__":

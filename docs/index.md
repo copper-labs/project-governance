@@ -23,10 +23,6 @@ lock.
   process handling, and configuration boundary.
 - [Runtime architecture](architecture/governance-runtime.md) explains what belongs in the
   wheel and what remains target-owned.
-- [Provider-aware agent orchestration](specs/provider-aware-agent-orchestration.md) defines
-  conservative native-host routing for Codex and Claude using compact bounded work contracts.
-- [Skill selection and utilization](specs/skill-utilization.md) defines proactive exact skill
-  selection and bounded local receipts for examining reported use after work.
 - [Operator guide](guides/user-guide.md) explains bootstrap, routine checks, and deliberate
   upgrades.
 - [Developer documentation](developer/index.md) provides progressive evaluator/operator and
@@ -49,15 +45,6 @@ lock.
 - [Specifications](specs/README.md) contain the active generic contracts.
 - [Guides](guides/README.md) provide task-oriented instructions for operators and agents.
 - [Decisions](decisions/README.md) records durable generic boundary decisions.
-- [Proposed Project Gateway](proposed/project-gateway/README.md) defines the work-in-progress
-  gateway-only architecture, requirements, protocol, subscription-host boundary, evidence model,
-  and implementation sequence. It does not authorize implementation.
-- [KMP skill-library strategy](proposed/kmp-skill-library/README.md) proposes a provider-neutral,
-  evidence-backed path from the current pack to a cohesive Kotlin Multiplatform library.
-- [KMP capability and normalization map](proposed/kmp-skill-library/capability-map.md) defines what
-  the library needs, what must be normalized, the coverage gaps, and how each gap should be filled.
-- [Future knowledge-graph direction](proposed/knowledge-graph/README.md) is non-executable and
-  requires a separately approved initiative before any implementation begins.
 
 ## Boundaries
 

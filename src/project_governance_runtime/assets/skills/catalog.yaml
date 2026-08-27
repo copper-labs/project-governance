@@ -42,26 +42,10 @@ standard_skills:
     category: governance
     path: .governance/runtime/skills/delegated-execution/SKILL.md
     description: Adaptively select and operate provider-neutral specialist roles for implementation work.
-  - id: delegated-research
-    category: delegated-role
-    path: .governance/runtime/skills/delegated-research/SKILL.md
-    description: Execute a bounded read-only research packet without coordinator bootstrap or nested delegation.
-  - id: delegated-implementation
-    category: delegated-role
-    path: .governance/runtime/skills/delegated-implementation/SKILL.md
-    description: Implement one bounded write packet without assuming coordinator responsibilities.
-  - id: delegated-build-verification
-    category: delegated-role
-    path: .governance/runtime/skills/delegated-build-verification/SKILL.md
-    description: Run mechanical checks against one named snapshot without repairing governed source.
-  - id: delegated-qa-review
-    category: delegated-role
-    path: .governance/runtime/skills/delegated-qa-review/SKILL.md
-    description: Independently review one digest-bound packet using the shared finding schema.
   - id: review
     category: loop
     path: .governance/runtime/skills/review/SKILL.md
-    description: Run peer review through shared review skills, finding schema, and peer resources.
+    description: Run one bounded review through a catalog skill and the shared finding schema.
   - id: maintain
     category: loop
     path: .governance/runtime/skills/maintain/SKILL.md
@@ -78,10 +62,6 @@ standard_skills:
     category: governance
     path: .governance/runtime/skills/work-item-lifecycle/SKILL.md
     description: Create, claim, update, stage-verify, review, or close work items through the configured tracker without skipping state, evidence, or mutation gates.
-  - id: governed-implementation
-    category: governance
-    path: .governance/runtime/skills/governed-implementation/SKILL.md
-    description: Governed implementation workflow from context selection through validation and closeout.
   - id: docs-governance-review
     category: governance
     path: .governance/runtime/skills/docs-governance-review/SKILL.md
@@ -94,10 +74,6 @@ standard_skills:
     category: architecture
     path: .governance/runtime/skills/architecture-design/SKILL.md
     description: Design architecture changes using target docs, profile constraints, and validation impact.
-  - id: implementation-quality-review
-    category: review
-    path: .governance/runtime/skills/implementation-quality-review/SKILL.md
-    description: Review implementation quality, maintainability, comments, naming, and tests.
   - id: qa-review
     category: review
     path: .governance/runtime/skills/qa-review/SKILL.md
@@ -172,21 +148,6 @@ resources:
   - id: loop-cycle
     path: .governance/runtime/skills/resources/loop-cycle.yaml
     description: Frame to Plan to Work to Review to Capture dry-run stage map.
-  - id: peer-dispatch
-    path: .governance/runtime/skills/resources/peer-dispatch.yaml
-    description: Agent-neutral peer review resources and shared finding schema binding.
-  - id: execution-roles
-    path: .governance/runtime/skills/resources/execution-roles.yaml
-    description: Provider-neutral delegated role permissions, host envelope, worker brief, and result envelope.
-  - id: agent-routing-schema
-    path: .governance/runtime/skills/resources/agent-routing.schema.json
-    description: Native-host routing input and output schema.
-  - id: agent-worker-brief-schema
-    path: .governance/runtime/skills/resources/agent-worker-brief.schema.json
-    description: Compact delegated worker brief schema.
-  - id: agent-control-state-schema
-    path: .governance/runtime/skills/resources/agent-control-state.schema.json
-    description: Dispatch authorization and repository control-state schema.
   - id: implementation-plan-template
     path: .governance/runtime/skills/resources/implementation-plan-template.md
     description: Canonical packet-ready implementation plan slice template.

@@ -26,7 +26,9 @@ Use this skill when implementation is done and you need to confirm that nothing 
 
 ## Validation
 
-Run docs-governance when scope changes affect durable docs. Run impacted code checks when removing or adjusting implementation.
+Consume existing proof. Run docs-governance when a scope change creates an uncovered durable-doc
+claim, or use one impacted code sign-off after implementation changes; do not automatically run
+both on an unchanged subject.
 
 ## Evidence
 

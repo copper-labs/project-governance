@@ -20,23 +20,20 @@ authoring, or migration changes.
 - `docs/index.md`
 - `.governance/runtime/skills/catalog.yaml`
 - `.governance/runtime/skills/review-finding.schema.yaml`
-- `.governance/runtime/skills/resources/peer-dispatch.yaml`
-- `.governance/runtime/skills/resources/execution-roles.yaml` when review is delegated
 - The changed diff or artifact under review
 
 ## Workflow
 
-1. Select the smallest sufficient lens set and one review pass. Use an explicitly assigned model
-   when the operator names one; otherwise reuse the current primary in a dedicated clean pass.
-   For a repeated-failure second opinion, inspect the owning check first and follow
-   `repeated_failure_consultation` in the peer-dispatch resource. Stop after the first conclusive
-   response; do not skip a ladder step or escalate to max automatically.
+1. Select the smallest sufficient review skill from the catalog and run one review pass. Use an
+   explicitly assigned model when the operator names one; otherwise reuse the current primary in a
+   dedicated clean pass.
+   A repeated failure returns to the owning check or operator; there is no automatic model ladder.
 2. Provide the review pass with scope, governing artifacts, integrated snapshot identity, validation
    results, and exact questions.
 3. Require findings to use the shared severity, location, risk, and recommendation fields.
 4. Keep review separate from implementation: inspect the stable candidate first, report findings,
-   and prevent silent fixes. A delegated QA reviewer is a separate assurance wave with its own
-   explicit operator start; otherwise the primary performs the dedicated pass.
+   and prevent silent fixes. A delegated QA reviewer is a separate host-native assignment;
+   otherwise the primary performs the dedicated pass.
 5. Reconcile high and medium findings with code, docs, tests, or a recorded rationale, then recheck
    only the affected claim unless the patch invalidated broader evidence. Allow one primary-owned
    repair and one affected recheck. A failed recheck returns to focused diagnosis or the operator;
@@ -50,8 +47,9 @@ authoring, or migration changes.
 
 ## Validation
 
-Run the relevant validation packs before review when practical. For review-skill changes, run
-template validation and ensure provider adapters remain thin.
+Consume the candidate's existing subject-valid validation before review. Run one relevant pack
+only for a named uncovered claim. For review-skill changes, use template validation as that focused
+proof and ensure provider adapters remain thin.
 
 ## Evidence
 

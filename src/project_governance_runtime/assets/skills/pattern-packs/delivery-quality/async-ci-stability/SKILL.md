@@ -20,16 +20,23 @@ Use this skill before pushing code, opening/updating a PR, or diagnosing failing
 ## Workflow
 
 1. Classify changed targets and map them to validation packs and CI jobs.
-2. Run fast local gates first: format, lint/typecheck/compile, and targeted tests.
-3. Run the CI-mirror gate for touched areas in the same order CI uses where possible.
-4. For app targets, run the smallest runtime smoke that proves startup and the touched flow.
-5. Fix failures minimally, rerun the failed command, then rerun the enclosing gate.
+2. Consume existing subject-valid local proof and identify one uncovered affected claim, if any.
+3. Run the target's impact-selected local sign-off once. Add one focused test or runtime smoke only
+   when the selected sign-off does not prove a named changed seam.
+4. Leave provider CI to its independent environment and trust boundary. Mirror CI locally only when
+   the target explicitly declares that separate proof necessary.
+5. Fix failures minimally, then choose one affected recheck: the failed owner for focused diagnosis
+   or the enclosing gate for final proof. Do not automatically run both against the unchanged
+   subject.
 6. Stop and reassess if the same failure repeats without a new hypothesis.
 7. Confirm implementation quality, commit message, and PR description readiness before final push recommendation.
 
 ## Validation
 
-Use the target profile's impact-aware pack selection. Escalate to full-suite checks when shared APIs, build logic, generated code, security, release, or cross-platform behavior changed.
+Use the target profile's impact-aware pack selection. Shared APIs, build logic, generated code, or
+cross-platform behavior may require one directly affected seam; they do not by themselves require
+a full suite. Use full-suite proof only at the target's declared release, schema, hook/selection,
+security/process-isolation, scheduled-reconciliation, or operator-requested boundary.
 
 ## Evidence
 

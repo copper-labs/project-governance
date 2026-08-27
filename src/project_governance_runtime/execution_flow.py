@@ -19,9 +19,11 @@ from .checker_scripts.finding_lifecycle import FINDING_STATES
 from .evidence_manifest import inspect_evidence_manifest
 from .execution_commands import command_argv, normalized_command
 from .processes import run_command
+from .state_io import path_lock
 
 
 PACKET_SHA256_ENV = "PROJECT_GOVERNANCE_CHANGE_PACKET_SHA256"
+ACTIVE_RUN_MARKER = ".active"
 
 
 def _pack_directory_name(pack_id: str) -> str:
@@ -155,25 +157,39 @@ def execution_environment(
     root: Path, plan: dict[str, Any], *, run_id: str | None = None
 ) -> Iterator[dict[str, str]]:
     """Provide one read-only materialized change packet to every child command."""
-    with tempfile.TemporaryDirectory(prefix="project-governance-change-") as directory:
-        temporary_root = Path(directory)
-        packet = _wire_packet(root, plan, temporary_root)
-        packet_path = temporary_root / "change-packet.json"
-        packet_path.write_text(
-            json.dumps(packet, sort_keys=True, separators=(",", ":")),
-            encoding="utf-8",
-        )
-        packet_path.chmod(stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
-        environment = dict(os.environ)
-        environment["PROJECT_GOVERNANCE_ROOT"] = str(root)
-        environment["PROJECT_GOVERNANCE_CHANGE_PACKET"] = str(packet_path.resolve())
-        environment[PACKET_SHA256_ENV] = hashlib.sha256(packet_path.read_bytes()).hexdigest()
-        if packet["subject_digest"] is not None:
-            environment["PROJECT_GOVERNANCE_SUBJECT_DIGEST"] = packet["subject_digest"]
-        else:
-            environment.pop("PROJECT_GOVERNANCE_SUBJECT_DIGEST", None)
-        environment["PROJECT_GOVERNANCE_RUN_ID"] = run_id or str(uuid4())
-        yield environment
+    resolved_run_id = run_id or str(uuid4())
+    runs_root = root / ".governance/runtime/runs"
+    run_root = runs_root / resolved_run_id
+    active = run_root / ACTIVE_RUN_MARKER
+    runs_state = root / ".governance/runtime/.runs-state"
+    with path_lock(runs_state, timeout_seconds=None):
+        run_root.mkdir(parents=True, exist_ok=True)
+        active.touch(exist_ok=False)
+        _prune_empty_evidence_scaffolding(runs_root)
+    try:
+        with tempfile.TemporaryDirectory(prefix="project-governance-change-") as directory:
+            temporary_root = Path(directory)
+            packet = _wire_packet(root, plan, temporary_root)
+            packet_path = temporary_root / "change-packet.json"
+            packet_path.write_text(
+                json.dumps(packet, sort_keys=True, separators=(",", ":")),
+                encoding="utf-8",
+            )
+            packet_path.chmod(stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
+            environment = dict(os.environ)
+            environment["PROJECT_GOVERNANCE_ROOT"] = str(root)
+            environment["PROJECT_GOVERNANCE_CHANGE_PACKET"] = str(packet_path.resolve())
+            environment[PACKET_SHA256_ENV] = hashlib.sha256(packet_path.read_bytes()).hexdigest()
+            if packet["subject_digest"] is not None:
+                environment["PROJECT_GOVERNANCE_SUBJECT_DIGEST"] = packet["subject_digest"]
+            else:
+                environment.pop("PROJECT_GOVERNANCE_SUBJECT_DIGEST", None)
+            environment["PROJECT_GOVERNANCE_RUN_ID"] = resolved_run_id
+            yield environment
+    finally:
+        with path_lock(runs_state, timeout_seconds=None):
+            active.unlink(missing_ok=True)
+            _prune_empty_evidence_scaffolding(runs_root)
 
 
 def execute_packs(
@@ -181,7 +197,7 @@ def execute_packs(
     packs: dict[str, dict[str, Any]],
     plan: dict[str, Any],
     *,
-    timeout_seconds: float,
+    timeout_seconds: float | None,
     environment: dict[str, str],
     command_arguments: dict[str, str],
 ) -> tuple[list[dict[str, Any]], str, str]:
@@ -221,7 +237,7 @@ def execute_pack(
     pack: dict[str, Any],
     plan: dict[str, Any],
     *,
-    timeout_seconds: float,
+    timeout_seconds: float | None,
     environment: dict[str, str],
     command_arguments: dict[str, str],
 ) -> tuple[dict[str, Any], str | None]:
@@ -258,20 +274,33 @@ def execute_pack(
                 break
         if command_status == "warning" and status == "passed":
             status = "warning"
+    applicability_findings = []
+    if not commands:
+        status = "failed"
+        applicability_findings.append({
+            "rule_id": "pack.no-applicable-command",
+            "severity": (
+                "blocking" if pack.get("enforcement") == "blocking" else "advisory"
+            ),
+            "pack_id": pack_id,
+            "message": "selected pack resolved no runnable commands",
+        })
     manifest = inspect_evidence_manifest(
         evidence_root,
         pack_environment.get("PROJECT_GOVERNANCE_SUBJECT_DIGEST"),
     )
+    _remove_empty_evidence_directories(evidence_root)
     manifest_findings = [
         {**finding, "pack_id": pack_id} for finding in manifest["findings"]
     ]
-    if manifest_findings:
+    pack_findings = applicability_findings + manifest_findings
+    if pack_findings:
         status = "failed"
     finding_counts = {
         state: sum(
             command["finding_counts"].get(state, 0) for command in commands
         )
-        + sum(finding.get("severity") == state for finding in manifest_findings)
+        + sum(finding.get("severity") == state for finding in pack_findings)
         for state in FINDING_STATES
     }
     process_failure_count = sum(command["process_failure"] for command in commands)
@@ -286,7 +315,7 @@ def execute_pack(
         "process_failure_count": process_failure_count,
         "integrity_failure_count": integrity_failure_count,
         "subject_digest": pack_environment.get("PROJECT_GOVERNANCE_SUBJECT_DIGEST"),
-        "findings": manifest_findings,
+        "findings": pack_findings,
         "evidence_manifest": manifest,
         "evidence_manifest_count": int(manifest["status"] != "absent"),
         "valid_evidence_manifest_count": int(manifest["status"] == "valid"),
@@ -297,12 +326,58 @@ def execute_pack(
     }, termination
 
 
+def _remove_empty_evidence_directories(evidence_root: Path) -> None:
+    """Prune only empty directories created for this pack and run."""
+    try:
+        evidence_root.rmdir()
+    except OSError:
+        return
+    try:
+        evidence_root.parent.rmdir()
+    except OSError:
+        pass
+
+
+def _prune_empty_evidence_scaffolding(runs_root: Path) -> None:
+    """Reclaim only inactive empty run and pack directories owned by the runtime."""
+    try:
+        run_roots = list(runs_root.iterdir())
+    except OSError:
+        return
+    for run_root in run_roots:
+        if (
+            run_root.is_symlink()
+            or not run_root.is_dir()
+            or (run_root / ACTIVE_RUN_MARKER).exists()
+        ):
+            continue
+        try:
+            pack_roots = list(run_root.iterdir())
+        except OSError:
+            continue
+        for pack_root in pack_roots:
+            if pack_root.is_symlink() or not pack_root.is_dir():
+                continue
+            try:
+                pack_root.rmdir()
+            except OSError:
+                pass
+        try:
+            run_root.rmdir()
+        except OSError:
+            pass
+    try:
+        runs_root.rmdir()
+    except OSError:
+        pass
+
+
 def execute_command(
     root: Path,
     entry: Any,
     plan: dict[str, Any],
     *,
-    timeout_seconds: float,
+    timeout_seconds: float | None,
     environment: dict[str, str],
     command_arguments: dict[str, str],
 ) -> tuple[dict[str, Any] | None, str | None, str | None]:

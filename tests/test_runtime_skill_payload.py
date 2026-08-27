@@ -32,6 +32,13 @@ FORBIDDEN_TEXT = (
     "telemetry lifecycle",
     "receipt invalidator",
     "duplicated proof cache",
+    "agent-dispatch",
+    "skills closeout",
+    "execution-roles.yaml",
+    "governed-implementation",
+    "implementation-quality-review",
+    "claude-opus-5",
+    "claude-fable-5",
 )
 
 
@@ -68,14 +75,49 @@ class RuntimeSkillPayloadTests(unittest.TestCase):
             self.assertNotIn(forbidden, text)
         self.assertNotIn("parallel governance runtime mode", text)
 
+    def test_source_provider_adapters_reference_only_live_shared_skills(self) -> None:
+        """Prevent thin source adapters from outliving the runtime skills they reference."""
+        sources = [ROOT / "CLAUDE.md", ROOT / "CODEX.md"]
+        for directory in (ROOT / ".claude/agents", ROOT / ".codex/agents"):
+            if directory.is_dir():
+                sources.extend(path for path in directory.iterdir() if path.is_file())
+        combined = "\n".join(path.read_text(encoding="utf-8") for path in sources)
+        for reference in INTERNAL_PATH.findall(combined):
+            relative = reference.removeprefix(RUNTIME_PREFIX)
+            self.assertTrue(
+                (SKILLS_SOURCE / relative).exists(),
+                f"source adapter names missing {reference}",
+            )
+        self.assertNotIn("role catalog", combined.lower())
+        self.assertFalse((ROOT / ".claude/agent-profiles.json").exists())
+        self.assertFalse((ROOT / ".codex/agent-profiles.json").exists())
+
+    def test_live_docs_do_not_claim_retired_runtime_commands(self) -> None:
+        """Keep current architecture and operating guidance on the public CLI surface."""
+        sources = []
+        for directory in (
+            ROOT / "docs/architecture",
+            ROOT / "docs/governance",
+            ROOT / "docs/guides",
+            ROOT / "docs/reference",
+            ROOT / "docs/specs",
+        ):
+            sources.extend(path for path in directory.rglob("*.md") if path.is_file())
+        combined = "\n".join(path.read_text(encoding="utf-8") for path in sources).lower()
+        for retired in (
+            "project-governance agent-dispatch",
+            "project-governance agent-route",
+            "project-governance skills closeout",
+            "generic skill closeout",
+        ):
+            self.assertNotIn(retired, combined)
+
     def test_work_and_review_skills_define_the_lean_loop(self) -> None:
         """Keep installed agent guidance proportional to changed behavior and risk."""
         skill_text = {
             name: (SKILLS_SOURCE / name / "SKILL.md").read_text(encoding="utf-8").lower()
             for name in (
-                "governed-implementation",
                 "work",
-                "implementation-quality-review",
                 "architecture-review",
             )
         }
@@ -88,16 +130,16 @@ class RuntimeSkillPayloadTests(unittest.TestCase):
         ):
             self.assertNotIn(retired, combined)
 
-        governed = skill_text["governed-implementation"]
+        governed = skill_text["work"]
         for required in (
             "one focused owner test",
             "one directly affected seam",
-            "one branch-aware impacted pre-push sign-off",
+            "branch-aware impacted pre-push sign-off",
             "do not run a separate manual pre-commit or pre-pr gate",
             "one primary-owned",
             "one affected recheck",
-            "do not start a fresh general review",
-            "second failure",
+            "starting another general qa",
+            "fails twice",
             "warnings",
         ):
             self.assertIn(required, governed)
@@ -117,14 +159,24 @@ class RuntimeSkillPayloadTests(unittest.TestCase):
         self.assertIn("one branch-aware impacted pre-push sign-off", plan_template)
         self.assertNotIn("one impacted pre-commit boundary", plan_template)
 
-        for review_skill in (
-            skill_text["implementation-quality-review"],
-            skill_text["architecture-review"],
-        ):
+        for review_skill in (skill_text["architecture-review"],):
             self.assertIn("over 500 lines", review_skill)
             self.assertIn("cohesive narrow unit may be accepted", review_skill)
             self.assertIn("helper extraction", review_skill)
             self.assertIn("meaningful owner", review_skill)
+
+        delegated = (SKILLS_SOURCE / "delegated-execution" / "SKILL.md").read_text(
+            encoding="utf-8"
+        ).lower()
+        work = skill_text["work"]
+        for instruction in (delegated, work):
+            self.assertIn("current checkout", instruction)
+            self.assertIn("delegation", instruction)
+            self.assertIn("operator", instruction)
+            self.assertIn("worktree", instruction)
+        for instruction in (delegated, work):
+            self.assertIn("path", instruction)
+            self.assertIn("retained or removed", instruction)
 
         authoring = (SKILLS_SOURCE / "technical-authoring" / "SKILL.md").read_text(
             encoding="utf-8"
@@ -176,6 +228,18 @@ class RuntimeSkillPayloadTests(unittest.TestCase):
         self.assertIn("git rev-parse --git-path PR_TITLE", user_guide)
         self.assertIn("git rev-parse --git-path PR_DESCRIPTION.md", user_guide)
         self.assertIn("fails closed", user_guide)
+        self.assertIn("checks only the pull request title and body", user_guide)
+        self.assertIn("--pack pr-description --stage pre-pr", user_guide)
+        impact_planning = (
+            SKILLS_SOURCE / "impact-planning" / "SKILL.md"
+        ).read_text(encoding="utf-8").lower()
+        self.assertIn("plan --stage pre-push --mode impacted", impact_planning)
+        self.assertNotIn("plan --stage pre-pr --mode impacted", impact_planning)
+        hook_operation = (
+            SKILLS_SOURCE / "hook-check-operation" / "SKILL.md"
+        ).read_text(encoding="utf-8").lower()
+        self.assertIn("pre-pr hook names only `pr-description`", hook_operation)
+        self.assertNotIn("pre-pr aggregation", hook_operation)
         for workflow in (
             "commit-message-workflow",
             "pr-description-workflow",

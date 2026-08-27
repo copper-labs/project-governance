@@ -20,9 +20,21 @@ LOCK_TIMEOUT_SECONDS = 2.0
 LOCK_RETRY_SECONDS = 0.01
 
 
+def _acquire(handle: Any, *, blocking: bool) -> None:
+    """Acquire one platform lock using blocking or single-attempt semantics."""
+    if os.name == "nt":
+        mode = msvcrt.LK_LOCK if blocking else msvcrt.LK_NBLCK
+        msvcrt.locking(handle.fileno(), mode, 1)
+        return
+    mode = fcntl.LOCK_EX if blocking else fcntl.LOCK_EX | fcntl.LOCK_NB
+    fcntl.flock(handle.fileno(), mode)
+
+
 @contextmanager
-def path_lock(path: Path, *, timeout_seconds: float = LOCK_TIMEOUT_SECONDS) -> Iterator[None]:
-    """Serialize state access using one adjacent non-content lock file."""
+def path_lock(
+    path: Path, *, timeout_seconds: float | None = LOCK_TIMEOUT_SECONDS
+) -> Iterator[None]:
+    """Serialize state access, optionally bounding advisory lock acquisition."""
     lock_path = path.with_suffix(path.suffix + ".lock")
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with lock_path.open("a+b") as handle:
@@ -32,18 +44,18 @@ def path_lock(path: Path, *, timeout_seconds: float = LOCK_TIMEOUT_SECONDS) -> I
                 handle.write(b"\0")
                 handle.flush()
             handle.seek(0)
-        deadline = monotonic() + timeout_seconds
-        while True:
-            try:
-                if os.name == "nt":
-                    msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
-                else:
-                    fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-                break
-            except OSError:
-                if monotonic() >= deadline:
-                    raise TimeoutError(f"state writer lock unavailable: {path}")
-                sleep(LOCK_RETRY_SECONDS)
+        if timeout_seconds is None:
+            _acquire(handle, blocking=True)
+        else:
+            deadline = monotonic() + timeout_seconds
+            while True:
+                try:
+                    _acquire(handle, blocking=False)
+                    break
+                except OSError:
+                    if monotonic() >= deadline:
+                        raise TimeoutError(f"state writer lock unavailable: {path}")
+                    sleep(LOCK_RETRY_SECONDS)
         try:
             yield
         finally:

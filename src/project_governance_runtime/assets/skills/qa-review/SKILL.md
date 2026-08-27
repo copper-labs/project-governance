@@ -18,7 +18,6 @@ fixtures, or release readiness.
 
 - `docs/governance/validation-strategy.md`
 - `.governance/runtime/skills/review-finding.schema.yaml`
-- `.governance/runtime/skills/resources/execution-roles.yaml`
 - repository profile `validation.packs`
 - repository profile `ci.pr_checks`
 - relevant specs, plans, or acceptance criteria

@@ -32,15 +32,18 @@ not package requirements.
 3. Give each pack one purpose, selector, command, and bounded failure message. Do not add a second
    planner, cache, generator, or execution path.
 4. Add only the focused behavior test and the directly affected integration seam.
-5. For a target extension, register its pack in the target configuration and run it explicitly,
-   followed by one impacted closeout check.
+5. For a target extension, register its pack and inspect the impacted plan. If that plan selects the
+   new owner, run the impacted closeout once. Otherwise run the pack explicitly and one distinct
+   affected seam. Do not execute the pack explicitly and then replay it inside an unchanged
+   enclosing gate.
 6. Retire obsolete behavior by deleting its code and references in the same change; Git history is
    the recovery path.
 
 ## Validation
 
-Run the changed component's focused test, then `project-governance check --pack <pack-id>` for a
-new or changed pack and one `--mode impacted` closeout check.
+Run the changed component's focused test, inspect impacted selection, and execute one closeout that
+includes the new or changed pack. Use `project-governance check --pack <pack-id>` only when the pack
+is not selected or focused diagnosis needs it; add one seam only when it proves a distinct claim.
 
 ## Evidence
 

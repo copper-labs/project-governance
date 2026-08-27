@@ -16,16 +16,16 @@ Git remains the implementation history and recovery mechanism.
 
 ## Active
 
-No runtime implementation plan is currently active.
+No implementation plan is currently active.
 
 ## Completed
 
+- [Lean Governance Operating Model](completed/2026-08-27-lean-governance-operating-model.md)
+  removed the runtime control plane, bounded workspace and telemetry overhead, and aligned hooks
+  with one affected local sign-off plus one narrow pull-request narrative check.
 - [Commit and pull request change narratives](completed/2026-08-24-change-narrative-enforcement.md)
   installed and enforced compact product-level narratives and useful titles across commits and
   ready pull requests, followed by audited Claude Opus 5 reconciliation.
-- [Skill utilization telemetry](completed/2026-08-24-skill-utilization-telemetry.md) delivered
-  bounded provider-neutral selection and closeout receipts, privacy-safe aggregation, proactive
-  context and Work guidance, and clean-wheel proof without Gateway or remote telemetry machinery.
 - [KMP Skill Library V0](completed/2026-08-24-kmp-skill-library-v0.md) delivered the governed
   seven-entry provider-neutral core, proactive matched-route selection, exact materialization,
   cross-provider evaluation, legacy-payload retirement, and clean-wheel proof. Publication,
@@ -42,9 +42,6 @@ No runtime implementation plan is currently active.
   impacted pre-push pass the local completion boundary and made QA evidence-consuming by default.
 - [Execution efficiency controls](completed/2026-08-20-execution-efficiency.md) closed the gap
   between narrow-proof policy, native-host delegation, and telemetry needed to spot repeated work.
-- [Provider-aware agent orchestration](completed/2026-08-16-provider-aware-agent-orchestration.md)
-  completed Codex/Claude native-host routing, compact work briefs, one-wave authorization, and
-  terminal-only model-mix telemetry.
 - [Governance V1.1 evidence integrity](completed/2026-08-15-governance-v1.1-evidence-integrity.md)
   completed packet identity, finding lifecycle, exact waivers, bounded evidence indexing,
   telemetry, and clean-wheel proof.

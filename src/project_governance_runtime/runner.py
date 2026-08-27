@@ -18,7 +18,7 @@ def execute(
     packs: dict[str, dict[str, Any]],
     plan: dict[str, Any],
     *,
-    timeout_seconds: float,
+    timeout_seconds: float | None,
     command_arguments: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Execute packs and time only materialization plus local orchestration."""
@@ -30,16 +30,20 @@ def execute(
     fingerprint = scope_fingerprint(
         plan.get("stage"), plan["mode"], plan["changed_paths"], plan["selected_packs"]
     )
+    telemetry_mode, retained_fingerprint = _telemetry_identity(plan, fingerprint)
+    retained_digest = (
+        digest if telemetry_mode != "explicit" and changed_path_count > 0 else None
+    )
     append(root, {
         "event": "run-started",
         "run_id": run_id,
         "runtime_version": _runtime_version(),
         "stage": plan.get("stage"),
-        "mode": plan["mode"],
+        "mode": telemetry_mode,
         "changed_path_count": changed_path_count,
         "selected_pack_count": selected_pack_count,
-        "selected_packs": plan["selected_packs"],
-        "scope_fingerprint": fingerprint,
+        "scope_fingerprint": retained_fingerprint,
+        "subject_digest": retained_digest,
     })
     try:
         with execution_environment(root, plan, run_id=run_id) as environment:
@@ -56,13 +60,15 @@ def execute(
             root,
             plan,
             run_id=run_id,
-            fingerprint=fingerprint,
+            fingerprint=retained_fingerprint,
+            telemetry_mode=telemetry_mode,
             changed_path_count=changed_path_count,
             selected_pack_count=selected_pack_count,
             status="failed",
             termination="runtime-exception",
             duration_ms=round((monotonic() - started) * 1000, 3),
             evidence=[],
+            subject_digest=retained_digest,
         )
         raise
     output = {
@@ -79,13 +85,15 @@ def execute(
         root,
         plan,
         run_id=run_id,
-        fingerprint=fingerprint,
+        fingerprint=retained_fingerprint,
+        telemetry_mode=telemetry_mode,
         changed_path_count=changed_path_count,
         selected_pack_count=selected_pack_count,
         status=overall,
         termination=termination,
         duration_ms=output["duration_ms"],
         evidence=evidence,
+        subject_digest=retained_digest,
     )
     return output
 
@@ -95,13 +103,15 @@ def _record_terminal(
     plan: dict[str, Any],
     *,
     run_id: str,
-    fingerprint: str,
+    fingerprint: str | None,
+    telemetry_mode: str,
     changed_path_count: int,
     selected_pack_count: int,
     status: str,
     termination: str,
     duration_ms: float,
     evidence: list[dict[str, Any]],
+    subject_digest: str | None,
 ) -> None:
     """Attempt one privacy-safe terminal lifecycle receipt."""
     append(root, {
@@ -109,42 +119,35 @@ def _record_terminal(
         "run_id": run_id,
         "runtime_version": _runtime_version(),
         "stage": plan.get("stage"),
-        "mode": plan["mode"],
+        "mode": telemetry_mode,
         "status": status,
         "termination_reason": termination,
         "duration_ms": duration_ms,
         "scope_fingerprint": fingerprint,
+        "subject_digest": subject_digest,
         "changed_path_count": changed_path_count,
         "selected_pack_count": selected_pack_count,
+        "pack_duration_ms": round(
+            sum(item["duration_ms"] for item in evidence), 3
+        ),
         "packs": [
-            {
-                "id": item["pack_id"],
-                "status": item["status"],
-                "duration_ms": item["duration_ms"],
-                "finding_count": item["finding_count"],
-                "command_count": len(item["commands"]),
-                "blocking_finding_count": item["finding_counts"]["blocking"],
-                "advisory_finding_count": item["finding_counts"]["advisory"],
-                "accepted_finding_count": item["finding_counts"]["accepted"],
-                "waived_finding_count": item["finding_counts"]["waived"],
-                "suppressed_finding_count": item["finding_counts"]["suppressed"],
-                "process_failure_count": item["process_failure_count"],
-                "integrity_failure_count": item["integrity_failure_count"],
-                "evidence_manifest_count": item["evidence_manifest_count"],
-                "valid_evidence_manifest_count": item[
-                    "valid_evidence_manifest_count"
-                ],
-                "invalid_evidence_manifest_count": item[
-                    "invalid_evidence_manifest_count"
-                ],
-                "evidence_claim_count": item["evidence_claim_count"],
-                "evidence_artifact_digest_count": item[
-                    "evidence_artifact_digest_count"
-                ],
-            }
+            {"id": item["pack_id"], "duration_ms": item["duration_ms"]}
             for item in evidence
         ],
     })
+
+
+def _telemetry_identity(
+    plan: dict[str, Any], fingerprint: str
+) -> tuple[str, str | None]:
+    """Keep named repair and authoring checks out of broad repetition signals."""
+    reasons = plan.get("selection_reasons", {})
+    named = plan.get("mode") == "explicit" or any(
+        "explicit" in pack_reasons
+        for pack_reasons in reasons.values()
+        if isinstance(pack_reasons, list)
+    )
+    return ("explicit", None) if named else (str(plan["mode"]), fingerprint)
 
 
 def _runtime_version() -> str:

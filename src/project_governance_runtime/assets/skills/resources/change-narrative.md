@@ -86,9 +86,10 @@ git rev-parse --git-path PR_TITLE
 git rev-parse --git-path PR_DESCRIPTION.md
 ```
 
-The ordinary pre-PR hook reads those worktree-local drafts. An explicit command may instead use
-`--pr-body-file <path> --pr-title <title>`. Supply those same values to the pull request provider so
-the validated draft and the visible pull request do not diverge.
+The ordinary narrative-only pre-PR hook reads those worktree-local drafts without replaying code
+validation. An explicit command may instead use `--pr-body-file <path> --pr-title <title>`. Supply
+those same values to the pull request provider so the validated draft and the visible pull request
+do not diverge.
 
 ## Review Questions
 

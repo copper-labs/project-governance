@@ -54,8 +54,8 @@ In Codex or Claude Code, tell the primary agent:
 
 That is the operator interface. `Use governed delegation for this task` and `Delegate this task`
 are equivalent. The primary prepares the bounded plan, chooses solo when delegation would add
-overhead, and handles the internal route, authorization, launch, and finish commands. The operator
-does not prepare JSON files or run those commands manually.
+overhead, and uses only host-native controls available to the current operator. The runtime has no
+delegation commands, provider profiles, role state, or completion receipts.
 
 ## Routine Work
 
@@ -68,26 +68,36 @@ project-governance check --stage pre-commit --mode impacted
 Inspect selection without running checks:
 
 ```sh
-project-governance plan --stage pre-pr --mode impacted --json
+project-governance plan --stage pre-push --mode impacted --json
 ```
 
 For agent work, the coordinator should run `project-governance context --task <description>
 --json-output .governance/runtime/context-result.json` before editing. Relevant governed skills are
-selected and materialized automatically from the repository route and facts. After work, the
-coordinator records one bounded per-skill closeout; the operator does not need to know or name the
-skill IDs. See
-[Skill selection and utilization](../specs/skill-utilization.md) for the internal contract.
+selected and materialized automatically from the repository route and facts. No utilization
+closeout is required. A materialized packet, including skills, cannot exceed 256 KiB. Skills use at
+most 16 KiB and at most half the configured context allowance, and a required skill outside that
+bound blocks explicitly. At most eight completed packets are retained, and interrupted runtime
+staging is cleaned on the next context run.
 
-If a pack fails, run that pack only, repair it, and run one impacted closeout. Do not use a broad
-run as a repair loop.
+If a pack fails, use its named execution only when focused diagnosis needs it. After the final
+repair, run one affected recheck: either the enclosing hook or the impacted pre-push sign-off. Do
+not automatically run the named pack and then replay it immediately inside an unchanged enclosing
+gate. When `git commit` or `git push` will invoke that gate, the hook is the recheck; do not run the
+same stage manually first. Do not use a broad run as a repair loop.
+
+The target repository owns its local-feedback objective and command or CI deadlines. The runtime
+has no default execution timeout. An explicitly supplied `--timeout-seconds` remains fail-closed;
+otherwise elapsed time is evidence, not a generic pass/fail policy. The runtime does not add
+another cache, scheduler, or retry system around target execution.
 
 ## Prepare a Pull Request
 
-The pre-PR hook fails closed until the pull request title and body have been authored. Store the
-one-line outcome at the path returned by `git rev-parse --git-path PR_TITLE`, and store the body at
-the path returned by `git rev-parse --git-path PR_DESCRIPTION.md`. The body contains Product impact,
-Nature of the change, Code areas impacted, and Why; it does not repeat Outcome, Validation, or a
-generic risk section.
+The shipped pre-PR hook checks only the pull request title and body, and fails closed until both have
+been authored. It does not replay the affected code-validation sign-off. Store the one-line outcome
+at the path returned by `git rev-parse --git-path PR_TITLE`, and store the body at the path returned
+by `git rev-parse --git-path PR_DESCRIPTION.md`. The body contains Product impact, Nature of the
+change, Code areas impacted, and Why; it does not repeat Outcome, Validation, or a generic risk
+section.
 
 Run the ordinary hook against those worktree-local drafts:
 
@@ -98,7 +108,7 @@ Run the ordinary hook against those worktree-local drafts:
 For provider automation or another explicit draft location, supply the pair together:
 
 ```sh
-project-governance check --stage pre-pr --mode impacted \
+project-governance check --pack pr-description --stage pre-pr --mode all \
   --pr-body-file <path> --pr-title "<plain-language outcome>"
 ```
 
@@ -113,10 +123,8 @@ Preview an adoption:
 project-governance update --to <version> --dry-run
 ```
 
-Review the old and new artifact hash, exact configuration migrations, bounded predecessor cleanup
-inventory, required project decision, and verification commands. Automatic cleanup is limited to
-unchanged files proven runtime-owned by the predecessor manifest; modified, target-owned, unknown,
-and ignored runtime state remain untouched. Apply only after that review:
+Review the old and new artifact hash, configuration-schema change, and verification commands. If
+the schema changes, update the repository-owned configuration first. Apply only after that review:
 
 ```sh
 project-governance update --to <version> --apply
@@ -124,14 +132,18 @@ python3 tools/governance-bootstrap.py
 .governance/runtime/bin/project-governance doctor
 ```
 
-The apply command swaps the tracked lock and may remove only reviewed, hash-proven predecessor
-artifacts from the dry-run list. Bootstrap then safely replaces the ignored local environment after
-the old runtime command has exited. Requesting the already locked immutable version returns
+The apply command swaps only the tracked lock. Bootstrap then safely replaces the ignored local
+environment after the old runtime command has exited. Requesting the already locked version returns
 `no-op`; the same version resolving to different bytes fails closed.
 
-Use `project-governance telemetry status` to inspect availability, validation outcomes, and
-retained self-reported skill utilization. The underlying ignored JSONL retains bounded, redacted
-aggregates for trend analysis; it is diagnostic only and never authorizes a pass or policy change.
+Use `project-governance telemetry status` for routine efficiency inspection. The underlying ignored
+JSONL retains at most 1,000 records and one mebibyte. It contains validation lifecycle aggregates
+only; it is diagnostic and never authorizes a pass or policy change.
+
+Use `--summary` on `plan` or `check` when a person or agent needs the outcome rather than a full
+machine receipt. Shipped hooks use this projection. Active failures remain visible, while changed
+path inventories, command lines, stdout, and stderr stay in the full default or `--json-output`
+receipt.
 
 ## Configuration Ownership
 

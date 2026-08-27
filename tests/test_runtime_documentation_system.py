@@ -297,8 +297,8 @@ class RuntimeDocumentationSystemTests(unittest.TestCase):
             self.assertEqual(routed["status"], "invalid")
             self.assertNotIn("capability", routed)
 
-    def test_cli_telemetry_does_not_retain_the_route_query(self) -> None:
-        """Observe command outcomes while discarding private catalog identifiers and paths."""
+    def test_cli_documentation_commands_do_not_create_validation_telemetry(self) -> None:
+        """Keep the telemetry budget exclusively for governed validation runs."""
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             command = [sys.executable, "-m", "project_governance_runtime.cli"]
@@ -329,16 +329,12 @@ class RuntimeDocumentationSystemTests(unittest.TestCase):
                 capture_output=True,
                 check=False,
             )
-            telemetry = (root / ".governance/telemetry/runs.jsonl").read_text(
-                encoding="utf-8"
-            )
+            telemetry = root / ".governance/telemetry/runs.jsonl"
             output = json.loads(routed.stdout)
 
         self.assertEqual(routed.returncode, 0, routed.stderr)
         self.assertEqual(output["status"], "matched")
-        self.assertNotIn("private-capability", telemetry)
-        self.assertNotIn("docs/developer", telemetry)
-        self.assertIn('"query_kind": "symbol"', telemetry)
+        self.assertFalse(telemetry.exists())
 
     def test_cli_route_statuses_have_stable_text_and_exit_contracts(self) -> None:
         """Reserve failure exits for broken input while keeping routine lookup states scriptable."""
@@ -377,8 +373,8 @@ class RuntimeDocumentationSystemTests(unittest.TestCase):
             invalid.stdout.strip(), "status=invalid query_kind=symbol match_count=0"
         )
 
-    def test_cli_records_failed_init_without_repository_content(self) -> None:
-        """Retain a bounded failure outcome when initialization rejects the local profile."""
+    def test_cli_failed_init_does_not_create_validation_telemetry(self) -> None:
+        """Return the failure directly without growing an unrelated activity ledger."""
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             profile = root / "config/governance/profile.yaml"
@@ -394,9 +390,7 @@ class RuntimeDocumentationSystemTests(unittest.TestCase):
                 capture_output=True,
                 check=False,
             )
-            telemetry = (root / ".governance/telemetry/runs.jsonl").read_text(
-                encoding="utf-8"
-            )
+            telemetry = root / ".governance/telemetry/runs.jsonl"
             output = json.loads(initialized.stdout)
 
         self.assertEqual(initialized.returncode, 1)
@@ -404,8 +398,7 @@ class RuntimeDocumentationSystemTests(unittest.TestCase):
         self.assertEqual(output["version"], 1)
         self.assertEqual(output["created"], [])
         self.assertEqual(output["conflicts"], [])
-        self.assertIn('"outcome": "failed"', telemetry)
-        self.assertNotIn("invalid", telemetry)
+        self.assertFalse(telemetry.exists())
 
 
 if __name__ == "__main__":

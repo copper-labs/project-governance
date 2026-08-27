@@ -28,17 +28,14 @@ capabilities:
       - AGENTS.md
       - src/project_governance_runtime/cli.py
       - tools/run-source-governance.sh
-  - id: inspect-skill-utilization
-    title: Select governed skills and inspect reported use
-    aliases: [skill-utilization, skill-telemetry]
+  - id: resolve-governed-context
+    title: Select the smallest governed context packet
+    aliases: [context-selection, context-routing]
     tasks:
       - understand proactive skill selection and exact materialization
-      - close out one context-bound skill selection
-      - inspect retained skill utilization without treating it as correctness proof
-    symbols: [project-governance context, project-governance skills closeout, project-governance telemetry status]
-    reference: docs/specs/skill-utilization.md
+      - resolve repository context without retaining task content
+    symbols: [project-governance context]
+    reference: docs/governance/context-routing.md
     guides: [docs/guides/agent-setup-instructions.md]
     sources:
       - src/project_governance_runtime/context.py
-      - src/project_governance_runtime/skill_utilization.py
-      - src/project_governance_runtime/telemetry.py

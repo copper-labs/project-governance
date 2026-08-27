@@ -6,6 +6,8 @@ import fnmatch
 from collections import deque
 from typing import Any
 
+from .execution_commands import pack_stage_command_gaps
+
 
 def _matches(path: str, patterns: list[Any]) -> bool:
     """Match repository globs, treating a leading recursive segment as zero-or-more directories."""
@@ -19,17 +21,38 @@ def _matches(path: str, patterns: list[Any]) -> bool:
 
 
 def _stage_candidates(
-    packs: dict[str, dict[str, Any]], stage: str | None, mode: str
+    packs: dict[str, dict[str, Any]],
+    stage: str | None,
+    *,
+    named_selection: bool,
 ) -> list[str]:
-    """Return active packs eligible for a stage or explicit selection."""
+    """Return active packs eligible for one stage or an explicit diagnostic."""
     result = []
     for pack_id, pack in packs.items():
         if str(pack.get("implementation_status", "active")) != "active":
             continue
         stages = [str(value) for value in pack.get("stages", [])]
-        if mode == "explicit" or stage in stages:
+        if (stage is None and named_selection) or stage in stages:
             result.append(pack_id)
     return sorted(result)
+
+
+def _selected_stage_command_blockers(
+    packs: dict[str, dict[str, Any]], selected: set[str], stage: str | None
+) -> list[dict[str, Any]]:
+    """Block only selected packs that cannot execute at the requested lifecycle stage."""
+    if stage is None:
+        return []
+    return [
+        {
+            "code": "pack-stage-without-command",
+            "pack_id": pack_id,
+            "uncovered_stages": [stage],
+        }
+        for pack_id in sorted(selected)
+        if packs[pack_id].get("enforcement") == "blocking"
+        if stage in pack_stage_command_gaps(packs[pack_id])
+    ]
 
 
 def _replacement_map(packs: dict[str, dict[str, Any]]) -> dict[str, str]:
@@ -82,19 +105,28 @@ def _execution_order(prerequisites: dict[str, list[str]]) -> list[str]:
 
 
 def _explicit_selection(
-    packs: dict[str, dict[str, Any]], explicit: list[str]
+    packs: dict[str, dict[str, Any]],
+    candidates: set[str],
+    explicit: list[str],
+    stage: str | None,
 ) -> tuple[set[str], dict[str, list[str]], list[dict[str, Any]], dict[str, list[str]]]:
-    """Select named packs and report unknown identifiers once."""
+    """Select named stage-eligible packs and report unavailable identifiers once."""
     missing = sorted(set(explicit) - set(packs))
-    blockers = (
-        [{
+    unavailable = sorted((set(explicit) & set(packs)) - candidates)
+    blockers: list[dict[str, Any]] = []
+    if missing:
+        blockers.append({
             "code": "unknown-explicit-pack",
             "message": f"Unknown pack(s): {', '.join(missing)}",
-        }]
-        if missing
-        else []
-    )
-    selected = set(explicit) - set(missing)
+        })
+    if unavailable:
+        stage_suffix = f" at stage {stage}" if stage else ""
+        blockers.append({
+            "code": "explicit-pack-unavailable",
+            "pack_ids": unavailable,
+            "message": f"Pack(s) unavailable{stage_suffix}: {', '.join(unavailable)}",
+        })
+    selected = set(explicit) & candidates
     reasons = {pack_id: ["explicit"] for pack_id in selected}
     return selected, reasons, blockers, {}
 
@@ -194,11 +226,13 @@ def build_plan(
 ) -> dict[str, Any]:
     """Build one explainable plan without executing repository commands."""
     explicit = sorted(set(explicit_pack_ids or []))
-    candidates = _stage_candidates(packs, stage, mode)
+    candidates = _stage_candidates(packs, stage, named_selection=bool(explicit))
     candidate_set = set(candidates)
     replacements = _replacement_map(packs)
-    if mode == "explicit":
-        selected, reasons, blockers, path_matches = _explicit_selection(packs, explicit)
+    if explicit:
+        selected, reasons, blockers, path_matches = _explicit_selection(
+            packs, candidate_set, explicit, stage
+        )
     elif mode == "all":
         selected, reasons, blockers, path_matches = _all_selection(
             candidates, stage, replacements
@@ -207,13 +241,14 @@ def build_plan(
         selected, reasons, blockers, path_matches = _impacted_selection(
             packs, candidates, changed_paths, replacements
         )
-
     prerequisites: dict[str, list[str]] = {}
     order: list[str] = []
     if not blockers:
         try:
             selected, prerequisites = _dependency_closure(selected, packs, candidate_set)
-            order = _execution_order(prerequisites)
+            blockers.extend(_selected_stage_command_blockers(packs, selected, stage))
+            if not blockers:
+                order = _execution_order(prerequisites)
         except ValueError as error:
             blockers.append({"code": "invalid-dependency-graph", "message": str(error)})
 
@@ -224,7 +259,7 @@ def build_plan(
             continue
         omitted[pack_id] = (
             f"replaced by target pack {replacements[pack_id]}"
-            if mode != "explicit" and pack_id in replacements
+            if not explicit and pack_id in replacements
             else "not selected by the requested scope"
         )
     return {

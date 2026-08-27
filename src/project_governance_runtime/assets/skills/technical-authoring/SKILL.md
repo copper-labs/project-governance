@@ -40,8 +40,9 @@ its terminology, capability meaning, technical claims, and approval.
 
 ## Validation
 
-Run the existing documentation pack and any project-selected deterministic checks. Keep editorial
-judgement separate from automated verdicts and source-comment checks.
+Consume existing subject-valid documentation proof. Run the documentation pack or one
+project-selected deterministic check only for a named uncovered claim. Keep editorial judgement
+separate from automated verdicts and source-comment checks.
 
 ## Evidence
 

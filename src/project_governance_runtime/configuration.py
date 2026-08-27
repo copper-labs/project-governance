@@ -23,7 +23,11 @@ class ConfigurationError(ValueError):
 
 def load_yaml(path: Path) -> dict[str, Any]:
     """Load one YAML mapping and fail with its exact path."""
-    value = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    try:
+        value = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError as error:
+        detail = getattr(error, "problem", None) or str(error)
+        raise ConfigurationError(f"{path}: invalid YAML: {detail}") from error
     if not isinstance(value, dict):
         raise ConfigurationError(f"{path}: expected a YAML mapping")
     return value

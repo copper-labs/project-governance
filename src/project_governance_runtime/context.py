@@ -1,8 +1,8 @@
 """Route and materialize a small, repository-local context packet.
 
-The runtime reads only child-owned profile and facts files.  It keeps route selection,
-skill discovery, and local file materialization deterministic without a generated profile,
-provider client, or persistent cache.
+The runtime reads only child-owned profile and facts files. It keeps route selection,
+skill discovery, and local file materialization deterministic without a generated profile or
+provider client. Ignored materializations are bounded by count.
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ from .skill_catalog import (
     canonical_skill_bytes,
 )
 from .skill_selection import select_attached_skills
+from .state_io import path_lock
 
 
 TOKEN_BYTES = 4
@@ -35,10 +36,18 @@ DEFAULT_BUDGET = {
 }
 SAFE_SKILL_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 MAX_SKILL_BYTES = 16_000
+MAX_CONTEXT_PACKETS = 8
+MAX_CONTEXT_PACKET_BYTES = 256 * 1024
+MAX_CONTEXT_BYTES = MAX_CONTEXT_PACKET_BYTES - MAX_SKILL_BYTES
+MAX_CONTEXT_TOKENS = MAX_CONTEXT_BYTES // TOKEN_BYTES
 
 
 class ContextError(ValueError):
     """Report invalid child context configuration or an unsafe local reference."""
+
+
+class _SourceOutsideBudget(ValueError):
+    """Stop reading one declared source when it cannot fit in the remaining packet budget."""
 
 
 def _load_mapping(path: Path) -> dict[str, Any]:
@@ -61,8 +70,10 @@ def _relative_path(value: Any, *, label: str) -> str:
     return relative.as_posix()
 
 
-def _file_bytes(root: Path, relative: str) -> bytes | None:
-    """Read one ordinary file only when it resolves below the repository root."""
+def _file_bytes(
+    root: Path, relative: str, *, max_bytes: int | None = None
+) -> bytes | None:
+    """Read one ordinary in-repository file without crossing an optional byte bound."""
     source = root / relative
     if not source.is_file() or source.is_symlink():
         return None
@@ -70,7 +81,18 @@ def _file_bytes(root: Path, relative: str) -> bytes | None:
         source.resolve().relative_to(root.resolve())
     except ValueError as error:
         raise ContextError(f"{relative}: resolved outside the repository") from error
-    return source.read_bytes()
+    if max_bytes is None:
+        return source.read_bytes()
+    try:
+        if source.stat().st_size > max_bytes:
+            raise _SourceOutsideBudget(relative)
+        with source.open("rb") as handle:
+            content = handle.read(max_bytes + 1)
+    except OSError:
+        return None
+    if len(content) > max_bytes:
+        raise _SourceOutsideBudget(relative)
+    return content
 
 
 def _unique(values: list[str]) -> list[str]:
@@ -150,6 +172,11 @@ def _budget(route: dict[str, Any] | None) -> dict[str, int]:
         if not isinstance(value, int) or isinstance(value, bool) or value < 0:
             raise ContextError(f"context_router token_budget.{key}: expected a nonnegative integer")
         result[key] = value
+    if result["total_context_tokens"] > MAX_CONTEXT_TOKENS:
+        raise ContextError(
+            "context_router token_budget.total_context_tokens exceeds the runtime-owned "
+            f"packet ceiling of {MAX_CONTEXT_TOKENS} tokens"
+        )
     return result
 
 
@@ -182,8 +209,22 @@ def _context_items(root: Path, groups: dict[str, list[str]], budget: dict[str, i
     }
     for group in ("primary", "active-plan", "expansion"):
         for relative in groups[group]:
-            content = _file_bytes(root, relative)
             required = group != "expansion"
+            remaining = min(
+                limits[group] - used[group], limits["total"] - used["total"]
+            )
+            try:
+                content = _file_bytes(root, relative, max_bytes=max(0, remaining))
+            except _SourceOutsideBudget:
+                omissions.append(
+                    {
+                        "path": relative,
+                        "group": group,
+                        "reason": "outside-byte-budget",
+                        "required": required,
+                    }
+                )
+                continue
             if content is None:
                 omissions.append({"path": relative, "group": group, "reason": "source-unavailable", "required": required})
                 continue
@@ -211,7 +252,22 @@ def _canonical_skill(
 ) -> tuple[dict[str, Any] | None, str | None]:
     """Load one installed package-owned skill and compare it with canonical bytes."""
     relative = str(record["path"])
-    content = _file_bytes(root, relative)
+    try:
+        content = _file_bytes(root, relative, max_bytes=MAX_SKILL_BYTES)
+    except _SourceOutsideBudget:
+        return (
+            {
+                "id": str(record["id"]),
+                "path": relative,
+                "activation_mode": str(record["activation_mode"]),
+                "activation_level": str(record["default_level"]),
+                "selected_by": selected_by,
+                "selection_reasons": reasons,
+                "_outside_budget": True,
+                "_required": required,
+            },
+            None,
+        )
     if content is None:
         return None, "unavailable"
     if content != canonical_skill_bytes(record):
@@ -227,6 +283,61 @@ def _canonical_skill(
             "selection_reasons": reasons,
             "_content": content,
             "_required": required,
+        },
+        None,
+    )
+
+
+def _route_declared_skill(
+    root: Path,
+    skill_id: str,
+    record: dict[str, Any] | None,
+    *,
+    include_evaluation: bool,
+) -> tuple[dict[str, Any] | None, str | None]:
+    """Resolve one direct route declaration through its canonical or target-owned boundary."""
+    if SAFE_SKILL_ID.fullmatch(skill_id) is None:
+        raise ContextError(f"context_router skill id is unsafe: {skill_id}")
+    if (
+        record is not None
+        and record.get("activation_mode") == "evaluation-only"
+        and not include_evaluation
+    ):
+        return None, "evaluation-only"
+    if record is not None:
+        return _canonical_skill(
+            root,
+            record,
+            selected_by="route-declaration",
+            reasons=["declared-by-route"],
+            required=True,
+        )
+    relative = f".governance/runtime/skills/{skill_id}/SKILL.md"
+    try:
+        content = _file_bytes(root, relative, max_bytes=MAX_SKILL_BYTES)
+    except _SourceOutsideBudget:
+        return (
+            {
+                "id": skill_id,
+                "path": relative,
+                "selected_by": "route-declaration",
+                "selection_reasons": ["declared-by-route"],
+                "_outside_budget": True,
+                "_required": True,
+            },
+            None,
+        )
+    if content is None:
+        return None, "unavailable"
+    return (
+        {
+            "id": skill_id,
+            "path": relative,
+            "sha256": hashlib.sha256(content).hexdigest(),
+            "selected_by": "route-declaration",
+            "selection_reasons": ["declared-by-route"],
+            "_content": content,
+            "_required": True,
         },
         None,
     )
@@ -248,42 +359,17 @@ def _discover_skills(
     evaluation_only: list[str] = []
     stale: list[str] = []
     for skill_id in _unique(declared):
-        if SAFE_SKILL_ID.fullmatch(skill_id) is None:
-            raise ContextError(f"context_router skill id is unsafe: {skill_id}")
-        record = index.get(skill_id)
-        if (
-            record is not None
-            and record.get("activation_mode") == "evaluation-only"
-            and not include_evaluation
-        ):
-            evaluation_only.append(skill_id)
-            continue
-        relative = (
-            str(record["path"])
-            if record is not None
-            else f".governance/runtime/skills/{skill_id}/SKILL.md"
+        skill, error = _route_declared_skill(
+            root, skill_id, index.get(skill_id), include_evaluation=include_evaluation
         )
-        content = _file_bytes(root, relative)
-        if content is None:
+        if skill is not None:
+            found.append(skill)
+        elif error == "unavailable":
             missing.append(skill_id)
-            continue
-        package_owned = record is not None and bool(
-            record.get("pack_id") is not None or record.get("router_for")
-        )
-        if package_owned:
-            skill, error = _canonical_skill(
-                root,
-                record,
-                selected_by="route-declaration",
-                reasons=["declared-by-route"],
-                required=True,
-            )
-            if error == "stale-materialization":
-                stale.append(skill_id)
-            elif skill is not None:
-                found.append(skill)
-            continue
-        found.append({"id": skill_id, "path": relative, "sha256": hashlib.sha256(content).hexdigest()})
+        elif error == "evaluation-only":
+            evaluation_only.append(skill_id)
+        elif error == "stale-materialization":
+            stale.append(skill_id)
     return found, missing, evaluation_only, stale
 
 
@@ -371,6 +457,16 @@ def _bounded_skill_items(
     items: list[dict[str, Any]] = []
     omissions: list[dict[str, Any]] = []
     for skill in skills:
+        if skill.get("_outside_budget"):
+            omissions.append(
+                {
+                    "id": skill["id"],
+                    "path": skill["path"],
+                    "reason": "outside-byte-budget",
+                    "required": bool(skill.get("_required")),
+                }
+            )
+            continue
         content = skill.get("_content")
         if not isinstance(content, bytes):
             continue
@@ -445,6 +541,24 @@ def _materialize(
     skill_items: list[dict[str, Any]],
 ) -> tuple[str, list[dict[str, Any]], list[dict[str, Any]]]:
     """Atomically publish selected bytes below ignored runtime state without overwriting content."""
+    runtime_root = root / ".governance/runtime/context"
+    runtime_root.mkdir(parents=True, exist_ok=True)
+    try:
+        runtime_root.resolve().relative_to(root.resolve())
+    except ValueError as error:
+        raise ContextError(".governance/runtime/context resolves outside the repository") from error
+    with path_lock(runtime_root / ".materialization-state", timeout_seconds=None):
+        _prune_abandoned_temporaries(runtime_root)
+        return _materialize_locked(root, runtime_root, items, skill_items)
+
+
+def _materialize_locked(
+    root: Path,
+    runtime_root: Path,
+    items: list[dict[str, Any]],
+    skill_items: list[dict[str, Any]],
+) -> tuple[str, list[dict[str, Any]], list[dict[str, Any]]]:
+    """Publish one packet while the runtime-owned context directory is locked."""
     identity = [
         {"id": item["id"], "group": item["group"], "path": item["source_path"], "sha256": item["sha256"]}
         for item in items
@@ -454,12 +568,6 @@ def _materialize(
         for item in skill_items
     )
     packet_id = hashlib.sha256(json.dumps(identity, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()[:16]
-    runtime_root = root / ".governance/runtime/context"
-    runtime_root.mkdir(parents=True, exist_ok=True)
-    try:
-        runtime_root.resolve().relative_to(root.resolve())
-    except ValueError as error:
-        raise ContextError(".governance/runtime/context resolves outside the repository") from error
     destination = runtime_root / f"context-{packet_id}"
     materialized: list[dict[str, Any]] = []
     for index, item in enumerate(items, start=1):
@@ -472,27 +580,60 @@ def _materialize(
         }
         for index, item in enumerate(skill_items, start=1)
     ]
+    if destination.is_symlink() or (destination.exists() and not destination.is_dir()):
+        destination.unlink()
     if destination.exists():
+        valid = True
         for item in [*materialized, *materialized_skills]:
-            existing = destination / str(item["materialized_path"])
             if _file_bytes(destination, str(item["materialized_path"])) != item["content"]:
-                raise ContextError(f"existing materialization does not match: {existing}")
-        return destination.relative_to(root).as_posix(), materialized, materialized_skills
+                valid = False
+                break
+        if valid:
+            destination.touch()
+            _prune_materializations(runtime_root, destination)
+            return destination.relative_to(root).as_posix(), materialized, materialized_skills
+        shutil.rmtree(destination)
     temporary = Path(tempfile.mkdtemp(prefix=".context-", dir=runtime_root))
     try:
         for item in [*materialized, *materialized_skills]:
             output = temporary / str(item["materialized_path"])
             output.parent.mkdir(parents=True, exist_ok=True)
             output.write_bytes(item["content"])
-        try:
-            temporary.rename(destination)
-        except FileExistsError:
-            shutil.rmtree(temporary)
-            return _materialize(root, items, skill_items)
+        temporary.rename(destination)
     except BaseException:
         shutil.rmtree(temporary, ignore_errors=True)
         raise
+    _prune_materializations(runtime_root, destination)
     return destination.relative_to(root).as_posix(), materialized, materialized_skills
+
+
+def _prune_abandoned_temporaries(runtime_root: Path) -> None:
+    """Remove only staging directories left by interrupted runtime materializations."""
+    for path in runtime_root.glob(".context-*"):
+        if path.is_symlink() or not path.is_dir():
+            continue
+        try:
+            path.resolve().relative_to(runtime_root.resolve())
+        except (OSError, ValueError):
+            continue
+        shutil.rmtree(path, ignore_errors=True)
+
+
+def _prune_materializations(runtime_root: Path, current: Path) -> None:
+    """Keep only the current packet and the newest bounded runtime-owned predecessors."""
+    candidates: list[tuple[int, Path]] = []
+    for path in runtime_root.glob("context-*"):
+        if path == current or path.is_symlink() or not path.is_dir():
+            continue
+        try:
+            path.resolve().relative_to(runtime_root.resolve())
+            modified = path.stat().st_mtime_ns
+        except (OSError, ValueError):
+            continue
+        candidates.append((modified, path))
+    candidates.sort(key=lambda item: item[0], reverse=True)
+    for _, path in candidates[MAX_CONTEXT_PACKETS - 1 :]:
+        shutil.rmtree(path, ignore_errors=True)
 
 
 def resolve_context(

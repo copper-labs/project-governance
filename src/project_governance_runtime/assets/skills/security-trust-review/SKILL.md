@@ -34,8 +34,9 @@ manifests, CI actions, build plugins, generated governance, release tooling, or 
 
 ## Validation
 
-Run security, dependency-freshness, validation-conformance, and impacted release packs where
-configured. If evidence is unavailable, record the gap as residual risk.
+Consume existing subject-valid security and dependency proof. Run only the configured owner for a
+named uncovered claim; do not replay every security, conformance, and release pack as a review
+matrix. If evidence is unavailable, record the gap as residual risk.
 
 ## Evidence
 

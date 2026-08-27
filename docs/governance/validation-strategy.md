@@ -21,21 +21,38 @@ because they exist.
 3. Run one directly affected integration seam only when the change crosses that seam.
 4. Commit the coherent result.
 
-For a failed governance check, rerun only the failed pack:
+For a failed governance check, use the named pack at the same lifecycle stage and subject only when
+focused diagnosis needs it:
 
 ```sh
-project-governance check --pack <pack-id>
+project-governance check --pack <pack-id> --stage <failed-stage> --mode impacted
 ```
 
-After it passes, freeze the candidate and run one branch-aware local sign-off:
+After the final repair, freeze the candidate and run one branch-aware local sign-off as the affected
+recheck:
 
 ```sh
 project-governance check --stage pre-push --mode impacted
 ```
 
-Pre-commit remains the staged changed-file hook; it is not a second completion boundary. Do not run
-a separate local pre-PR gate after the branch-aware pre-push sign-off. CI may run its own affected
-gate as an independent environment and trust boundary.
+Do not automatically run the named pack and then replay it immediately inside an unchanged
+enclosing gate. If retrying `git commit` or `git push` will invoke that gate, the hook is the one
+affected recheck; do not run the same stage manually first. A named pack remains available when its
+faster feedback is useful during diagnosis, but that deliberate extra execution needs a concrete
+diagnostic reason.
+
+Pre-commit remains the staged changed-file hook; it is not a second completion boundary. The shipped
+pre-PR hook names only the `pr-description` pack so authors can check the title and body without
+replaying code validation. Do not run a separate full local pre-PR gate after the branch-aware
+pre-push sign-off. CI may run its own affected gate as an independent environment and trust
+boundary.
+
+The adopting repository owns its local-feedback objective and every command or job deadline. The
+runtime records duration but does not infer failure from elapsed time or impose a generic default
+timeout. A target or operator may supply an explicit deadline; expiration fails closed with timeout
+evidence. When recurring local proof materially impairs the target's workflow, its owner decides
+whether product builds, platform, device, or external-service execution belongs in CI or a
+scheduled lane while preserving the required proof.
 
 Freeze one candidate before a broad or cross-platform proof. An independent QA pass consumes that
 candidate and its existing proof; it does not replay the matrix. It adds one focused check only for
@@ -72,11 +89,10 @@ content and base. If either changes, the integrated snapshot is a new candidate.
 | --- | --- |
 | Applicable source file | Formatting, naming, maintainability, comments, test quality, and target-owned packs for that path |
 | Governed documentation | Documentation governance |
-| Context routes, agent catalog, or root instructions | Context routing |
+| Context routes, skill catalog, root instructions, or provider adapters | Context routing and adapter-reference validation |
 | Runtime lock, bootstrap, hooks, profile, facts, or extension registration | Installation validation |
 | Enabled documentation profile or capability catalog | Existing documentation validation |
 | Telemetry implementation or telemetry policy | Telemetry verification |
-| Agent contract, routing, dispatch state, or native profile catalog | Agent contract plus synthetic native-host routing |
 | Pack definitions, schemas, selectors, or extension registration | Validation conformance |
 | Source file at commit time | Secret detection for changed files |
 
@@ -89,10 +105,11 @@ when its header or signature changes. Dependency freshness evaluates only coordi
 updated between the packet's before- and after-images. Existing comment debt and unchanged
 dependency tuples do not become implementation scope.
 
-Pre-commit secret proof deliberately includes bytes present only in the staged index. Pre-push,
-pre-PR, CI-PR, and release retain their declared live publishable worktree-and-index secret
-surfaces and report no pack digest. This difference is an explicit stage contract, not an
-inconsistency to normalize away.
+Pre-commit secret proof deliberately includes bytes present only in the staged index. When the
+secrets pack is selected, pre-push, deliberate full pre-PR, CI-PR, and release retain their declared
+live publishable worktree-and-index secret surfaces and report no pack digest. The shipped narrow
+pre-PR hook does not select the secrets pack. This difference is an explicit stage and selection
+contract, not an inconsistency to normalize away.
 
 ## V1.1 Proof Rules
 
@@ -121,20 +138,21 @@ Run the complete suite only for a runtime release, a configuration-schema migrat
 selection-contract change, a security/process-isolation boundary, scheduled reconciliation, or an
 explicit operator request.
 
-Provider-aware orchestration changes prove the pure routing table, command-entry clock, explicit
-start/finish lifecycle, writer lease, fail-solo behavior, terminal receipt sanitization, and both
-native catalogs before broad proof. Tests use synthetic catalogs and launch entries; they never
-call Codex or Claude.
+Delegation behavior belongs to the host agent. Runtime validation proves only repository checks,
+process ownership, explicit deadlines, and the bounded local telemetry it actually owns.
 
 ## Evidence
 
 Report the focused test, affected seam, selected packs, any intentionally omitted proof, and
 residual risk. The JSON result contains normalized findings, status, execution duration, and
-termination reason. Bounded local telemetry adds changed-path, selected-pack, executed-command,
-and per-pack duration/count aggregates without retaining paths, commands, output, prompts, or
-source content. `project-governance telemetry status` summarizes retained repeated scopes, broad
-runs, and slow packs as advisory observations. It does not prove a repeat was unnecessary because
-subject changes and invalidation reasons are not retained. It also excludes direct commands and
+termination reason. The optional `--summary` projection keeps active findings while omitting
+successful command detail and changed-path inventories. Bounded local telemetry adds changed-path
+and selected-pack counts, total and slowest-pack durations, and one opaque digest for eligible
+content-bound subjects without retaining paths, commands, output, prompts, or source content.
+`project-governance telemetry status` summarizes unmatched starts, runtime
+overhead, retained repeated scopes, same-subject repetition, broad runs, and slow packs as advisory
+observations. It does not prove a repeat was unnecessary because invalidation reasons are not
+retained. It also excludes direct commands and
 native-host launches outside the runtime, so missing telemetry is never evidence that no work ran.
 
 Run deterministic builds through a target pack or the governed harness when one exists. If a

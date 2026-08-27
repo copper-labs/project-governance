@@ -14,6 +14,26 @@ from .processes import CommandResult
 ENVELOPE_STATUSES = {"passed", "warning", "failed", "not-applicable"}
 
 
+def command_applies_to_stage(entry: Any, stage: str) -> bool:
+    """Return whether one command's optional stage filter admits the stage."""
+    if not isinstance(entry, dict):
+        return True
+    stages = [str(value) for value in entry.get("stages", [])]
+    return not stages or stage in stages
+
+
+def pack_stage_command_gaps(pack: dict[str, Any]) -> list[str]:
+    """Return declared stages that have no applicable command in one active pack."""
+    if str(pack.get("implementation_status", "active")) != "active":
+        return []
+    commands = list(pack.get("commands", []))
+    return [
+        stage
+        for stage in sorted(set(str(value) for value in pack.get("stages", [])))
+        if not any(command_applies_to_stage(entry, stage) for entry in commands)
+    ]
+
+
 def command_argv(
     entry: Any,
     *,
@@ -29,8 +49,7 @@ def command_argv(
         return formatted_argv(shlex.split(entry), values)
     if not isinstance(entry, dict):
         raise ValueError("pack command must be a string or mapping")
-    stages = [str(value) for value in entry.get("stages", [])]
-    if stage and stages and stage not in stages:
+    if stage and not command_applies_to_stage(entry, stage):
         return None
     if "builtin" in entry:
         return builtin_argv(entry, stage=stage, mode=mode, command_arguments=command_arguments)

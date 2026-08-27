@@ -27,7 +27,9 @@ Use this skill before closeout, PR, or release when a change claims to implement
 
 ## Validation
 
-Run or require the target profile checks tied to the governed artifact. Run docs-governance when traceability or artifact state changes.
+Consume existing target-profile proof tied to the governed artifact. Run one missing owner only for
+a named uncovered criterion. Use docs-governance as that focused owner when traceability or artifact
+state changed and no current proof covers it.
 
 ## Evidence
 

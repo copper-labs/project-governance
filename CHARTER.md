@@ -12,6 +12,3 @@ project instance and contains no product-specific policy or operational data.
 - Projects adopt an exact wheel deliberately; source changes never alter another project's lock.
 - Narrow checks are the normal loop. Broad proof is reserved for shared boundaries and explicit
   reconciliation.
-
-Future knowledge-graph work is documentation-only until a separately approved specification and
-implementation plan exists. It has no active runtime path.

@@ -31,7 +31,8 @@ reviewing a requested runtime update.
 3. For an update, run `project-governance update --to <version> --dry-run` first.
 4. Stop when a configuration-schema migration needs a project decision.
 5. Apply an approved lock-only update with `project-governance update --to <version> --apply`.
-6. Run the one affected installation seam and one impacted closeout check.
+6. Run the one affected installation seam. Add an impacted closeout only when it proves a distinct
+   changed-path claim rather than replaying the same installation proof.
 
 ## Validation
 

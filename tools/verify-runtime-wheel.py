@@ -104,7 +104,7 @@ def runtime_python(environment: Path) -> Path:
     return environment / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
 
 
-def runtime_lock(wheel: Path) -> dict[str, object]:
+def runtime_lock(wheel: Path, release_base: Path) -> dict[str, object]:
     """Describe the exact local artifact so doctor can validate the child integration surface."""
     return {
         "schema_version": 1,
@@ -114,8 +114,8 @@ def runtime_lock(wheel: Path) -> dict[str, object]:
         "sha256": hashlib.sha256(wheel.read_bytes()).hexdigest(),
         "source_commit": "0" * 40,
         "python": ">=3.9,<4",
-        "configuration_schema": 1,
-        "release_base_url": wheel.parent.as_uri(),
+        "configuration_schema": 2,
+        "release_base_url": release_base.as_uri(),
     }
 
 
@@ -232,8 +232,20 @@ def initialize_target(root: Path, wheel: Path) -> tuple[Path, Path]:
     ):
         if not (root / relative).is_file():
             raise RuntimeError(f"installed wheel did not materialize {relative}")
+    release_base = root.parent / "release-assets"
+    release_version = release_base / "source-ci"
+    release_version.mkdir(parents=True)
+    (release_version / wheel.name).write_bytes(wheel.read_bytes())
     lock_path = root / "config/governance/runtime.lock.yaml"
-    lock_path.write_text(json.dumps(runtime_lock(wheel), indent=2) + "\n", encoding="utf-8")
+    lock_path.write_text(
+        json.dumps(runtime_lock(wheel, release_base), indent=2) + "\n",
+        encoding="utf-8",
+    )
+    run(
+        [sys.executable, str(root / "tools/governance-bootstrap.py")],
+        root=root,
+        expected=0,
+    )
     run([str(command), "doctor"], root=root, expected=0)
     run(["git", "config", "user.email", "runtime@example.invalid"], root=root, expected=0)
     run(["git", "config", "user.name", "Runtime Wheel Verification"], root=root, expected=0)
@@ -256,6 +268,9 @@ def verify_change_narratives(root: Path, command: Path) -> None:
     commit_path = git_metadata_path(root, "COMMIT_EDITMSG")
     pr_path = git_metadata_path(root, "PR_DESCRIPTION.md")
     pr_title_path = git_metadata_path(root, "PR_TITLE")
+    pre_pr_hook = (root / ".githooks/pre-pr").read_text(encoding="utf-8")
+    if "--pack pr-description --stage pre-pr --mode all" not in pre_pr_hook:
+        raise RuntimeError("installed pre-PR hook is not narrative-only")
 
     commit_path.write_text("short\n", encoding="utf-8")
     run(
@@ -290,37 +305,16 @@ def verify_change_narratives(root: Path, command: Path) -> None:
 
     pr_title_path.write_text(VALID_PR_TITLE + "\n", encoding="utf-8")
     pr_path.write_text("", encoding="utf-8")
-    empty_pr = run(
-        [
-            str(command),
-            "check",
-            "--stage",
-            "pre-pr",
-            "--mode",
-            "impacted",
-            "--base-ref",
-            "HEAD",
-        ],
-        root=root,
-        expected=1,
-    )
+    empty_pr = run([str(root / ".githooks/pre-pr")], root=root, expected=1)
     if "pr-description.empty-body" not in empty_pr.stdout:
         raise RuntimeError("installed pre-PR proof did not reject the empty body")
     pr_path.write_text(VALID_PR_BODY, encoding="utf-8")
-    run(
-        [
-            str(command),
-            "check",
-            "--stage",
-            "pre-pr",
-            "--mode",
-            "impacted",
-            "--base-ref",
-            "HEAD",
-        ],
-        root=root,
-        expected=0,
-    )
+    pr_title_path.write_text("short\n", encoding="utf-8")
+    short_title = run([str(root / ".githooks/pre-pr")], root=root, expected=1)
+    if "pr-description.title-short" not in short_title.stdout:
+        raise RuntimeError("installed pre-PR proof did not reject the short title")
+    pr_title_path.write_text(VALID_PR_TITLE + "\n", encoding="utf-8")
+    run([str(root / ".githooks/pre-pr")], root=root, expected=0)
 
 
 def write_synthetic_changes(root: Path) -> None:
@@ -368,97 +362,8 @@ def verify_staged_outcomes(root: Path, command: Path) -> None:
         )
 
 
-def verify_agent_orchestration(root: Path, command: Path) -> None:
-    """Prove both installed native-host paths route and close without provider calls."""
-    fixture_root = root / "agent-fixtures"
-    fixture_root.mkdir()
-    task = {
-        "base_snapshot": "fixture-snapshot",
-        "delegated_token_ceiling": 1200,
-        "entries": [{
-            "task_id": "implementation-1",
-            "role": "implementation-worker",
-            "required_capability_tier": "economy",
-            "packet_ready": True,
-            "specialist_obligation": "implementation-write",
-            "objective": "Change one synthetic component",
-            "governing_refs": ["AGENTS.md"],
-            "base_snapshot": "fixture-snapshot",
-            "read_scope": ["synthetic/example.py"],
-            "write_scope": ["synthetic/example.py"],
-            "exclusions": ["unmapped/input.bin"],
-            "fixed_decisions": ["Keep the fixture local"],
-            "acceptance": ["Return one terminal result"],
-            "focused_proof": ["synthetic proof"],
-            "output_token_ceiling": 1000,
-            "escalate_or_stop_when": ["A new decision is required"],
-            "permission": "write",
-            "privacy": "same-provider",
-            "scope_valid": True,
-            "materialized_context": [],
-        }],
-    }
-    for provider in ("codex", "claude"):
-        task_path = fixture_root / f"{provider}-task.json"
-        session_path = fixture_root / f"{provider}-session.json"
-        catalog_path = fixture_root / f"{provider}-catalog.json"
-        results_path = fixture_root / f"{provider}-results.json"
-        task_path.write_text(json.dumps(task), encoding="utf-8")
-        session_path.write_text(json.dumps({
-            "provider": provider,
-            "profile_id": f"{provider}-primary",
-            "model": f"{provider}-primary-model",
-            "tier_rank": 3,
-        }), encoding="utf-8")
-        catalog_path.write_text(json.dumps({
-            "version": 1,
-            "provider": provider,
-            "profiles": [
-                {
-                    "id": f"{provider}-economy",
-                    "model": f"{provider}-economy-model",
-                    "tier": "economy",
-                    "tier_rank": 1,
-                    "effort": "high",
-                    "roles": ["implementation-worker"],
-                    "enabled": True,
-                },
-                {
-                    "id": f"{provider}-primary",
-                    "model": f"{provider}-primary-model",
-                    "tier": "primary",
-                    "tier_rank": 3,
-                    "effort": "high",
-                    "roles": [],
-                    "enabled": True,
-                },
-            ],
-        }), encoding="utf-8")
-        routed = run([
-            str(command), "agent-route", "--task", str(task_path), "--session",
-            str(session_path), "--catalog", str(catalog_path), "--json",
-        ], root=root, expected=0)
-        route_request = json.loads(routed.stdout)
-        if route_request.get("status") != "delegated":
-            raise RuntimeError(f"{provider} synthetic route did not delegate")
-        request_path = fixture_root / f"{provider}-request.json"
-        request_path.write_text(json.dumps(route_request), encoding="utf-8")
-        started = json.loads(run([
-            str(command), "agent-dispatch", "start", "--request", str(request_path), "--json",
-        ], root=root, expected=0).stdout)
-        results_path.write_text(json.dumps({
-            "entries": [{"task_id": "implementation-1", "status": "completed"}],
-        }), encoding="utf-8")
-        finished = json.loads(run([
-            str(command), "agent-dispatch", "finish", "--authorization",
-            started["authorization_digest"], "--results", str(results_path), "--json",
-        ], root=root, expected=0).stdout)
-        if finished.get("terminal_reason") != "completed":
-            raise RuntimeError(f"{provider} synthetic dispatch did not complete")
-
-
 def verify_documentation_system(root: Path, command: Path) -> None:
-    """Prove installed init, exact routes, validation, and content-free local telemetry."""
+    """Prove installed initialization, exact routes, and validation."""
     preview = json.loads(
         run([str(command), "docs", "init", "--dry-run"], root=root, expected=0).stdout
     )
@@ -521,14 +426,6 @@ def verify_documentation_system(root: Path, command: Path) -> None:
         root=root,
         expected=0,
     )
-    telemetry = (root / ".governance/telemetry/runs.jsonl").read_text(encoding="utf-8")
-    if any(value in telemetry for value in ("installed-runtime", "governed-check", "docs/developer")):
-        raise RuntimeError("documentation telemetry retained a route identifier or path")
-    status = json.loads(
-        run([str(command), "telemetry", "status"], root=root, expected=0).stdout
-    )
-    if status.get("documentation", {}).get("retained_operation_count", 0) < 5:
-        raise RuntimeError("documentation telemetry status omitted installed operations")
 
 
 def verify_custom_documentation_root(root: Path, command: Path) -> None:
@@ -572,6 +469,77 @@ def verify_documentation_conflict(root: Path, command: Path) -> None:
         raise RuntimeError("installed documentation conflict reported or wrote profile changes")
 
 
+def verify_context_cache_boundary(root: Path, command: Path) -> None:
+    """Prove the installed context command bounds packets and removes interrupted staging."""
+    guide = root / "docs/governance/context-guide.md"
+    guide.parent.mkdir(parents=True, exist_ok=True)
+    guide.write_text("Installed context guide\n", encoding="utf-8")
+    profile_path = root / "config/governance/profile.yaml"
+    profile = {
+        "schema_version": 1,
+        "project_extensions": [],
+        "context_router": {
+            "default_context": [],
+            "default_skills": ["work"],
+            "routes": [
+                {
+                    "id": "governance",
+                    "match": {"prompt_terms": ["governance"]},
+                    "primary_context": ["docs/governance/context-guide.md"],
+                    "token_budget": {
+                        "primary_context_tokens": 100,
+                        "active_plan_context_tokens": 100,
+                        "expansion_context_tokens": 100,
+                        "total_context_tokens": 10000,
+                    },
+                }
+            ],
+        },
+    }
+    profile_path.write_text(json.dumps(profile, indent=2) + "\n", encoding="utf-8")
+    resolved = json.loads(
+        run(
+            [str(command), "context", "--task", "governance", "--json"],
+            root=root,
+            expected=0,
+        ).stdout
+    )
+    if resolved["materialization"]["byte_limits"]["combined"] > 256 * 1024:
+        raise RuntimeError("installed context packet exceeded its runtime-owned byte ceiling")
+    selected_skills = [item for item in resolved.get("skills", []) if item.get("id") == "work"]
+    if len(selected_skills) != 1 or not selected_skills[0].get("materialized_path"):
+        raise RuntimeError("installed context packet omitted its declared standard skill")
+    packet_root = root / resolved["materialization"]["root"]
+    installed_skill = root / selected_skills[0]["path"]
+    packet_skill = packet_root / selected_skills[0]["materialized_path"]
+    if not packet_skill.is_file() or packet_skill.read_bytes() != installed_skill.read_bytes():
+        raise RuntimeError("installed context packet did not preserve exact standard skill bytes")
+    runtime_root = root / ".governance/runtime/context"
+    abandoned = runtime_root / ".context-interrupted"
+    abandoned.mkdir()
+    (abandoned / "partial").write_text("partial\n", encoding="utf-8")
+    run(
+        [str(command), "context", "--task", "governance", "--json"],
+        root=root,
+        expected=0,
+    )
+    if abandoned.exists():
+        raise RuntimeError("installed context command retained interrupted staging")
+    profile["context_router"]["routes"][0]["token_budget"][
+        "total_context_tokens"
+    ] = 70_000
+    profile_path.write_text(json.dumps(profile, indent=2) + "\n", encoding="utf-8")
+    rejected = json.loads(
+        run(
+            [str(command), "context", "--task", "governance", "--json"],
+            root=root,
+            expected=1,
+        ).stdout
+    )
+    if "packet ceiling" not in str(rejected.get("error", "")):
+        raise RuntimeError("installed context command did not explain the packet ceiling")
+
+
 def main() -> int:
     """Install the supplied wheel and prove its target-facing seams."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -588,10 +556,10 @@ def main() -> int:
         write_synthetic_changes(root)
         verify_replacement_plan(root, command)
         verify_staged_outcomes(root, command)
-        verify_agent_orchestration(root, command)
         verify_documentation_system(root, command)
         verify_custom_documentation_root(root, command)
         verify_documentation_conflict(root, command)
+        verify_context_cache_boundary(root, command)
     return 0
 
 
