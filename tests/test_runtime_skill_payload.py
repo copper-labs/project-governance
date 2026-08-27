@@ -37,6 +37,9 @@ FORBIDDEN_TEXT = (
     "execution-roles.yaml",
     "governed-implementation",
     "implementation-quality-review",
+    "capability tier",
+    "packet ready",
+    "native-host launches use the governed route",
     "claude-opus-5",
     "claude-fable-5",
 )
@@ -157,7 +160,9 @@ class RuntimeSkillPayloadTests(unittest.TestCase):
             SKILLS_SOURCE / "resources" / "implementation-plan-template.md"
         ).read_text(encoding="utf-8").lower()
         self.assertIn("one branch-aware impacted pre-push sign-off", plan_template)
+        self.assertIn("delivery: local-only | pr <url> | merged <sha>", plan_template)
         self.assertNotIn("one impacted pre-commit boundary", plan_template)
+        self.assertNotIn("## execution rules", plan_template)
 
         for review_skill in (skill_text["architecture-review"],):
             self.assertIn("over 500 lines", review_skill)
