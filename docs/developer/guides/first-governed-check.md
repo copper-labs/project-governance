@@ -38,7 +38,10 @@ project-governance init
 
 Expected result: JSON reports `status: initialized` and lists only newly created project-owned
 configuration, launcher, hook, and ignore paths. Repeating the command reports an empty `created`
-list and preserves later repository edits.
+list, an empty `refreshed` list, and preserves later repository edits. If a tracked launcher later
+differs from the installed wheel, `doctor` reports the difference without overwriting it. Use
+`project-governance init --refresh-launchers` only after reviewing and choosing the wheel-owned
+launcher.
 
 Add the exact released wheel identity to `config/governance/runtime.lock.yaml`, then materialize the
 locked runtime and inspect its health:

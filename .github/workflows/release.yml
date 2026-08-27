@@ -37,8 +37,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" \
-            dist/project_governance_runtime-*.whl \
-            dist/runtime.lock.yaml \
+            --draft \
             --verify-tag \
             --title "Project Governance $GITHUB_REF_NAME" \
             --generate-notes
+          gh release upload "$GITHUB_REF_NAME" \
+            dist/project_governance_runtime-*.whl \
+            dist/runtime.lock.yaml
+          gh release edit "$GITHUB_REF_NAME" --draft=false

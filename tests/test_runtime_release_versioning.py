@@ -116,6 +116,18 @@ class RuntimeReleaseVersioningTests(unittest.TestCase):
         )
         self.assertEqual(release["concurrency"]["cancel-in-progress"], "false")
         self.assertEqual(release["jobs"]["release"]["timeout-minutes"], "30")
+        publish = next(
+            step["run"]
+            for step in release["jobs"]["release"]["steps"]
+            if step.get("name") == "Publish immutable GitHub release"
+        )
+        self.assertLess(publish.index("gh release create"), publish.index("--draft"))
+        self.assertLess(publish.index("--draft"), publish.index("gh release upload"))
+        self.assertLess(
+            publish.index("gh release upload"),
+            publish.index("gh release edit"),
+        )
+        self.assertIn("--draft=false", publish)
 
 
 if __name__ == "__main__":

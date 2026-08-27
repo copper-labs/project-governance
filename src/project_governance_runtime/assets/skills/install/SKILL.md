@@ -28,10 +28,12 @@ reviewing a requested runtime update.
 1. Run `project-governance doctor` without changing the repository.
 2. For a new target, run `project-governance init`, review the created files, then create an exact
    runtime lock and run `python3 tools/governance-bootstrap.py`.
-3. For an update, run `project-governance update --to <version> --dry-run` first.
-4. Stop when a configuration-schema migration needs a project decision.
-5. Apply an approved lock-only update with `project-governance update --to <version> --apply`.
-6. Run the one affected installation seam. Add an impacted closeout only when it proves a distinct
+3. Review any launcher-drift notices. Preserve deliberate project customizations, or use
+   `project-governance init --refresh-launchers` to accept the installed wheel's thin launchers.
+4. For an update, run `project-governance update --to <version> --dry-run` first.
+5. Stop when a configuration-schema migration needs a project decision.
+6. Apply an approved lock-only update with `project-governance update --to <version> --apply`.
+7. Run the one affected installation seam. Add an impacted closeout only when it proves a distinct
    changed-path claim rather than replaying the same installation proof.
 
 ## Validation

@@ -227,6 +227,8 @@ class RuntimeSkillPayloadTests(unittest.TestCase):
         ).lower()
         self.assertNotIn("## validation", template)
         self.assertNotIn("risks or required action", template)
+        self.assertNotIn("how to test", template)
+        self.assertNotIn("anything tricky", template)
         user_guide = (ROOT / "docs/guides/user-guide.md").read_text(
             encoding="utf-8"
         )
@@ -245,19 +247,22 @@ class RuntimeSkillPayloadTests(unittest.TestCase):
         ).read_text(encoding="utf-8").lower()
         self.assertIn("pre-pr hook names only `pr-description`", hook_operation)
         self.assertNotIn("pre-pr aggregation", hook_operation)
-        for workflow in (
-            "commit-message-workflow",
-            "pr-description-workflow",
-        ):
-            text = (
-                SKILLS_SOURCE
-                / "pattern-packs/delivery-quality"
-                / workflow
-                / "SKILL.md"
-            ).read_text(encoding="utf-8").lower()
-            self.assertIn("change-narrative.md", text)
-            self.assertIn("product impact", text)
-            self.assertIn("nature of change", text)
+        commit_workflow = (
+            SKILLS_SOURCE
+            / "pattern-packs/delivery-quality/commit-message-workflow/SKILL.md"
+        ).read_text(encoding="utf-8").lower()
+        self.assertIn("change-narrative.md", commit_workflow)
+        self.assertIn("compact paragraph", commit_workflow)
+        self.assertIn("complete sentences", commit_workflow)
+        self.assertNotIn("product impact:", commit_workflow)
+        self.assertNotIn("why:", commit_workflow)
+        pr_workflow = (
+            SKILLS_SOURCE
+            / "pattern-packs/delivery-quality/pr-description-workflow/SKILL.md"
+        ).read_text(encoding="utf-8").lower()
+        self.assertIn("change-narrative.md", pr_workflow)
+        self.assertIn("product impact", pr_workflow)
+        self.assertIn("nature of change", pr_workflow)
 
     def test_materialized_release_skill_defines_one_candidate_cycle(self) -> None:
         """Keep installed release review candidate-bound and free of retired profiles."""

@@ -1,7 +1,8 @@
 # Change Narrative Field Guide
 
 Use this field guide before every ordinary commit and ready pull request. Repository instructions,
-the governing issue or plan, and current validation evidence remain authoritative.
+the governing issue or plan, and current validation evidence remain authoritative. Commits use a
+compact subject and paragraph; pull requests carry the complete structured reader journey.
 
 ## Orient Before The Diff
 
@@ -32,26 +33,31 @@ guessing from the diff.
 ## Commit Shape
 
 The subject is the outcome. Say what becomes possible, changes, or is prevented; do not title the
-commit with the act of editing code. Keep the required body fields compact and in this order:
+commit with the act of editing code. Follow it with a compact paragraph that helps a teammate
+understand the commit without opening the diff.
+
+Explain the problem or intent, the conceptual change, and any consequence, constraint, or decision
+that matters. Name recognizable capabilities or components when useful, but do not inventory files,
+symbols, or individual edits. Use complete sentences and connect the ideas into a coherent
+explanation rather than a checklist. Do not repeat the subject, reproduce test output, narrate the
+implementation process, or copy the pull request description. For a small mechanical change, one
+informative sentence may be enough. If the explanation becomes long or covers unrelated ideas,
+split the work into separate commits.
 
 ```text
 <Outcome>
 
-Product impact: <top-level area and how the change surfaces>
-Nature of change: <conceptual responsibility, relationship, contract, data-flow, boundary, or coupling change>
-Code areas impacted: <stable capability or subsystem names>
-Why: <problem, constraint, decision, or opportunity>
+<Short explanation of what changed or why it matters.>
 ```
 
 Example:
 
 ```text
-Make delivery checks explain their impact
+Detect outdated governance launchers
 
-Product impact: Contributor workflow — authors see missing change context before review; application behavior is unchanged.
-Nature of change: Unified commit and pull request orientation around one shared narrative while keeping editorial judgment outside automation.
-Code areas impacted: Delivery governance, agent authoring workflows.
-Why: Reviewers had to reconstruct purpose and impact from file changes.
+Older installations could retain outdated hook launchers after an upgrade and continue using the
+previous lifecycle. This change detects drift in runtime-owned launchers and provides an explicit
+refresh path while preserving project-owned customizations.
 ```
 
 ## Pull Request Shape
@@ -93,13 +99,16 @@ do not diverge.
 
 ## Review Questions
 
-- Can a teammate explain the outcome and affected experience without opening the diff?
+- Can a teammate understand the outcome and purpose without opening the diff?
 - Does the subject or title state the result rather than “updates,” a ticket, or a path?
+- Does the commit body connect intent, conceptual change, and relevant consequences without
+  becoming a checklist or implementation diary?
 - Does each product-impact entry say how the change surfaces, rather than naming changed code?
 - Does the nature of change explain a system relationship or responsibility rather than reciting
   edits?
 - Are code areas recognizable to teammates and free of file-path inventory?
 - Does the reason preserve information that cannot be recovered from the diff?
 
-The runtime blocks missing structure and explicit placeholder-only content. It does not grade plain
-language, infer product areas, or perform code review. The author and reviewer own those judgements.
+The runtime blocks a missing commit body, missing pull request structure, and explicit
+placeholder-only content. It does not score writing quality or infer product areas. It does not
+perform code review. The author and reviewer own those judgements.

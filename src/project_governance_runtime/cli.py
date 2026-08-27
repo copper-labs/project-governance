@@ -20,7 +20,13 @@ from .documentation import (
     route_documentation,
 )
 from .execution_commands import pack_stage_command_gaps
-from .installation import InstallationError, initialize, load_lock, update
+from .installation import (
+    InstallationError,
+    initialize,
+    launcher_drift,
+    load_lock,
+    update,
+)
 from .planning import build_plan, public_plan
 from .runner import execute
 from .telemetry import status as telemetry_status
@@ -74,7 +80,8 @@ def _parser() -> argparse.ArgumentParser:
     commands.add_parser("doctor")
     telemetry = commands.add_parser("telemetry")
     telemetry.add_argument("telemetry_command", choices=["status"])
-    commands.add_parser("init")
+    init = commands.add_parser("init")
+    init.add_argument("--refresh-launchers", action="store_true")
     docs = commands.add_parser("docs")
     docs_commands = docs.add_subparsers(dest="docs_command", required=True)
     docs_init = docs_commands.add_parser("init")
@@ -239,7 +246,9 @@ def _resolve_plan(args: argparse.Namespace, root: Path) -> tuple[dict[str, Any],
 def _doctor(root: Path) -> dict[str, Any]:
     """Report actionable installation health without changing repository state."""
     findings: list[str] = []
+    notices: list[str] = []
     source_checkout = (root / "src/project_governance_runtime/cli.py").is_file()
+    integration_drift = {"missing": [], "modified": []}
     lock_version: str | None = None
     runtime_lock_match: bool | None = None
     if not source_checkout:
@@ -267,6 +276,19 @@ def _doctor(root: Path) -> dict[str, Any]:
     for relative in required:
         if not (root / relative).exists():
             findings.append(f"{relative} is missing")
+    if not source_checkout:
+        integration_drift = launcher_drift(root)
+        for relative in integration_drift["missing"]:
+            notices.append(
+                f"tracked runtime launcher is missing: {relative}; "
+                "run project-governance init to create it"
+            )
+        for relative in integration_drift["modified"]:
+            notices.append(
+                f"tracked runtime launcher differs from this runtime: {relative}; "
+                "review the customization or run project-governance init "
+                "--refresh-launchers to replace it deliberately"
+            )
     try:
         packs = load_packs(root)
     except (ConfigurationError, OSError) as error:
@@ -286,6 +308,8 @@ def _doctor(root: Path) -> dict[str, Any]:
         "lock_version": lock_version,
         "runtime_lock_match": runtime_lock_match,
         "findings": findings,
+        "notices": notices,
+        "launcher_drift": integration_drift,
     }
 
 
@@ -544,7 +568,7 @@ def _run_administration(args: argparse.Namespace, root: Path) -> int:
     elif args.command == "telemetry":
         output = telemetry_status(root)
     elif args.command == "init":
-        output = initialize(root)
+        output = initialize(root, refresh_launchers=args.refresh_launchers)
     else:
         output = update(root, args.to, apply=args.apply)
     _emit(output)

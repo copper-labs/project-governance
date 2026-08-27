@@ -5,14 +5,14 @@ type: governance
 status: current
 owner: project-governance
 created: 2026-07-05
-updated: 2026-08-12
+updated: 2026-08-27
 summary: Defines the small, target-owned integration surface for the runtime wheel.
 ---
 
 # Bootstrap Standards
 
 Bootstrap creates a lean integration surface once. It does not copy the generic runtime into the
-repository and never overwrites a project decision.
+repository. Replacing tracked launchers requires a separate explicit command.
 
 ## Tracked Repository Files
 
@@ -31,12 +31,18 @@ repository and never overwrites a project decision.
 ## Bootstrap And Upgrade
 
 `project-governance init` creates missing integration files without replacing existing content.
+`doctor` reports tracked bootstrap or hook launchers that differ from the installed wheel as
+non-blocking notices because a project may customize them deliberately. After reviewing those
+differences, `project-governance init --refresh-launchers` replaces only those launchers; it does
+not edit project configuration or target packs.
 Bootstrap downloads the wheel named by the lock, verifies SHA256, builds the repository-local
 environment, and installs it. Private GitHub releases use `GH_TOKEN`, `GITHUB_TOKEN`, or the
 current `gh auth` credential without storing that credential. Hooks only report a bootstrap
 instruction when that environment is absent. Bootstrap also replaces ignored generic skill state
-with the exact wheel payload, so an existing adopter reruns bootstrap after updating its lock.
+with the exact wheel payload, so an existing adopter reruns bootstrap after updating its lock. Its
+repository-local pip invocation suppresses pip's unrelated upgrade advertisement.
 
 `project-governance update --to <version> --dry-run` shows the lock change, configuration-schema
-impact, any project-owned migration, and exact validation commands. `--apply` changes the lock only
-when no human judgment is required. A runtime release never updates a repository automatically.
+impact, and exact validation commands. A schema change requires deliberate review of project-owned
+configuration. `--apply` changes only the lock. A runtime release never updates a repository
+automatically.
