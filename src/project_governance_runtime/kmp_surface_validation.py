@@ -75,6 +75,19 @@ class _Validator:
                 path=path,
             )
         )
+
+    @staticmethod
+    def duplicates(values: list[Any]) -> list[Any]:
+        """Return repeated hashable values in deterministic linear time."""
+        seen: set[Any] = set()
+        repeated: set[Any] = set()
+        for value in values:
+            if value in seen:
+                repeated.add(value)
+            else:
+                seen.add(value)
+        return sorted(repeated)
+
     def structure(
         self,
         message: str,
@@ -171,8 +184,7 @@ class _Validator:
             )
             if parsed is not None:
                 result.append(parsed)
-        duplicates = sorted({item for item in result if result.count(item) > 1})
-        for item in duplicates:
+        for item in self.duplicates(result):
             self.structure(
                 f"{label} contains duplicate value {item}",
                 area_id=area_id,
@@ -261,7 +273,7 @@ class _Validator:
                 )
                 if role is not None and path is not None:
                     checkpoints.append((role, path))
-        for duplicate in sorted({item for item in checkpoints if checkpoints.count(item) > 1}):
+        for duplicate in self.duplicates(checkpoints):
             self.structure(
                 f"{label} contains duplicate checkpoint {duplicate[0]} at {duplicate[1]}",
                 area_id=area_id,
@@ -298,7 +310,7 @@ class _Validator:
                 if path is not None and claims:
                     proofs.append((path, set(claims)))
         proof_paths = [path for path, _ in proofs]
-        for duplicate in sorted({path for path in proof_paths if proof_paths.count(path) > 1}):
+        for duplicate in self.duplicates(proof_paths):
             self.structure(
                 f"{label} contains duplicate proof path {duplicate}",
                 area_id=area_id,
@@ -407,7 +419,7 @@ class _Validator:
             for area in areas
             if isinstance(area, dict) and isinstance(area.get("id"), str)
         ]
-        for duplicate in sorted({value for value in area_ids if area_ids.count(value) > 1}):
+        for duplicate in self.duplicates(area_ids):
             self.structure(f"duplicate area id {duplicate}", area_id=duplicate)
         return self.result()
 

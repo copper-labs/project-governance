@@ -120,7 +120,7 @@ def load_structured_document(data: bytes, *, format_name: str) -> Any:
             raise StructuredDocumentError(f"unsupported document format {format_name!r}")
     except StructuredDocumentError:
         raise
-    except (json.JSONDecodeError, yaml.YAMLError) as error:
+    except (json.JSONDecodeError, yaml.YAMLError, RecursionError) as error:
         detail = getattr(error, "problem", None) or str(error)
         raise StructuredDocumentError(f"invalid {format_name}: {detail}") from error
     _bounded_shape(value)

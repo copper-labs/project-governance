@@ -259,21 +259,21 @@ class RuntimeChangedPathTests(unittest.TestCase):
             path = root / "sample.py"
             path.write_text("first\nplanned\n", encoding="utf-8")
             run(root, "git", "add", "sample.py")
-            original = changed_paths_module._git_blob_identity
+            original = changed_paths_module._index_entry
             mutated = False
 
-            def mutate_before_index_identity(target: Path, object_name: str) -> str:
+            def mutate_before_index_entry(target: Path, object_path: str) -> tuple[str, str]:
                 nonlocal mutated
-                if object_name.startswith(":") and not mutated:
+                if not mutated:
                     path.write_text("new\nrange\nshape\n", encoding="utf-8")
                     run(root, "git", "add", "sample.py")
                     mutated = True
-                return original(target, object_name)
+                return original(target, object_path)
 
             with patch.object(
                 changed_paths_module,
-                "_git_blob_identity",
-                side_effect=mutate_before_index_identity,
+                "_index_entry",
+                side_effect=mutate_before_index_entry,
             ), self.assertRaisesRegex(ChangedPathError, "changed while resolving"):
                 resolve_change_scope(root, staged=True)
 
@@ -299,6 +299,21 @@ class RuntimeChangedPathTests(unittest.TestCase):
             self.assertIn("change scope is stale", message)
             self.assertIn("other.py", message)
             self.assertIn("sample.py", message)
+
+    def test_worktree_packet_rejects_file_type_change_with_identical_bytes(self) -> None:
+        """Bind a mutable after-image's type as well as its content identity."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            initialize(root)
+            path = root / "sample.py"
+            path.write_text("outside", encoding="utf-8")
+            scope = resolve_change_scope(root, base_ref="main")
+            path.unlink()
+            path.symlink_to("outside")
+
+            with self.assertRaisesRegex(ValueError, "change scope is stale"):
+                with execution_environment(root, {"change_scope": scope}):
+                    self.fail("a changed file type must not reach execution")
 
     def test_worktree_scope_captures_final_symlinks_without_dereferencing(self) -> None:
         """Represent final symlinks as Git link payloads without reading their targets."""

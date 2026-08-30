@@ -33,6 +33,10 @@ from project_governance_runtime.kmp_surface_validation import (  # noqa: E402
     STRUCTURE_RULE,
     validate_kmp_surface,
 )
+from project_governance_runtime.structured_documents import (  # noqa: E402
+    StructuredDocumentError,
+    load_structured_document,
+)
 from project_governance_runtime.validation_subject import ValidationSubject  # noqa: E402
 
 
@@ -290,6 +294,10 @@ class RuntimeKmpSurfaceValidationTests(unittest.TestCase):
         for result in (oversized, too_deep, duplicate_json):
             self.assertEqual(result["findings"][0]["rule_id"], STRUCTURE_RULE)
         self.assertIn("4096", "\n".join(item["message"] for item in oversized_path["findings"]))
+        with self.assertRaisesRegex(StructuredDocumentError, "invalid yaml"):
+            load_structured_document(
+                ("- " * 500 + "leaf\n").encode("utf-8"), format_name="yaml"
+            )
 
     def test_finding_output_is_deterministic_and_bounded(self) -> None:
         """Canonicalize equivalent ordering and stop at one 500-item result."""
@@ -405,6 +413,23 @@ class RuntimeKmpSurfaceValidationTests(unittest.TestCase):
             )
 
         self.assertIn("route.skills", "\n".join(default_only))
+
+    def test_doctor_structure_pass_does_not_expand_missing_target_gaps(self) -> None:
+        """Keep doctor's structural pass linear in declared routes, not area-target products."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_surface(
+                root,
+                targets=["web", "bridge-ios", "bridge-android"],
+                areas=[area("shell", ["web"])],
+            )
+            with patch(
+                "project_governance_runtime.kmp_surface_composition._validate_target"
+            ) as validate_target:
+                result = live_result(root, include_gaps=False)
+
+        self.assertEqual(result, {"status": "passed", "findings": []})
+        self.assertEqual(validate_target.call_count, 1)
 
     def test_doctor_rejects_nonstandard_or_incomplete_pack_wiring(self) -> None:
         """Use one conventional pack authority and require both documents in its selectors."""

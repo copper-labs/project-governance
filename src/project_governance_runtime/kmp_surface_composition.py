@@ -105,9 +105,7 @@ def _projections(
         )) is not None
     ]
     identifiers = [value["id"] for value in result if value["id"]]
-    for duplicate in sorted(
-        {value for value in identifiers if identifiers.count(value) > 1}
-    ):
+    for duplicate in validator.duplicates(identifiers):
         validator.structure(f"duplicate projection id {duplicate}", area_id=area_id)
     return result
 
@@ -126,7 +124,7 @@ def _routes(
         if (route := validator.target_route(value, index, area_id=area_id)) is not None
     ]
     targets = [route["target"] for route in routes if route["target"]]
-    for duplicate in sorted({target for target in targets if targets.count(target) > 1}):
+    for duplicate in validator.duplicates(targets):
         validator.structure(
             f"duplicate target route {duplicate}", area_id=area_id, target_id=duplicate
         )
@@ -266,7 +264,8 @@ def validate_area(
         shared["proofs"] or any(value["proofs"] for value in projections + routes)
     ):
         validator.structure("route area cannot contain proofs", area_id=area_id)
-    for target in sorted(catalog_targets):
+    targets_to_check = catalog_targets if validator.include_gaps else route_by_target
+    for target in sorted(targets_to_check):
         _validate_target(
             validator, route_by_target.get(target), validation=validation,
             area_id=area_id, target=target, shared=shared, projections=projections,

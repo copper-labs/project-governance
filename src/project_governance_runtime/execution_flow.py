@@ -14,7 +14,7 @@ from time import monotonic
 from typing import Any, Iterator
 from uuid import uuid4
 
-from .changed_paths import scope_subject_digest, worktree_file_bytes
+from .changed_paths import scope_subject_digest, worktree_source
 from .checker_scripts.finding_lifecycle import FINDING_STATES
 from .evidence_manifest import inspect_evidence_manifest
 from .execution_commands import command_argv, normalized_command
@@ -43,7 +43,10 @@ def _source_bytes(root: Path, source: dict[str, str]) -> bytes:
     kind = source.get("kind")
     path = source.get("path", "")
     if kind == "worktree":
-        return worktree_file_bytes(root, path)
+        content, file_type = worktree_source(root, path)
+        if file_type != source.get("file_type"):
+            raise ValueError(f"worktree source changed file type for {path}")
+        return content
     object_name = source.get("identity")
     if not object_name:
         raise ValueError(f"unbound {kind} content for {path}")
