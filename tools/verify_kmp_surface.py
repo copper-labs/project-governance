@@ -19,17 +19,15 @@ def _write(root: Path, relative: str, content: str = "fixture\n") -> None:
 
 def _enable(root: Path) -> None:
     """Create one deliberate adopter pack, graph, catalog, and context route."""
-    profile = {
-        "schema_version": 1,
-        "project_extensions": [],
-        "context_router": {
-            "routes": [{"id": "kmp", "skills": ["kmp-implementation"]}]
-        },
-    }
     _write(
         root,
         "config/governance/profile.yaml",
-        json.dumps(profile, indent=2) + "\n",
+        "schema_version: 1\n"
+        "project_extensions: []\n"
+        "context_router:\n"
+        "  routes:\n"
+        "    - id: kmp\n"
+        "      skills: [kmp-implementation]\n",
     )
     pack = {
         "id": "kmp-surface-validation",
@@ -37,7 +35,7 @@ def _enable(root: Path) -> None:
         "enforcement": "blocking",
         "stages": ["release"],
         "run_when": "matched",
-        "path_globs": ["config/validation/**", "ui/**", "shared/**", "docs/specs/**"],
+        "path_globs": ["config/validation/**", "ui/**", "shared/**", "contracts/**"],
         "depends_on": [],
         "commands": [{"builtin": "kmp-surface-validation"}],
     }
@@ -65,7 +63,7 @@ def _enable(root: Path) -> None:
                 "id": "shell",
                 "summary": "Shared shell reaches each installed target.",
                 "validation": "route",
-                "contract": {"path": "docs/specs/shell.md"},
+                "contract": {"path": "contracts/shell.txt"},
                 "shared_route": {
                     "checkpoints": [
                         {"role": "shared-owner", "path": "shared/Shell.kt"}
@@ -89,7 +87,7 @@ def _enable(root: Path) -> None:
         json.dumps(graph, indent=2) + "\n",
     )
     for relative in (
-        "docs/specs/shell.md",
+        "contracts/shell.txt",
         "shared/Shell.kt",
         "ui/web.txt",
         "ui/native-ios.txt",
