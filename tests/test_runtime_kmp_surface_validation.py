@@ -370,6 +370,42 @@ class RuntimeKmpSurfaceValidationTests(unittest.TestCase):
 
         self.assertIn(REFERENCE_RULE, {item["rule_id"] for item in result["findings"]})
 
+    def test_changed_and_explicit_subjects_read_unchanged_authorities_from_base(self) -> None:
+        """Read unchanged graph, catalog, and references through bounded base-tree blobs."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            run(root, "git", "init", "-q", "-b", "main")
+            run(root, "git", "config", "user.email", "runtime@example.invalid")
+            run(root, "git", "config", "user.name", "Runtime Tests")
+            write_surface(root)
+            write_file(root, "notes.txt", "baseline\n")
+            run(root, "git", "add", ".")
+            run(root, "git", "commit", "-qm", "baseline")
+            write_file(root, "notes.txt", "changed\n")
+
+            scopes = [
+                resolve_change_scope(root, base_ref="main"),
+                resolve_change_scope(
+                    root,
+                    explicit_paths=["notes.txt"],
+                    base_ref="main",
+                    packet_mode="explicit",
+                ),
+            ]
+            results = []
+            for scope in scopes:
+                with execution_environment(root, {"change_scope": scope}) as environment:
+                    with patch.dict(os.environ, environment, clear=True):
+                        results.append(validate_kmp_surface(root))
+
+        self.assertEqual(
+            results,
+            [
+                {"status": "passed", "findings": []},
+                {"status": "passed", "findings": []},
+            ],
+        )
+
     def test_doctor_accepts_adopter_stages_but_requires_route_local_wiring(self) -> None:
         """Keep lifecycle policy adopter-owned while ensuring agents can compose KMP leaves."""
         with tempfile.TemporaryDirectory() as directory:

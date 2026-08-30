@@ -224,7 +224,7 @@ def _file_type_from_git_mode(mode: str, object_name: str) -> str:
 
 def _tree_file_type(root: Path, reference: str, path: str) -> str:
     """Return one exact path's immutable file type from a Git tree."""
-    output = _git_bytes(root, ["ls-tree", "-z", reference, "--", path])
+    output = _git_bytes(root, ["ls-tree", "-z", reference, "--", f":(literal){path}"])
     records = [value for value in output.split(b"\0") if value]
     if len(records) != 1 or b"\t" not in records[0]:
         raise ChangedPathError(f"comparison source {reference}:{path!s} is unavailable")
@@ -237,7 +237,9 @@ def _tree_file_type(root: Path, reference: str, path: str) -> str:
 
 def _index_entry(root: Path, path: str) -> tuple[str, str]:
     """Return one staged blob identity and file type from the same index entry."""
-    output = _git_bytes(root, ["ls-files", "--stage", "-z", "--", path])
+    output = _git_bytes(
+        root, ["ls-files", "--stage", "-z", "--", f":(literal){path}"]
+    )
     records = [value for value in output.split(b"\0") if value]
     if len(records) != 1 or b"\t" not in records[0]:
         raise ChangedPathError(f"comparison source :{path!s} is unavailable")

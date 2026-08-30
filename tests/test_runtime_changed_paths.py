@@ -110,6 +110,22 @@ class RuntimeChangedPathTests(unittest.TestCase):
                     with self.assertRaisesRegex(RuntimeError, "no longer matches"):
                         analysis_path("sample.py", "staged")
 
+    def test_staged_packet_treats_glob_characters_as_literal_path_names(self) -> None:
+        """Resolve one exact index entry when another staged name matches its glob form."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            initialize(root)
+            (root / "a[1].txt").write_text("literal\n", encoding="utf-8")
+            (root / "a1.txt").write_text("glob match\n", encoding="utf-8")
+            run(root, "git", "add", ".")
+
+            scope = resolve_change_scope(root, staged=True)
+
+        self.assertEqual(
+            [record["path"] for record in scope["records"]],
+            ["a1.txt", "a[1].txt"],
+        )
+
     def test_subject_digest_is_stable_across_materialization_roots(self) -> None:
         """Exclude ephemeral paths from the exact logical subject identity."""
         with tempfile.TemporaryDirectory() as directory:
