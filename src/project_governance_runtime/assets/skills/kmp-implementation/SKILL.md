@@ -37,8 +37,22 @@ For wearable work, explicitly decide authority during disconnect, reconnection, 
 partial sensor availability. Phone-like lifecycle, continuous connectivity, and phone-owned
 execution are hypotheses, not defaults.
 
+## Maintain enabled surface validation
+
+For KMP-backed UI, binding, host, or renderer work, run
+`project-governance plan --pack kmp-surface-validation --json`. An unknown or inactive pack means
+the optional capability is not enabled; do not create configuration on its behalf.
+
+When the pack is active, read `config/validation/kmp-surfaces.yaml` and its `target_catalog` before
+editing. Route platform-exclusive behavior to platform-owned validation. For a cross-surface
+capability, update the existing area or add one, preserve a target route for every catalog target,
+and split host surfaces that can break, ship, or be validated independently. Keep broad routing
+shallow; use guarded roles and claims only for a fragile seam. Finish with
+`project-governance check --pack kmp-surface-validation`.
+
 ## Completion evidence
 
-Report the declared project shape, source-set and artifact decisions, selected skills, exclusions or
-missing facts, target-owned validation commands, and any target or device claim that remains
-unproved. Do not claim whole-of-KMP safety from one Android build or one simulator run.
+Report the declared project shape, source-set and artifact decisions, selected skills, active
+surface-graph impact, exclusions or missing facts, target-owned validation commands, and any target
+or device claim that remains unproved. Do not claim whole-of-KMP safety from one Android build or one
+simulator run.

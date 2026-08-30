@@ -12,6 +12,8 @@ import tempfile
 import venv
 from pathlib import Path
 
+from verify_kmp_surface import verify_kmp_surface
+
 
 REPLACEMENT_SCRIPT = """\
 import json
@@ -582,6 +584,7 @@ def main() -> int:
         python, command = initialize_target(root, wheel)
         verify_change_narratives(root, command)
         verify_launcher_refresh(root, command)
+        verify_kmp_surface(root, command, run)
         write_synthetic_packs(root, python)
         write_synthetic_changes(root)
         verify_replacement_plan(root, command)

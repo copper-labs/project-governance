@@ -39,3 +39,34 @@ capabilities:
     guides: [docs/guides/agent-setup-instructions.md]
     sources:
       - src/project_governance_runtime/context.py
+  - id: kmp-surface-validation
+    title: Define or implement KMP surface validation
+    aliases: [kmp-validation-graph, cross-surface-validation]
+    tasks:
+      - understand the adopter-owned target catalog and cross-surface completeness contract
+      - distinguish shallow route areas from guarded target-proof areas
+      - implement the subject-consistent bounded validator through the existing pack runner
+      - connect enabled graphs to existing KMP agent routing and lifecycle packs
+    symbols:
+      - kmp-surface-validation
+      - project-governance plan --pack
+      - project-governance check --pack
+    reference: docs/specs/kmp-surface-validation.md
+    guides:
+      - docs/guides/agent-setup-instructions.md
+      - docs/guides/module-authoring.md
+    sources:
+      - src/project_governance_runtime/assets/skills/kmp-implementation/SKILL.md
+      - src/project_governance_runtime/assets/skills/stack-packs/kmp/core/kmp-test-and-evidence/SKILL.md
+      - src/project_governance_runtime/checkers.py
+      - src/project_governance_runtime/checker_scripts/governance_changed_paths.py
+      - src/project_governance_runtime/configuration.py
+      - src/project_governance_runtime/execution_commands.py
+      - src/project_governance_runtime/execution_flow.py
+      - src/project_governance_runtime/kmp_surface_authorities.py
+      - src/project_governance_runtime/kmp_surface_composition.py
+      - src/project_governance_runtime/kmp_surface_doctor.py
+      - src/project_governance_runtime/kmp_surface_validation.py
+      - src/project_governance_runtime/skill_selection.py
+      - src/project_governance_runtime/structured_documents.py
+      - src/project_governance_runtime/validation_subject.py

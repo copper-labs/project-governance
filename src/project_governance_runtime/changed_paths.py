@@ -43,6 +43,16 @@ def subject_digest(records: list[dict[str, Any]]) -> str:
                     if record.get("after") is not None
                     else None
                 ),
+                "before_file_type": (
+                    record.get("before", {}).get("file_type")
+                    if record.get("before") is not None
+                    else None
+                ),
+                "after_file_type": (
+                    record.get("after", {}).get("file_type")
+                    if record.get("after") is not None
+                    else None
+                ),
                 "changed_ranges": record.get("changed_ranges", []),
             }
             for record in records
@@ -190,6 +200,7 @@ def _source(
     reference: str | None = None,
     *,
     identity: str | None = None,
+    file_type: str | None = None,
 ) -> dict[str, str]:
     """Describe bytes and bind them to one identity during plan resolution."""
     value = {"kind": kind, "path": path}
@@ -197,7 +208,49 @@ def _source(
         value["ref"] = reference
     if identity is not None:
         value["identity"] = identity
+    if file_type is not None:
+        value["file_type"] = file_type
     return value
+
+
+def _file_type_from_git_mode(mode: str, object_name: str) -> str:
+    """Classify the ordinary blob modes retained by a Git subject."""
+    if mode in {"100644", "100755"}:
+        return "regular"
+    if mode == "120000":
+        return "symlink"
+    raise ChangedPathError(f"comparison source {object_name!r} is not a regular file or symlink")
+
+
+def _tree_file_type(root: Path, reference: str, path: str) -> str:
+    """Return one exact path's immutable file type from a Git tree."""
+    output = _git_bytes(root, ["ls-tree", "-z", reference, "--", f":(literal){path}"])
+    records = [value for value in output.split(b"\0") if value]
+    if len(records) != 1 or b"\t" not in records[0]:
+        raise ChangedPathError(f"comparison source {reference}:{path!s} is unavailable")
+    metadata, raw_path = records[0].split(b"\t", 1)
+    if os.fsdecode(raw_path) != path:
+        raise ChangedPathError(f"comparison source {reference}:{path!s} is ambiguous")
+    mode = metadata.split(b" ", 1)[0].decode("ascii", errors="strict")
+    return _file_type_from_git_mode(mode, f"{reference}:{path}")
+
+
+def _index_entry(root: Path, path: str) -> tuple[str, str]:
+    """Return one staged blob identity and file type from the same index entry."""
+    output = _git_bytes(
+        root, ["ls-files", "--stage", "-z", "--", f":(literal){path}"]
+    )
+    records = [value for value in output.split(b"\0") if value]
+    if len(records) != 1 or b"\t" not in records[0]:
+        raise ChangedPathError(f"comparison source :{path!s} is unavailable")
+    metadata, raw_path = records[0].split(b"\t", 1)
+    if os.fsdecode(raw_path) != path:
+        raise ChangedPathError(f"comparison source :{path!s} is ambiguous")
+    fields = metadata.decode("ascii", errors="strict").split()
+    if len(fields) != 3 or fields[2] != "0":
+        raise ChangedPathError(f"comparison source :{path!s} has an unresolved index stage")
+    mode, identity, _ = fields
+    return identity, _file_type_from_git_mode(mode, f":{path}")
 
 
 def _git_blob_identity(root: Path, object_name: str) -> str:
@@ -209,8 +262,8 @@ def _git_blob_identity(root: Path, object_name: str) -> str:
     return identity
 
 
-def worktree_file_bytes(root: Path, path: str) -> bytes:
-    """Read one regular file or Git-compatible final symlink payload safely."""
+def worktree_source(root: Path, path: str) -> tuple[bytes, str]:
+    """Read bytes and type from one regular file or final symlink operation."""
     candidate = root / path
     try:
         resolved_root = root.resolve(strict=True)
@@ -230,7 +283,7 @@ def worktree_file_bytes(root: Path, path: str) -> bytes:
         raise ChangedPathError(f"cannot capture worktree content for {path!r}") from error
     if stat.S_ISLNK(metadata.st_mode):
         try:
-            return os.fsencode(os.readlink(candidate))
+            return os.fsencode(os.readlink(candidate)), "symlink"
         except OSError as error:
             raise ChangedPathError(
                 f"cannot capture worktree symlink payload for {path!r}"
@@ -252,15 +305,20 @@ def worktree_file_bytes(root: Path, path: str) -> bytes:
                 raise ChangedPathError(
                     f"changed worktree input must remain a regular file: {path!r}"
                 )
-            return handle.read()
+            return handle.read(), "regular"
     except OSError as error:
         raise ChangedPathError(f"cannot capture worktree content for {path!r}") from error
 
 
-def _worktree_identity(root: Path, path: str) -> str:
-    """Capture the identity of one regular worktree after-image."""
-    content = worktree_file_bytes(root, path)
-    return f"sha256:{hashlib.sha256(content).hexdigest()}"
+def worktree_file_bytes(root: Path, path: str) -> bytes:
+    """Read one regular file or Git-compatible final symlink payload safely."""
+    return worktree_source(root, path)[0]
+
+
+def _worktree_identity_and_type(root: Path, path: str) -> tuple[str, str]:
+    """Capture one worktree after-image's byte identity and file type together."""
+    content, file_type = worktree_source(root, path)
+    return f"sha256:{hashlib.sha256(content).hexdigest()}", file_type
 
 
 def _source_exists(root: Path, reference: str, path: str) -> bool:
@@ -301,20 +359,25 @@ def _record_sources(
             before_path,
             base_ref,
             identity=_git_blob_identity(root, before_object),
+            file_type=_tree_file_type(root, base_ref, before_path),
         )
     after = None
     if status != "deleted":
         if after_kind == "index":
+            identity, file_type = _index_entry(root, path)
             after = _source(
                 "index",
                 path,
-                identity=_git_blob_identity(root, f":{path}"),
+                identity=identity,
+                file_type=file_type,
             )
         else:
+            identity, file_type = _worktree_identity_and_type(root, path)
             after = _source(
                 "worktree",
                 path,
-                identity=_worktree_identity(root, path),
+                identity=identity,
+                file_type=file_type,
             )
     return {
         **record,

@@ -115,6 +115,38 @@ class RuntimeKmpSkillSelectionTests(unittest.TestCase):
                 [skill["id"] for skill in result["skills"]],
                 ["kmp-implementation", "kmp-build-and-compatibility"],
             )
+            router = root / result["materialization"]["root"] / result["skills"][0][
+                "materialized_path"
+            ]
+            self.assertIn(
+                "project-governance plan --pack kmp-surface-validation --json",
+                router.read_text(encoding="utf-8"),
+            )
+
+    def test_proof_task_selects_target_local_surface_guidance(self) -> None:
+        """Keep proof-specific graph obligations in the evidence leaf, not the router alone."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_target(
+                root,
+                kmp_profile(),
+                {
+                    "ecosystems": ["kmp"],
+                    "target_families": ["web", "apple"],
+                    "boundary_pressure": ["test-parity"],
+                },
+            )
+
+            result = resolve_context(root, "Add shared target proof for KMP surface parity", [])
+
+            self.assertEqual(
+                [skill["id"] for skill in result["skills"]],
+                ["kmp-implementation", "kmp-test-and-evidence"],
+            )
+            leaf = root / result["materialization"]["root"] / result["skills"][1][
+                "materialized_path"
+            ]
+            self.assertIn("required_target_proof_claims", leaf.read_text(encoding="utf-8"))
 
     def test_absent_kmp_facts_and_default_router_never_compose_leaves(self) -> None:
         """Require route-local enablement and explicit KMP facts without Android inference."""

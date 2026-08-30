@@ -25,6 +25,7 @@ from project_governance_runtime.changed_paths import (  # noqa: E402
 )
 import project_governance_runtime.changed_paths as changed_paths_module  # noqa: E402
 from project_governance_runtime.execution_flow import execution_environment  # noqa: E402
+from project_governance_runtime.validation_subject import ValidationSubject  # noqa: E402
 from governance_changed_paths import (  # noqa: E402
     analysis_path,
     changed_line_ranges,
@@ -86,6 +87,8 @@ class RuntimeChangedPathTests(unittest.TestCase):
                 before = Path(record["before_path"]).read_text(encoding="utf-8")
                 after = Path(record["after_path"]).read_text(encoding="utf-8")
                 self.assertEqual(record["changed_ranges"], [{"start": 2, "end": 2}])
+                self.assertEqual(record["before_file_type"], "regular")
+                self.assertEqual(record["after_file_type"], "regular")
                 self.assertEqual(before, "first\nsecond\n")
                 self.assertEqual(after, "first\nstaged\n")
                 self.assertNotEqual(after, path.read_text(encoding="utf-8"))
@@ -106,6 +109,22 @@ class RuntimeChangedPathTests(unittest.TestCase):
                     materialized.write_text("tampered\n", encoding="utf-8")
                     with self.assertRaisesRegex(RuntimeError, "no longer matches"):
                         analysis_path("sample.py", "staged")
+
+    def test_staged_packet_treats_glob_characters_as_literal_path_names(self) -> None:
+        """Resolve one exact index entry when another staged name matches its glob form."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            initialize(root)
+            (root / "a[1].txt").write_text("literal\n", encoding="utf-8")
+            (root / "a1.txt").write_text("glob match\n", encoding="utf-8")
+            run(root, "git", "add", ".")
+
+            scope = resolve_change_scope(root, staged=True)
+
+        self.assertEqual(
+            [record["path"] for record in scope["records"]],
+            ["a1.txt", "a[1].txt"],
+        )
 
     def test_subject_digest_is_stable_across_materialization_roots(self) -> None:
         """Exclude ephemeral paths from the exact logical subject identity."""
@@ -158,6 +177,20 @@ class RuntimeChangedPathTests(unittest.TestCase):
             second = resolve_change_scope(root, base_ref="main")
 
         self.assertNotEqual(first["subject_digest"], second["subject_digest"])
+
+    def test_subject_digest_binds_file_type_as_well_as_bytes(self) -> None:
+        """Distinguish a regular file from a symlink carrying the same payload bytes."""
+        record = {
+            "status": "modified",
+            "path": "sample.py",
+            "previous_path": None,
+            "before": {"identity": "before", "file_type": "regular"},
+            "after": {"identity": "same-bytes", "file_type": "regular"},
+            "changed_ranges": [],
+        }
+        symlink = {**record, "after": {"identity": "same-bytes", "file_type": "symlink"}}
+
+        self.assertNotEqual(subject_digest([record]), subject_digest([symlink]))
 
     def test_all_scope_has_no_content_bound_subject_digest(self) -> None:
         """Keep explicit all mode honest about reading the live checkout."""
@@ -218,6 +251,22 @@ class RuntimeChangedPathTests(unittest.TestCase):
                     "first\nplanned\n",
                 )
 
+    def test_subject_view_applies_staged_rename_membership(self) -> None:
+        """Remove the previous path and expose only the packet's renamed after-image."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            initialize(root)
+            run(root, "git", "mv", "sample.py", "moved.py")
+            scope = resolve_change_scope(root, staged=True)
+            with execution_environment(root, {"change_scope": scope}) as environment:
+                with patch.dict(os.environ, environment, clear=True):
+                    subject = ValidationSubject.from_runtime(root)
+                    self.assertIsNone(subject.entry_kind("sample.py"))
+                    self.assertEqual(subject.entry_kind("moved.py"), "regular")
+                    self.assertEqual(
+                        subject.read_bytes("moved.py", limit=100), b"first\nsecond\n"
+                    )
+
     def test_scope_resolution_rejects_index_mutation_between_ranges_and_blob(self) -> None:
         """Do not bind an earlier range snapshot to a later staged blob."""
         with tempfile.TemporaryDirectory() as directory:
@@ -226,21 +275,21 @@ class RuntimeChangedPathTests(unittest.TestCase):
             path = root / "sample.py"
             path.write_text("first\nplanned\n", encoding="utf-8")
             run(root, "git", "add", "sample.py")
-            original = changed_paths_module._git_blob_identity
+            original = changed_paths_module._index_entry
             mutated = False
 
-            def mutate_before_index_identity(target: Path, object_name: str) -> str:
+            def mutate_before_index_entry(target: Path, object_path: str) -> tuple[str, str]:
                 nonlocal mutated
-                if object_name.startswith(":") and not mutated:
+                if not mutated:
                     path.write_text("new\nrange\nshape\n", encoding="utf-8")
                     run(root, "git", "add", "sample.py")
                     mutated = True
-                return original(target, object_name)
+                return original(target, object_path)
 
             with patch.object(
                 changed_paths_module,
-                "_git_blob_identity",
-                side_effect=mutate_before_index_identity,
+                "_index_entry",
+                side_effect=mutate_before_index_entry,
             ), self.assertRaisesRegex(ChangedPathError, "changed while resolving"):
                 resolve_change_scope(root, staged=True)
 
@@ -266,6 +315,21 @@ class RuntimeChangedPathTests(unittest.TestCase):
             self.assertIn("change scope is stale", message)
             self.assertIn("other.py", message)
             self.assertIn("sample.py", message)
+
+    def test_worktree_packet_rejects_file_type_change_with_identical_bytes(self) -> None:
+        """Bind a mutable after-image's type as well as its content identity."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            initialize(root)
+            path = root / "sample.py"
+            path.write_text("outside", encoding="utf-8")
+            scope = resolve_change_scope(root, base_ref="main")
+            path.unlink()
+            path.symlink_to("outside")
+
+            with self.assertRaisesRegex(ValueError, "change scope is stale"):
+                with execution_environment(root, {"change_scope": scope}):
+                    self.fail("a changed file type must not reach execution")
 
     def test_worktree_scope_captures_final_symlinks_without_dereferencing(self) -> None:
         """Represent final symlinks as Git link payloads without reading their targets."""

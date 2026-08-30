@@ -89,11 +89,13 @@ other selected packs.
 The [completed V1.1 plan](../exec-plans/completed/2026-08-15-governance-v1.1-evidence-integrity.md)
 records the implementation and clean-wheel release proof for this source contract.
 
-- Changed and staged execution consumes only the immutable packet's materialized bytes. A
-  deterministic `subject_digest` hashes sorted logical records containing path status,
-  normalized and previous paths, before/after identities, and exact ranges without depending on
-  temporary paths. All mode is explicitly checkout-wide and has no content-bound
-  digest.
+- Changed and staged execution consumes the immutable packet's materialized changed bytes. A
+  subject-aware authority validator may additionally read unchanged blobs and file modes only from
+  the exact base commit named by that packet, then apply its deletion, rename, and after-image
+  overlay; it never falls back to the live index or checkout. A deterministic `subject_digest`
+  hashes sorted logical change records containing path status, normalized and previous paths,
+  before/after identities and file types, and exact ranges without depending on temporary paths.
+  All mode is explicitly checkout-wide and has no content-bound digest.
 - Findings use `blocking`, `advisory`, `accepted`, `waived`, or `suppressed`. A result may pass
   with nonempty accepted, waived, or suppressed findings; those findings remain visible. Nonzero
   exit, timeout, interruption, malformed output, missing required evidence, or an unknown state
@@ -122,6 +124,10 @@ repository-wide ownership of a non-supplemental built-in through `replaces_built
 modes, reports uncovered impacted paths once per replacement pair, and retains direct named
 built-in execution for diagnosis. Silent, partial, duplicate, or supplemental replacement remains
 invalid.
+
+The wheel also provides the `kmp-surface-validation` built-in command without a built-in pack. Only
+the adopter-owned pack defined by the [KMP Surface Validation specification](kmp-surface-validation.md)
+activates it; installation alone changes no selection or lifecycle behavior.
 
 Replacement is the only built-in ownership override. V1.1 adds no profile layer: target packs keep
 their existing per-command `stages`, path selection, dependencies, and optional

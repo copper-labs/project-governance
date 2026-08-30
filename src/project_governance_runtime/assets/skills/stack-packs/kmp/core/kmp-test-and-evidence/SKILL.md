@@ -11,6 +11,13 @@ support, performance, artifact, bridge, or wearable claim.
 Read `.governance/runtime/skills/stack-packs/kmp/core/kmp-test-and-evidence/references/decision-guide.md`
 to map claims to proof tiers.
 
+If `project-governance plan --pack kmp-surface-validation --json` finds the optional pack, read the
+conventional graph and its target catalog. Keep proof paths and claims aligned with the affected
+guarded area. A claim in `required_target_proof_claims` must be established inside each target route;
+shared or projection proof cannot substitute. Record an explicit proof gap when proof is genuinely
+missing, and remember that it remains blocking. Run
+`project-governance check --pack kmp-surface-validation` after the graph update.
+
 ## Build the proof matrix
 
 1. State the behavior and target rows being claimed. Separate source portability, compilation,

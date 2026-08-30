@@ -403,6 +403,7 @@ class RuntimeExecutionTests(unittest.TestCase):
                     "kind": "worktree",
                     "path": "sample.py",
                     "identity": identity,
+                    "file_type": "regular",
                 },
                 "changed_ranges": [{"start": 1, "end": 1}],
             }]
