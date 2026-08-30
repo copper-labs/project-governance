@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-07-05
-updated: 2026-08-24
+updated: 2026-08-30
 summary: Entry point for the reusable, package-based project governance runtime.
 ---
 
@@ -31,6 +31,9 @@ lock.
   few situations that require broader proof.
 - [Change narrative contract](specs/change-narrative-contract.md) defines the product-level and
   conceptual context required before a reader opens a commit or pull request diff.
+- [KMP Surface Validation](specs/kmp-surface-validation.md) defines the opt-in contract that maps
+  selected cross-surface KMP capabilities through an adopter-owned target catalog, the existing pack
+  runner, shallow routes, and guarded target-local proof.
 - [KMP skill inventory](reference/kmp-skill-inventory.md) records the current Kotlin Multiplatform
   capability surface, provenance, overlap, and known quality gaps.
 - [Pre-V0 KMP skill quality audit](reference/kmp-skill-quality-audit.md) preserves the whole-of-KMP

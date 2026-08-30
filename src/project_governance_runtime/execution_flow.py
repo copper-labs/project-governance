@@ -134,10 +134,18 @@ def _wire_packet(root: Path, plan: dict[str, Any], temporary_root: Path) -> dict
                 hashlib.sha256(content[(index, "before")]).hexdigest()
                 if before_path is not None else None
             ),
+            "before_file_type": (
+                record.get("before", {}).get("file_type")
+                if record.get("before") is not None else None
+            ),
             "after_path": after_path,
             "after_sha256": (
                 hashlib.sha256(content[(index, "after")]).hexdigest()
                 if after_path is not None else None
+            ),
+            "after_file_type": (
+                record.get("after", {}).get("file_type")
+                if record.get("after") is not None else None
             ),
             "changed_ranges": record.get("changed_ranges", []),
         })

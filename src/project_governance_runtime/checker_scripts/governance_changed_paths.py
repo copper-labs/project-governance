@@ -135,6 +135,12 @@ def _normalized_record(value: Any) -> dict[str, Any]:
         raise RuntimeError("change packet record status is malformed")
     status = value["status"]
     previous = value.get("previous_path")
+    before_file_type = value.get("before_file_type")
+    after_file_type = value.get("after_file_type")
+    if before_file_type not in {None, "regular", "symlink"}:
+        raise RuntimeError("change packet before file type is malformed")
+    if after_file_type not in {None, "regular", "symlink"}:
+        raise RuntimeError("change packet after file type is malformed")
     return {
         "status": status,
         "path": _safe_repository_path(value.get("path")),
@@ -146,11 +152,13 @@ def _normalized_record(value: Any) -> dict[str, Any]:
             value.get("before_sha256"),
             required=status != "added",
         ),
+        "before_file_type": before_file_type,
         "after_path": _materialized_path(
             value.get("after_path"),
             value.get("after_sha256"),
             required=status != "deleted",
         ),
+        "after_file_type": after_file_type,
         "changed_ranges": _normalized_ranges(value.get("changed_ranges")),
     }
 
@@ -161,6 +169,11 @@ def _load_packet() -> dict[str, Any] | None:
     if value is None:
         return None
     return {**value, "records": [_normalized_record(record) for record in value["records"]]}
+
+
+def load_change_packet() -> dict[str, Any] | None:
+    """Expose the validated runtime packet to reusable subject-aware validators."""
+    return _load_packet()
 
 
 def _packet(mode: str) -> dict[str, Any] | None:

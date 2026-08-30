@@ -22,6 +22,7 @@ CHECKERS = {
     "pr-description": "check-pr-description.py",
     "prose": "check-prose-style.py",
     "apple-dependencies": "check-apple-dependencies.py",
+    "kmp-surface-validation": "check-kmp-surface-validation.py",
 }
 
 

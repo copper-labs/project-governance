@@ -52,12 +52,14 @@ The architecture intentionally has two owners.
 
 ## V1.1 Integrity Boundary
 
-The completed V1.1 plan tightens evidence identity without adding another orchestration layer. Changed
-and staged packet-bound packs read packet materializations only and share one canonical
-`subject_digest`; explicit all mode and the declared later-stage live secret surface remain honest
-no-digest checkout-reading exceptions. Finding authorization is separate from process
-integrity: accepted, waived, and suppressed findings may remain in a passing result, but a failed,
-timed-out, interrupted, malformed, or incomplete child always blocks.
+The completed V1.1 plan tightens evidence identity without adding another orchestration layer.
+Changed and staged packet-bound packs read changed bytes from packet materializations and share one
+canonical `subject_digest`. A subject-aware authority validator may reconstruct unchanged files only
+from the exact base commit carried by the packet before applying its overlay; the live checkout is
+never a fallback. Explicit all mode and the declared later-stage live secret surface remain honest
+no-digest checkout-reading exceptions. Finding authorization is separate from process integrity:
+accepted, waived, and suppressed findings may remain in a passing result, but a failed, timed-out,
+interrupted, malformed, or incomplete child always blocks.
 
 Evidence manifests, when a pack opts in, are bounded claim summaries inside that pack's isolated
 run root. They are bound to the immutable subject digest; pack/run locality comes from the

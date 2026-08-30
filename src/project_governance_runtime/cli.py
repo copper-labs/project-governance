@@ -27,6 +27,7 @@ from .installation import (
     load_lock,
     update,
 )
+from .kmp_surface_doctor import kmp_surface_doctor_findings
 from .planning import build_plan, public_plan
 from .runner import execute
 from .telemetry import status as telemetry_status
@@ -301,6 +302,7 @@ def _doctor(root: Path) -> dict[str, Any]:
                     f"pack {pack_id} has no command for declared stage(s): "
                     + ", ".join(gaps)
                 )
+        findings.extend(kmp_surface_doctor_findings(root, packs))
     return {
         "status": "failed" if findings else "passed",
         "mode": "source" if source_checkout else "installed",

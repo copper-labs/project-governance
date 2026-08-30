@@ -25,6 +25,7 @@ from project_governance_runtime.changed_paths import (  # noqa: E402
 )
 import project_governance_runtime.changed_paths as changed_paths_module  # noqa: E402
 from project_governance_runtime.execution_flow import execution_environment  # noqa: E402
+from project_governance_runtime.validation_subject import ValidationSubject  # noqa: E402
 from governance_changed_paths import (  # noqa: E402
     analysis_path,
     changed_line_ranges,
@@ -86,6 +87,8 @@ class RuntimeChangedPathTests(unittest.TestCase):
                 before = Path(record["before_path"]).read_text(encoding="utf-8")
                 after = Path(record["after_path"]).read_text(encoding="utf-8")
                 self.assertEqual(record["changed_ranges"], [{"start": 2, "end": 2}])
+                self.assertEqual(record["before_file_type"], "regular")
+                self.assertEqual(record["after_file_type"], "regular")
                 self.assertEqual(before, "first\nsecond\n")
                 self.assertEqual(after, "first\nstaged\n")
                 self.assertNotEqual(after, path.read_text(encoding="utf-8"))
@@ -159,6 +162,20 @@ class RuntimeChangedPathTests(unittest.TestCase):
 
         self.assertNotEqual(first["subject_digest"], second["subject_digest"])
 
+    def test_subject_digest_binds_file_type_as_well_as_bytes(self) -> None:
+        """Distinguish a regular file from a symlink carrying the same payload bytes."""
+        record = {
+            "status": "modified",
+            "path": "sample.py",
+            "previous_path": None,
+            "before": {"identity": "before", "file_type": "regular"},
+            "after": {"identity": "same-bytes", "file_type": "regular"},
+            "changed_ranges": [],
+        }
+        symlink = {**record, "after": {"identity": "same-bytes", "file_type": "symlink"}}
+
+        self.assertNotEqual(subject_digest([record]), subject_digest([symlink]))
+
     def test_all_scope_has_no_content_bound_subject_digest(self) -> None:
         """Keep explicit all mode honest about reading the live checkout."""
         with tempfile.TemporaryDirectory() as directory:
@@ -217,6 +234,22 @@ class RuntimeChangedPathTests(unittest.TestCase):
                     Path(record["after_path"]).read_text(encoding="utf-8"),
                     "first\nplanned\n",
                 )
+
+    def test_subject_view_applies_staged_rename_membership(self) -> None:
+        """Remove the previous path and expose only the packet's renamed after-image."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            initialize(root)
+            run(root, "git", "mv", "sample.py", "moved.py")
+            scope = resolve_change_scope(root, staged=True)
+            with execution_environment(root, {"change_scope": scope}) as environment:
+                with patch.dict(os.environ, environment, clear=True):
+                    subject = ValidationSubject.from_runtime(root)
+                    self.assertIsNone(subject.entry_kind("sample.py"))
+                    self.assertEqual(subject.entry_kind("moved.py"), "regular")
+                    self.assertEqual(
+                        subject.read_bytes("moved.py", limit=100), b"first\nsecond\n"
+                    )
 
     def test_scope_resolution_rejects_index_mutation_between_ranges_and_blob(self) -> None:
         """Do not bind an earlier range snapshot to a later staged blob."""

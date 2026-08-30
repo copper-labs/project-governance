@@ -43,6 +43,16 @@ def subject_digest(records: list[dict[str, Any]]) -> str:
                     if record.get("after") is not None
                     else None
                 ),
+                "before_file_type": (
+                    record.get("before", {}).get("file_type")
+                    if record.get("before") is not None
+                    else None
+                ),
+                "after_file_type": (
+                    record.get("after", {}).get("file_type")
+                    if record.get("after") is not None
+                    else None
+                ),
                 "changed_ranges": record.get("changed_ranges", []),
             }
             for record in records
@@ -190,6 +200,7 @@ def _source(
     reference: str | None = None,
     *,
     identity: str | None = None,
+    file_type: str | None = None,
 ) -> dict[str, str]:
     """Describe bytes and bind them to one identity during plan resolution."""
     value = {"kind": kind, "path": path}
@@ -197,7 +208,57 @@ def _source(
         value["ref"] = reference
     if identity is not None:
         value["identity"] = identity
+    if file_type is not None:
+        value["file_type"] = file_type
     return value
+
+
+def _file_type_from_git_mode(mode: str, object_name: str) -> str:
+    """Classify the ordinary blob modes retained by a Git subject."""
+    if mode in {"100644", "100755"}:
+        return "regular"
+    if mode == "120000":
+        return "symlink"
+    raise ChangedPathError(f"comparison source {object_name!r} is not a regular file or symlink")
+
+
+def _tree_file_type(root: Path, reference: str, path: str) -> str:
+    """Return one exact path's immutable file type from a Git tree."""
+    output = _git_bytes(root, ["ls-tree", "-z", reference, "--", path])
+    records = [value for value in output.split(b"\0") if value]
+    if len(records) != 1 or b"\t" not in records[0]:
+        raise ChangedPathError(f"comparison source {reference}:{path!s} is unavailable")
+    metadata, raw_path = records[0].split(b"\t", 1)
+    if os.fsdecode(raw_path) != path:
+        raise ChangedPathError(f"comparison source {reference}:{path!s} is ambiguous")
+    mode = metadata.split(b" ", 1)[0].decode("ascii", errors="strict")
+    return _file_type_from_git_mode(mode, f"{reference}:{path}")
+
+
+def _index_file_type(root: Path, path: str) -> str:
+    """Return one exact path's file type from the captured staged index."""
+    output = _git_bytes(root, ["ls-files", "--stage", "-z", "--", path])
+    records = [value for value in output.split(b"\0") if value]
+    if len(records) != 1 or b"\t" not in records[0]:
+        raise ChangedPathError(f"comparison source :{path!s} is unavailable")
+    metadata, raw_path = records[0].split(b"\t", 1)
+    if os.fsdecode(raw_path) != path:
+        raise ChangedPathError(f"comparison source :{path!s} is ambiguous")
+    mode = metadata.split(b" ", 1)[0].decode("ascii", errors="strict")
+    return _file_type_from_git_mode(mode, f":{path}")
+
+
+def _worktree_file_type(root: Path, path: str) -> str:
+    """Capture the final component type used by a worktree after-image."""
+    try:
+        mode = (root / path).lstat().st_mode
+    except OSError as error:
+        raise ChangedPathError(f"cannot capture worktree file type for {path!r}") from error
+    if stat.S_ISREG(mode):
+        return "regular"
+    if stat.S_ISLNK(mode):
+        return "symlink"
+    raise ChangedPathError(f"changed worktree input has unsupported file type: {path!r}")
 
 
 def _git_blob_identity(root: Path, object_name: str) -> str:
@@ -301,6 +362,7 @@ def _record_sources(
             before_path,
             base_ref,
             identity=_git_blob_identity(root, before_object),
+            file_type=_tree_file_type(root, base_ref, before_path),
         )
     after = None
     if status != "deleted":
@@ -309,12 +371,14 @@ def _record_sources(
                 "index",
                 path,
                 identity=_git_blob_identity(root, f":{path}"),
+                file_type=_index_file_type(root, path),
             )
         else:
             after = _source(
                 "worktree",
                 path,
                 identity=_worktree_identity(root, path),
+                file_type=_worktree_file_type(root, path),
             )
     return {
         **record,
