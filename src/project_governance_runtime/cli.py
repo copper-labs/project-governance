@@ -55,6 +55,10 @@ def _selection_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--pack", action="append", default=[])
 
 
+class InvocationError(ConfigurationError):
+    """Separate invalid CLI combinations from failures resolving a validation scope."""
+
+
 def _parser() -> argparse.ArgumentParser:
     """Build the lean public CLI without legacy aliases."""
     parser = argparse.ArgumentParser(prog="project-governance")
@@ -125,37 +129,37 @@ def _validate_selection_arguments(
 
     timeout_seconds = getattr(args, "timeout_seconds", None)
     if getattr(args, "expected_status", None) and args.trigger != "test":
-        raise ConfigurationError("--expected-status requires --trigger test")
+        raise InvocationError("--expected-status requires --trigger test")
     if timeout_seconds is not None and (
         not math.isfinite(timeout_seconds) or timeout_seconds <= 0
     ):
-        raise ConfigurationError("--timeout-seconds must be a finite positive number")
+        raise InvocationError("--timeout-seconds must be a finite positive number")
     _validate_staged_scope(args, base_ref)
     if mode == "all":
         if args.staged or args.changed_path:
-            raise ConfigurationError(
+            raise InvocationError(
                 "--mode all cannot be combined with staged or changed-path scope"
             )
         if base_ref:
-            raise ConfigurationError("--mode all cannot be combined with --base-ref")
+            raise InvocationError("--mode all cannot be combined with --base-ref")
         if not args.stage:
-            raise ConfigurationError("--mode all requires --stage")
+            raise InvocationError("--mode all requires --stage")
     pr_body_file = getattr(args, "pr_body_file", None)
     pr_title = getattr(args, "pr_title", None)
     if bool(pr_body_file) != bool(pr_title):
-        raise ConfigurationError("--pr-body-file and --pr-title must be supplied together")
+        raise InvocationError("--pr-body-file and --pr-title must be supplied together")
     if not args.stage and not explicit and mode != "all":
-        raise ConfigurationError("impacted mode requires --stage")
+        raise InvocationError("impacted mode requires --stage")
 
 
 def _validate_staged_scope(args: argparse.Namespace, base_ref: str | None) -> None:
     """Keep staged selection bound to the pre-commit index subject."""
     if args.staged and args.changed_path:
-        raise ConfigurationError("--staged cannot be combined with --changed-path")
+        raise InvocationError("--staged cannot be combined with --changed-path")
     if args.staged and base_ref:
-        raise ConfigurationError("--staged cannot be combined with --base-ref")
+        raise InvocationError("--staged cannot be combined with --base-ref")
     if args.staged and args.stage != "pre-commit":
-        raise ConfigurationError("--staged requires --stage pre-commit")
+        raise InvocationError("--staged requires --stage pre-commit")
 
 
 def _empty_change_scope(args: argparse.Namespace, mode: str) -> dict[str, Any]:
@@ -499,6 +503,8 @@ def _run_check_or_plan(args: argparse.Namespace, root: Path) -> int:
     }
     try:
         plan, packs = _resolve_plan(args, root)
+    except InvocationError:
+        raise
     except (ChangedPathError, ConfigurationError, OSError, ValueError) as error:
         if args.command == "check":
             context["planning_duration_ms"] = round((monotonic() - started) * 1000, 3)

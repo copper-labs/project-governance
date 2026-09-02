@@ -237,6 +237,8 @@ the caller-declared trigger (`manual`, `hook`, or `test`), an optional test-only
 a total blocking-finding count, bounded counts of observed failure kinds, and at most ten failed pack IDs. Failure kinds distinguish
 reported check findings, timeouts, cancellation, invalid output, execution errors, packet or
 manifest integrity errors, configuration errors, selection blockers, and runtime exceptions.
+Counts represent failed commands and separate invalid-manifest observations; one pack can
+contribute multiple observations. Invalid CLI argument combinations are not validation runs.
 A nonzero exit code accompanied by a valid blocking finding is a check rejection, not evidence
 of a crash. Selection blockers are terminal observations even when no pack executes; planning
 duration is separate from execution duration. Argument parsing and process startup are not timed.

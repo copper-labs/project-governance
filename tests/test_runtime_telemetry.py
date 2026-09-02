@@ -25,6 +25,7 @@ from project_governance_runtime.telemetry import (  # noqa: E402
 )
 from project_governance_runtime.execution_commands import normalized_command  # noqa: E402
 from project_governance_runtime.processes import CommandResult  # noqa: E402
+from project_governance_runtime.runner import _failure_counts  # noqa: E402
 
 
 DIGEST_A = "sha256:" + "a" * 64
@@ -104,6 +105,56 @@ class RuntimeTelemetryTests(unittest.TestCase):
                 append(root, {"event": "run-terminal", "run_id": "old", "status": "failed"})
             review(root, "old", "confirmed-issue")
             self.assertEqual(status(root, since="2025-01-01")["validation"]["retained_run_count"], 0)
+
+    def test_telemetry_cli_reviews_and_filters_retained_runs(self) -> None:
+        """Exercise parser dispatch while retaining the failed observed verdict after review."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            append(root, {"event": "run-terminal", "run_id": "rejected", "status": "failed",
+                          "runtime_version": "2.3.0", "stage": "pre-commit", "trigger": "hook"})
+            command = [sys.executable, "-m", "project_governance_runtime.cli", "telemetry"]
+            environment = {**os.environ, "PYTHONPATH": str(ROOT / "src")}
+            for arguments in (
+                ["review", "--run-id", "rejected", "--disposition", "confirmed-issue"],
+                ["status", "--since", "2020-01-01", "--runtime-version", "2.3.0",
+                 "--stage", "pre-commit", "--trigger", "hook"],
+            ):
+                result = subprocess.run(command + arguments, cwd=root, env=environment, text=True, capture_output=True)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            observed = json.loads(result.stdout)["validation"]
+            self.assertEqual(observed["outcome_counts"], {"failed": 1})
+            self.assertEqual(observed["review_disposition_counts"], {"confirmed-issue": 1})
+
+    def test_invalid_cli_arguments_do_not_create_selection_failures(self) -> None:
+        """Keep invocation mistakes outside validation reliability statistics."""
+        with tempfile.TemporaryDirectory() as directory:
+            result = subprocess.run(
+                [sys.executable, "-m", "project_governance_runtime.cli", "check",
+                 "--stage", "pre-push", "--expected-status", "failed"],
+                cwd=directory, env={**os.environ, "PYTHONPATH": str(ROOT / "src")},
+                text=True, capture_output=True,
+            )
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("--expected-status requires --trigger test", result.stdout)
+            self.assertFalse((Path(directory) / ".governance/telemetry/runs.jsonl").exists())
+
+    def test_failure_observations_and_failed_pack_ids_are_bounded(self) -> None:
+        """Retain separate integrity observations while bounding failed pack identities."""
+        failures = _failure_counts([
+            {"status": "failed", "commands": [{"failure_kind": "integrity"}],
+             "invalid_evidence_manifest_count": 1},
+            {"status": "failed", "commands": []},
+        ], "runtime-exception")
+        self.assertEqual(failures, {"integrity": 2, "configuration": 1, "runtime": 1})
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            append(root, {"event": "run-terminal", "run_id": "bounded", "status": "failed",
+                          "failure_counts": failures, "blocking_finding_count": 3,
+                          "failed_pack_ids": [f"pack-{index:02}" for index in range(20)]})
+            observed = status(root)["validation"]
+            self.assertEqual(observed["failure_counts"], failures)
+            self.assertEqual(observed["blocking_finding_count"], 3)
+            self.assertEqual(len(observed["failed_pack_counts"]), MAX_PACK_SUMMARIES)
 
     def test_scope_fingerprint_is_stable_without_exposing_paths(self) -> None:
         first = scope_fingerprint(
