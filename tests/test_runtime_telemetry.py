@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -20,7 +21,11 @@ from project_governance_runtime.telemetry import (  # noqa: E402
     append,
     scope_fingerprint,
     status,
+    review,
 )
+from project_governance_runtime.execution_commands import normalized_command  # noqa: E402
+from project_governance_runtime.processes import CommandResult  # noqa: E402
+from project_governance_runtime.runner import _failure_counts  # noqa: E402
 
 
 DIGEST_A = "sha256:" + "a" * 64
@@ -29,6 +34,127 @@ FINGERPRINT_A = "sha256:" + "1" * 64
 
 class RuntimeTelemetryTests(unittest.TestCase):
     """Keep advisory measurements useful without retaining governed content."""
+
+    def test_failure_classification_preserves_exit_one_findings(self) -> None:
+        """Separate ordinary rejection, broken output, and execution failure by observed facts."""
+        finding = {"rule_id": "sample.rule", "severity": "blocking", "message": "private"}
+        cases = (
+            (1, json.dumps({"status": "failed", "findings": [finding]}), "completed", "check"),
+            (1, json.dumps({"status": "passed", "findings": []}), "completed", "execution"),
+            (0, "invalid JSON", "completed", "invalid-output"),
+            (124, "", "timeout", "timeout"),
+            (130, "", "cancelled", "cancelled"),
+        )
+        for code, output, termination, kind in cases:
+            with self.subTest(kind=kind):
+                command, outcome = normalized_command(CommandResult([], code, output, "", termination), [])
+                self.assertEqual(outcome, "failed")
+                self.assertEqual(command["failure_kind"], kind)
+
+    def test_cli_records_selection_failure_and_test_expectation_without_approving_it(self) -> None:
+        """Include blocked planning in telemetry while preserving the failing command exit."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            environment = {**os.environ, "PYTHONPATH": str(ROOT / "src")}
+            command = [
+                sys.executable, "-m", "project_governance_runtime.cli", "check",
+                "--stage", "pre-push", "--trigger", "test", "--expected-status", "blocked",
+            ]
+            result = subprocess.run(command, cwd=root, env=environment, text=True, capture_output=True)
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            records = [json.loads(line) for line in (root / ".governance/telemetry/runs.jsonl").read_text().splitlines()]
+            self.assertEqual(len(records), 2)
+            self.assertEqual(records[-1]["failure_counts"], {"selection": 1})
+            self.assertEqual(records[-1]["trigger"], "test")
+            self.assertIn("planning_duration_ms", records[-1])
+            self.assertEqual(status(root)["validation"]["nonterminal_run_count"], 0)
+            self.assertEqual(status(root)["validation"]["expectation_counts"], {"matched": 1})
+
+    def test_filters_test_expectations_and_review_leave_outcomes_intact(self) -> None:
+        """Join explicit review labels to retained runs without laundering real failures."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for run_id, version, trigger in (("old", "2.1.0", "hook"), ("negative", "2.3.0", "test")):
+                append(root, {
+                    "event": "run-terminal", "run_id": run_id, "runtime_version": version,
+                    "stage": "pre-commit", "trigger": trigger, "expected_status": "failed",
+                    "status": "failed", "failure_counts": {"check": 1, "private text": 5},
+                    "failed_pack_ids": ["format"], "planning_duration_ms": 12,
+                })
+            review(root, "negative", "false-positive")
+            selected = status(root, runtime_version="2.3.0", trigger="test", since="2020-01-01")
+            actual = selected["validation"]
+            self.assertEqual(actual["retained_run_count"], 1)
+            self.assertEqual(actual["outcome_counts"], {"failed": 1})
+            self.assertEqual(actual["expectation_counts"], {"matched": 1})
+            self.assertEqual(actual["review_disposition_counts"], {"false-positive": 1})
+            self.assertEqual(actual["failure_counts"], {"check": 1})
+            self.assertEqual(actual["planning_duration_ms"], 12)
+            self.assertEqual(status(root, trigger="hook")["validation"]["expectation_counts"], {"unspecified": 1})
+            with self.assertRaises(ValueError):
+                review(root, "missing", "confirmed-issue")
+            with self.assertRaises(ValueError):
+                status(root, since="2026-09-02T12:00:00")
+            self.assertNotIn("private text", (root / ".governance/telemetry/runs.jsonl").read_text())
+
+    def test_review_does_not_change_run_selection_time(self) -> None:
+        """Keep an old reviewed run outside a later measurement window."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with patch("project_governance_runtime.telemetry._now", return_value="2020-01-01T00:00:00Z"):
+                append(root, {"event": "run-terminal", "run_id": "old", "status": "failed"})
+            review(root, "old", "confirmed-issue")
+            self.assertEqual(status(root, since="2025-01-01")["validation"]["retained_run_count"], 0)
+
+    def test_telemetry_cli_reviews_and_filters_retained_runs(self) -> None:
+        """Exercise parser dispatch while retaining the failed observed verdict after review."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            append(root, {"event": "run-terminal", "run_id": "rejected", "status": "failed",
+                          "runtime_version": "2.3.0", "stage": "pre-commit", "trigger": "hook"})
+            command = [sys.executable, "-m", "project_governance_runtime.cli", "telemetry"]
+            environment = {**os.environ, "PYTHONPATH": str(ROOT / "src")}
+            for arguments in (
+                ["review", "--run-id", "rejected", "--disposition", "confirmed-issue"],
+                ["status", "--since", "2020-01-01", "--runtime-version", "2.3.0",
+                 "--stage", "pre-commit", "--trigger", "hook"],
+            ):
+                result = subprocess.run(command + arguments, cwd=root, env=environment, text=True, capture_output=True)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            observed = json.loads(result.stdout)["validation"]
+            self.assertEqual(observed["outcome_counts"], {"failed": 1})
+            self.assertEqual(observed["review_disposition_counts"], {"confirmed-issue": 1})
+
+    def test_invalid_cli_arguments_do_not_create_selection_failures(self) -> None:
+        """Keep invocation mistakes outside validation reliability statistics."""
+        with tempfile.TemporaryDirectory() as directory:
+            result = subprocess.run(
+                [sys.executable, "-m", "project_governance_runtime.cli", "check",
+                 "--stage", "pre-push", "--expected-status", "failed"],
+                cwd=directory, env={**os.environ, "PYTHONPATH": str(ROOT / "src")},
+                text=True, capture_output=True,
+            )
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("--expected-status requires --trigger test", result.stdout)
+            self.assertFalse((Path(directory) / ".governance/telemetry/runs.jsonl").exists())
+
+    def test_failure_observations_and_failed_pack_ids_are_bounded(self) -> None:
+        """Retain separate integrity observations while bounding failed pack identities."""
+        failures = _failure_counts([
+            {"status": "failed", "commands": [{"failure_kind": "integrity"}],
+             "invalid_evidence_manifest_count": 1},
+            {"status": "failed", "commands": []},
+        ], "runtime-exception")
+        self.assertEqual(failures, {"integrity": 2, "configuration": 1, "runtime": 1})
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            append(root, {"event": "run-terminal", "run_id": "bounded", "status": "failed",
+                          "failure_counts": failures, "blocking_finding_count": 3,
+                          "failed_pack_ids": [f"pack-{index:02}" for index in range(20)]})
+            observed = status(root)["validation"]
+            self.assertEqual(observed["failure_counts"], failures)
+            self.assertEqual(observed["blocking_finding_count"], 3)
+            self.assertEqual(len(observed["failed_pack_counts"]), MAX_PACK_SUMMARIES)
 
     def test_scope_fingerprint_is_stable_without_exposing_paths(self) -> None:
         first = scope_fingerprint(
@@ -96,7 +222,7 @@ class RuntimeTelemetryTests(unittest.TestCase):
             )
             records = [json.loads(line) for line in text.splitlines()]
 
-        self.assertEqual(records[0]["schema_version"], 2)
+        self.assertEqual(records[0]["schema_version"], 3)
         self.assertEqual(records[0]["selected_pack_count"], 12)
         self.assertEqual(len(records[1]["packs"]), MAX_PACK_SUMMARIES)
         self.assertEqual(records[1]["packs"][0], {"id": "pack-14", "duration_ms": 14})

@@ -196,6 +196,23 @@ Use `project-governance telemetry status` for routine efficiency inspection. The
 JSONL retains at most 1,000 records and one mebibyte. It contains validation lifecycle aggregates
 only; it is diagnostic and never authorizes a pass or policy change.
 
+Compare equivalent work with `project-governance telemetry status --runtime-version <version>
+--since <YYYY-MM-DD> --stage pre-commit`. Dates use UTC; timestamps require a timezone. Add
+`--trigger hook`, `--trigger manual`, or `--trigger test` to separate invocation contexts. Shipped
+hooks declare their trigger; older launchers require deliberate `init --refresh-launchers` after
+updating the pinned wheel. Historical records without these fields remain unknown.
+
+Test harnesses can run `project-governance check --trigger test --expected-status failed` with their
+ordinary stage and scope arguments. The real exit status remains failed, and the harness must still
+assert its expected result. Failure-kind counts distinguish reported findings from execution and
+selection problems. They do not establish whether a finding is correct.
+
+After investigating a retained run, record the conclusion with `project-governance telemetry review
+--run-id <id> --disposition false-positive`. Other dispositions are `confirmed-issue`, `mixed`, and
+`unreviewed`. This annotation affects reporting only and expires with the bounded local stream.
+Planning and execution durations are reported separately; shell startup and external builds are
+outside these measurements.
+
 Use `--summary` on `plan` or `check` when a person or agent needs the outcome rather than a full
 machine receipt. Shipped hooks use this projection. Active failures remain visible, while changed
 path inventories, command lines, stdout, and stderr stay in the full default or `--json-output`

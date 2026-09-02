@@ -2,4 +2,4 @@
 set -eu
 root="$(git rev-parse --show-toplevel)"
 cd "$root"
-exec tools/run-source-governance.sh check --summary --stage commit-msg --mode impacted --commit-message-file "$1"
+exec tools/run-source-governance.sh check --trigger hook --summary --stage commit-msg --mode impacted --commit-message-file "$1"

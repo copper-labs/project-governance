@@ -60,6 +60,11 @@ previous lifecycle. This change detects drift in runtime-owned launchers and pro
 refresh path while preserving project-owned customizations.
 ```
 
+Validate the prepared commit message before attempting the commit:
+`project-governance check --pack commit-message --stage commit-msg --commit-message-file <path>`.
+Then let `git commit --file <path>` run the staged hook once. Prepare and check the PR narrative
+before the final push so narrative repair does not force another source-validation cycle.
+
 ## Pull Request Shape
 
 Use one compact outcome as the pull request title. Do not repeat it in an Outcome section. Use the

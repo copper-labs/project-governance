@@ -33,7 +33,15 @@ Use this skill before creating or amending a commit, or when a commit-message ho
 
 ## Validation
 
-Run the commit-message validation pack or hook when available.
+Prepare the message file before the expensive staged gate. Run the cheap narrative preflight:
+
+```sh
+project-governance check --pack commit-message --stage commit-msg --commit-message-file <path>
+```
+
+Then use `git commit --file <path>` so the hook is the one staged governance gate. Do not run a
+manual pre-commit gate immediately before the same hook on unchanged inputs. If message validation
+fails, repair the message before retrying the commit.
 
 ## Evidence
 

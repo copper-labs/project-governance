@@ -161,6 +161,7 @@ def normalized_command(result: CommandResult, argv: list[str]) -> tuple[dict[str
             "message": f"checker declared unknown envelope status {declared_status!r}",
         })
     summary = finding_summary(findings)
+    reported_blocking = summary["finding_counts"]["blocking"] > 0
     if process_failed or declared_status == "failed" or not declared_status_valid:
         status = "failed"
     elif summary["status"] == "failed":
@@ -193,8 +194,29 @@ def normalized_command(result: CommandResult, argv: list[str]) -> tuple[dict[str
         "finding_counts": summary["finding_counts"],
         "process_failure": process_failed,
         "integrity_failure": integrity_failure,
+        "failure_kind": _failure_kind(
+            result, status, structured is not None and declared_status_valid and not invalid_finding_state,
+            reported_blocking,
+        ),
         "findings": findings,
     }, status
+
+
+def _failure_kind(
+    result: CommandResult, status: str, valid_output: bool, blocking_findings: bool
+) -> str | None:
+    """Classify observed failures without treating an ordinary exit-one finding as a crash."""
+    if status != "failed":
+        return None
+    if result.termination_reason in {"timeout", "cancelled"}:
+        return result.termination_reason
+    if result.termination_reason != "completed":
+        return "execution"
+    if not valid_output:
+        return "invalid-output"
+    if result.exit_code < 0:
+        return "execution"
+    return "check" if blocking_findings else "execution"
 
 
 def structured_output(stdout: str) -> dict[str, Any] | None:

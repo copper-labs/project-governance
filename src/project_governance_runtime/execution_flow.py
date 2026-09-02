@@ -488,6 +488,7 @@ def _packet_integrity_command(argv: list[str], message: str) -> dict[str, Any]:
         },
         "process_failure": False,
         "integrity_failure": True,
+        "failure_kind": "integrity",
         "findings": [finding],
     }
 
@@ -504,3 +505,4 @@ def _add_packet_integrity_failure(command: dict[str, Any], message: str) -> None
     command["finding_count"] += 1
     command["finding_counts"]["blocking"] += 1
     command["integrity_failure"] = True
+    command["failure_kind"] = "integrity"

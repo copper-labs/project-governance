@@ -2,4 +2,4 @@
 set -eu
 root="$(git rev-parse --show-toplevel)"
 cd "$root"
-exec tools/run-source-governance.sh check --summary --stage pre-push --mode impacted
+exec tools/run-source-governance.sh check --trigger hook --summary --stage pre-push --mode impacted

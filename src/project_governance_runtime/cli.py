@@ -6,6 +6,7 @@ import argparse
 import json
 import math
 import sys
+from time import monotonic
 from pathlib import Path
 from typing import Any
 
@@ -29,8 +30,11 @@ from .installation import (
 )
 from .kmp_surface_doctor import kmp_surface_doctor_findings
 from .planning import build_plan, public_plan
-from .runner import execute
-from .telemetry import status as telemetry_status
+from .runner import execute, record_selection_failure
+from .telemetry import (
+    DISPOSITIONS, EXPECTED_STATUSES, TRIGGERS,
+    review as telemetry_review, status as telemetry_status,
+)
 
 
 MAX_SUMMARY_MESSAGE_LENGTH = 1000
@@ -51,6 +55,10 @@ def _selection_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--pack", action="append", default=[])
 
 
+class InvocationError(ConfigurationError):
+    """Separate invalid CLI combinations from failures resolving a validation scope."""
+
+
 def _parser() -> argparse.ArgumentParser:
     """Build the lean public CLI without legacy aliases."""
     parser = argparse.ArgumentParser(prog="project-governance")
@@ -68,6 +76,8 @@ def _parser() -> argparse.ArgumentParser:
     check.add_argument("--commit-message-file", type=Path)
     check.add_argument("--pr-body-file", type=Path)
     check.add_argument("--pr-title")
+    check.add_argument("--trigger", choices=sorted(TRIGGERS), default="manual")
+    check.add_argument("--expected-status", choices=sorted(EXPECTED_STATUSES))
     plan = commands.add_parser("plan")
     _selection_arguments(plan)
     plan.add_argument("--json", action="store_true")
@@ -80,7 +90,15 @@ def _parser() -> argparse.ArgumentParser:
     context.add_argument("--json-output", type=Path)
     commands.add_parser("doctor")
     telemetry = commands.add_parser("telemetry")
-    telemetry.add_argument("telemetry_command", choices=["status"])
+    telemetry_commands = telemetry.add_subparsers(dest="telemetry_command", required=True)
+    telemetry_status_parser = telemetry_commands.add_parser("status")
+    telemetry_status_parser.add_argument("--since")
+    telemetry_status_parser.add_argument("--runtime-version")
+    telemetry_status_parser.add_argument("--stage")
+    telemetry_status_parser.add_argument("--trigger", choices=sorted(TRIGGERS))
+    telemetry_review_parser = telemetry_commands.add_parser("review")
+    telemetry_review_parser.add_argument("--run-id", required=True)
+    telemetry_review_parser.add_argument("--disposition", choices=sorted(DISPOSITIONS), required=True)
     init = commands.add_parser("init")
     init.add_argument("--refresh-launchers", action="store_true")
     docs = commands.add_parser("docs")
@@ -110,36 +128,38 @@ def _validate_selection_arguments(
     """Reject combinations that would give one run competing scope authorities."""
 
     timeout_seconds = getattr(args, "timeout_seconds", None)
+    if getattr(args, "expected_status", None) and args.trigger != "test":
+        raise InvocationError("--expected-status requires --trigger test")
     if timeout_seconds is not None and (
         not math.isfinite(timeout_seconds) or timeout_seconds <= 0
     ):
-        raise ConfigurationError("--timeout-seconds must be a finite positive number")
+        raise InvocationError("--timeout-seconds must be a finite positive number")
     _validate_staged_scope(args, base_ref)
     if mode == "all":
         if args.staged or args.changed_path:
-            raise ConfigurationError(
+            raise InvocationError(
                 "--mode all cannot be combined with staged or changed-path scope"
             )
         if base_ref:
-            raise ConfigurationError("--mode all cannot be combined with --base-ref")
+            raise InvocationError("--mode all cannot be combined with --base-ref")
         if not args.stage:
-            raise ConfigurationError("--mode all requires --stage")
+            raise InvocationError("--mode all requires --stage")
     pr_body_file = getattr(args, "pr_body_file", None)
     pr_title = getattr(args, "pr_title", None)
     if bool(pr_body_file) != bool(pr_title):
-        raise ConfigurationError("--pr-body-file and --pr-title must be supplied together")
+        raise InvocationError("--pr-body-file and --pr-title must be supplied together")
     if not args.stage and not explicit and mode != "all":
-        raise ConfigurationError("impacted mode requires --stage")
+        raise InvocationError("impacted mode requires --stage")
 
 
 def _validate_staged_scope(args: argparse.Namespace, base_ref: str | None) -> None:
     """Keep staged selection bound to the pre-commit index subject."""
     if args.staged and args.changed_path:
-        raise ConfigurationError("--staged cannot be combined with --changed-path")
+        raise InvocationError("--staged cannot be combined with --changed-path")
     if args.staged and base_ref:
-        raise ConfigurationError("--staged cannot be combined with --base-ref")
+        raise InvocationError("--staged cannot be combined with --base-ref")
     if args.staged and args.stage != "pre-commit":
-        raise ConfigurationError("--staged requires --stage pre-commit")
+        raise InvocationError("--staged requires --stage pre-commit")
 
 
 def _empty_change_scope(args: argparse.Namespace, mode: str) -> dict[str, Any]:
@@ -476,7 +496,23 @@ def _result_exit_code(output: dict[str, Any]) -> int:
 
 def _run_check_or_plan(args: argparse.Namespace, root: Path) -> int:
     """Plan or execute validation without mixing setup and context commands into the branch."""
-    plan, packs = _resolve_plan(args, root)
+    started = monotonic()
+    context = {
+        "trigger": getattr(args, "trigger", "manual"),
+        "expected_status": getattr(args, "expected_status", None),
+    }
+    try:
+        plan, packs = _resolve_plan(args, root)
+    except InvocationError:
+        raise
+    except (ChangedPathError, ConfigurationError, OSError, ValueError) as error:
+        if args.command == "check":
+            context["planning_duration_ms"] = round((monotonic() - started) * 1000, 3)
+            run_id = record_selection_failure(root, stage=args.stage, mode=args.mode, telemetry_context=context)
+            _emit({"status": "failed", "error": str(error), "run_id": run_id})
+            return 1
+        raise
+    context["planning_duration_ms"] = round((monotonic() - started) * 1000, 3)
     output = public_plan(plan)
     if args.command == "check" and plan["status"] != "blocked":
         output = execute(
@@ -489,6 +525,11 @@ def _run_check_or_plan(args: argparse.Namespace, root: Path) -> int:
                 "pr_body_file": str(args.pr_body_file or ""),
                 "pr_title": str(args.pr_title or ""),
             },
+            telemetry_context=context,
+        )
+    elif args.command == "check":
+        output["run_id"] = record_selection_failure(
+            root, stage=args.stage, mode=args.mode, telemetry_context=context
         )
     summary = _result_summary(output) if args.summary else None
     _emit(output, getattr(args, "json_output", None), stdout_value=summary)
@@ -568,7 +609,13 @@ def _run_administration(args: argparse.Namespace, root: Path) -> int:
     if args.command == "doctor":
         output = _doctor(root)
     elif args.command == "telemetry":
-        output = telemetry_status(root)
+        if args.telemetry_command == "review":
+            output = telemetry_review(root, args.run_id, args.disposition)
+        else:
+            output = telemetry_status(
+                root, since=args.since, runtime_version=args.runtime_version,
+                stage=args.stage, trigger=args.trigger,
+            )
     elif args.command == "init":
         if (
             args.refresh_launchers

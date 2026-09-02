@@ -231,11 +231,26 @@ normal pinned-wheel update path.
 Telemetry is one ignored validation JSONL file bounded by both 1,000 records and one mebibyte. Each
 append reads at most the newest one mebibyte, including when stale or externally modified state is
 larger. It records only run identity, runtime version, stage, mode, non-reversible scope and subject
-digests,
-changed-path and selected-pack counts, terminal status and reason, total duration, total pack
-duration, and the ten slowest pack IDs with durations. It never records paths, commands, output,
+digests, changed-path and selected-pack counts, terminal status and reason, total duration, total pack
+duration, planning duration, and the ten slowest pack IDs with durations. Schema 3 also retains
+the caller-declared trigger (`manual`, `hook`, or `test`), an optional test-only expected status,
+a total blocking-finding count, bounded counts of observed failure kinds, and at most ten failed pack IDs. Failure kinds distinguish
+reported check findings, timeouts, cancellation, invalid output, execution errors, packet or
+manifest integrity errors, configuration errors, selection blockers, and runtime exceptions.
+Counts represent failed commands and separate invalid-manifest observations; one pack can
+contribute multiple observations. Invalid CLI argument combinations are not validation runs.
+A nonzero exit code accompanied by a valid blocking finding is a check rejection, not evidence
+of a crash. Selection blockers are terminal observations even when no pack executes; planning
+duration is separate from execution duration. Argument parsing and process startup are not timed.
+It never records paths, commands, output,
 findings, prompts, documentation activity, skill activity, agent activity, or source content.
 Writes are concurrency-safe and fail open; telemetry cannot weaken or approve a check. The single
 `telemetry status` view reports retained bytes, outcomes, durations, runner overhead, modes, broad
-runs, repeated scopes and subjects, unmatched starts, and slow packs. It does not declare a run
-hung or a repeat unnecessary.
+runs, repeated scopes and subjects, unmatched starts, and slow packs. Filters select runtime version,
+stage, trigger, and an ISO date or timezone-aware timestamp. Legacy metadata remains unknown.
+Test expectations are compared with actual outcomes only for reporting; an expected failure still
+fails the command. `telemetry review --run-id <id> --disposition <value>` appends an explicit
+`confirmed-issue`, `false-positive`, `mixed`, or `unreviewed` annotation to the same bounded stream.
+Only retained runs can be annotated, and the latest retained annotation wins. Reviews do not change
+the observed outcome or run timestamp. A passing retry never automatically classifies a prior
+failure. The view does not declare a run hung or a repeat unnecessary.

@@ -29,6 +29,7 @@ from project_governance_runtime.validation_subject import ValidationSubject  # n
 from governance_changed_paths import (  # noqa: E402
     analysis_path,
     changed_line_ranges,
+    changed_path_views,
     changed_path_records as checker_changed_path_records,
 )
 
@@ -60,6 +61,34 @@ def initialize(root: Path) -> str:
 
 class RuntimeChangedPathTests(unittest.TestCase):
     """Keep changed scope immutable, exact, and fail-closed."""
+
+    def test_views_validate_once_and_detect_tampering_on_the_next_call(self) -> None:
+        """Keep multi-file selection linear without reusing stale packet validation."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            initialize(root)
+            for index in range(30):
+                (root / f"new-{index}.md").write_text("bound text\n", encoding="utf-8")
+            run(root, "git", "rm", "sample.py")
+            run(root, "git", "add", ".")
+            scope = resolve_change_scope(root, staged=True)
+            plan = {"stage": "pre-commit", "mode": "impacted", "change_scope": scope}
+            with execution_environment(root, plan) as environment:
+                import governance_changed_paths as reader
+
+                with patch.dict(os.environ, environment, clear=True), patch.object(
+                    reader, "_load_packet", wraps=reader._load_packet
+                ) as loader:
+                    views = changed_path_views("staged")
+                    self.assertEqual(len(views), 30)
+                    self.assertTrue(all(is_new for _, _, is_new in views))
+                    self.assertTrue(all(path.read_text() == "bound text\n" for _, path, _ in views))
+                    loader.assert_called_once()
+                    views[0][1].chmod(0o600)
+                    views[0][1].write_text("tampered\n")
+                    with self.assertRaisesRegex(RuntimeError, "no longer matches"):
+                        changed_path_views("staged")
+                    self.assertEqual(loader.call_count, 2)
 
     def test_staged_packet_materializes_index_content_and_exact_range(self) -> None:
         """Never let an unstaged edit change the bytes selected for pre-commit."""
