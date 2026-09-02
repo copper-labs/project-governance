@@ -47,6 +47,13 @@ replaying code validation. Do not run a separate full local pre-PR gate after th
 pre-push sign-off. CI may run its own affected gate as an independent environment and trust
 boundary.
 
+Prepare the authored commit message before the expensive staged gate. Check that draft through
+`project-governance check --pack commit-message --stage commit-msg --commit-message-file <path>`,
+then let `git commit --file <path>` invoke the one staged gate. This cheap narrative preflight avoids
+replaying source validation merely to fix message structure. Prepare and check the PR narrative
+before the final push for the same reason. Hook-triggered checks declare `--trigger hook`; manual
+diagnosis and explicitly labeled tests remain distinguishable in telemetry.
+
 The adopting repository owns its local-feedback objective and every command or job deadline. The
 runtime records duration but does not infer failure from elapsed time or impose a generic default
 timeout. A target or operator may supply an explicit deadline; expiration fails closed with timeout

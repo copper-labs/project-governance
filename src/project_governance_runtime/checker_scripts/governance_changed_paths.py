@@ -259,9 +259,16 @@ def analysis_path(repository_path: str, mode: str) -> Path:
 
 def changed_path_views(mode: str) -> list[tuple[str, Path, bool]]:
     """Pair each stable repository path with the exact file bytes to analyze."""
+    if mode == "all":
+        return [(path, Path(path), is_new) for path, is_new in _all_records()]
+    packet = _packet(mode)
+    if packet is None:
+        raise RuntimeError("direct checker requires a runtime change packet")
+    # Validate every bound byte once for this call; retain no cache across calls or commands.
     return [
-        (repository_path, analysis_path(repository_path, mode), is_new)
-        for repository_path, is_new in changed_path_records(mode)
+        (record["path"], Path(record["after_path"]), record["status"] in {"added", "renamed"})
+        for record in packet["records"]
+        if record["status"] != "deleted"
     ]
 
 
