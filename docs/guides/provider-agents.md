@@ -2,7 +2,7 @@
 id: guide.provider-agents
 title: Delegate To An Optional Provider Agent
 type: guide
-status: draft
+status: current
 owner: project-governance
 created: 2026-09-06
 updated: 2026-09-06
@@ -13,7 +13,11 @@ summary: Start, observe, and reconcile a native Gemini, Claude, or Codex assignm
 
 Use this guide when an authorized parent agent needs another provider to implement, test, research,
 or review a bounded task. The [owning contract](../specs/provider-agent-skills.md) defines the
-capability and process boundaries. This guide accompanies the implementation candidate.
+capability and process boundaries. These optional helpers are available in the 2.4.0 wheel.
+
+Gemini ships with an operator-authorized validation exception: quota prevented its live capability
+and Gemini-parent routing checks. Those checks remain unverified for 2.4.0. Codex and Claude have
+live capability evidence, including Claude delegating to Codex.
 
 ## Prepare The Host
 

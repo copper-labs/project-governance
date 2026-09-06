@@ -36,11 +36,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set --
+          notes_file=".github/release-notes/$GITHUB_REF_NAME.md"
+          if [ -f "$notes_file" ]; then
+            set -- --notes-file "$notes_file"
+          fi
           gh release create "$GITHUB_REF_NAME" \
             --draft \
             --verify-tag \
             --title "Project Governance $GITHUB_REF_NAME" \
-            --generate-notes
+            --generate-notes "$@"
           gh release upload "$GITHUB_REF_NAME" \
             dist/project_governance_runtime-*.whl \
             dist/runtime.lock.yaml

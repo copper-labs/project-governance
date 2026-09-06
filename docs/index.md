@@ -43,8 +43,8 @@ lock.
 
 ## Reference Areas
 
-The [optional provider agent proposal](specs/provider-agent-skills.md) defines the standalone
-Gemini, Claude, and Codex wrapper release currently being developed. It is not installed behavior.
+The [optional provider agent contract](specs/provider-agent-skills.md) defines the standalone
+Gemini, Claude, and Codex wrappers in 2.4.0, including the scoped Gemini live-validation exception.
 
 - [Governance policies](governance/README.md) cover packs, hooks, context routing, quality, and
   bootstrap rules.

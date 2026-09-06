@@ -27,11 +27,21 @@ deferred. This release adds no role-to-model policy, price table, model ranking,
 
 ## Delivery
 
-- Delivery: secondary-review repairs implemented and independently rechecked; release authorized
-  but held for the remaining live provider and cross-parent proofs and final release gates.
+- Delivery: secondary-review repairs implemented and independently rechecked; publication authorized
+  with the scoped Gemini exception below, subject to the automated release gates and readback.
 - Candidate base: current `main` after the 2.3.0 release.
 - Target: 2.4.0 under the existing semantic release contract for additive capabilities.
 - Existing unrelated checkout work remains outside this candidate.
+
+### Authorized 2.4.0 Exception
+
+On 2026-09-06 the operator explicitly authorized publication with Gemini live validation waived
+and disclosed. A fresh acceptance attempt still failed because of provider quota. Gemini's live
+read/edit/command/web proof and Gemini-parent routing acceptance remain deferred and unverified.
+This exception permits 2.4.0 publication; it does not convert fixture evidence into live proof or
+waive Codex/Claude evidence, independent review, source readiness, or immutable publication checks.
+The authored 2.4.0 release notes carry the same limitation. Complete the deferred checks when
+provider access is available; do not substitute another model silently.
 
 ## Slice 1: Settle The Provider Boundary
 
@@ -124,9 +134,10 @@ deferred. This release adds no role-to-model policy, price table, model ranking,
   Keychain access and expired-session problems were resolved before its successful live tests.
   The Claude parent-to-Codex seam passed with a real child repair and independent test readback.
   Antigravity login is restored, but quota exhaustion still blocks Gemini's live provider and
-  parent-routing acceptance. Those Gemini checks remain release blockers.
+  parent-routing acceptance. Those Gemini checks are deferred under the explicit 2.4.0 exception.
 - Escalate or stop when: required provider authentication or model access is unavailable. Do not
-  release a provider wrapper based solely on fake-provider evidence.
+  release a provider wrapper based solely on fake-provider evidence without an explicit scoped
+  operator exception; the authorized 2.4.0 Gemini exception above applies to this publication.
 
 ## Stable-Candidate Proof And Release
 
@@ -170,7 +181,8 @@ The initial local candidate passed all selected repository checks, the reproduci
 the complete runtime suite: 351 tests with one existing optional TypeScript-compiler test skipped
 because that dependency is unavailable. The Linux provider suite and clean installed-wheel journey
 also pass. These proofs do not replace the outstanding live provider acceptance or certify a
-published release. The plan remains active until those checks and release readback are complete.
+published release. The plan retains the deferred Gemini checks and publication readback as explicit
+follow-up work; publication may proceed under the scoped exception above.
 
 ## Proof Budget
 

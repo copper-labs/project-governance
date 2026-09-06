@@ -18,4 +18,4 @@ summary: Active specifications for the package runtime, KMP surface validation, 
 | [Reader-first technical authoring](technical-authoring-harness.md) | Reader contracts, progressive explanation, grounded procedures, and editorial boundaries |
 | [On-demand developer documentation](developer-documentation-system.md) | Installable documentation structure, one human and agent corpus, exact catalog routing, research handoff, and deterministic validation |
 | [Change narrative](change-narrative-contract.md) | Plain-language product impact, conceptual change, code-area context, and deterministic commit and pull request structure |
-| [Optional provider agent skills](provider-agent-skills.md) (draft) | Shared lifecycle and full native capabilities for optional Gemini, Claude, and Codex delegation |
+| [Optional provider agent skills](provider-agent-skills.md) | Shared lifecycle and full native capabilities for optional Gemini, Claude, and Codex delegation |

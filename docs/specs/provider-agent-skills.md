@@ -2,7 +2,7 @@
 id: spec.provider-agent-skills
 title: Optional Provider Agent Skills
 type: spec
-status: draft
+status: current
 owner: project-governance
 created: 2026-09-06
 updated: 2026-09-06
@@ -17,9 +17,14 @@ A parent agent can delegate an authorized assignment to Gemini, Claude, or Codex
 observe progress, and collect a result. The same commands work from any parent with shell access.
 For example, Claude can start Codex, then wait for its code changes and test evidence.
 
-This contract is a proposed, standalone capability release. Implementation-plan templates,
+This contract defines the standalone 2.4.0 capability release. Implementation-plan templates,
 task-to-model planning, role presets, model rankings, and price comparisons are separate work.
 They are not prerequisites for these wrappers.
+
+For 2.4.0, the operator explicitly waived Gemini live capability and Gemini-parent routing
+acceptance because provider quota prevented execution. Deterministic coverage remains required;
+the waived live checks remain unverified and deferred. Codex/Claude live proof and automated
+release gates are not waived. The release notes disclose this scoped exception.
 
 ## Architecture Decision
 
