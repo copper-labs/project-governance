@@ -46,6 +46,11 @@ def _merged(content):
     return content[:first] + BLOCK + content[last:]
 
 
+def _uses_section(path, content):
+    # Codex skips empty overrides; populating one would hide the authored AGENTS.md.
+    return path.name != "AGENTS.override.md" or bool(content.strip())
+
+
 def install_harness_instructions(root: Path) -> list[str]:
     """Add or refresh only managed pointers while preserving authored host instructions."""
     if (root / "src/project_governance_runtime/cli.py").is_file():
@@ -54,6 +59,8 @@ def install_harness_instructions(root: Path) -> list[str]:
     # Validate every destination before writing; shared in-repository symlinks stay intact.
     for path in _entry_paths(root):
         target, current = _read_entry(root, path)
+        if not _uses_section(path, current):
+            continue
         expected = _merged(current)
         if current != expected:
             changes[target] = expected
@@ -72,7 +79,7 @@ def harness_routing_status(root: Path) -> dict:
         entries.append(relative)
         try:
             _, content = _read_entry(root, path)
-            if content != _merged(content):
+            if _uses_section(path, content) and content != _merged(content):
                 issues.append(f"Missing or outdated harness routing section: {relative}")
         except (OSError, ValueError, RuntimeError) as error:
             issues.append(str(error))

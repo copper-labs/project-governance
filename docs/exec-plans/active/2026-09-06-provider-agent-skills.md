@@ -89,10 +89,11 @@ deferred. This release adds no role-to-model policy, price table, model ranking,
 - Proof state: skill validation and 16 catalog, selection, and payload tests pass. Installation
   tests pass. Clean installed-wheel proof passes, including optional-provider absence, three
   native protocol fixtures, overlapping-job queueing, cancellation, and bootstrap exclusion.
-  Nine additional host-integration tests pass. Independent review closed unsafe runtime-target
+  Ten additional host-integration tests pass. Independent review closed unsafe runtime-target
   symlinks, incomplete route-readiness checks, and permission preservation; a case-insensitive
   macOS alias regression also passes. The installed-wheel journey now checks the harness default
   with a competing command on PATH.
+  Empty Codex overrides remain inactive, preserving the repository's authored AGENTS.md guidance.
   A live Codex parent selected the exact repository-local harness command while the existing
   global Gemini plugin and competing commands were present. It used the host binding, received
   streamed fixture events, and reported the terminal missing-read-evidence blocker honestly.

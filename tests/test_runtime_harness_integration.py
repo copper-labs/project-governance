@@ -65,6 +65,17 @@ class HarnessIntegrationTests(unittest.TestCase):
         self.assertIn(BLOCK, override.read_text())
         self.assertTrue(override.read_text().endswith("Repository override rules\n"))
 
+    def test_empty_override_does_not_hide_the_authored_agent_file(self):
+        """Keep inactive overrides empty so Codex retains its normal instruction source."""
+        override = self.root / "AGENTS.override.md"
+        override.write_text(" \n")
+        (self.root / "AGENTS.md").write_text("Project rules\n")
+        install_harness_instructions(self.root)
+        self.assertEqual(override.read_text(), " \n")
+        self.assertIn("Project rules", (self.root / "AGENTS.md").read_text())
+        issues = harness_routing_status(self.root)["issues"]
+        self.assertFalse(any("AGENTS.override.md" in issue for issue in issues))
+
     @unittest.skipUnless(os.name == "posix", "symlink fixture requires POSIX")
     def test_shared_internal_symlink_keeps_one_instruction_authority(self):
         """Preserve host entry aliases and write their shared target once."""

@@ -70,8 +70,10 @@ by default for cross-model work. The command is `harness-agent`; helper environm
 The existing wheel identity and `.governance/runtime` installation layout remain unchanged.
 
 Initialization and deliberate wheel bootstrap install thin, marked routing sections in root
-`AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`. An existing `AGENTS.override.md` receives the same pointer
-because Codex can load it instead of `AGENTS.md`. One wheel-owned Markdown resource,
+`AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`. An existing nonempty `AGENTS.override.md` receives the same
+pointer because Codex can load it instead of `AGENTS.md`. Empty overrides remain empty, preserving
+Codex's [documented instruction discovery](https://learn.chatgpt.com/docs/agent-configuration/agents-md).
+One wheel-owned Markdown resource,
 `resources/harness-delegation.md`, owns the shared route. This is the adoption default, not a
 separate opt-in or an ambient global-skill precedence assumption.
 
