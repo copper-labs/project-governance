@@ -22,7 +22,8 @@ deferred. This release adds no role-to-model policy, price table, model ranking,
 
 ## Delivery
 
-- Delivery: local work in progress; release authorized by the operator.
+- Delivery: implementation and local candidate proof complete; release authorized but held for
+  the remaining live provider and cross-parent proofs.
 - Candidate base: current `main` after the 2.3.0 release.
 - Target: 2.4.0 under the existing semantic release contract for additive capabilities.
 - Existing unrelated checkout work remains outside this candidate.
@@ -56,10 +57,13 @@ deferred. This release adds no role-to-model policy, price table, model ranking,
   malformed streams, identity drift, incomplete work, cancellation, and worker death fail honestly.
 - Focused proof: deterministic protocol fixtures and detached-process lifecycle tests.
 - Invalidates prior proof when: request, protocol, process ownership, or terminal-result behavior changes.
-- Proof state: 23 focused provider tests pass on macOS and Python 3.9. Independent implementation
+- Proof state: 23 focused provider tests pass on macOS with Python 3.9 and Linux with Python 3.10.
+  Independent implementation
   review found two startup publication races, stale resolved-denial handling, and intermediate
   Gemini session drift. Repairs and regression tests are complete. The independent affected
-  recheck closed all four findings and passed seven relevant regression tests.
+  recheck closed all four findings and passed seven relevant regression tests. A subsequent
+  maintainability refactor separated transport, native message dispatch, validation, and lifecycle
+  responsibilities; focused tests and the independent regression review passed.
 - Escalate or stop when: provider capability or cleanup guarantees cannot be demonstrated.
 
 ## Slice 3: Installable Skills And Operator Journey
@@ -75,8 +79,8 @@ deferred. This release adds no role-to-model policy, price table, model ranking,
 - Focused proof: skill payload, context selection/materialization, and installed-wheel seam.
 - Invalidates prior proof when: packaging, discovery, entry point, or configuration precedence changes.
 - Proof state: skill validation and 16 catalog, selection, and payload tests pass. Installation
-  tests pass. The installed-wheel proof now includes optional-provider absence, three native
-  protocol fixtures, overlapping-job queueing, cancellation, and bootstrap exclusion.
+  tests pass. Clean installed-wheel proof passes, including optional-provider absence, three
+  native protocol fixtures, overlapping-job queueing, cancellation, and bootstrap exclusion.
 - Escalate or stop when: installation requires a provider account or changes core configuration validity.
 
 ## Slice 4: Live Proof And Independent QA
@@ -107,6 +111,12 @@ The release boundary includes the complete runtime suite, reproducible wheel bou
 installed-wheel proof, and Linux/macOS process evidence. Follow the
 [release process](../../governance/release-process.md) for merge, immutable tag publication, and
 wheel/lock/hash readback. A changed integration base forms a new candidate.
+
+The local candidate passes all selected repository checks, the reproducible wheel boundary, and
+the complete runtime suite: 342 tests with one existing optional TypeScript-compiler test skipped
+because that dependency is unavailable. The Linux provider suite and clean installed-wheel journey
+also pass. These proofs do not replace the outstanding live provider acceptance or certify a
+published release. The plan remains active until those checks and release readback are complete.
 
 ## Proof Budget
 
