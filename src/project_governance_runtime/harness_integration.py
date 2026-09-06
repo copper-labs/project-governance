@@ -57,10 +57,13 @@ def install_harness_instructions(root: Path) -> list[str]:
         return []
     changes = {}
     # Validate every destination before writing; shared in-repository symlinks stay intact.
-    for path in _entry_paths(root):
-        target, current = _read_entry(root, path)
+    entries = [(path, *_read_entry(root, path)) for path in _entry_paths(root)]
+    inactive = {target for path, target, current in entries if not _uses_section(path, current)}
+    for path, target, current in entries:
         if not _uses_section(path, current):
             continue
+        if target.exists() and any(target.samefile(override) for override in inactive):
+            raise ValueError(f"Harness entry would activate an empty override: {path.name}")
         expected = _merged(current)
         if current != expected:
             changes[target] = expected

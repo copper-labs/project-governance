@@ -23,7 +23,7 @@ requiring any provider. The helper supports macOS and Linux; native Windows is n
 this release. Other governance commands retain their existing platform support.
 
 Adoption defaults cross-model work to these harness skills. Initialization and bootstrap add a
-small managed routing section to `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, and an existing
+small managed routing section to `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, and an existing nonempty
 `AGENTS.override.md`. Authored instructions outside that section are preserved. No system wrapper
 is removed. Start a fresh parent session after setup and inspect `project-governance doctor` for
 the `harness_delegation` route and any missing integration. Explicit operator route choices still

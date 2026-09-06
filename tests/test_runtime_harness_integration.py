@@ -77,6 +77,26 @@ class HarnessIntegrationTests(unittest.TestCase):
         self.assertFalse(any("AGENTS.override.md" in issue for issue in issues))
 
     @unittest.skipUnless(os.name == "posix", "symlink fixture requires POSIX")
+    def test_shared_entry_cannot_activate_an_empty_override_indirectly(self):
+        """Reject aliases that would populate an inactive override through another host entry."""
+        override = self.root / "AGENTS.override.md"
+        override.write_text("")
+        (self.root / "AGENTS.md").write_text("Project rules\n")
+        (self.root / "CLAUDE.md").symlink_to(override)
+        with self.assertRaisesRegex(ValueError, "activate an empty override"):
+            install_harness_instructions(self.root)
+        self.assertEqual(override.read_text(), "")
+        self.assertEqual((self.root / "AGENTS.md").read_text(), "Project rules\n")
+        self.assertFalse((self.root / "GEMINI.md").exists())
+        case_alias = self.root / "AGENTS.OVERRIDE.md"
+        if case_alias.exists():
+            (self.root / "CLAUDE.md").unlink()
+            (self.root / "CLAUDE.md").symlink_to(case_alias)
+            with self.assertRaisesRegex(ValueError, "activate an empty override"):
+                install_harness_instructions(self.root)
+            self.assertEqual(override.read_text(), "")
+
+    @unittest.skipUnless(os.name == "posix", "symlink fixture requires POSIX")
     def test_shared_internal_symlink_keeps_one_instruction_authority(self):
         """Preserve host entry aliases and write their shared target once."""
         (self.root / "AGENTS.md").write_text("Project rules\n")
