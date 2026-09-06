@@ -21,6 +21,9 @@ Git remains the implementation history and recovery mechanism.
 
 ## Completed
 
+- [Automatic governance updates at top-level task startup](completed/2026-09-06-top-level-startup-updates.md)
+  implements compatible updates with contextual worktree assessment and isolated local commits.
+
 - [Lean Governance Operating Model](completed/2026-08-27-lean-governance-operating-model.md)
   removed the runtime control plane, bounded workspace and telemetry overhead, and aligned hooks
   with one affected local sign-off plus one narrow pull-request narrative check.

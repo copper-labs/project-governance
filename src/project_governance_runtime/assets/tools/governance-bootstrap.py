@@ -13,6 +13,7 @@ import subprocess
 import sys
 import tempfile
 import urllib.request
+import uuid
 import venv
 from pathlib import Path
 from urllib.parse import quote, unquote
@@ -76,7 +77,7 @@ def read_remote(location: str) -> bytes:
         return response.read()
 
 
-def install_locked() -> int:
+def install_locked(destination: Path = RUNTIME_ROOT, *, isolated: bool = False) -> int:
     """Download, verify, and install only the wheel named by the target lock."""
     lock = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
     wheel_name = str(lock["wheel"])
@@ -95,8 +96,13 @@ def install_locked() -> int:
         actual = hashlib.sha256(wheel.read_bytes()).hexdigest()
         if actual != lock["sha256"]:
             raise SystemExit("Locked governance wheel SHA256 does not match the downloaded bytes.")
-        venv.EnvBuilder(with_pip=True, clear=True).create(RUNTIME_ROOT)
-        python = RUNTIME_ROOT / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
+        # Resolve the base executable before activation; nested macOS venvs can otherwise
+        # link back through the stable runtime pointer and become circular after its switch.
+        base_python = str(Path(sys._base_executable).resolve())
+        created = subprocess.run([base_python, "-m", "venv", "--clear", str(destination)], check=False)
+        if created.returncode:
+            return created.returncode
+        python = destination / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
         result = subprocess.run(
             [str(python), "-m", "pip", "install", str(wheel)],
             cwd=ROOT,
@@ -109,7 +115,8 @@ def install_locked() -> int:
             [
                 str(python),
                 "-c",
-                "from pathlib import Path; from project_governance_runtime.installation import materialize_skills; materialize_skills(Path.cwd())",
+                ("from pathlib import Path; import sys; from project_governance_runtime.installation import materialize_skills; "
+                 + ("materialize_skills(Path.cwd(), destination=Path(sys.prefix)/'skills', refresh_instructions=False)" if isolated else "materialize_skills(Path.cwd())")),
             ],
             cwd=ROOT,
             check=False,
@@ -140,10 +147,54 @@ def environment_replacement_lock():
         os.close(descriptor)
 
 
+def recover_enable(journal: Path) -> int:
+    """Restore the original directory when initial activation stopped before its pointer existed."""
+    if journal.is_symlink():
+        raise SystemExit("Unsafe startup enable journal.")
+    value = json.loads(journal.read_text())
+    previous = Path(value["previous"])
+    generations = ROOT / ".governance/runtimes"
+    if generations.is_symlink() or previous.parent != generations or previous.is_symlink():
+        raise SystemExit("Unsafe startup enable recovery path.")
+    if hashlib.sha256(LOCK_PATH.read_bytes()).hexdigest() != value["lock_digest"]:
+        raise SystemExit("Runtime lock changed during enablement; inspect it before recovery.")
+    if RUNTIME_ROOT.is_symlink():
+        raise SystemExit("Runtime pointer exists; use project-governance startup recover.")
+    if RUNTIME_ROOT.exists() or not previous.is_dir():
+        raise SystemExit("Use project-governance startup recover while the original runtime exists.")
+    previous.rename(RUNTIME_ROOT)
+    journal.unlink()
+    print("Restored the previous runtime. Review and retry startup enable.")
+    return 0
+
+
+def replace_generation() -> int:
+    """Keep the installed generation usable until deliberate replacement has succeeded."""
+    generations = ROOT / ".governance/runtimes"
+    if generations.is_symlink() or RUNTIME_ROOT.resolve().parent != generations:
+        raise SystemExit("Unsafe runtime generation pointer.")
+    destination = generations / ("manual-" + uuid.uuid4().hex)
+    status = install_locked(destination, isolated=True)
+    if status:
+        return status
+    temporary = RUNTIME_ROOT.parent / (".runtime-" + uuid.uuid4().hex)
+    temporary.symlink_to(destination.relative_to(RUNTIME_ROOT.parent), target_is_directory=True)
+    os.replace(temporary, RUNTIME_ROOT)
+    return 0
+
+
 def main() -> int:
     """Protect the installed environment for the complete replacement transaction."""
+    state = ROOT / ".governance/startup"
+    if state.is_symlink() or RUNTIME_ROOT.parent.is_symlink():
+        raise SystemExit("Governance state must remain repository-local.")
     with environment_replacement_lock():
-        return install_locked()
+        journal = state / "enable.json"
+        if sys.argv[1:] == ["--recover-startup-enable"]:
+            return recover_enable(journal)
+        if journal.exists() or (state / "transaction.json").exists():
+            raise SystemExit("Recover the interrupted startup operation before bootstrap.")
+        return replace_generation() if RUNTIME_ROOT.is_symlink() else install_locked()
 
 
 if __name__ == "__main__":

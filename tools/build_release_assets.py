@@ -50,6 +50,28 @@ def release_lock(wheel: Path, tag: str, source_commit: str) -> dict[str, object]
     }
 
 
+def compatibility(lock_raw: bytes, policy: dict) -> dict:
+    """Bind reviewed release compatibility to the exact published lock bytes."""
+    lock = json.loads(lock_raw)
+    required = {"automatic", "from_version", "before_version", "startup_contract", "integration_change"}
+    if set(policy) != required or type(policy["automatic"]) is not bool or type(policy["integration_change"]) is not bool:
+        raise ValueError("release update policy has unsupported fields")
+    if policy["startup_contract"] != 1:
+        raise ValueError("release startup contract is unsupported")
+    versions = [semantic_version(policy[key]) for key in ("from_version", "before_version")]
+    if not all(versions):
+        raise ValueError("release compatibility requires stable source boundaries")
+    lower, upper = (tuple(map(int, item.split("."))) for item in versions)
+    target = tuple(map(int, lock["version"].split(".")))
+    if not lower <= target < upper or lower[0] != target[0]:
+        raise ValueError("release compatibility range does not cover its target")
+    if policy["automatic"] and policy["integration_change"]:
+        raise ValueError("integration changes cannot authorize automatic adoption")
+    return {"schema_version": 1, "version": lock["version"],
+            "lock_sha256": hashlib.sha256(lock_raw).hexdigest(),
+            "configuration_schema": lock["configuration_schema"], **policy}
+
+
 def git_revision(root: Path) -> str:
     """Return the full source identity for the release lock."""
     result = subprocess.run(
@@ -81,6 +103,8 @@ def main() -> int:
         json.dumps(lock, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    update = compatibility(arguments.output.read_bytes(), json.loads((root / ".github/runtime-update-policy.json").read_text()))
+    arguments.output.with_name("runtime-update.json").write_text(json.dumps(update, indent=2, sort_keys=True) + "\n")
     print(json.dumps(lock, indent=2, sort_keys=True))
     return 0
 

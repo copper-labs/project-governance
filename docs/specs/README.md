@@ -19,3 +19,5 @@ summary: Active specifications for the package runtime, KMP surface validation, 
 | [On-demand developer documentation](developer-documentation-system.md) | Installable documentation structure, one human and agent corpus, exact catalog routing, research handoff, and deterministic validation |
 | [Change narrative](change-narrative-contract.md) | Plain-language product impact, conceptual change, code-area context, and deterministic commit and pull request structure |
 | [Optional provider agent skills](provider-agent-skills.md) | Shared lifecycle and full native capabilities for optional Gemini, Claude, and Codex delegation |
+
+- [Top-level startup updates](startup-runtime-updates.md) defines opt-in compatibility and runtime ownership.

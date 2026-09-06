@@ -35,13 +35,16 @@ def normalize(task, workspace, *, provider, model=None, effort=None, executable=
     ancestry = enclosing_jobs if enclosing_jobs is not None else json.loads(os.environ.get("HARNESS_AGENT_ANCESTRY", "[]"))
     if not isinstance(ancestry, list) or len(ancestry) > 32:
         raise AgentError("invalid enclosing job ancestry")
+    from .runtime import binding as runtime_binding
+
+    pinned_runtime = runtime_binding(directory(workspace))
     selected = binding(provider, model, effort, executable, config)
     return dict(protocol_version=PROTOCOL_VERSION, **selected, task=task, workspace=directory(workspace),
                 context=context, role=role, constraints=constraints, access=access,
                 additional_roots=sorted(set(directory(r) for r in roots)), required_tools=required,
                 timeout_seconds=duration(timeout_seconds), idle_timeout_seconds=duration(idle_timeout_seconds),
                 idempotency_key=idempotency_key, conversation_id=conversation_id, parent_job_id=parent_job_id,
-                enclosing_jobs=ancestry, runner_digest=code_digest())
+                enclosing_jobs=ancestry, runner_digest=code_digest(), runtime_binding=pinned_runtime)
 
 
 def _validate_text(task, context, role, constraints):
@@ -130,6 +133,8 @@ def start(task, workspace, *, store=None, environment_fd=None, **options):
     """Create or deduplicate a job, then release its worker after durable publication."""
     store = store or Store()
     request = normalize(task, workspace, **options)
+    if request.get("runtime_binding") and environment_fd is None:
+        raise AgentError("Startup-managed jobs require the guarded installed harness-agent entry")
     fingerprint = hashlib.sha256(json.dumps({k: v for k, v in request.items() if k != "idempotency_key"}, sort_keys=True).encode()).hexdigest()
     with store.lock():
         prior = _deduplicate(store, request, fingerprint)
@@ -257,6 +262,9 @@ def follow_up(job_id, task, *, store=None, environment_fd=None, timeout_seconds=
     if current["state"] not in TERMINAL or not current.get("conversation_id"):
         raise AgentError("follow-up needs a terminal job with an exact provider session")
     prior = validate_record(read_json(store.job(job_id) / "request.json"))
+    from .runtime import validate
+
+    validate(prior)
     keys = ("provider", "model", "effort", "role", "constraints", "additional_roots", "access", "required_tools", "idle_timeout_seconds")
     return start(task, prior["workspace"], store=store, environment_fd=environment_fd,
                  **{key: prior[key] for key in keys}, executable=prior["backend"],

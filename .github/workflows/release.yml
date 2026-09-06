@@ -48,5 +48,6 @@ jobs:
             --generate-notes "$@"
           gh release upload "$GITHUB_REF_NAME" \
             dist/project_governance_runtime-*.whl \
-            dist/runtime.lock.yaml
+            dist/runtime.lock.yaml \
+            dist/runtime-update.json
           gh release edit "$GITHUB_REF_NAME" --draft=false

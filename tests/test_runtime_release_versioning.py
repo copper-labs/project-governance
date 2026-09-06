@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import subprocess
+import json
+import hashlib
 import sys
 import tempfile
 import unittest
@@ -16,7 +18,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
-from build_release_assets import release_lock  # noqa: E402
+from build_release_assets import compatibility, release_lock  # noqa: E402
 from release_version import development_version, git_version, semantic_version  # noqa: E402
 
 
@@ -88,6 +90,16 @@ class RuntimeReleaseVersioningTests(unittest.TestCase):
         self.assertEqual(lock["wheel"], wheel.name)
         self.assertEqual(lock["configuration_schema"], 2)
         self.assertNotIn("required_target_migrations", lock)
+
+    def test_startup_compatibility_binds_exact_lock_and_rejects_integration_approval(self):
+        """Release policy cannot silently authorize a migration or an unrelated source range."""
+        raw = json.dumps({"version": "2.5.0", "configuration_schema": 2}).encode()
+        policy = {"automatic": True, "from_version": "2.5.0", "before_version": "3.0.0",
+                  "startup_contract": 1, "integration_change": False}
+        self.assertEqual(compatibility(raw, policy)["lock_sha256"], hashlib.sha256(raw).hexdigest())
+        for change in ({"integration_change": True}, {"from_version": "3.0.0"}, {"startup_contract": 2}):
+            with self.assertRaises(ValueError):
+                compatibility(raw, {**policy, **change})
 
     def test_source_readiness_runs_once_at_candidate_boundaries(self) -> None:
         """Avoid complete release proof on every repair push and again after merge."""

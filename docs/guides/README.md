@@ -16,3 +16,5 @@ summary: Task-oriented guides for the package-based runtime.
 - [Pack and extension authoring](module-authoring.md): target-owned validation extensions.
 - [Optional provider agents](provider-agents.md): delegate to Gemini, Claude, or Codex and follow
   native tool activity from any shell-capable parent.
+
+- [Compatible startup updates](startup-runtime-updates.md) covers one-time opt-in and recovery.

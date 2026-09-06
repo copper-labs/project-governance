@@ -160,6 +160,9 @@ class Worker:
         self.heartbeat(force=True)
 
     def _execute(self):
+        from .runtime import validate
+
+        validate(self.request)
         self.before = snapshot(self.request["workspace"])
         version = subprocess.run([self.request["backend"], "--version"], capture_output=True, text=True, timeout=10)
         if version.returncode:
@@ -174,6 +177,10 @@ class Worker:
         env = dict(os.environ)
         ancestry = [*self.request["enclosing_jobs"], {"state_root": str(self.store.root), "job_id": self.path.name}]
         env["HARNESS_AGENT_ANCESTRY"] = json.dumps(ancestry)
+        pin = self.request.get("runtime_binding")
+        if pin:
+            env["GOVERNANCE_PARENT_TASK"] = self.path.name
+            env["GOVERNANCE_PARENT_LOCK_DIGEST"] = pin["lock_digest"]
         gate_read, gate_write = os.pipe()
         try:
             self.proc = subprocess.Popen([

@@ -13,9 +13,11 @@ def main():
     import fcntl
 
     # Repository bootstrap clears this venv, but never its parent directory.
-    prefix = Path(sys.prefix).resolve()
-    if prefix.name == "runtime" and prefix.parent.name == ".governance":
-        lock_path = prefix.parent / "runtime-use.lock"
+    from ..runtime_access import installation_root
+
+    root = installation_root()
+    if root is not None:
+        lock_path = root / ".governance/runtime-use.lock"
     else:
         # External Python installations are managed by their operator, not bootstrap.
         lock_path = Path.home() / ".local/share/harness-agents/runtime-use.lock"
@@ -26,6 +28,12 @@ def main():
             fcntl.flock(fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
         except BlockingIOError:
             print("Governance environment is being replaced; retry after bootstrap finishes.", file=sys.stderr)
+            return 1
+        if root is not None and Path(sys.prefix).resolve() != (root / ".governance/runtime").resolve():
+            print("Provider process loaded a previous runtime; restart it.", file=sys.stderr)
+            return 1
+        if root is not None and (root / ".governance/startup/transaction.json").exists():
+            print("Governance update requires recovery before provider work.", file=sys.stderr)
             return 1
         from .cli import main as run
 

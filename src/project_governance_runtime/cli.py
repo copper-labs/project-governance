@@ -116,6 +116,9 @@ def _parser() -> argparse.ArgumentParser:
     action = upgrade.add_mutually_exclusive_group(required=True)
     action.add_argument("--dry-run", action="store_true")
     action.add_argument("--apply", action="store_true")
+    from .startup import add_arguments
+
+    add_arguments(commands.add_parser("startup"))
     return parser
 
 
@@ -324,7 +327,9 @@ def _doctor(root: Path) -> dict[str, Any]:
                     + ", ".join(gaps)
                 )
         findings.extend(kmp_surface_doctor_findings(root, packs))
+    startup_health = _startup_health(root, source_checkout, findings)
     return {
+        "startup_updates": startup_health,
         "status": "failed" if findings else "passed",
         "mode": "source" if source_checkout else "installed",
         "runtime_version": __version__,
@@ -335,6 +340,15 @@ def _doctor(root: Path) -> dict[str, Any]:
         "launcher_drift": integration_drift,
         "harness_delegation": harness_routing_status(root) if not source_checkout else {"status": "source-checkout"},
     }
+
+
+def _startup_health(root: Path, source: bool, findings: list) -> dict:
+    from .startup import health
+
+    status = health(root) if not source else {"status": "source-checkout"}
+    if status["status"] in {"invalid", "recovery-required"}:
+        findings.append("startup update state needs attention: " + status["status"])
+    return status
 
 
 def _emit(
@@ -638,6 +652,16 @@ def main() -> int:
     args = _parser().parse_args()
     root = _root()
     try:
+        if args.command == "startup":
+            from .startup import dispatch
+            from .startup_state import StartupError
+
+            try:
+                output = dispatch(args, root)
+            except StartupError as error:
+                output = {"status": error.status, "reason": str(error)}
+            _emit(output)
+            return 1 if output.get("status") == "recovery-required" else 0
         if args.command in {"check", "plan"}:
             return _run_check_or_plan(args, root)
         if args.command == "context":
@@ -659,4 +683,6 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    from .runtime_entry import main as installed_main
+
+    raise SystemExit(installed_main())
