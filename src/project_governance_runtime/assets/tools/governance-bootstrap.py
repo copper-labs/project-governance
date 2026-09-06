@@ -96,7 +96,12 @@ def install_locked(destination: Path = RUNTIME_ROOT, *, isolated: bool = False) 
         actual = hashlib.sha256(wheel.read_bytes()).hexdigest()
         if actual != lock["sha256"]:
             raise SystemExit("Locked governance wheel SHA256 does not match the downloaded bytes.")
-        venv.EnvBuilder(with_pip=True, clear=True).create(destination)
+        # Resolve the base executable before activation; nested macOS venvs can otherwise
+        # link back through the stable runtime pointer and become circular after its switch.
+        base_python = str(Path(sys._base_executable).resolve())
+        created = subprocess.run([base_python, "-m", "venv", "--clear", str(destination)], check=False)
+        if created.returncode:
+            return created.returncode
         python = destination / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
         result = subprocess.run(
             [str(python), "-m", "pip", "install", str(wheel)],

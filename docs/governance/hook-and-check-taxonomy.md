@@ -11,7 +11,7 @@ summary: Defines thin hooks, their package CLI stages, and the narrative inputs 
 
 # Hook And Check Taxonomy
 
-Hooks are thin launchers. They do not download, upgrade, or contain governance logic. Bootstrap
+Git hooks are thin launchers. They do not download, upgrade, or contain governance logic. Bootstrap
 installs the exact wheel named by the runtime lock; an unavailable runtime produces one actionable
 bootstrap message.
 
@@ -52,3 +52,9 @@ Git invokes pre-commit again when a commit is retried and pre-push again when a 
 That automatic invocation is the affected recheck for the repaired candidate. Do not run the same
 stage manually immediately before the Git operation. Use a named pack first only when focused
 diagnosis needs faster or narrower feedback.
+
+Native task lifecycle hooks are a separate opt-in boundary under the
+[startup update contract](../specs/startup-runtime-updates.md). They report a candidate to the parent,
+which assesses the task before asking the runtime to apply it. The native adapter contains no
+release-selection policy. Commit hooks invoked by an updater can join its validation transaction;
+they never initiate another update.

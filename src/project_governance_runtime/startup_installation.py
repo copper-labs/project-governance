@@ -128,7 +128,7 @@ def prepare(root: Path, candidate: dict, settings: dict) -> Path:
             identity = Parser().parsestr(archive.read(names[0]).decode())
         if identity["Name"] != lock["package"] or identity["Version"] != lock["version"]:
             raise StartupError("Candidate wheel identity does not match its lock")
-        _run([sys.executable, "-m", "venv", str(destination)], root, deadline)
+        _run([str(Path(sys._base_executable).resolve()), "-m", "venv", str(destination)], root, deadline)
         python = str(destination / "bin/python")
         _run([python, "-m", "pip", "install", "--disable-pip-version-check", str(wheel)], root, deadline)
         _run([python, "-c", "from pathlib import Path; import sys; from project_governance_runtime.installation import materialize_skills; materialize_skills(Path.cwd(), destination=Path(sys.prefix)/'skills', refresh_instructions=False)"], root, deadline)

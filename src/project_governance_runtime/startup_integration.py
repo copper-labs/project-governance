@@ -124,7 +124,7 @@ def enable(root: Path, provider: str) -> dict:
             program = script.split('if __name__ == "__main__":')[0]
             program += "\nraise SystemExit(install_locked(Path(" + repr(str(destination)) + "), isolated=True))\n"
             program = program.replace('ROOT = Path(__file__).resolve().parents[1]', 'ROOT = Path(' + repr(str(root)) + ')')
-            _run([sys.executable, "-c", program], root, time.monotonic() + settings["install_seconds"])
+            _run([str(Path(sys._base_executable).resolve()), "-c", program], root, time.monotonic() + settings["install_seconds"])
         else:
             active_environment(root)
         for path, content in changes.items():

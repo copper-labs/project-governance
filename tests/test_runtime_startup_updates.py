@@ -360,6 +360,17 @@ class StartupAdditionalSafetyTests(unittest.TestCase):
                 with self.assertRaises(AgentError):
                     binding(str(f.root))
 
+    def test_nested_worker_cannot_discard_its_inherited_runtime(self):
+        from project_governance_runtime.provider_agents.config import AgentError
+        from project_governance_runtime.provider_agents.runtime import binding
+        with tempfile.TemporaryDirectory() as directory:
+            f = Adopter(Path(directory).resolve())
+            with patch("project_governance_runtime.provider_agents.runtime.installation_root", return_value=f.root), patch.dict(os.environ, {"GOVERNANCE_PARENT_TASK": "parent", "GOVERNANCE_PARENT_LOCK_DIGEST": "d" * 64}):
+                with self.assertRaises(AgentError):
+                    binding(str(f.root))
+                with self.assertRaises(AgentError):
+                    binding("/tmp")
+
     def test_mutated_native_hook_config_is_rejected_without_overwrite(self):
         from project_governance_runtime.startup_integration import hook_config
         with tempfile.TemporaryDirectory() as directory:
