@@ -45,8 +45,9 @@ tools/run-source-governance.sh check --summary --stage pre-commit --mode impacte
 
 ## Validation
 
-- Change one owning component, run its focused test, then run one directly affected integration
-  seam.
+- Plan coherent implementation batches and their test checkpoints using the
+  [validation strategy](docs/governance/validation-strategy.md). Run focused checks during work;
+  consolidate QA, documentation, and integrated proof at the declared batch boundary.
 - Run broad proof only for a wheel release, configuration-schema migration, hook or selection
   contract change, security/process-isolation boundary, scheduled reconciliation, or explicit
   operator request.

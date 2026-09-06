@@ -5,7 +5,7 @@ type: governance
 status: current
 owner: project-governance
 created: 2026-07-05
-updated: 2026-08-21
+updated: 2026-09-06
 summary: Defines focused, impact-aware validation for the package runtime and its adopters.
 ---
 
@@ -16,10 +16,41 @@ because they exist.
 
 ## Normal Change Loop
 
-1. Change one owning component.
-2. Run its focused unit or behavior test.
-3. Run one directly affected integration seam only when the change crosses that seam.
-4. Commit the coherent result.
+1. Plan a bounded implementation batch that delivers an observable behavior or outcome.
+2. Run focused checks at the planned development checkpoints.
+3. Complete the batch, then perform its integrated proof and applicable independent QA.
+4. Consolidate documentation and status, then commit the coherent result.
+
+The planning agent owns the default batch size and test cadence. A batch can span shared code and
+its affected host bindings when they implement one settled contract. Define its acceptance claims,
+focused test checkpoints, expensive build point, review boundary, and reasons to split early.
+Choose boundaries by dependency, uncertainty, risk, and reviewability; a file, helper, passing test,
+or local recovery commit is not automatically a new QA or documentation boundary.
+
+Size each batch to make meaningful progress without multiplying setup and review overhead or
+making failures hard to isolate. Combine tightly related steps that share context and proof; split
+unrelated outcomes or uncertainty that needs earlier feedback. Fixed file, line, or time quotas
+are not a substitute for this judgment.
+
+The writer completes the authorized batch without seeking approval for each internal step. Adjust
+the planned checks when a failure, changed dependency, or newly discovered risk provides a concrete
+reason. Escalate unresolved contracts or authority changes before dependent work; batching does not
+defer necessary feedback or expand the approved scope. When delegation is used, coordinate on
+completed batches, blockers, or material changes instead of repeatedly interrupting active work.
+
+Group shared changes before expensive native or cross-platform rebuilds. Build earlier when a
+compiler, ABI, host, or integration uncertainty needs resolving. Automated integration proof belongs
+at the planned checkpoints; attended user testing belongs at the agreed acceptance milestone.
+
+Capture command results as they occur in existing logs. Update plan checkboxes, status narratives,
+evidence summaries, and explanatory documentation once at the batch boundary. Update a governing
+contract or decision earlier when dependent work needs it, and keep documentation required for a
+commit or delivery current. Report completed milestones and concrete blockers rather than inferred
+completion percentages.
+
+Reuse passing evidence only while its claim and relevant inputs remain valid, including source,
+dependencies, configuration, toolchain, binary, environment, and expiry. An unchanged test file is
+not enough. The build system owns reuse; this policy does not add a cache or waive required gates.
 
 For a failed governance check, use the named pack at the same lifecycle stage and subject only when
 focused diagnosis needs it:
@@ -61,8 +92,10 @@ evidence. When recurring local proof materially impairs the target's workflow, i
 whether product builds, platform, device, or external-service execution belongs in CI or a
 scheduled lane while preserving the required proof.
 
-Freeze one candidate before a broad or cross-platform proof. An independent QA pass consumes that
-candidate and its existing proof; it does not replay the matrix. It adds one focused check only for
+Freeze the completed batch before broad or cross-platform proof and perform one applicable
+independent QA review at that boundary. An earlier review needs a named risk or unresolved decision.
+An independent QA pass consumes that candidate and its existing proof; it does not replay the matrix.
+It adds one focused check only for
 a named changed seam with no evidence. One QA repair permits one affected deterministic recheck. If
 that recheck fails, return to focused diagnosis or the operator instead of starting another general
 QA, verifier, or broad-proof cycle.
@@ -167,3 +200,9 @@ native-host launches outside the runtime, so missing telemetry is never evidence
 Run deterministic builds through a target pack or the governed harness when one exists. If a
 necessary command has no governed execution surface, report that coverage gap with the evidence
 instead of silently treating runtime telemetry as complete.
+
+At batch closeout, use existing logs or host/provider summaries to note available timings, review
+rounds, rebuilds, and token usage only when useful for improving the next batch. Keep this in the
+existing evidence summary; do not add per-step bookkeeping, new collectors, or a reporting gate.
+Leave unavailable values unknown and compare cost with accepted outcomes and defects. Summed run
+durations are not elapsed delivery time, and repeated calls alone do not establish wasted work.

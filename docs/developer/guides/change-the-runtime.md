@@ -5,15 +5,15 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-08-21
-updated: 2026-08-21
+updated: 2026-09-06
 summary: Guides a source contributor from authority and ownership through focused proof and one final affected sign-off.
 ---
 
 # Change The Runtime Safely
 
 Use this journey when you need to change the Project Governance source repository itself. You will
-finish with one coherent owner change, its focused proof, one directly affected seam, and one final
-branch-aware sign-off.
+finish with one coherent implementation batch, its focused and affected integration proof, and one
+final branch-aware sign-off.
 
 ## Establish Authority And Ownership
 
@@ -21,7 +21,7 @@ Read `AGENTS.md`, [Documentation Index](../../index.md), and the smallest curren
 plan that owns the behavior. Markdown owns active governance decisions. Current Python source and
 tests own installed behavior. Git history preserves removed implementation.
 
-Locate one implementation owner before editing. The public CLI is in
+Locate the implementation owners before editing. The public CLI is in
 `src/project_governance_runtime/cli.py`; initialization and updates are in `installation.py`;
 selection is in `planning.py`; execution is in `runner.py`; built-in checker entry points are under
 `checker_scripts/`; installed generic guidance is under `assets/skills/`. The exact source proof and
@@ -31,7 +31,7 @@ release boundary is owned by the
 Do not add adopter identities, paths, product evidence, copied runtime code, compatibility shims, or
 a second policy authority to solve a source problem.
 
-## Change And Prove One Owner
+## Change And Prove The Batch
 
 Install source-development dependencies once:
 
@@ -39,9 +39,11 @@ Install source-development dependencies once:
 python3 -m pip install -r requirements-dev.txt
 ```
 
-Make the smallest cohesive change. Run its focused unit or behavior test, then one directly affected
-integration seam if the behavior crosses a boundary. For example, a CLI command that records
-telemetry needs its command test and telemetry redaction/status test; it does not need every checker
+Follow the plan's focused test checkpoints and integration boundary. A narrow owner repair normally
+needs its focused unit or behavior test and one directly affected integration seam. A batch may
+include several related owners without requiring separate QA and documentation cycles for each.
+For example, a CLI command that records telemetry needs its command test and telemetry
+redaction/status test; it does not need every checker
 test during the repair loop.
 
 The source checkout command always imports this checkout rather than an older installed wheel:
@@ -55,7 +57,8 @@ failed focused check into a broad replay.
 
 ## Finish The Candidate
 
-When focused proof passes, freeze the candidate and run one affected source sign-off:
+When the batch and its focused proof are complete, consolidate documentation, freeze the candidate,
+and run one affected source sign-off:
 
 ```sh
 tools/run-source-governance.sh check --summary --stage pre-push --mode impacted

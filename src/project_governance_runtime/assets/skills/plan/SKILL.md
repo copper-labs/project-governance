@@ -7,7 +7,7 @@ provenance: package-default
 
 # Plan
 
-Turn framed work into an executable governed slice.
+Turn framed work into coherent implementation batches with planned test and review boundaries.
 
 ## Trigger
 
@@ -30,14 +30,22 @@ multiple files, or requires validation and review evidence.
 2. Discover Apple dependency surfaces before proposing dependency work. Default to SwiftPM. If the
    plan would add, expand, or remove CocoaPods, alert the operator now and stop that slice until a
    specific compatibility or availability reason is approved and recorded.
-3. Break the work into independently useful slices using the canonical template. Mark exact
-   dependencies and use `Execution: parallel with <slice IDs>` only for non-overlapping ownership.
+3. Define bounded, reviewable batches around observable outcomes using the canonical template.
+   Make each batch substantial enough to avoid repeated setup and review, and small enough to
+   understand and diagnose confidently. Combine tightly related steps; split unrelated outcomes or
+   uncertainty that needs earlier feedback. Do not size batches by fixed file, line, or time quotas.
+   Group shared behavior and affected bindings when they implement one settled contract. Mark exact
+   dependencies and use `Execution: parallel with <batch IDs>` only for non-overlapping ownership.
+   Split early for unresolved contracts, material risk, or work too large to review coherently.
 4. Declare a `Proof Budget`: claims to prove, cheapest sufficient evidence, normally one complete
-   proof cycle, expected duration or cost, invalidation rules, equivalent-repeat reason policy, and
-   an explicit stop condition.
+   proof cycle, expected duration or cost, invalidation rules, and an explicit stop condition.
+   Set focused development checkpoints, expensive build points, one applicable QA review per batch,
+   and the attended acceptance milestone. The writer may adjust checks for new evidence or risk.
 5. Map changed areas to validation packs, review skills, rollback, and evidence. Treat checks that
    prove the same claim on the same digest-bound subject as substitutes, not additive ceremonies.
-6. Record open questions only when they block safe execution.
+6. Consolidate plan/status and explanatory documentation at batch closeout. Update governing
+   contracts earlier when dependent work needs them. Record open questions only when they block
+   safe execution; internal steps do not each require approval, QA, or a documentation update.
 7. Keep the plan in the correct lifecycle location and link every active plan from
    `docs/exec-plans/README.md`.
 
@@ -47,6 +55,6 @@ Run docs-governance for durable plans. Run impact planning dry-run when changed 
 
 ## Evidence
 
-Report the plan path or no-plan rationale, dependency order, slice ownership and sequencing,
+Report the plan path or no-plan rationale, dependency order, batch ownership and sequencing,
 delivery state when known, validation packs, proof budget and stop condition, review skills,
 rollback, and unresolved blockers.
