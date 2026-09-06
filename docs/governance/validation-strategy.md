@@ -136,8 +136,8 @@ The completed V1.1 evidence-integrity plan's focused proof establishes:
 - an optional evidence manifest is bounded, binds the immutable subject, rejects ambiguous input,
   and never resolves an artifact path or reads artifact content; no checkpoint or cross-pack
   composition behavior exists; and
-- wheel inspection rejects concrete adopter/product identities and explicit model-invocation
-  instructions without banning generic documentation vocabulary.
+- wheel inspection rejects concrete adopter/product identities and model invocation in governance
+  checks; optional provider support has a separate, explicit import and execution boundary.
 
 ## Broad Proof
 
@@ -145,8 +145,10 @@ Run the complete suite only for a runtime release, a configuration-schema migrat
 selection-contract change, a security/process-isolation boundary, scheduled reconciliation, or an
 explicit operator request.
 
-Delegation behavior belongs to the host agent. Runtime validation proves only repository checks,
-process ownership, explicit deadlines, and the bounded local telemetry it actually owns.
+Delegation decisions belong to the host agent. Runtime validation proves repository checks,
+process ownership, explicit deadlines, and bounded local telemetry. The optional provider helper
+also needs deterministic native-protocol fixtures, process cleanup proof, and live provider tool
+evidence. It never turns a model's review into a governance-check verdict.
 
 ## Evidence
 

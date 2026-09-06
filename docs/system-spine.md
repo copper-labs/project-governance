@@ -35,9 +35,10 @@ For substantial agent work, the coordinator may run the public context command. 
 route selects and materializes the smallest exact skill set. The runtime does not require a
 per-skill utilization receipt or retain task content.
 
-Optional delegation uses the host's native agent controls. The primary remains responsible for
-planning and integration, all roles share the current checkout by default, and delegation never
-authorizes another worktree.
+Optional delegation uses the host's native controls or the separately invoked
+[provider-agent skills](specs/provider-agent-skills.md). The primary owns planning and integration.
+Delegation itself does not authorize extra workspaces. The helper supervises submitted native
+provider jobs; it does not select models or add model calls to governance checks.
 
 The runner resolves changed scope once, supplies every selected pack the same immutable before/after
 packet, and gives each pack a run-scoped evidence directory. An unmapped path produces one selector

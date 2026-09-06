@@ -26,6 +26,33 @@ canonical_roots:
   pattern_packs: .governance/runtime/skills/pattern-packs
 
 standard_skills:
+  - id: gemini-agent
+    category: provider
+    path: .governance/runtime/skills/gemini-agent/SKILL.md
+    description: Delegate an authorized task to native Gemini with full tools and observable progress.
+    activation:
+      mode: governed
+      default_level: recommended
+    applicability:
+      task_terms: [use gemini, gemini agent, gemini-agent]
+  - id: claude-agent
+    category: provider
+    path: .governance/runtime/skills/claude-agent/SKILL.md
+    description: Delegate an authorized task to native Claude Code with full tools and observable progress.
+    activation:
+      mode: governed
+      default_level: recommended
+    applicability:
+      task_terms: [use claude, claude agent, claude-agent]
+  - id: codex-agent
+    category: provider
+    path: .governance/runtime/skills/codex-agent/SKILL.md
+    description: Delegate an authorized task to native Codex from Claude or another parent with shell access.
+    activation:
+      mode: governed
+      default_level: recommended
+    applicability:
+      task_terms: [use codex, codex agent, codex-agent]
   - id: frame
     category: loop
     path: .governance/runtime/skills/frame/SKILL.md
@@ -145,6 +172,9 @@ pattern_packs:
     description: Deep workflow and review skills for discovery, risk, implementation quality, CI, docs, and delivery.
 
 resources:
+  - id: provider-agent-operation
+    path: .governance/runtime/skills/resources/provider-agent-operation.md
+    description: Shared native-provider job lifecycle, capability boundary, invocation, and recovery guidance.
   - id: loop-cycle
     path: .governance/runtime/skills/resources/loop-cycle.yaml
     description: Frame to Plan to Work to Review to Capture dry-run stage map.

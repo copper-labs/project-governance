@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 import hashlib
 import json
 import os
@@ -75,7 +76,7 @@ def read_remote(location: str) -> bytes:
         return response.read()
 
 
-def main() -> int:
+def install_locked() -> int:
     """Download, verify, and install only the wheel named by the target lock."""
     lock = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
     wheel_name = str(lock["wheel"])
@@ -117,6 +118,32 @@ def main() -> int:
             return result.returncode
     print(f"Installed project-governance-runtime {lock['version']}.")
     return 0
+
+
+@contextmanager
+def environment_replacement_lock():
+    """Refuse replacement while an optional process still uses this environment."""
+    if os.name != "posix":
+        yield
+        return
+    import fcntl
+
+    RUNTIME_ROOT.parent.mkdir(parents=True, exist_ok=True)
+    descriptor = os.open(RUNTIME_ROOT.parent / "runtime-use.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    try:
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            raise SystemExit("Governance environment is in use. Finish or cancel active provider jobs before bootstrap.") from error
+        yield
+    finally:
+        os.close(descriptor)
+
+
+def main() -> int:
+    """Protect the installed environment for the complete replacement transaction."""
+    with environment_replacement_lock():
+        return install_locked()
 
 
 if __name__ == "__main__":

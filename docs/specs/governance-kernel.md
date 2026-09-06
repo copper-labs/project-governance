@@ -57,8 +57,10 @@ half the configured total context allowance; a required skill outside that bound
 Target files and skills are read only through their remaining byte allowance. The runtime retains
 at most eight ignored packets, rebuilds a corrupted cache entry, and removes interrupted staging
 under one blocking local materialization lock rather than imposing an elapsed-time policy.
-Delegation remains a host-agent concern: the wheel owns no launch state, provider catalog, writer
-lease, role receipt, retry loop, or per-skill closeout workflow.
+Delegation decisions remain a host-agent concern. The governance kernel owns no launch state,
+provider catalog, role receipt, retry loop, or per-skill closeout workflow. The separately invoked
+[optional provider helper](provider-agent-skills.md) owns the lifecycle of jobs explicitly submitted
+to it. Checks, routing, and core doctor never import that helper or invoke a provider.
 
 Stages remain command boundaries, not selectable profiles:
 

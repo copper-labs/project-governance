@@ -1,0 +1,107 @@
+---
+id: guide.provider-agents
+title: Delegate To An Optional Provider Agent
+type: guide
+status: draft
+owner: project-governance
+created: 2026-09-06
+updated: 2026-09-06
+summary: Start, observe, and reconcile a native Gemini, Claude, or Codex assignment from any shell-capable parent.
+---
+
+# Delegate To An Optional Provider Agent
+
+Use this guide when an authorized parent agent needs another provider to implement, test, research,
+or review a bounded task. The [owning contract](../specs/provider-agent-skills.md) defines the
+capability and process boundaries. This guide accompanies the implementation candidate.
+
+## Prepare The Host
+
+Install the governance wheel through the repository's normal pinned bootstrap. It supplies
+`project-governance-agent` and the `gemini-agent`, `claude-agent`, and `codex-agent` skills without
+requiring any provider. The helper supports macOS and Linux; native Windows is not supported in
+this release. Other governance commands retain their existing platform support.
+
+Install and authenticate only the provider you intend to use:
+
+| Provider | Existing native login | Native integration |
+| --- | --- | --- |
+| Gemini | Start `agy` interactively; verify with `agy models` | Antigravity CLI |
+| Claude | `claude auth login`; verify with `claude auth status --json` | Claude Code print mode |
+| Codex | `codex login` | Local stdio app server |
+
+Provider tools, skills, hooks, MCP servers, and credentials remain in their native installations.
+The wrapper does not install accounts or copy secrets. A parent-only desktop tool is not
+automatically available to another provider. Name required access in the assignment and reconcile
+the provider's advertised and observed capabilities.
+
+## Run One Assignment
+
+Resolve the repository root. Set `agent` to its absolute
+`.governance/runtime/bin/project-governance-agent` path, `workspace` to the authorized absolute
+workspace, and `task_file` to a file describing the task and constraints. Select `model` and
+`effort` from the provider's current available values.
+
+```sh
+"$agent" doctor --provider codex
+"$agent" start --provider codex --workspace "$workspace" \
+  --model "$model" --effort "$effort" --task-file "$task_file"
+```
+
+The first command checks the executable and version without a billable call. It does not certify
+authentication or every tool. The second returns a durable job ID. All provider roles retain full
+native tool capabilities; scope remains the parent's assignment. This is trusted local execution,
+so the parent must actually have authority to grant that access.
+
+A Claude parent can run the exact command above to delegate to Codex. It does not need a Codex
+desktop task, a new MCP server, or a second wrapper implementation. If the parent itself is a
+wrapped job, overlapping child ownership fails immediately; use a separate authorized workspace
+or return control to the parent.
+
+## Observe And Reconcile
+
+Use the returned ID and carry forward each returned cursor:
+
+```sh
+"$agent" wait "$job_id" --after 0 --seconds 30
+"$agent" events "$job_id" --after "$cursor"
+"$agent" result "$job_id"
+```
+
+Wait returns on new events, completion, or its time limit. A text or tool event records provider
+activity. A heartbeat reports that the supervisor is alive and how long it has been since provider
+activity. `run` accepts the same launch options and streams JSON through the terminal result when
+the caller prefers foreground execution.
+
+Check the final state, remaining work, observed model, artifacts, tool evidence, and cleanup.
+Model-reported checks are separate from observed tool operations. Requested effort is not presented
+as observed when a provider omits that field. Missing required tools, denied operations, malformed
+completion, or remaining work prevent success. The parent still verifies the actual changes.
+
+## Configure Or Recover
+
+Pass `--config` with a host-owned or ignored personal JSON file containing `version: 1` and a
+`providers` object. A provider entry accepts `model`, `effort`, and `executable`; command arguments
+take precedence. No model, effort floor, role policy, or task-to-model assignment ships as a default.
+Future model changes are ordinary host configuration changes, not new wheel releases, unless the
+native protocol itself changes.
+
+`--timeout` and `--idle-timeout` are caller-owned deadlines and default to disabled. Native Gemini
+uses a recorded maximum print ceiling when the overall deadline is disabled, because native zero
+means immediate expiry. Add `--require-tool` for each category or exact tool that must be exercised.
+
+```sh
+"$agent" follow-up "$job_id" --task-file "$next_task_file"
+"$agent" cancel "$job_id"
+"$agent" status "$job_id"
+```
+
+Follow-up resumes the exact completed session. Cancellation preserves partial work; confirm its
+terminal result before reusing the workspace. A provider request for fresh human input produces
+a blocker and cleanup rather than an indefinite wait. Resolve the missing input, then follow up
+with an explicit task when the provider session remains available.
+
+Evidence lives outside the installed wheel in a private user data directory. Set
+`PROJECT_GOVERNANCE_AGENT_STATE` to select another private location. The original task is retained;
+keep credentials out of it. Finish or cancel queued and running jobs before upgrading. Bootstrap
+refuses to replace an environment still used by workers or their cleanup guardians.

@@ -14,3 +14,5 @@ summary: Task-oriented guides for the package-based runtime.
 - [Operator guide](user-guide.md): install, routine checks, and deliberate upgrades.
 - [Agent setup](agent-setup-instructions.md): source and adopter reading paths and boundaries.
 - [Pack and extension authoring](module-authoring.md): target-owned validation extensions.
+- [Optional provider agents](provider-agents.md): delegate to Gemini, Claude, or Codex and follow
+  native tool activity from any shell-capable parent.
