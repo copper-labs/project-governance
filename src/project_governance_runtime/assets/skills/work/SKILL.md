@@ -7,7 +7,7 @@ provenance: package-default
 
 # Work
 
-Execute the approved slice with narrow edits and early validation.
+Complete the approved implementation batch with focused checks at the planned checkpoints.
 
 ## Trigger
 
@@ -33,15 +33,21 @@ after the work has been framed and scoped.
    request.
 3. Follow the plan's proof budget and stop condition. Reuse checks that prove the same claim on the
    same digest-bound subject; record a reason before deliberately repeating an equivalent passed
-   gate.
+   gate. Confirm relevant dependencies, configuration, toolchain, binary, environment, and expiry
+   remain valid; an unchanged test file alone does not establish reusable evidence.
 4. If a clean integration snapshot advances, rebaseline immediately, discard stale integration
    mechanics, and retain only subject-valid evidence.
-5. Make the smallest coherent edits that advance the approved final state.
+5. Complete the agreed batch without helper-by-helper approval or review handoffs. Adjust test
+   checkpoints for a concrete failure or new risk; escalate unresolved contracts or authority
+   changes before dependent work. Coordinate delegated work on blockers, material changes, and
+   completed batches.
 6. Keep source of truth changes in shared docs, skills, manifests, or generated policy before
    provider adapters.
-7. Run one focused owner test during implementation. Add one directly affected seam only when the
-   change crosses that seam. On the stable candidate, run one branch-aware impacted pre-push
-   sign-off; do not run a separate manual pre-commit or pre-PR gate.
+7. Run the planned focused checks during implementation. A narrow repair normally needs
+   one focused owner test and one directly affected seam only when it crosses that seam. Group
+   shared changes before expensive builds, bringing compilation or integration forward when risk
+   requires it. On the stable candidate, run one branch-aware impacted pre-push sign-off;
+   do not run a separate manual pre-commit or pre-PR gate.
 8. Repair a failed focused owner. Use its named execution when diagnosis needs narrow feedback; on
    the final repair, let either the enclosing Git hook or the one impacted pre-push sign-off serve
    as the affected recheck. Do not run both immediately on the unchanged subject. If the same check
@@ -52,12 +58,18 @@ after the work has been framed and scoped.
    and reject helper extraction that only relocates related code without creating a meaningful owner.
 10. Run deterministic build commands under the harness and bind build evidence to the integrated
     snapshot. Any delegated QA remains an explicit host-native assignment.
-11. Reconcile QA with one primary-owned repair and one affected recheck. If it fails, stop instead
-    of starting another general QA, verifier, or broad-proof cycle.
+11. Use one applicable independent QA review on the completed batch and its existing proof. Review
+    earlier only for a named risk or unresolved decision. Reconcile QA with one primary-owned
+    repair and one affected recheck. If it fails, return to focused diagnosis instead of
+    starting another general QA, verifier, or broad-proof cycle.
 12. Before any commit or pull request handoff, write the shared change narrative from the governing
     intent: outcome, product impact, conceptual change, code areas, and why. Do not derive product
     intent from file names alone or copy machine validation evidence into the narrative.
-13. Update evidence artifacts as part of the slice, not after memory fades.
+13. Capture command results in existing logs as work proceeds. Consolidate plan checkboxes, status,
+    evidence summaries, and explanatory docs at batch closeout. Update governing contracts earlier
+    when dependent work needs them; keep commit/delivery documentation current. Report completed
+    milestones and blockers. Note useful cost observations from existing records without adding
+    per-step bookkeeping.
 
 ## Validation
 
