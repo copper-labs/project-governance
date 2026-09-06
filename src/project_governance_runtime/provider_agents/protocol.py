@@ -45,7 +45,15 @@ def prompt(request):
         f"Parent constraints: {request['constraints']}\n"
     )
     if request["access"] == "shared":
-        text += "Shared workspace assignment: do not edit project files; use scratch for review artifacts.\n"
+        text += ("Shared workspace assignment: do not edit project files, change Git state, delegate writes, "
+                 "or run builds/tests that mutate shared outputs or interfere with active work. "
+                 "Use existing evidence and external scratch for authorized analysis artifacts. "
+                 "Files may change under a cooperating writer; identify the snapshot or file contents "
+                 "behind findings and label work-in-progress findings provisional, never final approval.\n")
+    elif request.get("allow_readers", False):
+        text += ("Cooperating writer assignment: you are the only writer among this runner's overlapping jobs. "
+                 "Read-only siblings may inspect changing files. Coordinate through the primary; "
+                 "do not start overlapping child jobs or treat provisional reader advice as approval.\n")
     if request["required_tools"]:
         text += "Completion requires observed successful tools/categories: " + ", ".join(request["required_tools"]) + "\n"
     if request["context"]:

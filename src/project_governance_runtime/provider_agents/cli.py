@@ -50,7 +50,9 @@ def parser():
         p.add_argument("--role", default="general")
         p.add_argument("--add-dir", action="append", default=[])
         p.add_argument("--require-tool", action="append", default=[])
-        p.add_argument("--shared", action="store_true")
+        access = p.add_mutually_exclusive_group()
+        access.add_argument("--shared", action="store_true", help="Read-only assignment; may overlap a cooperating writer.")
+        access.add_argument("--writer", action="store_true", help="One writer that permits shared readers; default is exclusive.")
         p.add_argument("--timeout", default="0")
         p.add_argument("--idle-timeout", default="0")
         p.add_argument("--idempotency-key")
@@ -125,7 +127,7 @@ def _start(args, environment_fd):
         provider=args.provider, model=args.model, effort=args.effort, config=args.config,
         executable=args.executable, context=read_text(args.context_file) if args.context_file else "",
         constraints=args.constraints, role=args.role, additional_roots=args.add_dir,
-        required_tools=args.require_tool, access="shared" if args.shared else "exclusive",
+        required_tools=args.require_tool, access="shared" if args.shared else "writer" if args.writer else "exclusive",
         timeout_seconds=args.timeout, idle_timeout_seconds=args.idle_timeout,
         idempotency_key=args.idempotency_key, environment_fd=environment_fd)
 

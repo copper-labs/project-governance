@@ -21,6 +21,7 @@ multiple files, or requires validation and review evidence.
 - `docs/index.md`
 - `docs/governance/validation-strategy.md`
 - `.governance/runtime/skills/resources/implementation-plan-template.md`
+- `.governance/runtime/skills/delegated-execution/SKILL.md`
 - `docs/governance/apple-dependency-policy.md` when Apple platforms may be in scope
 - The governing spec, PRD, issue, plan, or decision
 
@@ -35,8 +36,12 @@ multiple files, or requires validation and review evidence.
    understand and diagnose confidently. Combine tightly related steps; split unrelated outcomes or
    uncertainty that needs earlier feedback. Do not size batches by fixed file, line, or time quotas.
    Group shared behavior and affected bindings when they implement one settled contract. Mark exact
-   dependencies and use `Execution: parallel with <batch IDs>` only for non-overlapping ownership.
+   dependencies; parallel investigation never grants a second writer in the same repository.
    Split early for unresolved contracts, material risk, or work too large to review coherently.
+   Assess independent read-only assignments that replace necessary investigation or prevent rework.
+   Record `Parallel support`: each useful question, expected output, and when it is needed, or a
+   short reason for solo execution. Use zero to two readers, with a separate justification for
+   the second. This is one batch-planning decision, not an agent quota or an extra approval.
 4. Declare a `Proof Budget`: claims to prove, cheapest sufficient evidence, normally one complete
    proof cycle, expected duration or cost, invalidation rules, and an explicit stop condition.
    Set focused development checkpoints, expensive build points, one applicable QA review per batch,

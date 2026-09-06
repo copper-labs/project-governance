@@ -69,6 +69,24 @@ desktop task, a new MCP server, or a second wrapper implementation. If the paren
 wrapped job, overlapping child ownership fails immediately; use a separate authorized workspace
 or return control to the parent.
 
+## Use A Writer With Bounded Readers
+
+In 2.6.0 or later, add `--writer` to the writer's `start` command when independent readers can
+help. Dispatch up to two justified reader assignments from the same primary, adding `--shared`
+to each. Use the installed delegated-execution skill to choose distinct questions, evidence, and
+needed-by points. Continue useful work and reconcile one concise result from each reader.
+
+Default access remains exclusive. An overlapping second writer waits; an exclusive assignment
+waits for both the writer and readers. Readers cannot bypass an earlier queued exclusive job.
+Use exclusive access for a frozen approval review or an operation requiring isolation. The flags
+describe cooperation, not a filesystem sandbox: readers must not edit Git or run shared-output
+builds/tests. Native agents outside this helper still need primary-owned coordination.
+
+The writer and readers must be siblings. A wrapped writer cannot start overlapping child readers,
+and a wrapped reader cannot start an overlapping writer. Existing job state remains compatible;
+older runners treat the new writer mode conservatively as exclusive. New follow-ups retain the
+chosen access. Different provider models are optional; role names never select a model or effort.
+
 ## Observe And Reconcile
 
 Use the returned ID and carry forward each returned cursor:

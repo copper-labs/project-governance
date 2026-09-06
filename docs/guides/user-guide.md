@@ -64,10 +64,15 @@ In Codex or Claude Code, tell the primary agent:
 
 > Use delegation for this task.
 
-That is the operator interface. `Use governed delegation for this task` and `Delegate this task`
-are equivalent. The primary prepares the bounded plan, chooses solo when delegation would add
-overhead, and uses only host-native controls available to the current operator. The runtime has no
-delegation commands, provider profiles, role state, or completion receipts.
+`Use governed delegation for this task` and `Delegate this task` are equivalent. Within existing
+operator and host authority, the planning and work skills also consider useful read-only support
+without waiting for another reminder. The primary keeps one writer and zero to two readers,
+chooses distinct bounded questions, and remains solo when delegation would add overhead.
+
+Use native controls for same-model agents and the [optional provider helper](provider-agents.md)
+for the repository's cross-model route. Its explicit `--writer` mode can overlap `--shared`
+readers; default exclusive jobs retain isolation. The governance check engine never dispatches
+agents. Reader advice does not add approval reviews, tests, or documentation checkpoints.
 
 ## Routine Work
 

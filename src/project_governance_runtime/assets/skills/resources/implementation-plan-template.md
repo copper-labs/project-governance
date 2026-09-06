@@ -31,8 +31,9 @@ it proves. Choose checkpoints by dependency and risk. The writer may adjust them
 completing an internal step does not automatically trigger QA or documentation updates.
 
 - Depends on: <batch IDs or none>
-- Ownership: <related components and affected bindings; non-overlapping writers>
+- Ownership: <related components and affected bindings; one writer in this repository>
 - Execution: sequential | parallel with <batch IDs>
+- Parallel support: <zero to two bounded read-only assignments, expected outputs and needed-by points; or a brief solo rationale>
 - Semantic contract: settled | unresolved
 - Fixed decisions: <facts workers must not revisit>
 - Acceptance: <observable completion claims>
@@ -48,6 +49,9 @@ completing an internal step does not automatically trigger QA or documentation u
 
 Use existing logs for command results. At closeout, include useful cost observations already
 available from those records; leave missing metrics unknown. No per-step reporting is required.
+Parallel support should replace investigation the primary or writer would otherwise perform.
+Each reader needs a distinct question and enough context to answer it without repeating discovery.
+Follow the installed delegated-execution skill; parallel batches do not authorize another writer.
 
 ## Stable-Candidate Proof
 
