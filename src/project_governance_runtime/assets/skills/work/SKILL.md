@@ -20,14 +20,18 @@ after the work has been framed and scoped.
 - `CHARTER.md`
 - `docs/index.md`
 - The active plan or governing artifact
+- `.governance/runtime/skills/delegated-execution/SKILL.md`
 - `.governance/runtime/skills/resources/change-narrative.md` before any commit or pull request handoff
 - Route-selected pack manifests or policies
 
 ## Workflow
 
 1. Inspect current files before editing and preserve unrelated user changes.
-2. Record delegation and its ownership boundaries only when delegation occurs. Across active waves,
-   one repository may contain one writer and two non-overlapping readers; do not expand a scope
+2. Follow the plan's `Parallel support` decision. At a material blocker or long-running build,
+   reassess whether bounded independent investigation can replace necessary work; do not repeat
+   this assessment after every internal step. Continue useful work while readers investigate.
+   Record delegation and its ownership boundaries only when delegation occurs. Across active waves,
+   one repository may contain one writer and up to two non-overlapping readers; do not expand a scope
    after authorization. All roles use the current checkout by default. Delegation does not
    authorize creating or moving a worktree; each additional worktree requires a direct operator
    request.
@@ -62,6 +66,7 @@ after the work has been framed and scoped.
     earlier only for a named risk or unresolved decision. Reconcile QA with one primary-owned
     repair and one affected recheck. If it fails, return to focused diagnosis instead of
     starting another general QA, verifier, or broad-proof cycle.
+    Reader findings on work in progress are provisional advice, not approval of the final candidate.
 12. Before any commit or pull request handoff, write the shared change narrative from the governing
     intent: outcome, product impact, conceptual change, code areas, and why. Do not derive product
     intent from file names alone or copy machine validation evidence into the narrative.

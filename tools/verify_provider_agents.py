@@ -18,6 +18,7 @@ def verify_provider_agents(root):
         proof.default_route()
         proof.absent_provider()
         proof.native_protocols()
+        proof.cooperating_writer()
         proof.upgrade_exclusion()
         proof.released_environment()
 
@@ -62,11 +63,11 @@ class _InstalledProviderProof:
             time.sleep(.05)
         raise RuntimeError("installed provider job did not finish")
 
-    def launch(self, provider):
+    def launch(self, provider, *access):
         """Use the same explicit binding and fixture for every native protocol."""
         return json.loads(self.invoke(self.agent, "start", "--provider", provider, "--model", "fixture-model",
             "--effort", "high", "--workspace", self.workspace, "--task", "Exercise installed provider",
-            "--executable", self.native, "--require-tool", "command"))["job_id"]
+            "--executable", self.native, "--require-tool", "command", *access))["job_id"]
 
     def absent_provider(self):
         """Keep ordinary governance usable when no native provider binary is discoverable."""
@@ -117,6 +118,28 @@ class _InstalledProviderProof:
             self.invoke(self.core, "--version")
         finally:
             self.cancel_jobs(jobs)
+
+    def cooperating_writer(self):
+        """Prove installed flags reach native providers concurrently without losing exclusive isolation."""
+        previous = len(list((self.scratch / "logs").glob("*.argv.json")))
+        self.environment["PROVIDER_AGENT_FIXTURE_SCENARIO"] = "sleep"
+        jobs, exclusive = [], None
+        try:
+            for flag in ("--writer", "--shared", "--shared"):
+                jobs.append(self.launch("codex", flag))
+            deadline = time.monotonic() + 5
+            while len(list((self.scratch / "logs").glob("*.argv.json"))) < previous + 3:
+                if time.monotonic() >= deadline:
+                    raise RuntimeError("installed writer and both readers did not overlap")
+                time.sleep(.05)
+            self.environment["PROVIDER_AGENT_FIXTURE_SCENARIO"] = "normal"
+            exclusive = self.launch("codex")
+            if json.loads(self.invoke(self.agent, "status", exclusive))["state"] != "queued":
+                raise RuntimeError("exclusive job ran during installed writer/reader work")
+        finally:
+            self.cancel_jobs(jobs)
+        if self.completed(exclusive)["state"] != "succeeded":
+            raise RuntimeError("exclusive work did not resume after writer and reader cleanup")
 
     def cancel_jobs(self, jobs):
         """Stop every test job before releasing its temporary workspace."""

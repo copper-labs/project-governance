@@ -1,6 +1,7 @@
 # Operate An Optional Provider Agent
 
-Use these helpers when the user authorizes delegation. The parent remains responsible for scope,
+Use these helpers within the operator's and host's delegation authority, following the installed
+delegated-execution skill for useful reader assignments. The parent remains responsible for scope,
 integration, verification, and delivery. Keep its permission limits and relevant conversation
 context in the task: a child does not inherit the parent's conversation or in-memory tools.
 
@@ -46,7 +47,14 @@ since provider activity; it is not a new model response.
 
 `--timeout` sets an overall deadline including queue time. `--idle-timeout` bounds provider
 inactivity. Both default to zero (disabled); respect the host's task-duration policy.
-`--require-tool` is repeatable. `--shared` asks for no project edits while keeping native tools.
+`--require-tool` is repeatable. Default access is exclusive. Use `--writer` for the sole writer
+when read-only siblings should work alongside it; use `--shared` for those readers. The two flags
+are mutually exclusive. Another overlapping writer still waits, and an exclusive job excludes
+both writers and readers. The primary counts native jobs as well and keeps at most two readers.
+Readers do not edit project files, Git state, or shared build/test outputs, and do not delegate
+writes. Native tools remain available; these flags do not establish a filesystem sandbox.
+Earlier queued exclusive jobs retain priority; do not bypass them by changing access or state roots.
+Old runners conservatively serialize writer-mode jobs, so overlap requires a supporting runner.
 `--add-dir` adds another authorized root. `--context-file` supplies bounded extra evidence.
 
 An optional JSON file selected with `--config` provides `version: 1` and a `providers` object.
@@ -72,9 +80,10 @@ session requires a new explicit assignment, never the most recent ambient conver
 is a request; confirm a terminal state and cleanup before reusing its workspace. Partial edits
 remain. Requests requiring new human input or unavailable parent-only tools produce a blocker.
 
-The runner coordinates only its own jobs. Conflicting nested jobs fail before queueing, including
-conflicts with earlier ancestors. Return control to the parent or use a separately authorized
-workspace. Do not remove ancestry metadata to bypass that check. Native parents outside this
+The runner coordinates only its own jobs. Dispatch the writer and readers as siblings from the
+primary; overlapping nested writer/reader jobs fail before queueing, including conflicts with
+earlier ancestors. Return control to the primary or use a separately authorized workspace.
+Do not remove ancestry metadata to bypass that check. Native parents outside this
 runner can delegate normally; a Claude parent can invoke the Codex skill directly.
 
 Job evidence is private local state under the user's `harness-agents` data directory,

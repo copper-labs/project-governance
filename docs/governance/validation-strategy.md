@@ -100,6 +100,33 @@ a named changed seam with no evidence. One QA repair permits one affected determ
 that recheck fails, return to focused diagnosis or the operator instead of starting another general
 QA, verifier, or broad-proof cycle.
 
+## Selective Read-Only Support
+
+Single-writer ownership does not serialize discovery or verification preparation. At batch
+planning, identify zero to two useful independent reader assignments, their outputs, and when
+answers are needed, or state a brief reason to work solo. Reassess at material blockers and long
+operations rather than after every step. A reader must replace investigation the primary or
+writer would otherwise perform, or address a concrete risk of rework. A second reader needs a
+separate justification; the existing orchestrator need not create a manager role.
+
+The installed delegated-execution skill owns assignment, communication, model-selection, and
+reader boundaries. Readers consume existing evidence and do not edit Git or run commands that
+mutate shared build/test state. Findings about unfinished work remain provisional. One independent
+approval review on the frozen batch remains the review boundary; investigations do not add gates.
+The primary reconciles findings and coordinates native and optional-helper jobs together.
+
+Use existing logs for a small matched comparison of zero, one, and two readers when calibrating
+the policy. Keep tasks, starting snapshots, writer settings, and acceptance checks comparable;
+include rework and all participating agents' tokens. Repeat noisy comparisons before drawing
+conclusions. The initial target is meaningful speed improvement with less than 25% median total
+token premium; it is an evaluation preference, not an established optimum or blocking runtime
+budget. Distinguish elapsed time from summed process durations, cached tokens from fresh input,
+and monetary cost from token volume. Do not double-count reported reasoning tokens already
+included in output. Missing usage remains unknown. No new collector or per-batch experiment is
+required, and shipping the policy alone does not establish a measured improvement.
+
+The [research basis](../reference/selective-reader-research.md) records the evidence and its limits.
+
 ## Publication Candidate
 
 A publication candidate is one exact integration snapshot whose content is intended for release.

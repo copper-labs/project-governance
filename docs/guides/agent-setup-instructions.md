@@ -35,6 +35,11 @@ For substantial governed work, resolve bounded context before editing with `cont
 --json-output .governance/runtime/context-result.json` and read the selected materialized skills.
 The runtime records no per-skill utilization receipt.
 
+Planning and work read the installed delegated-execution skill. At batch planning, identify useful
+independent reader assignments or a brief solo rationale. Reconsider at material blockers or long
+builds without inventing busywork. Keep one writer and zero to two readers, with distinct questions
+and evidence. The primary may be the writer; no extra manager role is required.
+
 Use the smallest proof that covers the changed component and one affected seam. When a governance
 pack fails, use `project-governance check --pack <pack-id>` only when focused diagnosis needs it.
 After the final repair, use either the enclosing Git hook or one impacted closeout as the affected
@@ -47,6 +52,8 @@ after setup. Explicit operator route choices override the default. Use native co
 same-model subagents. Keep the
 current session primary, use at most one writer and two non-overlapping readers, and share the
 current checkout. Delegation does not authorize another worktree.
+For optional-helper overlap, dispatch `--writer` and `--shared` sibling jobs from the primary.
+Default exclusive access retains isolation. Readers do not mutate Git or shared build/test outputs.
 
 ## Boundaries
 

@@ -170,15 +170,36 @@ processes before reporting terminal completion. The wrapper cannot promise clean
 remote or daemonized work; assignments must name any intentionally retained background services.
 The result does not imply that cancelling a process rolls back edits or remote actions.
 
-Workspace coordination covers this runner's jobs only. Exclusive jobs serialize overlapping roots.
-Shared jobs carry a no-project-edits assignment constraint but retain tools. Every continuation
-serializes access to its exact provider session, including when workspaces differ. The parent
-still coordinates unrelated agents and pre-existing changes.
+Workspace coordination covers this runner's jobs only. Default exclusive jobs serialize all
+overlapping roots. The explicit `--writer` mode, added in 2.6.0, permits shared readers beside one
+writer; overlapping writers still serialize. `--shared` readers carry a no-project-edits assignment
+constraint but retain tools. The flags are mutually exclusive and do not grant authority to edit.
+Every continuation serializes access to its exact provider session, including when workspaces
+differ. Earlier queued exclusive jobs retain their place rather than being starved by new readers.
+Ownership remains held until process cleanup is confirmed. The parent still coordinates native
+agents outside the helper and the policy ceiling of one writer and up to two readers; the runner
+does not add agent-count scheduling.
+
+The new writer mode retains protocol 1 and is stored as `access: exclusive` with the strictly
+boolean `allow_readers: true`. Only exclusive records may set that flag. An absent flag means the
+original behavior. New runners recognize compatible sibling readers; older runners see an
+exclusive claim and serialize conservatively. They cannot launch a second overlapping writer.
+New follow-ups preserve the flag. An older runner may continue the job as fully exclusive, but
+cannot broaden its authority. No migration or separate registry is introduced.
+
+Read-only scope excludes Git changes, delegated writes, and build/test commands that alter shared
+outputs or interfere with the writer. Use existing evidence and identify its snapshot. Work-in-
+progress advice is provisional and cannot approve a later candidate. The constraint is enforced
+through the host assignment, not filesystem isolation; before/after snapshots may contain the
+writer's changes and do not attribute them to a reader.
 
 The parent-independence example uses a native parent outside this runner. A wrapped parent may
 start a child in a separate workspace, but conflicting nested ownership is rejected before
 queueing. Propagate and inspect the full enclosing-job ancestry, including a grandparent's roots;
 never let a parent wait behind its own claim.
+Reader/writer overlap is restricted to sibling jobs dispatched by the primary. Overlapping nested
+jobs involving the new writer flag fail before queueing, including a writer requested by a shared
+parent. Otherwise a child can wait behind an exclusive sibling that itself waits for the parent.
 This release does not implement ownership handoff or suspend a parent's active assignment.
 
 A repeated idempotency key returns the original job only when the normalized request matches.

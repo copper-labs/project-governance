@@ -34,6 +34,9 @@ authoring, or migration changes.
 4. Keep review separate from implementation: inspect the stable candidate first, report findings,
    and prevent silent fixes. A delegated QA reviewer is a separate host-native assignment;
    otherwise the primary performs the dedicated pass.
+   Earlier read-only investigation is provisional advice, not approval. Reuse valid evidence from
+   it, but assess the frozen candidate independently; changed inputs invalidate affected claims.
+   A delegated reviewer counts within the two-reader ceiling, not as an additional permanent role.
 5. Reconcile high and medium findings with code, docs, tests, or a recorded rationale, then recheck
    only the affected claim unless the patch invalidated broader evidence. Allow one primary-owned
    repair and one affected recheck. A failed recheck returns to focused diagnosis or the operator;

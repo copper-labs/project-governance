@@ -47,6 +47,10 @@ def validate_record(value):
     """Refuse unknown protocol versions before state can influence ownership."""
     if not isinstance(value, dict) or type(value.get("protocol_version")) is not int or value["protocol_version"] != PROTOCOL_VERSION:
         raise AgentError("unsupported job state version; preserve state and use its matching runner")
+    if ("access" in value or "allow_readers" in value) and (value.get("access") not in ("exclusive", "shared") or
+            type(value.get("allow_readers", False)) is not bool or
+            (value.get("allow_readers", False) and value["access"] != "exclusive")):
+        raise AgentError("unsupported workspace access; preserve the job's ownership record")
     return value
 
 

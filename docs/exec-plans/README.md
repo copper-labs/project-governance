@@ -21,6 +21,8 @@ Git remains the implementation history and recovery mechanism.
 
 ## Completed
 
+- [Selective read-only support](completed/2026-09-06-selective-readers.md) adds bounded reader
+  assignments to planning and a cooperating writer mode to the optional provider helper.
 - [Automatic governance updates at top-level task startup](completed/2026-09-06-top-level-startup-updates.md)
   implements compatible updates with contextual worktree assessment and isolated local commits.
 

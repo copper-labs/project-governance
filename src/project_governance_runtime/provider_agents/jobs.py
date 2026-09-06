@@ -40,7 +40,8 @@ def normalize(task, workspace, *, provider, model=None, effort=None, executable=
     pinned_runtime = runtime_binding(directory(workspace))
     selected = binding(provider, model, effort, executable, config)
     return dict(protocol_version=PROTOCOL_VERSION, **selected, task=task, workspace=directory(workspace),
-                context=context, role=role, constraints=constraints, access=access,
+                context=context, role=role, constraints=constraints,
+                access="exclusive" if access == "writer" else access, allow_readers=access == "writer",
                 additional_roots=sorted(set(directory(r) for r in roots)), required_tools=required,
                 timeout_seconds=duration(timeout_seconds), idle_timeout_seconds=duration(idle_timeout_seconds),
                 idempotency_key=idempotency_key, conversation_id=conversation_id, parent_job_id=parent_job_id,
@@ -56,8 +57,8 @@ def _validate_text(task, context, role, constraints):
 
 
 def _validate_scope(access, roots, required, idempotency_key):
-    if access not in {"exclusive", "shared"}:
-        raise AgentError("access must be exclusive or shared")
+    if access not in {"exclusive", "shared", "writer"}:
+        raise AgentError("access must be exclusive, shared, or writer")
     if not isinstance(roots, list) or len(roots) > 32:
         raise AgentError("additional_roots must be an array of up to 32 directories")
     if not isinstance(required, list) or len(required) > 100 or any(not isinstance(t, str) or not t for t in required):
@@ -76,11 +77,16 @@ def overlap(left, right):
 
 
 def conflicts(request, other):
-    """Serialize exclusive workspace use and continuation of the same session."""
+    """Allow sibling readers beside one writer while retaining exclusive and session claims."""
+    validate_record(request)
+    validate_record(other)
     same_session = request.get("conversation_id") and request["provider"] == other["provider"] and request["conversation_id"] == other.get("conversation_id")
     roots = [request["workspace"], *request["additional_roots"]]
     other_roots = [other["workspace"], *other["additional_roots"]]
-    return same_session or ("exclusive" in {request["access"], other["access"]} and overlap(roots, other_roots))
+    # Older protocol-1 runners see an exclusive claim and conservatively serialize it.
+    modes = ["writer" if value.get("allow_readers", False) else value["access"] for value in (request, other)]
+    serializes = "exclusive" in modes or modes == ["writer", "writer"]
+    return bool(same_session or (serializes and overlap(roots, other_roots)))
 
 
 def recover(path):
@@ -171,8 +177,14 @@ def _check_ancestors(request):
         path = parent_store.job(ancestor["job_id"])
         value = validate_record(read_json(path / "status.json"))
         prior = validate_record(read_json(path / "request.json"))
-        if value["state"] not in TERMINAL and conflicts(request, prior):
-            raise AgentError("nested job conflicts with an enclosing job's workspace or session; use a separate workspace or return control to the parent")
+        if value["state"] in TERMINAL:
+            continue
+        roots = [request["workspace"], *request["additional_roots"]]
+        prior_roots = [prior["workspace"], *prior["additional_roots"]]
+        # A queued exclusive sibling could otherwise strand a child behind its waiting parent.
+        writer_overlap = (request.get("allow_readers") or prior.get("allow_readers")) and overlap(roots, prior_roots)
+        if conflicts(request, prior) or writer_overlap:
+            raise AgentError("nested job conflicts with an enclosing job's workspace or session; dispatch cooperating siblings from the primary or use a separately authorized workspace")
 
 
 def _launch_worker(store, job_id, path, environment_fd):
@@ -266,7 +278,10 @@ def follow_up(job_id, task, *, store=None, environment_fd=None, timeout_seconds=
 
     validate(prior)
     keys = ("provider", "model", "effort", "role", "constraints", "additional_roots", "access", "required_tools", "idle_timeout_seconds")
+    options = {key: prior[key] for key in keys}
+    if prior.get("allow_readers", False):
+        options["access"] = "writer"
     return start(task, prior["workspace"], store=store, environment_fd=environment_fd,
-                 **{key: prior[key] for key in keys}, executable=prior["backend"],
+                 **options, executable=prior["backend"],
                  timeout_seconds=prior["timeout_seconds"] if timeout_seconds is None else timeout_seconds,
                  conversation_id=current["conversation_id"], parent_job_id=job_id)
