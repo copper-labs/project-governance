@@ -23,7 +23,7 @@ RESOURCE = ".governance/runtime/skills/resources/startup-runtime-updates.md"
 BLOCK = START + "\nAt top-level task entry, follow `" + RESOURCE + "`. Minor work may already be underway.\nSubagents inherit the parent runtime and never check for or initiate updates.\n" + END
 SUPPORTED = {"codex"}
 HOOK_COMMAND = 'python3 "$(git rev-parse --show-toplevel)/tools/governance-startup.py" {provider}'
-HOOK_TIMEOUTS = {"SessionStart": 90, "SubagentStart": 90, "SessionEnd": 3}
+HOOK_TIMEOUTS = {"SessionStart": 90, "SubagentStart": 90, "SessionEnd": 3, "UserPromptSubmit": 10}
 
 
 def _safe(root: Path, relative: str) -> Path:

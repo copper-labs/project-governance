@@ -327,6 +327,31 @@ class StartupAdditionalSafetyTests(unittest.TestCase):
             with self.assertRaises(StartupError):
                 f.run()
 
+    def test_later_prompt_reopens_reservation_without_a_new_update(self):
+        with tempfile.TemporaryDirectory() as directory:
+            f = Adopter(Path(directory).resolve())
+            start = dict(hook_event_name="SessionStart", source="startup", session_id="same-native-task")
+            with patch("project_governance_runtime.startup_releases.discover", return_value=f.candidate) as discovery:
+                initial = handle_event(f.root, "codex", start)
+                prompt = dict(hook_event_name="UserPromptSubmit", session_id="same-native-task")
+                self.assertEqual(handle_event(f.root, "codex", prompt)["status"], "available")
+                path = task_path(f.root, initial["task_id"])
+                closed = read_json(path)
+                closed["state"] = "closed"
+                write_json(path, closed)
+                self.assertEqual(handle_event(f.root, "codex", prompt)["status"], "deferred")
+                self.assertEqual(read_json(path)["state"], "open")
+                with self.assertRaises(StartupError):
+                    f.run()
+                prompt.update(session_id="unknown-task", source="startup")
+                unknown = handle_event(f.root, "codex", prompt)
+                self.assertEqual(unknown["status"], "deferred")
+                from project_governance_runtime.startup import hook_output
+                self.assertIn("refresh current guidance", json.dumps(hook_output(prompt, unknown)))
+                prompt["agent_id"] = "child"
+                self.assertNotIn("task_id", handle_event(f.root, "codex", prompt))
+                discovery.assert_called_once()
+
     def test_enable_interruption_before_rename_recovers_intact_original(self):
         from project_governance_runtime.startup_integration import recover_enable
         with tempfile.TemporaryDirectory() as directory:

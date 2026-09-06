@@ -39,6 +39,7 @@ need no announcement. At normal top-level task closeout release its reservation 
 ```
 
 This is housekeeping at task closeout, not a per-step test or documentation boundary. A native
-SessionEnd hook also releases the reservation. Never release another task to force an update.
+SessionEnd hook also releases the reservation. A later operator prompt reopens the reservation
+without discovering releases or creating another update opportunity. Never release another task to force an update.
 Only the operator may deliberately enable host integration, recover an interrupted update, or
 approve a major upgrade or migration. Automatic local commits never authorize remote pushes.

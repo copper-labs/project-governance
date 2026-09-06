@@ -84,7 +84,7 @@ def handle_event(root: Path, provider: str, event: dict) -> dict:
     if not isinstance(session, str) or not 1 <= len(session) <= 128:
         return result("deferred", "Native session identity is unavailable")
     kind, source = event.get("hook_event_name"), event.get("source")
-    if kind not in {"SessionStart", "SessionEnd"}:
+    if kind not in {"SessionStart", "SessionEnd", "UserPromptSubmit"}:
         return result("deferred", "Not a supported top-level startup event")
     root = repository(root)
     task_id = digest(json.dumps([provider, session, str(root)]).encode())
@@ -123,15 +123,17 @@ def _register_and_discover(root: Path, provider: str, event: dict, task_id: str)
     receipt["owner"] = host_owner(provider)
     if prior and prior["lock_digest"] != lock_digest(root):
         answer = result("approval-required", "Runtime changed; refresh the parent context before continuing")
-    elif event.get("source") != "startup":
-        answer = result("deferred", "Continuation reserved its runtime; refresh current guidance if its previous identity was unavailable")
+    elif event.get("hook_event_name") == "UserPromptSubmit" and was_open:
+        answer = prior["result"]
+    elif event.get("hook_event_name") == "UserPromptSubmit" or event.get("source") != "startup":
+        answer = result("deferred", "Continuation reserved its runtime; refresh current guidance if its previous identity was unavailable", refresh_context=not bool(prior))
     elif prior:
         answer = prior["result"] if was_open else result("deferred", "Completed tasks do not initiate another update")
     else:
         answer = result("deferred", "Startup task reserved its current runtime")
     receipt["result"] = {**answer, "task_id": task_id}
     write_json(path, receipt)
-    if prior or event.get("source") != "startup":
+    if prior or event.get("hook_event_name") != "SessionStart" or event.get("source") != "startup":
         return receipt["result"]
     answer = _discover_for_task(root, event, current)
     receipt["result"] = {**answer, "task_id": task_id}
@@ -161,9 +163,13 @@ def _discover_for_task(root: Path, event: dict, current: dict) -> dict:
 
 def hook_output(event: dict, answer: dict) -> dict:
     """Give the parent one compact action without exposing artifact blobs or credentials."""
-    if not isinstance(event, dict) or event.get("hook_event_name") != "SessionStart":
+    if not isinstance(event, dict) or event.get("hook_event_name") not in {"SessionStart", "UserPromptSubmit"}:
         return {}
     task = answer.get("task_id")
+    if task and event["hook_event_name"] == "UserPromptSubmit" and answer["status"] in {"current", "available", "deferred"} and not answer.get("must_wait") and not answer.get("refresh_context"):
+        message = "Governance task reservation is active. This prompt did not check for releases. "
+        message += "At task closeout run project-governance startup finish --task-id " + task + "."
+        return {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": message}}
     message = "Governance startup: " + answer["status"] + ". " + answer["reason"] + "."
     if answer["status"] == "available":
         message += (" Before substantial implementation, read .governance/runtime/skills/resources/startup-runtime-updates.md. "
@@ -172,7 +178,7 @@ def hook_output(event: dict, answer: dict) -> dict:
         message += " At task completion run project-governance startup finish --task-id " + task + "."
     if answer["status"] == "current" and not task:
         return {}
-    return {"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": message}}
+    return {"hookSpecificOutput": {"hookEventName": event["hook_event_name"], "additionalContext": message}}
 
 
 def health(root: Path) -> dict:

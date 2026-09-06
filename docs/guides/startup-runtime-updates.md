@@ -49,7 +49,8 @@ The updater prepares and verifies the candidate, checks for conflicting work or 
 users, and commits only the new runtime lock through normal Git hooks and signing. It never
 pushes. The parent reads the new installed guidance before continuing. At normal task closeout,
 run `project-governance startup finish --task-id <native-receipt>` once. Native session-end events
-also release the reservation; positively dead host processes can be reconciled at a later check.
+also release the reservation. A later operator prompt reopens it without another update check.
+Positively dead host processes can be reconciled at a later check.
 Unknown live ownership defers an update instead of guessing from an age limit.
 
 Subagents, resumes, forks, and compaction do not check for releases. Delegated workers inherit

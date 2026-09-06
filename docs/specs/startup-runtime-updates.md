@@ -28,7 +28,9 @@ counts, timestamps, or the existence of a plan are not a freeze.
 
 Supported host adapters accept native startup events, record one task identity, and present an
 update result to the parent. Native subagent events, delegated harness ancestry, resumed tasks,
-forks of existing work, clear, and compaction never discover releases or apply an update. A worker
+forks of existing work, clear, and compaction never discover releases or apply an update. A later operator prompt reopens a closed reservation without release discovery, so subsequent
+work in the same conversation remains visible to other tasks. An initial prompt preserves its
+already-open startup opportunity. A worker
 inherits the parent's runtime identity and reports a mismatch or missing installation to it.
 
 The startup hook does not decide whether a user request allows edits. Before application the

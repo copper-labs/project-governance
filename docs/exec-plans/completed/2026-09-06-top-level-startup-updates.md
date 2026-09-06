@@ -438,7 +438,9 @@ Independent Codex review identified four actionable boundaries: exact prepared l
 Git hooks, reservations for concurrent starts and continuations, worker inheritance across
 worktrees, and interruption before the initial runtime directory rename. Regression fixtures and
 review reconciliation cover each boundary. A follow-up checked inherited pins before unmanaged
-fallback. Clean installed proof exposed and resolved a macOS nested-venv executable link cycle.
+fallback. Clean installed proof exposed and resolved a macOS nested-venv executable link cycle. Operator
+prompt events reopen reservations after an earlier task closeout without creating a new release
+check or update opportunity.
 
 The owning startup suite covers these repairs. The provider suite passes. Clean-wheel proof covers
 one-time enablement, candidate installation and activation, ordinary commit-hook execution, and
