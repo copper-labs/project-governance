@@ -100,7 +100,10 @@ deferred. This release adds no role-to-model policy, price table, model ranking,
   streamed fixture events, and reported the terminal missing-read-evidence blocker honestly.
   No competing command ran; cleanup was confirmed and authored startup text remained intact.
   The child was synthetic: this proves route selection and evidence reporting, not live Gemini
-  capability. Native Claude and Gemini parent routing still need their live acceptance checks.
+  capability. A live Claude parent subsequently selected the exact installed harness, delegated
+  a real repair to Codex, collected streamed progress and a successful terminal result, and
+  independently verified the tests. Existing native configuration remained active; no competing
+  command ran. Gemini parent routing still needs its live acceptance check.
 - Escalate or stop when: installation requires a provider account or changes core configuration validity.
 
 ## Slice 4: Live Proof And Independent QA
@@ -116,10 +119,12 @@ deferred. This release adds no role-to-model policy, price table, model ranking,
 - Focused proof: one representative live tool task per provider plus the cross-parent seam;
   additional calls only for a named failed or uncovered claim.
 - Invalidates prior proof when: provider command, protocol translation, or permission mode changes.
-- Proof state: Codex exercised reads, edits, commands/tests, web access, public progress, exact
-  continuation, and confirmed cleanup in a temporary fixture. Antigravity login is restored, but
-  quota exhaustion blocks live execution. Claude Code still requires login. The live Claude,
-  Gemini, and Claude-parent-to-Codex proofs remain release blockers.
+- Proof state: Codex and Claude exercised reads, edits, commands/tests, web access, public
+  progress, exact continuation, and confirmed cleanup in temporary fixtures. Claude's local
+  Keychain access and expired-session problems were resolved before its successful live tests.
+  The Claude parent-to-Codex seam passed with a real child repair and independent test readback.
+  Antigravity login is restored, but quota exhaustion still blocks Gemini's live provider and
+  parent-routing acceptance. Those Gemini checks remain release blockers.
 - Escalate or stop when: required provider authentication or model access is unavailable. Do not
   release a provider wrapper based solely on fake-provider evidence.
 
