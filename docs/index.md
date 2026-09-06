@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-07-05
-updated: 2026-08-30
+updated: 2026-09-06
 summary: Entry point for the reusable, package-based project governance runtime.
 ---
 
@@ -42,6 +42,9 @@ lock.
   decision, selected-body digests, corrections, and residual consumer-proof risks.
 
 ## Reference Areas
+
+The [optional provider agent contract](specs/provider-agent-skills.md) defines the standalone
+Gemini, Claude, and Codex wrappers in 2.4.0, including the scoped Gemini live-validation exception.
 
 - [Governance policies](governance/README.md) cover packs, hooks, context routing, quality, and
   bootstrap rules.

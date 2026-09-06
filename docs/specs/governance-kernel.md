@@ -43,7 +43,8 @@ packs without running them. Their optional `--summary` projection omits path inv
 lines, and process output while retaining bounded active findings; default output and
 `--json-output` remain full machine receipts. `doctor` reports the running package version, locked
 version, their match state, invalid configuration, and tracked launcher drift plainly. `init`
-creates only missing integration files. `init --refresh-launchers` deliberately replaces only the
+creates missing integration files and refreshes only marked harness-routing sections in host
+agent instructions. `init --refresh-launchers` deliberately replaces only the
 tracked bootstrap and hook launchers with the installed wheel's versions; it does not change
 project configuration. `update` advances the runtime lock only after required
 target-owned configuration is ready; schema changes remain blocked in dry-run output until an
@@ -57,8 +58,10 @@ half the configured total context allowance; a required skill outside that bound
 Target files and skills are read only through their remaining byte allowance. The runtime retains
 at most eight ignored packets, rebuilds a corrupted cache entry, and removes interrupted staging
 under one blocking local materialization lock rather than imposing an elapsed-time policy.
-Delegation remains a host-agent concern: the wheel owns no launch state, provider catalog, writer
-lease, role receipt, retry loop, or per-skill closeout workflow.
+Delegation decisions remain a host-agent concern. The governance kernel owns no launch state,
+provider catalog, role receipt, retry loop, or per-skill closeout workflow. The separately invoked
+[optional provider helper](provider-agent-skills.md) owns the lifecycle of jobs explicitly submitted
+to it. Checks, routing, and core doctor never import that helper or invoke a provider.
 
 Stages remain command boundaries, not selectable profiles:
 

@@ -5,7 +5,7 @@ type: governance
 status: current
 owner: project-governance
 created: 2026-08-15
-updated: 2026-08-27
+updated: 2026-09-06
 summary: Defines semantic release identity and the automated immutable wheel publication boundary.
 ---
 
@@ -55,3 +55,6 @@ such as `1.1.2.dev3+gabcdef123456`. They are CI or local artifacts, not GitHub r
 The runtime lock version equals the GitHub tag so `project-governance update --to <version>` resolves
 one unambiguous release directory. Existing hash-named releases remain historical; new releases do
 not reuse that convention.
+
+When `.github/release-notes/<version>.md` exists, publication includes that authored text before
+the generated change list. Record operator-authorized validation exceptions there before publication.

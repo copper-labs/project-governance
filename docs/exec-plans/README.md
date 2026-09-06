@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-02-16
-updated: 2026-08-24
+updated: 2026-09-06
 summary: Active and completed execution plans for the current source repository.
 ---
 
@@ -16,7 +16,8 @@ Git remains the implementation history and recovery mechanism.
 
 ## Active
 
-No implementation plan is currently active.
+- [Optional provider agent skills](active/2026-09-06-provider-agent-skills.md) builds and releases
+  Gemini, Claude, and Codex wrappers independently of later implementation-plan improvements.
 
 ## Completed
 

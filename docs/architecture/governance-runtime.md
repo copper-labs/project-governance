@@ -5,7 +5,7 @@ type: architecture
 status: current
 owner: project-governance
 created: 2026-02-16
-updated: 2026-08-21
+updated: 2026-09-06
 summary: Architecture for a small, package-based, project-neutral governance runtime.
 ---
 
@@ -16,7 +16,7 @@ The architecture intentionally has two owners.
 | Owner | Responsibilities |
 | --- | --- |
 | Runtime wheel | CLI, changed-path selection, built-in generic packs, dependency ordering, process ownership and cancellation, explicit-timeout enforcement, normalized findings, minimal developer-doc installation and exact catalog routing, bounded local validation telemetry, bootstrap/update commands, generic skills, and configuration schemas |
-| Adopting repository | Runtime lock, profile, facts, target packs, source mappings, tool commands, duration and retry policy, product documentation, root agent instructions, and product proof |
+| Adopting repository | Runtime lock, profile, facts, target packs, source mappings, tool commands, duration and retry policy, product documentation, authored root agent instructions, and product proof |
 
 ## Design Rules
 
@@ -41,8 +41,14 @@ The architecture intentionally has two owners.
     runtime reclaims inactive empty scaffolding; it never interprets or deletes product evidence.
 12. Comment and dependency ratchets govern changed declarations and changed coordinates, not every
     old issue encountered in a touched file.
-13. Delegation uses the host agent's native controls in the current checkout. The wheel owns no
-    provider routing, dispatch state, worker leases, or completion receipts.
+13. The host owns delegation decisions and provider access. Optional
+    [provider-agent skills](../specs/provider-agent-skills.md) use one separately invoked helper for
+    native Gemini, Claude, and Codex jobs. That helper owns only their process lifecycle, local
+    workspace coordination, progress, and results. Governance checks and routing never invoke it.
+    Model selection, role assignments, retries, and review policy remain host-owned. Adoption and
+    bootstrap maintain a marked routing pointer in host entry files, making the supplied harness
+    skills the cross-model default. The wheel owns only that section; authored instructions remain
+    repository-owned. Explicit operator route choices override the default.
 14. Context source reads, selected skill bytes, retained packets, and telemetry scans have explicit
     byte or count ceilings. Corrupted ignored packet state is rebuilt rather than becoming durable
     authority or a permanent blocker.
@@ -96,6 +102,7 @@ operation discovers or edits a source checkout.
 ## Out Of Scope
 
 The runtime has no product adapters, target identities, generated ownership ledger, copied runtime,
-merge machinery, package cache, analyzer registry, custom resolver, signature framework, model
-invocation path, or dormant implementation path. Git history remains the recovery mechanism for
-retired work.
+merge machinery, package cache, analyzer registry, custom resolver, signature framework, or dormant
+implementation path. Governance validation has no model invocation path. The optional provider
+helper is an explicit skill capability, not a check executor or model router. Git history remains
+the recovery mechanism for retired work.

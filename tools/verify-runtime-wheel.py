@@ -13,6 +13,7 @@ import venv
 from pathlib import Path
 
 from verify_kmp_surface import verify_kmp_surface
+from verify_provider_agents import verify_provider_agents
 
 
 REPLACEMENT_SCRIPT = """\
@@ -582,6 +583,7 @@ def main() -> int:
         root = Path(temporary) / "target"
         root.mkdir()
         python, command = initialize_target(root, wheel)
+        verify_provider_agents(root)
         verify_change_narratives(root, command)
         verify_launcher_refresh(root, command)
         verify_kmp_surface(root, command, run)

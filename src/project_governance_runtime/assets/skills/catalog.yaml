@@ -13,6 +13,7 @@ target_input_contract: >
 
 discovery_contract:
   - Read AGENTS.md first.
+  - Use resources/harness-delegation.md for the default cross-model route before selecting a global provider skill.
   - Read this catalog when the task requires a governed workflow or stack-specific skill.
   - Select the narrowest matching skill by id, category, description, and target context.
   - Read the selected SKILL.md completely before acting.
@@ -26,6 +27,33 @@ canonical_roots:
   pattern_packs: .governance/runtime/skills/pattern-packs
 
 standard_skills:
+  - id: harness-gemini-agent
+    category: provider
+    path: .governance/runtime/skills/harness-gemini-agent/SKILL.md
+    description: Delegate an authorized task to native Gemini with full tools and observable progress.
+    activation:
+      mode: governed
+      default_level: recommended
+    applicability:
+      task_terms: [use gemini, ask gemini, delegate to gemini, gemini agent, harness-gemini-agent]
+  - id: harness-claude-agent
+    category: provider
+    path: .governance/runtime/skills/harness-claude-agent/SKILL.md
+    description: Delegate an authorized task to native Claude Code with full tools and observable progress.
+    activation:
+      mode: governed
+      default_level: recommended
+    applicability:
+      task_terms: [use claude, ask claude, delegate to claude, claude agent, harness-claude-agent]
+  - id: harness-codex-agent
+    category: provider
+    path: .governance/runtime/skills/harness-codex-agent/SKILL.md
+    description: Delegate an authorized task to native Codex from Claude or another parent with shell access.
+    activation:
+      mode: governed
+      default_level: recommended
+    applicability:
+      task_terms: [use codex, ask codex, delegate to codex, codex agent, harness-codex-agent]
   - id: frame
     category: loop
     path: .governance/runtime/skills/frame/SKILL.md
@@ -145,6 +173,12 @@ pattern_packs:
     description: Deep workflow and review skills for discovery, risk, implementation quality, CI, docs, and delivery.
 
 resources:
+  - id: harness-delegation
+    path: .governance/runtime/skills/resources/harness-delegation.md
+    description: Default repository cross-model routing and precedence over ambient system wrappers.
+  - id: harness-agent-operation
+    path: .governance/runtime/skills/resources/harness-agent-operation.md
+    description: Shared native-provider job lifecycle, capability boundary, invocation, and recovery guidance.
   - id: loop-cycle
     path: .governance/runtime/skills/resources/loop-cycle.yaml
     description: Frame to Plan to Work to Review to Capture dry-run stage map.
