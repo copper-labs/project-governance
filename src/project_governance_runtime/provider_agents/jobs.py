@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import fcntl
 import json
 import os
 from pathlib import Path
@@ -14,8 +15,8 @@ import uuid
 
 from . import PROTOCOL_VERSION
 from .config import AgentError, TERMINAL, binding, code_digest, directory, duration
-from .processes import record, same_process, terminate_owned
-from .storage import Store, atomic_json, events_since, read_json, validate_record
+from .processes import cleanup_stage, record, same_process, terminate_owned
+from .storage import Events, Store, atomic_json, events_since, read_json, validate_record
 
 
 def normalize(task, workspace, *, provider, model=None, effort=None, executable=None, config=None,
@@ -88,16 +89,41 @@ def recover(path):
     if same_process(worker) or same_process(read_json(path / "guardian.json")):
         return value
     if not terminate_owned(path, read_json(path / "provider.json"), grace=.2):
-        return {**value, "stage": "Cleanup is pending; owned processes remain"}
-    state = "cancelled" if (path / "cancel.json").exists() else "failed"
-    error = "Worker exited without a terminal result; partial work is preserved"
-    partial = read_json(path / "result.json", {})
-    atomic_json(path / "result.json", {**partial, "protocol_version": PROTOCOL_VERSION,
-                "job_id": path.name, "state": state, "answer": partial.get("answer", ""),
-                "error": error, "remaining": [error], "cleanup_confirmed": True})
-    value.update(state=state, stage=error, finished_at=time.time())
-    atomic_json(path / "status.json", value)
-    return value
+        return {**value, "stage": cleanup_stage(path)}
+    return finish_cleanup(path)
+
+
+def finish_cleanup(path):
+    """Publish retained completion after abandoned-process cleanup is confirmed."""
+    fd = os.open(path / "completion.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        value = validate_record(read_json(path / "status.json"))
+        if value["state"] in TERMINAL:
+            return value
+        partial = read_json(path / "result.json", {})
+        pending = partial.get("pending_state")
+        state = pending if pending in TERMINAL else "failed"
+        error = partial.get("error") if pending in TERMINAL else "Worker exited without a terminal result; partial work is preserved"
+        if (path / "cancel.json").exists():
+            state, error = "cancelled", "Cancellation requested"
+        remaining = list(partial.get("remaining", []))
+        if error and error not in remaining:
+            remaining.append(error)
+        finished_at = time.time()
+        partial.pop("pending_state", None)
+        atomic_json(path / "result.json", {**partial, "protocol_version": PROTOCOL_VERSION,
+                    "job_id": path.name, "state": state, "answer": partial.get("answer", ""),
+                    "error": error, "remaining": remaining, "cleanup_confirmed": True, "finished_at": finished_at})
+        events = Events(path / "events.jsonl", value["provider"])
+        events.sequence = value.get("last_event", 0)
+        event = events.append("finished", state=state, message=error or state)
+        value.update(state=state, stage=error or state, finished_at=finished_at,
+                     last_event=event["sequence"], current_tool=None)
+        atomic_json(path / "status.json", value)
+        return value
+    finally:
+        os.close(fd)
 
 
 def start(task, workspace, *, store=None, environment_fd=None, **options):

@@ -239,12 +239,23 @@ Success requires a provider terminal success, valid structured completion with n
 successful required tool evidence, existing reported artifacts, and completed process cleanup.
 Exit zero, a heartbeat, or the model's claim alone is insufficient. Intermediate recoverable tool
 errors do not automatically fail a completed assignment. Unresolved denied required actions do.
+Native structured denials are authoritative. A text fallback accepts a standalone denial diagnostic;
+it must not infer an access denial from quoted source or mixed command output.
+
+Provider inactivity starts at native launch, after workspace/session queueing and preflight. Those
+earlier phases still consume an explicitly configured overall deadline. If process cleanup remains
+pending, retain the completed answer and observed evidence durably before the worker exits. The
+guardian and reader recovery preserve that receipt and publish a terminal outcome only after cleanup.
+A signal permission failure retains process ownership, reports pending cleanup, and leaves status,
+events, result polling, and cancellation usable. It never grants permission or counts as confirmed exit.
 
 Requests and job evidence live in a private, configurable user state directory outside the
 replaceable governance environment. Use private files and directories, atomic state writes,
 bounded event reads, and secret redaction in exported diagnostics. Original task text is sensitive
 local data; do not copy credentials into it or send job evidence to governance telemetry. Do not
 silently delete artifacts, logs, or partial work as part of an upgrade.
+Redact recognizable credential fields inside JSON and Python dictionary text as well as structured
+objects, including public tool events and terminal receipts. Repeated redaction is idempotent.
 
 ## Compatibility And Migration
 

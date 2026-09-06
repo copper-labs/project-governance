@@ -6,6 +6,7 @@ import sys
 import time
 
 from .config import TERMINAL
+from .jobs import finish_cleanup
 from .processes import collect, record, same_process, terminate_owned
 from .storage import atomic_json, read_json, validate_record
 
@@ -26,12 +27,7 @@ def main():
                 return
         elif not same_process(worker):
             if terminate_owned(path, provider, grace=.2):
-                error = "Worker exited before completion; partial work is preserved"
-                state = "cancelled" if (path / "cancel.json").exists() else "failed"
-                atomic_json(path / "result.json", {
-                    "protocol_version": value["protocol_version"], "job_id": path.name, "state": state,
-                    "answer": "", "error": error, "remaining": [error], "cleanup_confirmed": True})
-                atomic_json(path / "status.json", {**value, "state": state, "stage": error, "finished_at": time.time()})
+                finish_cleanup(path)
                 return
         time.sleep(.25)
 

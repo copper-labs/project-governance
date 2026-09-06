@@ -109,6 +109,17 @@ def signal_record(value, sig):
             os.kill(value["pid"], sig)
         except ProcessLookupError:
             pass
+        except PermissionError:
+            # Keep the identity owned; inability to signal is not proof of exit.
+            return False
+    return True
+
+
+def cleanup_stage(path):
+    """Explain cleanup blockers without exposing process arguments or credentials."""
+    if read_json(path / "cleanup.json", {}).get("signal_denied"):
+        return "Cleanup pending; permission denied signaling owned processes"
+    return "Cleanup pending; owned processes remain"
 
 
 def terminate_owned(path, provider, grace=1):
@@ -116,10 +127,12 @@ def terminate_owned(path, provider, grace=1):
     if not provider:
         return True
     children = collect(path, provider)
+    denied = {}
     for sig, wait in ((signal.SIGTERM, grace), (signal.SIGKILL, 2)):
-        for child in reversed(children):
-            signal_record(child, sig)
-        signal_record(provider, sig)
+        for child in [*reversed(children), provider]:
+            if not signal_record(child, sig):
+                denied[child["pid"]] = child
+        atomic_json(path / "cleanup.json", {"signal_denied": list(denied.values())})
         end = time.monotonic() + wait
         while time.monotonic() < end:
             if not any(same_process(r) for r in [provider, *children]):

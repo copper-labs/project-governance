@@ -29,7 +29,7 @@ ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "tests/fixtures/provider_agent.py"
 
 
-class ProviderAgentTests(unittest.TestCase):
+class ProviderAgentCase(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
@@ -79,6 +79,8 @@ class ProviderAgentTests(unittest.TestCase):
             time.sleep(.05)
         self.fail("fixture did not reach its running marker")
 
+
+class ProviderAgentTests(ProviderAgentCase):
     def test_three_native_protocols_complete_and_resume_exactly(self):
         for provider in ("gemini", "claude", "codex"):
             with self.subTest(provider=provider):
@@ -427,6 +429,159 @@ worker.main()
                     time.sleep(.05)
         finally:
             os.close(check_fd)
+
+
+
+class ProviderAgentRepairTests(ProviderAgentCase):
+    def test_idle_deadline_starts_at_launch_and_still_stops_inactive_provider(self):
+        os.environ["PROVIDER_AGENT_FIXTURE_SCENARIO"] = "sleep"
+        first = self.start()
+        self.ready()
+        os.environ["PROVIDER_AGENT_FIXTURE_SCENARIO"] = "normal"
+        second = self.start(idle_timeout_seconds=1)
+        self.assertEqual(second["state"], "queued")
+        time.sleep(1.2)
+        jobs.cancel(first["job_id"])
+        self.assertEqual(self.await_result(second["job_id"])["state"], "succeeded")
+        os.environ["PROVIDER_AGENT_FIXTURE_SCENARIO"] = "sleep"
+        value = self.await_result(self.start(idle_timeout_seconds=.5)["job_id"])
+        self.assertEqual(value["state"], "timed_out")
+        self.assertEqual(value["error"], "Provider inactivity deadline exceeded")
+
+    def test_claude_mixed_output_is_not_a_denial_but_native_denials_block(self):
+        from project_governance_runtime.provider_agents.claude import Claude
+
+        for content in ('Exit code 1\nerror = "Permission denied"\n(eval):1: ==== not found',
+                        [{"type": "text", "text": 'Exit code 1\nprint("Access denied")'}]):
+            protocol = Claude({"model": "fixture-model", "effort": "high", "required_tools": ["command"]}, lambda *_a, **_k: None)
+            protocol.initialize("fixture-model", "session", "full", "full")
+            protocol.tool("one", "Bash", "command", "ACTIVE")
+            protocol.accept({"type": "user", "message": {"content": [{"type": "tool_result",
+                "tool_use_id": "one", "is_error": True, "content": content}]}})
+            protocol.tool("retry", "Bash", "command", "DONE", output="OK")
+            final = {"type": "result", "subtype": "success", "is_error": False, "structured_output": {
+                "outcome": "completed", "answer": "Done", "artifacts": [], "checks": [], "sources": [], "remaining": []}}
+            protocol.accept(final)
+            self.assertEqual(protocol.finish()[0], "succeeded")
+            self.assertEqual(protocol.denied, [])
+            # Native permission_denials remain authoritative even with successful tools.
+            protocol.done = False
+            protocol.accept({**final, "permission_denials": [{"tool_name": "Read", "tool_use_id": "denied"}]})
+            self.assertEqual(protocol.finish()[0], "blocked")
+
+    def test_cleanup_pending_preserves_completion_for_guardian_and_recovery(self):
+        for mode in ("guardian", "recovery", "cancel"):
+            with self.subTest(mode=mode):
+                request = jobs.normalize("Exercise delayed cleanup", str(self.workspace), provider="claude",
+                                         model="fixture-model", effort="high", executable=str(FIXTURE))
+                job_id, path = self.store.create(request)
+                script = """
+import sys,time
+from project_governance_runtime.provider_agents import worker
+worker.terminate_owned = lambda *a, **k: False
+original = worker.Worker.finish
+def pause(self, *args, **kwargs):
+    original(self, *args, **kwargs)
+    (self.path / 'pending-ready').touch()
+    end = time.monotonic() + 10
+    while not (self.path / 'release-cleanup').exists() and time.monotonic() < end:
+        time.sleep(.05)
+worker.Worker.finish = pause
+if sys.argv[2] == 'recovery':
+    worker.Worker._start_guardian = lambda self: None
+worker.main()
+"""
+                child = subprocess.Popen([sys.executable, "-c", script, job_id, mode])
+                try:
+                    end = time.monotonic() + 10
+                    while not (path / "pending-ready").exists() and time.monotonic() < end:
+                        time.sleep(.05)
+                    self.assertTrue((path / "pending-ready").exists())
+                    self.assertFalse(jobs.result(job_id)["ready"])
+                    pending = read_json(path / "result.json")
+                    self.assertFalse(pending["cleanup_confirmed"])
+                    self.assertEqual(pending["pending_state"], "succeeded")
+                    if mode == "cancel":
+                        jobs.cancel(job_id)
+                    (path / "release-cleanup").touch()
+                    child.wait(timeout=5)
+                    result = self.await_result(job_id)
+                    self.assertEqual(result["state"], "cancelled" if mode == "cancel" else "succeeded")
+                    self.assertTrue(result["cleanup_confirmed"])
+                    for key in ("answer", "observed_tools", "observed_model", "conversation_id", "usage", "workspace_before", "workspace_after"):
+                        self.assertTrue(result[key])
+                        self.assertEqual(result[key], pending[key])
+                    self.assertNotIn("pending_state", result)
+                    self.assertEqual(sum(e["type"] == "finished" for e in jobs.events(job_id)["events"]), 1)
+                finally:
+                    (path / "release-cleanup").touch()
+                    if child.poll() is None:
+                        child.kill()
+                    child.wait(timeout=5)
+
+    def test_signal_permission_failure_keeps_readers_and_unrelated_jobs_usable(self):
+        request = jobs.normalize("Exercise orphan cleanup", str(self.workspace), provider="claude",
+                                 model="fixture-model", effort="high", executable=str(FIXTURE))
+        job_id, path = self.store.create(request)
+        atomic_json(path / "status.json", {**read_json(path / "status.json"), "state": "running", "created_at": time.time() - 10})
+        child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(90)"])
+        atomic_json(path / "provider.json", record(child.pid))
+        original_kill = os.kill
+        def deny(pid, sig):
+            if pid == child.pid:
+                raise PermissionError("Synthetic signaling denial")
+            return original_kill(pid, sig)
+        try:
+            with patch("project_governance_runtime.provider_agents.processes.os.kill", side_effect=deny):
+                self.assertIn("permission denied", jobs.status(job_id)["stage"])
+                self.assertEqual(jobs.events(job_id)["state"], "running")
+                self.assertFalse(jobs.result(job_id)["ready"])
+                self.assertEqual(jobs.cancel(job_id)["state"], "running")
+                self.assertTrue((path / "cancel.json").exists())
+                self.assertTrue(same_process(read_json(path / "provider.json")))
+                # Exercise the actual blocker scan under the same fault, without spawning
+                # a worker that could signal this synthetic orphan outside the mock.
+                from project_governance_runtime.provider_agents.worker import Worker
+                separate = self.root / "separate"
+                separate.mkdir()
+                other_id, other_path = self.store.create({**request, "workspace": str(separate)})
+                self.assertEqual(Worker(self.store, other_id)._blockers(), [])
+                atomic_json(other_path / "cancel.json", {"requested_at": time.time()})
+        finally:
+            child.terminate()
+            child.wait(timeout=5)
+        result = self.await_result(job_id)
+        self.assertEqual(result["state"], "cancelled")
+        self.assertTrue(result["cleanup_confirmed"])
+
+    def test_credential_text_is_redacted_in_events_and_terminal_receipts(self):
+        from project_governance_runtime.provider_agents.worker import Worker
+        from project_governance_runtime.provider_agents.storage import Redactor
+
+        request = jobs.normalize("Check public projections", str(self.workspace), provider="claude",
+                                 model="fixture-model", effort="high", executable=str(FIXTURE))
+        job_id, path = self.store.create(request)
+        worker = Worker(self.store, job_id)
+        worker.protocol.initialize("fixture-model", "session", "full", "full")
+        tokens = ["synthetic-json-token", "synthetic-python-token", "synthetic-spaced-token with spaces", "synthetic-bare-token",
+                  "synthetic-prefixed-key", "synthetic-prefixed-password", "synthetic-prefixed-secret"]
+        output = [json.dumps({"access_token": tokens[0]}), str({"api-key": tokens[1]}),
+                  json.dumps({"password": tokens[2]}), "secret=" + tokens[3],
+                  "export OPENAI_API_KEY=" + tokens[4], "DB_PASSWORD=" + tokens[5], "CLIENT_SECRET=" + tokens[6]]
+        worker.protocol.tool("one", "Bash", "command", "DONE", parameters={"nested": {"access_token": tokens[0]}}, output=output)
+        worker.finish("succeeded", {"answer": "Done", "remaining": [], "artifacts": []}, None)
+        for name in ("events.jsonl", "result.json", "status.json"):
+            public = (path / name).read_text()
+            for token in tokens:
+                self.assertNotIn(token, public)
+        self.assertIn("[REDACTED]", (path / "events.jsonl").read_text())
+        redactor = Redactor()
+        for raw in [*output, json.dumps({"password": 'synthetic-escaped-"quote\\slash'}),
+                    '{"access_token":"synthetic-truncated-token', "{'secret': 'synthetic-truncated-token"]:
+            cleaned = redactor.clean(raw)
+            self.assertNotIn("synthetic-", cleaned)
+            self.assertEqual(redactor.clean(cleaned), cleaned)
+
 
 
 if __name__ == "__main__":

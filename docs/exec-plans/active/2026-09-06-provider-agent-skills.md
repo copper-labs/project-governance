@@ -27,8 +27,8 @@ deferred. This release adds no role-to-model policy, price table, model ranking,
 
 ## Delivery
 
-- Delivery: implementation and local candidate proof complete; release authorized but held for
-  the remaining live provider and cross-parent proofs.
+- Delivery: secondary-review repairs implemented and independently rechecked; release authorized
+  but held for the remaining live provider and cross-parent proofs and final release gates.
 - Candidate base: current `main` after the 2.3.0 release.
 - Target: 2.4.0 under the existing semantic release contract for additive capabilities.
 - Existing unrelated checkout work remains outside this candidate.
@@ -130,6 +130,35 @@ deferred. This release adds no role-to-model policy, price table, model ranking,
 
 ## Stable-Candidate Proof And Release
 
+### Secondary Review Reconciliation
+
+The secondary Claude review identified idle-deadline queue accounting, uncaught signal permission
+errors, and lost completion evidence during delayed cleanup. Parent reconciliation also reproduced
+false denial detection from printed source and missed credential redaction inside quoted text.
+All five findings have focused regressions and an independent affected recheck. Signal-denial and delayed-cleanup failures use controlled fault
+injection; a real foreign-UID Linux descendant has not been exercised.
+
+Repairs start the idle clock at native launch, retain cleanup blockers without disabling readers,
+persist pending completion for both guardian and reader recovery, constrain denial-text inference,
+and redact quoted credential fields in public projections. The redaction tests also cover truncated
+quoted output, prefixed environment names, and repeated filtering. The independent recheck caught
+a prefixed-name regression introduced by the repair; it was corrected and independently closed.
+
+Repair proof: 39 wrapper/host-integration tests passed on macOS; 28 wrapper tests passed on Linux,
+followed by all five repair regressions after the test grouping and truncation refinement. The full
+runtime suite passed 358 tests with one existing optional compiler test skipped. The final prefix
+correction received a focused public-event/receipt test and independent comparison against the
+previous redactor rather than a repeated broad suite. Clean installed-wheel proof complements
+these source tests. Source sign-off is required again for the final documented candidate.
+
+Claude's additional unproven architectural risks remain investigation leads, not accepted defects
+or completed repairs. Its recheck also recorded a pre-existing limitation for backslash-escaped JSON
+nested inside tool-output strings; that encoding is outside this repair's text matcher. Ambiguous
+OS command output remains observed tool-error evidence rather than an inferred permission denial.
+Native structured denial records remain authoritative.
+
+### Candidate And Publication Gates
+
 Freeze one candidate after independent QA reconciliation. Run one branch-aware local sign-off.
 Prepare the change narrative, open the PR, and run source readiness on the proposed merge result.
 The release boundary includes the complete runtime suite, reproducible wheel boundary, clean
@@ -137,7 +166,7 @@ installed-wheel proof, and Linux/macOS process evidence. Follow the
 [release process](../../governance/release-process.md) for merge, immutable tag publication, and
 wheel/lock/hash readback. A changed integration base forms a new candidate.
 
-The local candidate passes all selected repository checks, the reproducible wheel boundary, and
+The initial local candidate passed all selected repository checks, the reproducible wheel boundary, and
 the complete runtime suite: 351 tests with one existing optional TypeScript-compiler test skipped
 because that dependency is unavailable. The Linux provider suite and clean installed-wheel journey
 also pass. These proofs do not replace the outstanding live provider acceptance or certify a

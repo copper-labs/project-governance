@@ -54,9 +54,18 @@ def prompt(request):
 
 
 def permission_denied(error):
-    """Recognize explicit access failures without treating every error as a denial."""
-    return bool(re.search(r"\b(?:permissions?|access)\s+(?:(?:was|is)\s+)?denied\b|\bauto[- ]denied\b|PERMISSION_DENIED|ACCESS_DENIED",
-                          str(error), re.I))
+    """Accept denial diagnostics, never search mixed tool output for denial words."""
+    if isinstance(error, list):
+        error = error[0].get("text") if len(error) == 1 and isinstance(error[0], dict) else None
+    if isinstance(error, dict):
+        if error.get("code") in ("PERMISSION_DENIED", "ACCESS_DENIED"):
+            return True
+        error = error.get("message")
+    if not isinstance(error, str):
+        return False
+    return bool(re.fullmatch(r"(?:Error:\s*)?(?:(?:permissions?|access)\s+(?:(?:was|is)\s+)?denied|"
+                             r"auto[- ]denied|PERMISSION_DENIED|ACCESS_DENIED)(?:[.!]|:[^\r\n]*)?",
+                             error.strip(), re.I))
 
 
 class Protocol:

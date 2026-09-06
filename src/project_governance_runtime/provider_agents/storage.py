@@ -62,8 +62,13 @@ class Redactor:
         for secret in self.values:
             value = value.replace(secret, "[REDACTED]")
         value = re.sub(r"(?i)(Bearer\s+)[A-Za-z0-9._~+/-]+=*", r"\1[REDACTED]", value)
-        return re.sub(r"(?i)((?:api[_-]?key|access[_-]?token|password|secret)\s*[=:]\s*)[^\s,;&\"']+",
-                      r"\1[REDACTED]", value)
+        # Tool evidence often contains JSON or Python repr rather than structured fields.
+        pattern = (r"(?i)((?:api[_-]?key|access[_-]?token|password|secret|authorization)\b[\"']?\s*[=:]\s*)"
+                   r'''("(?:\\.|[^"\\])*(?:"|$)|'(?:\\.|[^'\\])*(?:'|$)|\[REDACTED\]|[^\s,;&"'}\]]+)''')
+        def mask(match):
+            quote = match[2][0] if match[2][0] in "\"'" else ""
+            return match[1] + quote + "[REDACTED]" + quote
+        return re.sub(pattern, mask, value)
 
     def clean(self, value):
         """Redact credentials recursively while preserving the surrounding evidence."""
@@ -72,7 +77,7 @@ class Redactor:
         if isinstance(value, list):
             return [self.clean(v) for v in value]
         if isinstance(value, dict):
-            return {k: "[REDACTED]" if re.fullmatch(r"(?i)(api_?key|access_token|password|secret|authorization)", k)
+            return {k: "[REDACTED]" if re.fullmatch(r"(?i)(api[_-]?key|access[_-]?token|password|secret|authorization)", k)
                     else self.clean(v) for k, v in value.items()}
         return value
 

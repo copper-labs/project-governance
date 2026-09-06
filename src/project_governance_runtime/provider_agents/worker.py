@@ -16,7 +16,7 @@ from .codex import Codex
 from .config import AgentError, TERMINAL, code_digest
 from .gemini import Gemini
 from .jobs import conflicts, recover
-from .processes import record, same_process, terminate_owned
+from .processes import cleanup_stage, record, same_process, terminate_owned
 from .protocol import artifact_evidence
 from .stream import ProviderStream
 from .storage import Events, Redactor, Store, atomic_json, read_json, validate_record
@@ -182,6 +182,8 @@ class Worker:
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
                 start_new_session=True, close_fds=True, pass_fds=(gate_read,))
             atomic_json(self.path / "provider.json", record(self.proc.pid))
+            # Queueing and preflight consume the overall deadline, not provider inactivity.
+            self.last_activity = time.monotonic()
             os.write(gate_write, b"1")
         finally:
             os.close(gate_read)
@@ -194,14 +196,11 @@ class Worker:
                 self.proc.wait(timeout=3)
             except subprocess.TimeoutExpired:
                 cleaned = False
-        if not cleaned:
-            # Keep ownership and the environment lock while the guardian retries cleanup.
-            self.state["stage"] = "Cleanup pending; owned processes remain"
-            self.heartbeat(force=True)
-            return
         if self.proc and self.proc.returncode and state == "succeeded" and not self.expected_shutdown:
             state, error = "failed", f"Provider exited {self.proc.returncode}"
-        self.finish(state, completion, error)
+        self.finish(state, completion, error, cleanup_confirmed=cleaned)
+        if not cleaned:
+            return
         if self.guardian:
             self.guardian.wait(timeout=5)
 
@@ -209,8 +208,8 @@ class Worker:
         """Exchange native frames while preserving supervisor cancellation and liveness."""
         return ProviderStream(self).run()
 
-    def finish(self, state, completion, error):
-        """Store observed evidence and publish a terminal state after process cleanup."""
+    def finish(self, state, completion, error, cleanup_confirmed=True):
+        """Persist completion evidence even when the guardian must finish cleanup."""
         artifacts = artifact_evidence(completion.get("artifacts", []), self.request["workspace"])
         remaining = [*completion.get("remaining", []), *([error] if error else [])]
         if state == "succeeded" and any(not a["exists"] for a in artifacts):
@@ -226,10 +225,17 @@ class Worker:
             conversation_id=p.conversation_id, parent_job_id=self.request.get("parent_job_id"),
             capabilities=p.init, artifacts=artifacts, reported_checks=completion.get("checks", []),
             reported_sources=completion.get("sources", []), observed_tools=list(p.tools.values()), denied_actions=p.denied,
-            usage=p.usage, provider_exit_code=self.proc.returncode if self.proc else None, cleanup_confirmed=True,
+            usage=p.usage, provider_exit_code=self.proc.returncode if self.proc else None, cleanup_confirmed=cleanup_confirmed,
             supervisor_closed_server=self.expected_shutdown,
             workspace_before=self.before, workspace_after=snapshot(self.request["workspace"]), finished_at=time.time())
+        if not cleanup_confirmed:
+            value.update(pending_state=state, state=self.state["state"], finished_at=None)
         atomic_json(self.path / "result.json", self.redactor.clean(value))
+        if not cleanup_confirmed:
+            # The guardian retains the environment lock; no terminal success is visible yet.
+            self.state["stage"] = cleanup_stage(self.path)
+            self.heartbeat(force=True)
+            return
         self.state.update(state=state, stage=error or state, finished_at=value["finished_at"], current_tool=None)
         self.emit("finished", state=state, message=error or state)
 
