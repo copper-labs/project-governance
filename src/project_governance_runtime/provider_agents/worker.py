@@ -51,7 +51,7 @@ class Worker:
         self.protocol = {"gemini": Gemini, "claude": Claude, "codex": Codex}[self.request["provider"]](self.request, self.emit)
         self.before, self.provider_version = {}, None
         self.expected_shutdown = False
-        self.environment_fd = os.environ.get("PROJECT_GOVERNANCE_AGENT_ENV_FD")
+        self.environment_fd = os.environ.get("HARNESS_AGENT_ENV_FD")
 
     def heartbeat(self, force=False):
         """Persist supervisor liveness separately from actual provider activity."""
@@ -173,7 +173,7 @@ class Worker:
     def _launch_provider(self):
         env = dict(os.environ)
         ancestry = [*self.request["enclosing_jobs"], {"state_root": str(self.store.root), "job_id": self.path.name}]
-        env["PROJECT_GOVERNANCE_AGENT_ANCESTRY"] = json.dumps(ancestry)
+        env["HARNESS_AGENT_ANCESTRY"] = json.dumps(ancestry)
         gate_read, gate_write = os.pipe()
         try:
             self.proc = subprocess.Popen([

@@ -14,6 +14,7 @@ from . import __version__
 from .changed_paths import ChangedPathError, resolve_change_scope
 from .configuration import ConfigurationError, load_packs
 from .context import ContextError, resolve_context
+from .harness_integration import harness_routing_status
 from .documentation import (
     DocumentationError,
     documentation_selection_paths,
@@ -332,6 +333,7 @@ def _doctor(root: Path) -> dict[str, Any]:
         "findings": findings,
         "notices": notices,
         "launcher_drift": integration_drift,
+        "harness_delegation": harness_routing_status(root) if not source_checkout else {"status": "source-checkout"},
     }
 
 

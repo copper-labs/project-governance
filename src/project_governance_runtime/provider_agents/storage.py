@@ -80,8 +80,8 @@ class Redactor:
 class Store:
     """Keep private job records outside the replaceable governance installation."""
     def __init__(self, root=None):
-        self.root = Path(root or os.environ.get("PROJECT_GOVERNANCE_AGENT_STATE") or
-                         Path.home() / ".local/share/project-governance-agents").expanduser().resolve()
+        self.root = Path(root or os.environ.get("HARNESS_AGENT_STATE") or
+                         Path.home() / ".local/share/harness-agents").expanduser().resolve()
         self.jobs = self.root / "jobs"
         if self.jobs.is_symlink():
             raise AgentError("job storage must not be a symlink")

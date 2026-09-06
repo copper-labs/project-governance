@@ -32,7 +32,7 @@ def doctor(provider):
 
 def parser():
     """Expose one consistent command contract for every supported parent agent."""
-    root = argparse.ArgumentParser(prog="project-governance-agent", description="Optional native provider jobs with full authorized tools.")
+    root = argparse.ArgumentParser(prog="harness-agent", description="Optional native provider jobs with full authorized tools.")
     sub = root.add_subparsers(dest="command", required=True)
     for name in ("start", "run"):
         p = sub.add_parser(name)

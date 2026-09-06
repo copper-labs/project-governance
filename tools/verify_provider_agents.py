@@ -15,6 +15,7 @@ def verify_provider_agents(root):
         return
     with tempfile.TemporaryDirectory(prefix="provider-wheel-proof-") as temporary:
         proof = _InstalledProviderProof(root, Path(temporary))
+        proof.default_route()
         proof.absent_provider()
         proof.native_protocols()
         proof.upgrade_exclusion()
@@ -27,7 +28,7 @@ class _InstalledProviderProof:
     def __init__(self, root, scratch):
         self.root, self.scratch = root, scratch
         self.runtime = root / ".governance/runtime"
-        self.agent = self.runtime / "bin/project-governance-agent"
+        self.agent = self.runtime / "bin/harness-agent"
         self.core = self.runtime / "bin/project-governance"
         self.python = self.runtime / "bin/python"
         self.workspace = scratch / "workspace"
@@ -36,12 +37,12 @@ class _InstalledProviderProof:
         self.native = scratch / "provider-fixture"
         self.native.write_text(f"#!{self.python}\n" + fixture.read_text().split("\n", 1)[1])
         self.native.chmod(0o700)
-        self.environment = {**os.environ, "PROJECT_GOVERNANCE_AGENT_STATE": str(scratch / "state"),
-                           "PROJECT_GOVERNANCE_AGENT_ANCESTRY": "[]",
+        self.environment = {**os.environ, "HARNESS_AGENT_STATE": str(scratch / "state"),
+                           "HARNESS_AGENT_ANCESTRY": "[]",
                            "PROVIDER_AGENT_FIXTURE_LOG": str(scratch / "logs"),
                            "PROVIDER_AGENT_FIXTURE_SCENARIO": "normal"}
         self.environment.pop("PYTHONPATH", None)
-        self.environment.pop("PROJECT_GOVERNANCE_AGENT_ENV_FD", None)
+        self.environment.pop("HARNESS_AGENT_ENV_FD", None)
 
     def invoke(self, command, *arguments, expected=0, env=None):
         """Run only the installed command and keep its diagnostic output bounded."""
@@ -75,10 +76,26 @@ class _InstalledProviderProof:
         if missing["available"]:
             raise RuntimeError("missing provider was incorrectly reported available")
 
+    def default_route(self):
+        """Check the adopted default while a competing command remains on PATH."""
+        competing = self.scratch / "system-bin"
+        competing.mkdir()
+        marker = self.scratch / "wrong-route"
+        wrapper = competing / "harness-agent"
+        wrapper.write_text(f"#!{self.python}\nfrom pathlib import Path\nPath({str(marker)!r}).touch()\n")
+        wrapper.chmod(0o700)
+        self.environment["PATH"] = str(competing) + os.pathsep + self.environment.get("PATH", "")
+        report = json.loads(self.invoke(self.core, "doctor"))["harness_delegation"]
+        if report["status"] != "ready" or report["executable"] != str(self.agent.resolve()):
+            raise RuntimeError(f"installed harness default is incomplete: {report}")
+        self.invoke(self.agent, "--help")
+        if marker.exists():
+            raise RuntimeError("a competing system command replaced the installed harness route")
+
     def native_protocols(self):
         """Require the installed skills and successful execution through all three adapters."""
         for provider in ("gemini", "claude", "codex"):
-            if not (self.runtime / "skills" / f"{provider}-agent/SKILL.md").is_file():
+            if not (self.runtime / "skills" / f"harness-{provider}-agent/SKILL.md").is_file():
                 raise RuntimeError(f"installed provider skill is missing: {provider}")
             value = self.completed(self.launch(provider))
             if value["state"] != "succeeded" or not value["cleanup_confirmed"]:

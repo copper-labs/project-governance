@@ -40,7 +40,11 @@ pack fails, use `project-governance check --pack <pack-id>` only when focused di
 After the final repair, use either the enclosing Git hook or one impacted closeout as the affected
 recheck; do not run both immediately against the unchanged subject.
 
-When the operator explicitly requests delegated execution, use the host's native controls. Keep the
+For cross-model work, follow `.governance/runtime/skills/resources/harness-delegation.md` and use the
+provided `harness-*` skills by default, even when system wrappers are available. Initialization and
+bootstrap maintain thin routing pointers in host startup instructions; reload the parent session
+after setup. Explicit operator route choices override the default. Use native controls for
+same-model subagents. Keep the
 current session primary, use at most one writer and two non-overlapping readers, and share the
 current checkout. Delegation does not authorize another worktree.
 

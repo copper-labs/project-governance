@@ -31,7 +31,7 @@ def normalize(task, workspace, *, provider, model=None, effort=None, executable=
             conversation_id = str(uuid.UUID(conversation_id))
         except (ValueError, TypeError) as error:
             raise AgentError("provider session must be an exact UUID") from error
-    ancestry = enclosing_jobs if enclosing_jobs is not None else json.loads(os.environ.get("PROJECT_GOVERNANCE_AGENT_ANCESTRY", "[]"))
+    ancestry = enclosing_jobs if enclosing_jobs is not None else json.loads(os.environ.get("HARNESS_AGENT_ANCESTRY", "[]"))
     if not isinstance(ancestry, list) or len(ancestry) > 32:
         raise AgentError("invalid enclosing job ancestry")
     selected = binding(provider, model, effort, executable, config)
@@ -145,9 +145,9 @@ def _check_ancestors(request):
 
 
 def _launch_worker(store, job_id, path, environment_fd):
-    env = dict(os.environ, PROJECT_GOVERNANCE_AGENT_STATE=str(store.root), PYTHONUNBUFFERED="1")
+    env = dict(os.environ, HARNESS_AGENT_STATE=str(store.root), PYTHONUNBUFFERED="1")
     fds = () if environment_fd is None else (environment_fd,)
-    env["PROJECT_GOVERNANCE_AGENT_ENV_FD"] = str(environment_fd) if environment_fd is not None else ""
+    env["HARNESS_AGENT_ENV_FD"] = str(environment_fd) if environment_fd is not None else ""
     gate_read, gate_write = os.pipe()
     child, launch_error = None, None
     try:

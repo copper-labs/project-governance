@@ -22,7 +22,7 @@ class Codex(Protocol):
     def initial_input(self):
         """Identify this client and begin the native protocol handshake."""
         return self.wire({"id": 0, "method": "initialize", "params": {
-            "clientInfo": {"name": "project_governance_agent", "version": "1.0"}}})
+            "clientInfo": {"name": "harness_agent", "version": "1.0"}}})
 
     @staticmethod
     def wire(item):

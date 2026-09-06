@@ -17,6 +17,11 @@ Deliver the [provider-agent contract](../../specs/provider-agent-skills.md) thro
 skills and one shared helper. Any shell-capable parent can start a provider with full native tools,
 follow progress, collect honest results, and continue or cancel an exact job.
 
+The supplied skills are named `harness-gemini-agent`, `harness-claude-agent`, and
+`harness-codex-agent`, with the exact repository-local `harness-agent` executable. Adoption and
+upgrades install this cross-model default automatically. Provider access remains optional, and
+explicit operator route choices take precedence. Existing global wrappers remain untouched.
+
 Implementation-plan template improvements and advance task-to-model assignments are explicitly
 deferred. This release adds no role-to-model policy, price table, model ranking, or required provider.
 
@@ -75,12 +80,25 @@ deferred. This release adds no role-to-model policy, price table, model ranking,
 - Fixed decisions: no relative helper dependency on relocated context packets; no automatic login,
   provider installation, global settings mutation, or external legacy-wrapper retirement.
 - Acceptance: clean-wheel invocation works; missing providers leave ordinary governance usable;
-  host configuration can select different model IDs and efforts without package edits.
+  host configuration can select different model IDs and efforts without package edits. Adoption
+  and existing bootstrap launchers install marked pointers in each native host entry file;
+  authored text, permissions, and safe symlinks remain intact. Core doctor reports incomplete
+  routing resources without invoking providers or claiming universal host precedence.
 - Focused proof: skill payload, context selection/materialization, and installed-wheel seam.
 - Invalidates prior proof when: packaging, discovery, entry point, or configuration precedence changes.
 - Proof state: skill validation and 16 catalog, selection, and payload tests pass. Installation
   tests pass. Clean installed-wheel proof passes, including optional-provider absence, three
   native protocol fixtures, overlapping-job queueing, cancellation, and bootstrap exclusion.
+  Nine additional host-integration tests pass. Independent review closed unsafe runtime-target
+  symlinks, incomplete route-readiness checks, and permission preservation; a case-insensitive
+  macOS alias regression also passes. The installed-wheel journey now checks the harness default
+  with a competing command on PATH.
+  A live Codex parent selected the exact repository-local harness command while the existing
+  global Gemini plugin and competing commands were present. It used the host binding, received
+  streamed fixture events, and reported the terminal missing-read-evidence blocker honestly.
+  No competing command ran; cleanup was confirmed and authored startup text remained intact.
+  The child was synthetic: this proves route selection and evidence reporting, not live Gemini
+  capability. Native Claude and Gemini parent routing still need their live acceptance checks.
 - Escalate or stop when: installation requires a provider account or changes core configuration validity.
 
 ## Slice 4: Live Proof And Independent QA
@@ -113,7 +131,7 @@ installed-wheel proof, and Linux/macOS process evidence. Follow the
 wheel/lock/hash readback. A changed integration base forms a new candidate.
 
 The local candidate passes all selected repository checks, the reproducible wheel boundary, and
-the complete runtime suite: 342 tests with one existing optional TypeScript-compiler test skipped
+the complete runtime suite: 351 tests with one existing optional TypeScript-compiler test skipped
 because that dependency is unavailable. The Linux provider suite and clean installed-wheel journey
 also pass. These proofs do not replace the outstanding live provider acceptance or certify a
 published release. The plan remains active until those checks and release readback are complete.

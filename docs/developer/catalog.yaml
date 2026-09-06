@@ -2,11 +2,11 @@ version: 1
 capabilities:
   - id: provider-agents
     title: Delegate work to an optional native provider agent
-    aliases: [gemini-agent, claude-agent, codex-agent]
+    aliases: [harness-gemini-agent, harness-claude-agent, harness-codex-agent]
     tasks:
       - start a native provider job from a shell-capable parent
       - follow progress and recover a delegated provider assignment
-    symbols: [project-governance-agent]
+    symbols: [harness-agent]
     reference: docs/specs/provider-agent-skills.md
     guides: [docs/guides/provider-agents.md]
     sources:

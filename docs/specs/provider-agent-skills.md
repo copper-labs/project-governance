@@ -34,7 +34,7 @@ translation, and provider-specific errors. Provider roles describe the assignmen
 remove tools or select a cheaper model.
 
 The wheel ships the optional helper under `project_governance_runtime.provider_agents` and exposes
-`project-governance-agent`. Three thin skills explain its use. The governance CLI, doctor, hooks,
+`harness-agent`. Three thin skills explain its use. The governance CLI, doctor, hooks,
 checkers, and context selector neither import this helper nor launch a provider. Installing or
 updating governance does not authenticate, install, or probe any provider.
 
@@ -62,6 +62,35 @@ Arguments override that file. No personal model mix ships as a default. Configur
 provider bindings only; it does not prescribe which model a future implementation-plan task uses.
 Model IDs and effort names remain provider-specific. Unsupported selections fail visibly.
 
+## Repository Default And Host Activation
+
+Adopting repositories use `harness-gemini-agent`, `harness-claude-agent`, and `harness-codex-agent`
+by default for cross-model work. The command is `harness-agent`; helper environment variables use
+`HARNESS_AGENT_`, and private job data defaults to `harness-agents` under the user data directory.
+The existing wheel identity and `.governance/runtime` installation layout remain unchanged.
+
+Initialization and deliberate wheel bootstrap install thin, marked routing sections in root
+`AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`. An existing `AGENTS.override.md` receives the same pointer
+because Codex can load it instead of `AGENTS.md`. One wheel-owned Markdown resource,
+`resources/harness-delegation.md`, owns the shared route. This is the adoption default, not a
+separate opt-in or an ambient global-skill precedence assumption.
+
+Only managed sections change. Preserve surrounding authored text, file permissions, and safe
+in-repository symlinks. Reject external or replaceable runtime destinations, including case aliases,
+and malformed markers before writing any section. Setup does not
+rewrite this source checkout's own instruction files. Existing bootstrap launchers gain the route
+through the installed `materialize_skills` entry point, without requiring a separate launcher refresh.
+
+The parent resolves the exact repository-local command and does not silently fall back to a global
+plugin, legacy script, or another model when the route is unavailable. Explicit operator choices
+can override the default. Same-model native subagents remain available. Conflicting higher-priority
+or custom instructions must be surfaced and reconciled; file placement cannot guarantee behavioral
+enforcement. Restart the parent session after setup so startup instructions are loaded again.
+
+Core `doctor` reports the configured default, startup-file drift, missing installed resources,
+and command location. It never runs a provider or claims to detect every global instruction
+conflict. Release proof includes native-parent route selection while ambient wrappers are present.
+
 ## Full Capabilities And Authority
 
 All three adapters start in the provider's noninteractive full-access mode. They retain native
@@ -88,7 +117,7 @@ The result distinguishes advertised, exercised, denied, and unknown access.
 
 ## Public Interface
 
-The supported entry point is the installed `project-governance-agent` command. Selected context
+The supported entry point is the installed `harness-agent` command. Selected context
 packets may relocate a skill body; examples resolve the command from the installed environment,
 not a scripts directory relative to that body. No global provider configuration is rewritten.
 
@@ -227,9 +256,9 @@ contract. Adapt Claude's native invocation and stream handling; retire its role-
 restrictions in this new route. Add Codex through its native app-server protocol. Preserve source
 provenance and tests, without personal paths or defaults in the wheel.
 
-This repository becomes the source owner of the new governance route. Existing externally installed
-wrappers and active jobs are not overwritten or deleted by a wheel release. Operators can switch
-to the new skills after testing; external retirement is a separate explicit migration. Do not add
+This repository becomes the source owner of the new harness route. Existing externally installed
+wrappers and active jobs are not overwritten or deleted by a wheel release. Adopting or upgrading
+a repository installs the harness default; external retirement is a separate explicit migration. Do not add
 old-command compatibility shims or maintain two implementations inside governance.
 
 ## Acceptance And Release Proof

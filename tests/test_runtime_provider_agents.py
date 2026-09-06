@@ -36,8 +36,8 @@ class ProviderAgentTests(unittest.TestCase):
         self.workspace = self.root / "workspace"
         self.workspace.mkdir()
         self.env = patch.dict(os.environ, {
-            "PROJECT_GOVERNANCE_AGENT_STATE": str(self.root / "state"),
-            "PROJECT_GOVERNANCE_AGENT_ANCESTRY": "[]",
+            "HARNESS_AGENT_STATE": str(self.root / "state"),
+            "HARNESS_AGENT_ANCESTRY": "[]",
             "PROVIDER_AGENT_FIXTURE_LOG": str(self.root / "logs"),
             "PROVIDER_AGENT_FIXTURE_SCENARIO": "normal", "PYTHONPATH": str(ROOT / "src"),
         })

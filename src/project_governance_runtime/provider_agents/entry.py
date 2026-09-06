@@ -18,7 +18,7 @@ def main():
         lock_path = prefix.parent / "runtime-use.lock"
     else:
         # External Python installations are managed by their operator, not bootstrap.
-        lock_path = Path.home() / ".local/share/project-governance-agents/runtime-use.lock"
+        lock_path = Path.home() / ".local/share/harness-agents/runtime-use.lock"
     lock_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     fd = os.open(lock_path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
     try:

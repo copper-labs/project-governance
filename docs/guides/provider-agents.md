@@ -18,9 +18,16 @@ capability and process boundaries. This guide accompanies the implementation can
 ## Prepare The Host
 
 Install the governance wheel through the repository's normal pinned bootstrap. It supplies
-`project-governance-agent` and the `gemini-agent`, `claude-agent`, and `codex-agent` skills without
+`harness-agent` and the `harness-gemini-agent`, `harness-claude-agent`, and `harness-codex-agent` skills without
 requiring any provider. The helper supports macOS and Linux; native Windows is not supported in
 this release. Other governance commands retain their existing platform support.
+
+Adoption defaults cross-model work to these harness skills. Initialization and bootstrap add a
+small managed routing section to `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, and an existing
+`AGENTS.override.md`. Authored instructions outside that section are preserved. No system wrapper
+is removed. Start a fresh parent session after setup and inspect `project-governance doctor` for
+the `harness_delegation` route and any missing integration. Explicit operator route choices still
+apply; missing access never silently selects another wrapper.
 
 Install and authenticate only the provider you intend to use:
 
@@ -38,7 +45,7 @@ the provider's advertised and observed capabilities.
 ## Run One Assignment
 
 Resolve the repository root. Set `agent` to its absolute
-`.governance/runtime/bin/project-governance-agent` path, `workspace` to the authorized absolute
+`.governance/runtime/bin/harness-agent` path, `workspace` to the authorized absolute
 workspace, and `task_file` to a file describing the task and constraints. Select `model` and
 `effort` from the provider's current available values.
 
@@ -102,6 +109,6 @@ a blocker and cleanup rather than an indefinite wait. Resolve the missing input,
 with an explicit task when the provider session remains available.
 
 Evidence lives outside the installed wheel in a private user data directory. Set
-`PROJECT_GOVERNANCE_AGENT_STATE` to select another private location. The original task is retained;
+`HARNESS_AGENT_STATE` to select another private location. The original task is retained;
 keep credentials out of it. Finish or cancel queued and running jobs before upgrading. Bootstrap
 refuses to replace an environment still used by workers or their cleanup guardians.

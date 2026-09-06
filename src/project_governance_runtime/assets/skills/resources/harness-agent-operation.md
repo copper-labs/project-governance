@@ -6,7 +6,7 @@ context in the task: a child does not inherit the parent's conversation or in-me
 
 ## Prepare The Assignment
 
-Resolve the repository root and its exact `.governance/runtime/bin/project-governance-agent`
+Resolve the repository root and its exact `.governance/runtime/bin/harness-agent`
 executable. Use that absolute path for every operation; a same-named global command might belong
 to another wheel. The helper supports macOS and Linux with Python 3.9 or later. Provider CLIs and
 authentication are optional prerequisites, not installed by governance.
@@ -77,7 +77,7 @@ conflicts with earlier ancestors. Return control to the parent or use a separate
 workspace. Do not remove ancestry metadata to bypass that check. Native parents outside this
 runner can delegate normally; a Claude parent can invoke the Codex skill directly.
 
-Job evidence is private local state under the user's `project-governance-agents` data directory,
-or `PROJECT_GOVERNANCE_AGENT_STATE`. It is separate from governance telemetry and includes the
+Job evidence is private local state under the user's `harness-agents` data directory,
+or `HARNESS_AGENT_STATE`. It is separate from governance telemetry and includes the
 original task. Preserve evidence and partial work. Finish or cancel active jobs before replacing
 their installed governance environment; bootstrap refuses replacement while it remains in use.

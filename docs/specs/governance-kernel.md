@@ -43,7 +43,8 @@ packs without running them. Their optional `--summary` projection omits path inv
 lines, and process output while retaining bounded active findings; default output and
 `--json-output` remain full machine receipts. `doctor` reports the running package version, locked
 version, their match state, invalid configuration, and tracked launcher drift plainly. `init`
-creates only missing integration files. `init --refresh-launchers` deliberately replaces only the
+creates missing integration files and refreshes only marked harness-routing sections in host
+agent instructions. `init --refresh-launchers` deliberately replaces only the
 tracked bootstrap and hook launchers with the installed wheel's versions; it does not change
 project configuration. `update` advances the runtime lock only after required
 target-owned configuration is ready; schema changes remain blocked in dry-run output until an

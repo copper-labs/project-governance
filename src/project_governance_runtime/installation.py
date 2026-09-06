@@ -15,6 +15,7 @@ from typing import Any
 from urllib.parse import quote, unquote
 
 from .state_io import atomic_write_text
+from .harness_integration import install_harness_instructions
 
 LOCK_PATH = Path("config/governance/runtime.lock.yaml")
 PROFILE_DEFAULT_TEXT = "schema_version: 1\nproject_extensions: []\n"
@@ -149,6 +150,10 @@ def initialize(root: Path, *, refresh_launchers: bool = False) -> dict[str, Any]
     """Create missing integration and optionally replace tracked launch surfaces."""
     created: list[str] = []
     refreshed: list[str] = []
+    try:
+        harness_updates = install_harness_instructions(root)
+    except (OSError, ValueError, RuntimeError) as error:
+        raise InstallationError(str(error)) from error
     defaults = {
         "config/governance/profile.yaml": PROFILE_DEFAULT_TEXT,
         "config/governance/facts.lock.yaml": "schema_version: 1\nfacts: {}\n",
@@ -189,11 +194,18 @@ def initialize(root: Path, *, refresh_launchers: bool = False) -> dict[str, Any]
         "created": created,
         "refreshed": refreshed,
         "launcher_drift": launcher_drift(root),
+        "harness_instructions_updated": harness_updates,
     }
 
 
 def materialize_skills(root: Path) -> list[str]:
     """Replace ignored generic skill discovery with the exact installed wheel payload."""
+    # Older bootstrap launchers already call this entry point on deliberate wheel upgrades.
+    # Install host routing here too, so upgrading does not require another adoption step.
+    try:
+        install_harness_instructions(root)
+    except (OSError, ValueError, RuntimeError) as error:
+        raise InstallationError(str(error)) from error
     destination = root / ".governance/runtime/skills"
     if destination.exists():
         shutil.rmtree(destination)

@@ -1,11 +1,11 @@
 ---
-name: codex-agent
+name: harness-codex-agent
 description: Delegate an authorized task to Codex from Claude or another parent with shell access, full native tools, durable jobs, and progress. Use when the user requests Codex as a delegated worker or reviewer.
 ---
 
 # Codex Agent
 
-Read `.governance/runtime/skills/resources/provider-agent-operation.md` for the shared launch,
+Read `.governance/runtime/skills/resources/harness-agent-operation.md` for the shared launch,
 capability, continuation, and evidence contract. Use provider `codex` with an explicit installed
 model ID and effort, or the host's caller-selected configuration. No model is a package default.
 

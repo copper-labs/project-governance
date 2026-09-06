@@ -7,6 +7,10 @@ provenance: package-default
 
 # Delegated Execution
 
+For cross-model assignments, follow the repository's default in
+`.governance/runtime/skills/resources/harness-delegation.md` before choosing a system-level wrapper.
+Use the supplied `harness-*` skill unless the operator explicitly chooses another route.
+
 Use the host's native delegation, or the optional Gemini, Claude, and Codex skills, when the operator
 requests it or one bounded specialist can materially reduce uncertainty or elapsed time.
 
