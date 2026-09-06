@@ -198,15 +198,16 @@ def initialize(root: Path, *, refresh_launchers: bool = False) -> dict[str, Any]
     }
 
 
-def materialize_skills(root: Path) -> list[str]:
+def materialize_skills(root: Path, *, destination: Path | None = None, refresh_instructions: bool = True) -> list[str]:
     """Replace ignored generic skill discovery with the exact installed wheel payload."""
     # Older bootstrap launchers already call this entry point on deliberate wheel upgrades.
     # Install host routing here too, so upgrading does not require another adoption step.
     try:
-        install_harness_instructions(root)
+        if refresh_instructions:
+            install_harness_instructions(root)
     except (OSError, ValueError, RuntimeError) as error:
         raise InstallationError(str(error)) from error
-    destination = root / ".governance/runtime/skills"
+    destination = destination or root / ".governance/runtime/skills"
     if destination.exists():
         shutil.rmtree(destination)
     destination.mkdir(parents=True, exist_ok=True)

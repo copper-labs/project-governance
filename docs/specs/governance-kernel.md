@@ -257,3 +257,10 @@ fails the command. `telemetry review --run-id <id> --disposition <value>` append
 Only retained runs can be annotated, and the latest retained annotation wins. Reviews do not change
 the observed outcome or run timestamp. A passing retry never automatically classifies a prior
 failure. The view does not declare a run hung or a repeat unnecessary.
+
+## Compatible Startup Adoption
+
+The optional `startup` command family follows the [startup update contract](startup-runtime-updates.md).
+It adds once-authorized compatible selection and an isolated local commit at a native top-level
+task boundary. Existing `update --to` semantics remain deliberate. Ordinary Git hooks never discover
+or apply updates; hooks invoked by the updater may join only its validation transaction.

@@ -206,3 +206,11 @@ rounds, rebuilds, and token usage only when useful for improving the next batch.
 existing evidence summary; do not add per-step bookkeeping, new collectors, or a reporting gate.
 Leave unavailable values unknown and compare cost with accepted outcomes and defects. Summed run
 durations are not elapsed delivery time, and repeated calls alone do not establish wasted work.
+
+## Compatible Runtime Lock Updates
+
+A repository that opts into the [startup update contract](../specs/startup-runtime-updates.md)
+receives verified candidate installation and ordinary commit-hook validation for each eligible
+lock update. It does not repeat independent agent review or application-wide proof for that lock
+change. Source releases retain independent QA and broad wheel proof. The updater joins its own
+validation children to the held runtime lock; Git hooks never initiate update discovery.

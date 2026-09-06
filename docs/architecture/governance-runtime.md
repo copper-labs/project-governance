@@ -106,3 +106,12 @@ merge machinery, package cache, analyzer registry, custom resolver, signature fr
 implementation path. Governance validation has no model invocation path. The optional provider
 helper is an explicit skill capability, not a check executor or model router. Git history remains
 the recovery mechanism for retired work.
+
+## Startup Update Boundary
+
+The [startup update contract](../specs/startup-runtime-updates.md) owns optional native task entry.
+Shared runtime code discovers compatible releases, prepares immutable environments, and isolates a
+local lock commit. Thin tracked host hooks route events; the parent assesses work already underway.
+Ignored receipts and a recovery journal coordinate one worktree without a background service.
+The tracked lock remains the sole version authority. See the
+[setup and recovery guide](../guides/startup-runtime-updates.md).

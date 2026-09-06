@@ -312,3 +312,12 @@ schema and help remain the compatibility check for its version.
   resume, model fallback, per-invocation settings, and permission modes.
 - [Codex app server](https://developers.openai.com/codex/app-server) documents stdio lifecycle,
   settings readback, turn events, tools, and session continuation.
+
+## Startup-Managed Runtime Inheritance
+
+For a repository that opts into [startup updates](startup-runtime-updates.md), an assignment
+records the parent installation and exact lock digest. Workers and follow-ups verify that binding
+before invoking a provider and retain shared runtime ownership through cleanup. A wrapper launched
+from another worktree or an external installation rejects the mismatch instead of bootstrapping
+the destination. Run it through that destination's own installed runtime after the parent reconciles
+its version. Standalone provider work without startup-managed governance retains its existing route.

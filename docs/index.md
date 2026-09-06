@@ -13,8 +13,8 @@ summary: Entry point for the reusable, package-based project governance runtime.
 
 `project-governance` provides a small, project-neutral runtime for checking changed work. Markdown
 is the current authority for its policies, guides, and configuration. The runtime is distributed as
-one wheel; each adopting repository deliberately pins one exact wheel and SHA256 in its runtime
-lock.
+one wheel; each adopting repository pins one exact wheel and SHA256 in its runtime lock. Adoption
+is deliberate by default, with an optional compatible-update policy for top-level task startup.
 
 ## Start Here
 
@@ -25,6 +25,8 @@ lock.
   wheel and what remains target-owned.
 - [Operator guide](guides/user-guide.md) explains bootstrap, routine checks, and deliberate
   upgrades.
+- [Startup update guide](guides/startup-runtime-updates.md) explains one-time Codex opt-in,
+  work assessment, isolated local commits, and recovery.
 - [Developer documentation](developer/index.md) provides progressive evaluator/operator and
   source-contributor journeys plus the shared agent catalog.
 - [Validation strategy](governance/validation-strategy.md) defines narrow proof by default and the
@@ -56,5 +58,5 @@ Gemini, Claude, and Codex wrappers in 2.4.0, including the scoped Gemini live-va
 
 This repository does not contain a customer's source paths, build commands, runtime evidence,
 credentials, product vocabulary, or target-specific checks. Those remain in the adopting
-repository. It also does not automatically update adopters or publish a wheel: both actions need
-an operator decision.
+repository. Publishing a wheel requires an operator decision. An adopter may authorize compatible
+startup updates through its tracked profile; major releases and integration changes remain deliberate.

@@ -9,6 +9,7 @@ project instance and contains no product-specific policy or operational data.
 - The standard wheel contains only generic runtime behavior, generic checks, schemas, and shared
   skills.
 - A project owns its profile, facts, extension packs, documentation, and thin integration files.
-- Projects adopt an exact wheel deliberately; source changes never alter another project's lock.
+- Projects pin an exact wheel. Adoption is deliberate unless a tracked opt-in authorizes a
+  compatible update at top-level task startup; source changes never alter another project's lock.
 - Narrow checks are the normal loop. Broad proof is reserved for shared boundaries and explicit
   reconciliation.

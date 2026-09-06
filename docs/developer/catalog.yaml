@@ -1,5 +1,26 @@
 version: 1
 capabilities:
+  - id: startup-runtime-updates
+    title: Adopt compatible governance updates at top-level task startup
+    aliases: [startup-updates, automatic-governance-updates]
+    tasks:
+      - enable compatible startup updates once for a repository
+      - assess ongoing work before an isolated runtime lock update
+      - recover an interrupted startup update
+    symbols: [project-governance startup]
+    reference: docs/specs/startup-runtime-updates.md
+    guides: [docs/guides/startup-runtime-updates.md]
+    sources:
+      - src/project_governance_runtime/process_identity.py
+      - src/project_governance_runtime/startup.py
+      - src/project_governance_runtime/startup_transaction.py
+      - src/project_governance_runtime/startup_releases.py
+      - src/project_governance_runtime/startup_installation.py
+      - src/project_governance_runtime/startup_integration.py
+      - src/project_governance_runtime/startup_git.py
+      - src/project_governance_runtime/startup_state.py
+      - src/project_governance_runtime/runtime_access.py
+      - src/project_governance_runtime/runtime_entry.py
   - id: provider-agents
     title: Delegate work to an optional native provider agent
     aliases: [harness-gemini-agent, harness-claude-agent, harness-codex-agent]

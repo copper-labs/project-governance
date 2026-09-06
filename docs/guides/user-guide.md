@@ -226,3 +226,10 @@ identity or product rules in the shared runtime.
 
 For agent usage, see [Agent setup](agent-setup-instructions.md). For the exact operational rules,
 see [Validation strategy](../governance/validation-strategy.md).
+
+## Optional Startup Updates
+
+After deliberate adoption of runtime 2.5.0, an operator may enable compatible updates for new
+top-level Codex tasks. Minor work already underway remains eligible; execution of a substantial
+plan retains its runtime. Follow the [startup update guide](startup-runtime-updates.md) for
+one-time setup, hook trust, the isolated local commit, and recovery. Major releases remain deliberate.

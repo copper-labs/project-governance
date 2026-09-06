@@ -44,5 +44,11 @@ repository-local pip invocation suppresses pip's unrelated upgrade advertisement
 
 `project-governance update --to <version> --dry-run` shows the lock change, configuration-schema
 impact, and exact validation commands. A schema change requires deliberate review of project-owned
-configuration. `--apply` changes only the lock. A runtime release never updates a repository
-automatically.
+configuration. `--apply` changes only the lock. A runtime release never pushes a repository update. An explicit tracked opt-in may authorize the
+[startup update contract](../specs/startup-runtime-updates.md) for compatible local adoption.
+
+Native task startup is distinct from Git hooks. The [startup update guide](../guides/startup-runtime-updates.md)
+covers its one-time integration. Git hooks remain update-free; updater-owned validation can join
+the exclusive runtime transaction. Runtime generations are installed at their final paths and
+retained for recovery. Manual bootstrap also preserves the existing generation until installation
+succeeds.
