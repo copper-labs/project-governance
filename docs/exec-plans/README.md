@@ -16,13 +16,13 @@ Git remains the implementation history and recovery mechanism.
 
 ## Active
 
-- [Automatic governance updates at top-level task startup](active/2026-09-06-top-level-startup-updates.md)
-  implements compatible updates with contextual worktree assessment and isolated local commits.
-
 - [Optional provider agent skills](active/2026-09-06-provider-agent-skills.md) builds and releases
   Gemini, Claude, and Codex wrappers independently of later implementation-plan improvements.
 
 ## Completed
+
+- [Automatic governance updates at top-level task startup](completed/2026-09-06-top-level-startup-updates.md)
+  implements compatible updates with contextual worktree assessment and isolated local commits.
 
 - [Lean Governance Operating Model](completed/2026-08-27-lean-governance-operating-model.md)
   removed the runtime control plane, bounded workspace and telemetry overhead, and aligned hooks

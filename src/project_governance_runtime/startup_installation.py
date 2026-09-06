@@ -21,9 +21,11 @@ from .startup_state import StartupError, digest, read_json, state_root, write_js
 def integration_digest() -> str:
     """Detect shipped startup or launcher changes that require deliberate adoption."""
     from .harness_integration import BLOCK
+    from .startup_integration import BLOCK as STARTUP_BLOCK, HOOK_COMMAND, HOOK_TIMEOUTS
 
     resources = files("project_governance_runtime").joinpath("assets")
-    values = [BLOCK.encode()]
+    values = [BLOCK.encode(), STARTUP_BLOCK.encode(), HOOK_COMMAND.encode(),
+              json.dumps(HOOK_TIMEOUTS, sort_keys=True).encode()]
     for relative in (*RUNTIME_LAUNCHERS, "tools/governance-startup.py"):
         values.append(resources.joinpath(*relative.split("/")).read_bytes())
     return digest(b"\0".join(values))

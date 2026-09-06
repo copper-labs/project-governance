@@ -22,6 +22,8 @@ END = "<!-- governance-startup:end -->"
 RESOURCE = ".governance/runtime/skills/resources/startup-runtime-updates.md"
 BLOCK = START + "\nAt top-level task entry, follow `" + RESOURCE + "`. Minor work may already be underway.\nSubagents inherit the parent runtime and never check for or initiate updates.\n" + END
 SUPPORTED = {"codex"}
+HOOK_COMMAND = 'python3 "$(git rev-parse --show-toplevel)/tools/governance-startup.py" {provider}'
+HOOK_TIMEOUTS = {"SessionStart": 90, "SubagentStart": 90, "SessionEnd": 3}
 
 
 def _safe(root: Path, relative: str) -> Path:
@@ -52,8 +54,8 @@ def hook_config(root: Path, provider: str) -> tuple[Path, str]:
     if not isinstance(value, dict) or not isinstance(value.get("hooks", {}), dict):
         raise StartupError("Host hook configuration is not an object")
     events = value.setdefault("hooks", {})
-    command = 'python3 "$(git rev-parse --show-toplevel)/tools/governance-startup.py" ' + provider
-    for event in ("SessionStart", "SubagentStart", "SessionEnd"):
+    command = HOOK_COMMAND.format(provider=provider)
+    for event, timeout in HOOK_TIMEOUTS.items():
         groups = events.setdefault(event, [])
         if not isinstance(groups, list):
             raise StartupError("Host hook event must contain an array of handlers")
@@ -62,7 +64,7 @@ def hook_config(root: Path, provider: str) -> tuple[Path, str]:
             raise StartupError("Host hook handlers are malformed")
         existing = [handler for group in groups for handler in group.get("hooks", [])
                     if "tools/governance-startup.py" in str(handler.get("command", ""))]
-        expected = {"type": "command", "command": command, "timeout": 3 if event == "SessionEnd" else 90}
+        expected = {"type": "command", "command": command, "timeout": timeout}
         if existing and existing != [expected]:
             raise StartupError("Existing startup hook differs; reconcile its configuration deliberately")
         if not existing:

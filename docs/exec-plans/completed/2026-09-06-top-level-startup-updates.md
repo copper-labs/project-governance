@@ -2,7 +2,7 @@
 id: exec-plan.top-level-startup-updates
 title: Automatic Governance Updates At Top-Level Task Startup
 type: exec-plan
-status: active
+status: completed
 owner: project-governance
 created: 2026-09-06
 updated: 2026-09-06
@@ -32,10 +32,11 @@ transcripts to infer ownership; replacing the current deliberate update command.
 
 ## Delivery And Authority
 
-- Delivery: implementation and independent review authorized; publish 2.5.0 after reconciliation.
+- Delivery: implementation and independent review complete for 2.5.0. Publication remains gated
+  by candidate CI and the immutable release workflow.
 - Source baseline: published 2.4.1, canonical commit
   `f8c909240efb094e7f9c3643a2670503ac1f399e`, verified against the remote reference.
-- Implementation is underway in an isolated source checkout. Existing adopting repositories remain
+- Implementation and reconciliation are committed in an isolated source checkout. Existing adopting repositories remain
   unchanged; each owns its separate one-time opt-in.
 - Implement from the current canonical source when approved. Preserve unrelated work; the planning
   checkout is not itself a release candidate. Reconcile its plan index with the implementation base.
@@ -426,6 +427,35 @@ claim. An adapter should remain disabled if its bounded probe cannot establish t
 The installation/commit transaction is the largest implementation component. Treat its recovery
 and concurrency proof as required behavior, not optional infrastructure. Keep the rest to a small
 policy, stable adapters, shared updater, and bounded local files.
+
+## Implementation Closeout
+
+The three implementation batches delivered shared discovery and compatibility, recoverable
+installation and isolated commits, then Codex integration, worker bindings, and release proof.
+The source remains product-neutral. No adopting repository was changed or opted in.
+
+Independent Codex review identified four actionable boundaries: exact prepared lock readback after
+Git hooks, reservations for concurrent starts and continuations, worker inheritance across
+worktrees, and interruption before the initial runtime directory rename. Regression fixtures and
+review reconciliation cover each boundary. A follow-up checked inherited pins before unmanaged
+fallback. Clean installed proof exposed and resolved a macOS nested-venv executable link cycle.
+
+The owning startup suite covers these repairs. The provider suite passes. Clean-wheel proof covers
+one-time enablement, candidate installation and activation, ordinary commit-hook execution, and
+preservation of unrelated staged and unstaged work. Existing passing owner proof is reused where
+its inputs remain unchanged; final source-readiness CI validates the publication candidate.
+The published release, immutable asset digests, and its completed workflow provide delivery
+readback rather than this plan asserting publication in advance.
+
+Codex native probes establish distinct parent/child events and inherited startup context, including
+session-end behavior in the bundled host. The older CLI lacked that end event, so explicit task
+closeout and positive process identity remain necessary. Claude startup ran but its child probe
+was quota-blocked; automatic adoption stays disabled. Antigravity remains manual because its
+native hook contract lacks the required parent identity. These are explicit support limits.
+
+Ordinary compatible updates contain no additional model call or independent agent review.
+The local lock commit is the durable update record. Documentation and source status were closed
+at implementation-batch boundaries; no collector, scheduler, or periodic reporting system was added.
 
 ## Research Sources
 

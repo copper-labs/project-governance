@@ -36,7 +36,9 @@ parent supplies its assessment of the work: not started, minor work, substantial
 or read-only. Only the first two permit application. An assessment cannot waive failed runtime,
 Git, provenance, or integration checks. Unknown identities and unsupported hosts remain manual.
 
-Supported host integration and exact live conformance evidence are recorded at release closeout.
+Codex is the enabled host adapter. Claude remains disabled pending complete live parent/child
+conformance; the Antigravity Gemini route lacks the required native root identity. Exact host
+conformance evidence stays outside the reusable checkout.
 Host setup is deliberate, local to the adopting repository, and preserves authored hook entries
 and instructions. Required native hook trust is never bypassed by production code. The thin
 startup pointer stays stable; versioned guidance is read after installation. Updates requiring
@@ -112,4 +114,4 @@ Runtime releases receive independent QA and the existing broad release proof. Ea
 compatible lock update uses deterministic installation proof and its ordinary commit hooks; it
 does not add another independent agent review or application-wide test run. Development and
 acceptance cadence follow the approved
-[implementation plan](../exec-plans/active/2026-09-06-top-level-startup-updates.md).
+[implementation plan](../exec-plans/completed/2026-09-06-top-level-startup-updates.md).
