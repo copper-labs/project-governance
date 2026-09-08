@@ -485,6 +485,8 @@ def _result_summary(output: dict[str, Any]) -> dict[str, Any]:
         )
     }
     summary["plan"] = _plan_summary(output.get("plan", {}))
+    if output.get("blocked_packs"):
+        summary["blocked_packs"] = output["blocked_packs"]
     nonpassing_packs: list[dict[str, Any]] = []
     active_findings: list[dict[str, Any]] = []
     for item in output.get("evidence", []):
