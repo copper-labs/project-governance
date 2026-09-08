@@ -198,6 +198,15 @@ JSON, document shapes, and structural errors always block, and all mode stays st
 no before-image authority. A non-`node_modules` lock package with no resolved tarball is a local
 workspace member, not a registry coordinate; linked `node_modules` entries are also skipped.
 
+An exact npm manifest dependency needs no external publication evidence when its consumer is the
+root or a declared root npm workspace, and its name and version match one unique declared local
+workspace package. Resolve membership from the validation subject (immutable base plus packet
+images for changed/staged checks), never from unstaged replacements. Root `workspaces` arrays and
+`workspaces.packages` lists support exact paths and ordinary `*`, `?`, and `**` patterns. Unsupported
+patterns cannot establish membership. Missing, ambiguous, unsafe, or mismatched local packages
+retain external evidence checks. Organization prefixes confer no exemption. Overrides, toolchains,
+and external lock entries keep their existing checks; publication evidence schemas do not change.
+
 ## Configuration And Distribution
 
 An adopting repository tracks:
