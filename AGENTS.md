@@ -3,6 +3,10 @@
 This repository defines a reusable, project-neutral governance runtime. Keep this file compact;
 durable decisions and plans live under `docs/**`.
 
+Follow the [charter's design principle](CHARTER.md#design-principle): diagnose first, add the smallest
+change that earns its cost, and remove what no longer helps. Apply it to every proposed change;
+do not turn it into another checklist or approval layer.
+
 ## Non-Negotiables
 
 - Markdown is the active governance authority. Git history preserves removed implementation.

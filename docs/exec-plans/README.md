@@ -21,6 +21,8 @@ Git remains the implementation history and recovery mechanism.
 
 ## Completed
 
+- [Evidence-first efficiency](completed/2026-09-07-evidence-first-efficiency.md) adds on-demand repeat
+  diagnosis and a project-wide principle of evidence-led simplicity.
 - [Selective read-only support](completed/2026-09-06-selective-readers.md) adds bounded reader
   assignments to planning and a cooperating writer mode to the optional provider helper.
 - [Automatic governance updates at top-level task startup](completed/2026-09-06-top-level-startup-updates.md)

@@ -39,6 +39,12 @@ after the work has been framed and scoped.
    same digest-bound subject; record a reason before deliberately repeating an equivalent passed
    gate. Confirm relevant dependencies, configuration, toolchain, binary, environment, and expiry
    remain valid; an unchanged test file alone does not establish reusable evidence.
+   When repeated work is reported or observed, inspect existing results before another broad run.
+   Use `project-governance telemetry status` with version, stage, trigger, or time filters as needed
+   to locate repeat examples; do not call it before every check. Distinguish missing evidence,
+   mechanical hook duplication, and premature QA boundaries before changing the workflow.
+   Telemetry references locate observations, not reusable proof; inspect the original result and
+   relevant inputs. Direct commands outside the runtime require existing host or build logs.
 4. If a clean integration snapshot advances, rebaseline immediately, discard stale integration
    mechanics, and retain only subject-valid evidence.
 5. Complete the agreed batch without helper-by-helper approval or review handoffs. Adjust test

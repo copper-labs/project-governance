@@ -18,6 +18,8 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from project_governance_runtime.telemetry import (  # noqa: E402
     MAX_PACK_SUMMARIES,
+    MAX_REPEAT_EXAMPLES,
+    _validation_status,
     append,
     scope_fingerprint,
     status,
@@ -34,6 +36,87 @@ FINGERPRINT_A = "sha256:" + "1" * 64
 
 class RuntimeTelemetryTests(unittest.TestCase):
     """Keep advisory measurements useful without retaining governed content."""
+
+    def test_repeat_examples_isolate_identity_and_keep_latest_observed_pair(self) -> None:
+        """Do not mistake a different trust boundary, test fixture, or source for a repeat."""
+        base = {
+            "event": "run-terminal", "runtime_version": "2.6.0", "stage": "pre-push",
+            "trigger": "manual", "mode": "impacted", "scope_fingerprint": FINGERPRINT_A,
+            "subject_digest": DIGEST_A, "status": "passed", "duration_ms": 10,
+        }
+        records = [{**base, "run_id": "original"}]
+        for key, value in (
+            ("runtime_version", "2.5.0"), ("stage", "ci-pr"), ("trigger", "hook"),
+            ("subject_digest", "sha256:" + "b" * 64),
+            ("scope_fingerprint", "sha256:" + "2" * 64),
+        ):
+            records.append({**base, key: value, "run_id": key})
+        for mode in ("all", "explicit"):
+            records.extend({**base, "mode": mode, "run_id": f"{mode}-{i}"} for i in range(2))
+        records.extend({**base, "trigger": "test", "run_id": f"test-{i}"} for i in range(2))
+        for key in ("runtime_version", "stage", "subject_digest", "scope_fingerprint", "run_id"):
+            records.extend({**base, key: None, "run_id": None if key == "run_id" else f"missing-{key}-{i}"}
+                           for i in range(2))
+        self.assertEqual(_validation_status(records)["repeat_examples"], [])
+        records.extend([
+            {**base, "run_id": "repair", "status": "failed"},
+            {**base, "run_id": "latest"},
+        ])
+        examples = _validation_status(records)["repeat_examples"]
+        self.assertEqual(len(examples), 1)
+        self.assertEqual(examples[0]["previous"]["run_id"], "repair")
+        self.assertEqual(examples[0]["previous"]["status"], "failed")
+        self.assertEqual(examples[0]["current"]["run_id"], "latest")
+        self.assertNotIn("reusable", examples[0])
+
+    def test_repeat_examples_are_bounded_and_leave_unknown_duration_absent(self) -> None:
+        """Prioritize observed costly repeats without inventing timings for legacy records."""
+        records = []
+        for index in range(MAX_REPEAT_EXAMPLES + 2):
+            for run in range(2):
+                records.append({
+                    "event": "run-terminal", "runtime_version": "2.6.0", "stage": "pre-push",
+                    "trigger": "manual", "mode": "impacted", "scope_fingerprint": FINGERPRINT_A,
+                    "subject_digest": f"sha256:{index:064x}", "run_id": f"{index}-{run}",
+                    "status": "passed", "duration_ms": index,
+                })
+        examples = _validation_status(records)["repeat_examples"]
+        self.assertEqual(len(examples), MAX_REPEAT_EXAMPLES)
+        self.assertEqual([item["current"]["duration_ms"] for item in examples], [6, 5, 4, 3, 2])
+        for record in records[:2]:
+            del record["duration_ms"]
+        example = _validation_status(records[:2])["repeat_examples"][0]
+        self.assertNotIn("duration_ms", example["previous"])
+        self.assertNotIn("duration_ms", example["current"])
+
+    def test_repeat_examples_cli_is_read_only_and_filters_before_pairing(self) -> None:
+        """Expose real retained run references without extra writes or private result content."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            base = {
+                "event": "run-terminal", "runtime_version": "2.6.0", "stage": "pre-push",
+                "trigger": "manual", "mode": "impacted", "scope_fingerprint": FINGERPRINT_A,
+                "subject_digest": DIGEST_A, "status": "passed", "duration_ms": 10,
+                "stdout": "private output", "command": "private command",
+            }
+            for run_id, date in (("old", "2026-09-01T00:00:00Z"), ("new", "2026-09-07T00:00:00Z")):
+                with patch("project_governance_runtime.telemetry._now", return_value=date):
+                    append(root, {**base, "run_id": run_id})
+            path = root / ".governance/telemetry/runs.jsonl"
+            before = path.read_bytes()
+            command = [sys.executable, "-m", "project_governance_runtime.cli", "telemetry", "status"]
+            environment = {**os.environ, "PYTHONPATH": str(ROOT / "src")}
+            for filters, count in (([], 1), (["--since", "2026-09-07"], 0),
+                                   (["--runtime-version", "2.5.0"], 0), (["--trigger", "hook"], 0)):
+                result = subprocess.run(command + filters, cwd=root, env=environment, text=True, capture_output=True)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                observed = json.loads(result.stdout)["validation"]["repeat_examples"]
+                self.assertEqual(len(observed), count)
+                self.assertNotIn("private", result.stdout)
+                self.assertEqual(path.read_bytes(), before)
+                if count:
+                    self.assertEqual(observed[0]["previous"]["run_id"], "old")
+                    self.assertEqual(observed[0]["current"]["run_id"], "new")
 
     def test_failure_classification_preserves_exit_one_findings(self) -> None:
         """Separate ordinary rejection, broken output, and execution failure by observed facts."""
