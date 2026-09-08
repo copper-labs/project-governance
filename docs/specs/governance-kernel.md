@@ -151,7 +151,13 @@ output. Duration policy belongs to the target repository or operator. The runner
 deadline, but an explicitly supplied timeout remains blocking and terminates the owned process
 group. It does not maintain a second cache around a repository's build, test, device, or language
 tool. It resolves one immutable change packet before execution and supplies one run ID and one
-isolated evidence root per selected pack.
+isolated evidence root per selected pack. Ordinary checker failures (valid findings with a normal
+exit of zero or one) remain failures but do not prevent independent packs from running on that
+same packet. A failed pack blocks its declared dependents, including transitive dependents;
+`blocked_packs` names those omitted checks and their failed prerequisites. Blocking dependents
+keep the run failed. Malformed output, packet or evidence integrity failures, crashes, abnormal
+exits, cancellation, and timeouts still stop execution immediately. Command-level `fail_fast`
+within a pack is unchanged. No completed result is reused across runs.
 
 The runtime owns no evidence-retention policy. It prunes only its empty directory scaffolding;
 nonempty evidence remains target-owned and must be retained or removed by target policy.

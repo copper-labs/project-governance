@@ -52,6 +52,12 @@ Reuse passing evidence only while its claim and relevant inputs remain valid, in
 dependencies, configuration, toolchain, binary, environment, and expiry. An unchanged test file is
 not enough. The build system owns reuse; this policy does not add a cache or waive required gates.
 
+Read the complete diagnostic result before repairing a failed batch. Independent checks collect
+findings in one invocation; do not launch every remaining pack separately to discover the next
+failure. A short summary is not the complete finding inventory: follow checker-owned evidence
+artifacts when results are sampled. Repair related findings together, then recheck the affected
+owners. Stop writers before final sign-off so its source comparison can remain stable.
+
 For a failed governance check, use the named pack at the same lifecycle stage and subject only when
 focused diagnosis needs it:
 
