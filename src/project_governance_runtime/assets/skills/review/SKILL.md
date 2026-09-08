@@ -30,6 +30,12 @@ authoring, or migration changes.
    A repeated failure returns to the owning check or operator; there is no automatic model ladder.
 2. Provide the review pass with scope, governing artifacts, integrated snapshot identity, validation
    results, and exact questions.
+   Within this same pass, reread the governing PRD, spec, or original request and approved
+   clarifications. Check every in-scope requirement against the finished behavior and existing
+   evidence, not just the diff. When both PRD and spec apply, check that both are satisfied and flag
+   omissions or contradictions between them. If neither exists, use the original request; no new
+   document is required. Report missing behavior separately from unproven claims. Do not weaken
+   requirements to match the implementation or add another review cycle for this comparison.
 3. Require findings to use the shared severity, location, risk, and recommendation fields.
 4. Keep review separate from implementation: inspect the stable candidate first, report findings,
    and prevent silent fixes. A delegated QA reviewer is a separate host-native assignment;
@@ -58,3 +64,5 @@ proof and ensure provider adapters remain thin.
 
 Report the review model/resource, prompt role, findings by severity, reconciliations, recheck
 status, and residual risk.
+Include a concise requirements conclusion with governing source references, supporting evidence,
+and gaps or explicitly approved exceptions. A requirement matrix is optional for simple work.

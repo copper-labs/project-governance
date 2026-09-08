@@ -18,12 +18,20 @@ Use this skill before closeout, PR, or release when a change claims to implement
 
 ## Workflow
 
-1. List each requirement and acceptance criterion in reviewable form.
-2. Map implementation changes to those requirements.
-3. Mark each item as implemented, partially implemented, missing, changed, or out of scope.
+1. Reread the sources that govern the work: PRD, spec, or original request and approved
+   clarifications. Use whichever apply; an absent document does not require creating one.
+2. Compare every in-scope requirement with the finished behavior, not just changed files. When both
+   PRD and spec apply, check both and identify product requirements omitted by the spec. Flag
+   contradictions; do not silently choose a source or weaken requirements to fit the implementation.
+3. Distinguish implemented behavior from validated behavior. Report missing, partial, or changed
+   behavior separately from claims that lack sufficient evidence. Keep approved exceptions explicit.
 4. Check non-goals and forbidden behaviors.
-5. Check tests and validation evidence for every high-risk requirement.
-6. Recommend pass, pass with follow-ups, or request changes.
+5. Assess existing candidate-valid evidence appropriate to each requirement. Run additional
+   validation only for a named evidence gap; inspection, tests, or demonstrations must support the
+   actual claim. Passing tests alone do not establish that all requested behavior was delivered.
+6. Recommend pass, pass with follow-ups, or request changes. Do not describe unmet or unproven
+   required behavior as complete. Include this comparison in the existing review and closeout,
+   without adding a separate acceptance stage or reviewer.
 
 ## Validation
 
@@ -33,4 +41,6 @@ state changed and no current proof covers it.
 
 ## Evidence
 
-Report a requirement-by-requirement matrix, missing or changed behavior, extra behavior, validation gaps, and final compliance recommendation.
+Report governing source references, supporting evidence, missing or changed behavior, extra behavior,
+validation gaps, approved exceptions, and the compliance recommendation. A short conclusion is
+sufficient for simple work; use a requirement matrix only when it helps explain coverage.
