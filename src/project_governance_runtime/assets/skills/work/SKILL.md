@@ -73,6 +73,15 @@ after the work has been framed and scoped.
     repair and one affected recheck. If it fails, return to focused diagnosis instead of
     starting another general QA, verifier, or broad-proof cycle.
     Reader findings on work in progress are provisional advice, not approval of the final candidate.
+    Before declaring completion, reread the governing PRD, spec, or original request and approved
+    clarifications. Compare every in-scope requirement with the delivered behavior and existing
+    validation evidence. When both PRD and spec govern the work, check both, including product
+    requirements omitted by the spec; flag contradictions rather than silently choosing one or
+    weakening requirements to match the code. If neither exists, use the original request without
+    creating another document. Distinguish missing behavior from unproven claims, and run additional
+    validation only for a named evidence gap. Include this check in the existing review and
+    closeout: cite the governing sources, supporting evidence, and any gaps or approved exceptions.
+    A short statement is sufficient for simple work; this adds no separate review or acceptance stage.
 12. Before any commit or pull request handoff, write the shared change narrative from the governing
     intent: outcome, product impact, conceptual change, code areas, and why. Do not derive product
     intent from file names alone or copy machine validation evidence into the narrative.
