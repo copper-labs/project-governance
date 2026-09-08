@@ -15,6 +15,7 @@ from .state_io import atomic_write_text, path_lock
 MAX_RECORDS = 1000
 MAX_TELEMETRY_BYTES = 1024 * 1024
 MAX_PACK_SUMMARIES = 10
+MAX_REPEAT_EXAMPLES = 5
 MAX_ID_LENGTH = 256
 SCHEMA_VERSION = 3
 _SHA256_DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
@@ -319,6 +320,48 @@ def _validation_status(records: list[dict[str, Any]]) -> dict[str, Any]:
         ),
         "nonterminal_run_count": len(nonterminal_ids),
         "slowest_packs": slowest,
+        "repeat_examples": _repeat_examples(terminal),
+    }
+
+
+def _repeat_examples(terminal: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Expose bounded diagnostic pairs on demand without treating identity as reusable proof."""
+    identity_keys = (
+        "runtime_version", "stage", "trigger", "mode", "scope_fingerprint", "subject_digest",
+    )
+    previous: dict[tuple[str, ...], dict[str, Any]] = {}
+    examples: dict[tuple[str, ...], dict[str, Any]] = {}
+    for record in terminal:
+        identity = tuple(record.get(key) for key in identity_keys)
+        if (not all(isinstance(value, str) and value for value in identity)
+                or record.get("trigger") not in {"manual", "hook"}
+                or record.get("mode") != "impacted" or not record.get("run_id")):
+            continue
+        prior = previous.get(identity)
+        previous[identity] = record
+        if prior is None or prior["run_id"] == record["run_id"]:
+            continue
+        # Pair within one observed identity, not across versions, stages, or test fixtures.
+        examples[identity] = {
+            **dict(zip(identity_keys, identity)),
+            "previous": _run_reference(prior),
+            "current": _run_reference(record),
+        }
+    return sorted(
+        examples.values(),
+        key=lambda item: (
+            -(_number(item["current"].get("duration_ms")) or 0),
+            item["current"]["run_id"],
+        ),
+    )[:MAX_REPEAT_EXAMPLES]
+
+
+def _run_reference(record: dict[str, Any]) -> dict[str, Any]:
+    """Keep only retained observations needed to locate and interpret an execution."""
+    return {
+        key: record[key] for key in (
+            "run_id", "recorded_at", "status", "termination_reason", "duration_ms",
+        ) if key in record
     }
 
 

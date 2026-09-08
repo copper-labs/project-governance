@@ -224,6 +224,19 @@ observations. It does not prove a repeat was unnecessary because invalidation re
 retained. It also excludes direct commands and
 native-host launches outside the runtime, so missing telemetry is never evidence that no work ran.
 
+When investigating repeated work, use the on-demand `repeat_examples` in `telemetry status` to
+locate original run results. Distinguish unavailable prior evidence, mechanical hook duplication,
+and premature agent review boundaries before choosing an intervention. Same-subject observations
+do not establish unchanged dependencies, tools, or environment. The view neither skips execution
+nor runs automatically before checks.
+
+Evaluate one targeted change at a time on representative tasks against current behavior, holding
+acceptance quality and relevant model/host settings comparable. Include defects and rework alongside
+available elapsed time and all-agent token use; inspect existing traces for the cause of a change.
+Try advisory feedback before hard blocking unless the execution owner can prove the invariant.
+Remove additions that fail to justify their overhead. This is targeted evaluation of a proposed
+improvement, not a required experiment or reporting ceremony for every implementation batch.
+
 Run deterministic builds through a target pack or the governed harness when one exists. If a
 necessary command has no governed execution surface, report that coverage gap with the evidence
 instead of silently treating runtime telemetry as complete.

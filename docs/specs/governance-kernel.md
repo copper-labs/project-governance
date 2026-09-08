@@ -258,6 +258,15 @@ Only retained runs can be annotated, and the latest retained annotation wins. Re
 the observed outcome or run timestamp. A passing retry never automatically classifies a prior
 failure. The view does not declare a run hung or a repeat unnecessary.
 
+The same on-demand view includes at most five `repeat_examples` from impacted runs, each with the
+latest pair of distinct run IDs for one known runtime version, stage, trigger, mode, scope digest,
+and subject digest. Explicit test triggers and incomplete identities are excluded. Filters apply
+before pairing; file order defines the latest retained observation. Examples prioritize the
+longest current-run durations and expose only retained timestamps, outcomes, termination reasons,
+and durations beside the pair's identity. Missing durations remain absent. These references help
+locate original logs; they do not establish unchanged build inputs, redundant work, or permission
+to reuse evidence. No extra event, persistent index, or execution-time history lookup is added.
+
 ## Compatible Startup Adoption
 
 The optional `startup` command family follows the [startup update contract](startup-runtime-updates.md).
