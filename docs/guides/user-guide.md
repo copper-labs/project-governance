@@ -238,3 +238,9 @@ After deliberate adoption of runtime 2.5.0, an operator may enable compatible up
 top-level Codex tasks. Minor work already underway remains eligible; execution of a substantial
 plan retains its runtime. Follow the [startup update guide](startup-runtime-updates.md) for
 one-time setup, hook trust, the isolated local commit, and recovery. Major releases remain deliberate.
+
+## Preserve Upstream Notices
+
+Use the [upstream notice preservation guide](preserve-upstream-notices.md) when selected third-party
+licenses must retain their original bytes despite trailing whitespace. The opt-in registry binds
+each formatting exemption to an exact notice path, SHA256, and upstream source URL.

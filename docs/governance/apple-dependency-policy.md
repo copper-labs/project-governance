@@ -19,3 +19,7 @@ The generic Apple-dependency pack identifies relevant dependency surfaces. The a
 decides its policy posture and owns any exception rationale, affected products, validation, and
 eventual removal decision. The package runtime does not infer that decision or store customer
 details.
+
+SwiftPM-only implementation plans do not require a CocoaPods exception. The planning approval
+gate applies to CocoaPods terms (`CocoaPods`, `Podfile`, and `.podspec`), including plans that
+mention both package managers. CocoaPods approval must remain current and bound to the work item.
