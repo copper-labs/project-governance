@@ -49,6 +49,9 @@ completing an internal step does not automatically trigger QA or documentation u
 
 Use existing logs for command results. At closeout, include useful cost observations already
 available from those records; leave missing metrics unknown. No per-step reporting is required.
+For long-running proof, include command/prerequisites, wait strategy, estimate versus explicit
+deadline, and evidence location within the proof budget, preferably by runbook reference. Follow
+`.governance/runtime/skills/resources/efficient-execution.md`; do not add another checklist.
 Parallel support should replace investigation the primary or writer would otherwise perform.
 Each reader needs a distinct question and enough context to answer it without repeating discovery.
 Follow the installed delegated-execution skill; parallel batches do not authorize another writer.

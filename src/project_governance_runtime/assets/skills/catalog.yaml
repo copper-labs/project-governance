@@ -173,6 +173,9 @@ pattern_packs:
     description: Deep workflow and review skills for discovery, risk, implementation quality, CI, docs, and delivery.
 
 resources:
+  - id: efficient-execution
+    path: .governance/runtime/skills/resources/efficient-execution.md
+    description: Portable long-running command supervision, process recovery, and compact evidence output.
   - id: startup-runtime-updates
     path: .governance/runtime/skills/resources/startup-runtime-updates.md
     description: Parent-only startup assessment, isolated compatible adoption, and task closeout.

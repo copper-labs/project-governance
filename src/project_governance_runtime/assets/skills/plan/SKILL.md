@@ -21,6 +21,7 @@ multiple files, or requires validation and review evidence.
 - `docs/index.md`
 - `docs/governance/validation-strategy.md`
 - `.governance/runtime/skills/resources/implementation-plan-template.md`
+- `.governance/runtime/skills/resources/efficient-execution.md` for long-running proof
 - `.governance/runtime/skills/delegated-execution/SKILL.md`
 - `docs/governance/apple-dependency-policy.md` when Apple platforms may be in scope
 - The governing spec, PRD, issue, plan, or decision
@@ -46,6 +47,8 @@ multiple files, or requires validation and review evidence.
    proof cycle, expected duration or cost, invalidation rules, and an explicit stop condition.
    Set focused development checkpoints, expensive build points, one applicable QA review per batch,
    and the attended acceptance milestone. The writer may adjust checks for new evidence or risk.
+   For long-running proof, include the efficient-execution resource's command, wait, and evidence
+   details within this budget; reference existing runbooks rather than add new planning fields.
 5. Map changed areas to validation packs, review skills, rollback, and evidence. Treat checks that
    prove the same claim on the same digest-bound subject as substitutes, not additive ceremonies.
 6. Consolidate plan/status and explanatory documentation at batch closeout. Update governing

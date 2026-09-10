@@ -92,7 +92,7 @@ chosen access. Different provider models are optional; role names never select a
 Use the returned ID and carry forward each returned cursor:
 
 ```sh
-"$agent" wait "$job_id" --after 0 --seconds 30
+"$agent" wait "$job_id" --after 0 --seconds 60
 "$agent" events "$job_id" --after "$cursor"
 "$agent" result "$job_id"
 ```

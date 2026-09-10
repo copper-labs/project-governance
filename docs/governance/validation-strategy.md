@@ -5,7 +5,7 @@ type: governance
 status: current
 owner: project-governance
 created: 2026-07-05
-updated: 2026-09-06
+updated: 2026-09-10
 summary: Defines focused, impact-aware validation for the package runtime and its adopters.
 ---
 
@@ -41,6 +41,8 @@ completed batches, blockers, or material changes instead of repeatedly interrupt
 Group shared changes before expensive native or cross-platform rebuilds. Build earlier when a
 compiler, ABI, host, or integration uncertainty needs resolving. Automated integration proof belongs
 at the planned checkpoints; attended user testing belongs at the agreed acceptance milestone.
+Serialize commands sharing mutable build outputs or devices; do not regenerate dependencies while
+their consumers validate. Independent jobs with isolated inputs and outputs may run concurrently.
 
 Capture command results as they occur in existing logs. Update plan checkboxes, status narratives,
 evidence summaries, and explanatory documentation once at the batch boundary. Update a governing
@@ -105,6 +107,46 @@ It adds one focused check only for
 a named changed seam with no evidence. One QA repair permits one affected deterministic recheck. If
 that recheck fails, return to focused diagnosis or the operator instead of starting another general
 QA, verifier, or broad-proof cycle.
+
+## Long-Running Command Supervision
+
+This policy owns direct-command supervision. The wheel's
+[efficient execution resource](../../src/project_governance_runtime/assets/skills/resources/efficient-execution.md)
+is its portable agent guidance. Existing selection, evidence reuse, diagnostic inventory, and
+deadline rules above still apply. The [runtime specification](../specs/governance-kernel.md#selection-and-execution)
+owns failure handling; compact output never changes which independent checks continue or which
+dependents are blocked. The [provider helper contract](../specs/provider-agent-skills.md)
+owns its job IDs, cursors, and wait limits.
+
+For long-running proof, extend the existing proof budget with the canonical command and
+prerequisites, wait strategy, estimated duration if known, explicit deadline if any, and evidence
+location. Reuse runbooks instead of adding fields or per-step records. An estimate is not a deadline.
+
+- Prefer completion-aware waits. For long commands, request 60 seconds where supported; otherwise
+  use the longest wait compatible with the tool and higher-priority host instructions. Honor an
+  applicable host preference for longer event-driven waits. Shorter waits need actionable input or
+  a concrete intervention need. Required progress messages do not require extra status investigations.
+- Retain the owning process handle for each active invocation. Empty logs or an expired wait are
+  not process failure and never justify a duplicate, restart, or termination. Enforced deadlines
+  and explicit cancellation remain effective; confirm terminal status before claiming an outcome.
+- Do not end a working turn solely because authorized tests remain active. Continue useful work
+  or wait on the same invocation. If a host interruption or user/authority boundary prevents that,
+  preserve its handle, command/workspace identity, evidence path, and next action in the existing
+  handoff when possible. On recovery, verify identity and handle validity; a lost handle is not
+  proof of exit. Resolve status before rerunning, or report that it cannot be established.
+- Keep permitted full diagnostic logs and machine receipts in existing target-owned artifacts,
+  subject to redaction and retention policy. Return changed phase, terminal status, actionable
+  failures, and evidence references. Aim for about 1,000 tokens per routine tool response where
+  the host supports output limits; this is a soft target, not a runtime limit. Disclose omitted or
+  truncated detail and expand it when diagnosis requires. Never hide a failure to meet the target.
+- Diagnose before retrying and record a short reason in existing evidence: changed source,
+  repaired environment, corrected harness, or a named diagnostic experiment. Preserve the failed
+  attempt. Takeover, compaction, or elapsed time alone does not invalidate reusable proof; real
+  expiry and other relevant input changes still do.
+
+Review compliance once at the existing batch boundary using available execution records. Missing
+records remain unknown. These instructions cannot mechanically enforce conversational behavior,
+waive required proof, or establish token savings; field evaluation uses the existing Evidence rules.
 
 ## Selective Read-Only Support
 

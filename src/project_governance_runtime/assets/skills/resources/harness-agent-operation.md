@@ -34,13 +34,16 @@ Use the resolved absolute command in place of `$agent` and supply actual values:
 "$agent" doctor --provider codex
 "$agent" start --provider codex --workspace "$workspace" \
   --model "$model" --effort "$effort" --task-file "$task_file"
-"$agent" wait "$job_id" --after 0 --seconds 30
+"$agent" wait "$job_id" --after 0 --seconds 60
 "$agent" events "$job_id" --after "$cursor"
 "$agent" result "$job_id"
 ```
 
-`start` returns a durable job ID. Continue useful independent work and use waits of at most 60
-seconds. Carry forward the returned cursor to avoid replaying output. `run` streams normalized
+`start` returns a durable job ID. Continue useful independent work and request 60-second waits
+unless host limits or a concrete intervention need require less. This helper caps each wait at 60
+seconds; events or completion can return sooner. Follow
+`.governance/runtime/skills/resources/efficient-execution.md` for supervision and interruption
+handoff. Carry forward the returned cursor to avoid replaying output. `run` streams normalized
 JSON events through completion when foreground execution is more appropriate. Meaningful public
 text and tool events indicate provider activity. A supervisor heartbeat reports liveness and time
 since provider activity; it is not a new model response.
