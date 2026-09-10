@@ -15,6 +15,8 @@ Test Execution selects necessary proof and its cheapest reliable execution path.
 directly. Long batches can use a deterministic job in the existing harness registry. The job owns
 processes, workspace/output exclusion, deadlines and durable results; it never invokes a model.
 Projects own test commands, assertions, input completeness and device management.
+The [completed implementation plan](../exec-plans/completed/2026-09-10-shared-test-execution.md)
+records the review reconciliation and acceptance boundaries.
 
 ## Commands
 

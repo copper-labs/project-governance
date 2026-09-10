@@ -258,6 +258,8 @@ class TestBatchTests(ProviderAgentCase):
         self.assertEqual(result["state"], "failed")
         self.assertEqual([c["outcome"] for c in result["cases"]], ["not-run"])
         self.assertFalse(result["assessment_allowed"])
+        for name in ("request.json", "status.json", "result.json"):
+            self.assertEqual(read_json(self.store.job(job["job_id"]) / name)["protocol_version"], 1)
 
     def test_virtual_environment_interpreter_keeps_its_invocation_identity(self):
         import venv

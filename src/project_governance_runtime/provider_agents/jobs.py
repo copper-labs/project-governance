@@ -236,9 +236,10 @@ def _launch_worker(store, job_id, path, environment_fd):
         result = {"protocol_version": value["protocol_version"], "job_id": job_id, "state": "failed",
                   "answer": "", "error": launch_error, "remaining": [launch_error], "cleanup_confirmed": True}
         if value.get("kind") == "test-batch":
-            from .test_batches import recover_result
+            from .test_batches import recover_result, terminal_protocol
 
             result = recover_result(path, result)
+            value["protocol_version"] = result["protocol_version"] = terminal_protocol(path)
         atomic_json(path / "result.json", result)
         atomic_json(path / "status.json", {**value, "state": "failed", "finished_at": time.time(), "error": launch_error})
     else:

@@ -2,11 +2,11 @@
 id: exec-plan.shared-test-execution
 title: Shared Test Execution With Model-Free Waiting
 type: exec-plan
-status: active
+status: completed
 owner: project-governance
 created: 2026-09-10
 updated: 2026-09-10
-summary: Plan one reusable test execution skill and deterministic batch runner with Codex and Claude CLI handoff, proactive adoption, and bounded cost.
+summary: Delivers shared test execution, verified Codex and Claude CLI handoff, proactive adoption, and bounded usage observations.
 ---
 
 # Shared Test Execution With Model-Free Waiting
@@ -21,15 +21,17 @@ Repository instructions and existing lifecycle routes make this the normal decis
 work benefits, without loading the full skill for every task.
 
 The operator approved this plan, full implementation, final Claude Fable 5.1 review and reconciliation,
-and publication as a new feature release. Implementation and host acceptance are in progress.
+and publication as a new feature release. Implementation, host acceptance and independent review
+are complete; publication remains subject to the normal source and tagged-release gates.
 Named adopter mutation remains separate from this source release; fixtures use isolated temporary
 projects. This plan records the contract; only completed proof supports delivery claims.
 
 - Delivery: authorized feature implementation and release from the released 2.6.6 baseline.
-- Proposed release: next available compatible minor release, expected 2.7.0 if the baseline holds.
+- Release: 2.7.0 from the released 2.6.6 baseline.
   This is a new optional capability, not another guidance-only patch.
-- Planning review: independent review, reconciliation and final simplification complete; ready for implementation.
-- Implementation proof state: focused runtime fixtures in progress; live host and release proof pending.
+- Review: planning and final implementation reviews, material-finding recheck and simplification complete.
+- Implementation proof: focused runtime suites, installed-wheel checks and both native host paths passed.
+  Exact-candidate Linux and tagged-wheel proof remain mandatory publication gates.
 
 ## Problem And Existing Owners
 
@@ -461,9 +463,46 @@ do not retain compatibility aliases or silently downgrade an adopter's lock.
 - Final simplification pass: complete after the approving recheck; dispositions recorded above.
 - Operator follow-up: added light usage telemetry for later impact evaluation. Parent checked it
   against the live validation-only telemetry owner and repeated the simplification check. This
-  addition was made after Claude's approval and has not received a further independent review.
+  addition was made after planning approval and was covered by the final implementation review.
 - Planning validation: documentation pack and whitespace check passed. Runtime and live-host
-  acceptance remain unexecuted; this approval covers the plan, not an implemented candidate.
+  acceptance were unexecuted at planning approval; implementation acceptance is recorded below.
+
+## Implementation Closeout
+
+The installed skill and its narrow contract use the existing harness lifecycle, registry, follow-up
+and local telemetry file. Managed root instructions and Plan/Work/Review routes make the skill an
+ordinary testing decision. No scheduler, separate resource registry, collector or copied runtime
+was added. Projects retain assertion semantics, input completeness and device-lock authority.
+
+Independent Claude Fable 5.1 implementation review requested two material corrections. Confirmed
+terminal batches now restore the existing record format so another repository's older installation
+can use the shared store again. The active record remains protected until cleanup and final status
+publication. Interrupted preparation startup now preserves and cancels its exact created job.
+The focused recheck approved these corrections. Its minor worker-spawn case received the same
+terminal publication rule and a focused regression check.
+
+The same reconciliation reduced process-observation and cleanup-write frequency, made initial input
+uncertainty explicit, clarified the final cleanup receipt, and prevented launcher failure from matching
+accepted negative test exits. Live acceptance corrected preparation scope and bound assessment to the
+actual result-file hash. Available Claude usage includes its reported auxiliary model activity once.
+
+Focused lifecycle, recovery, telemetry, installation and provider-seam checks passed. Fresh native
+Codex and Claude sessions found and read the installed skill through repository routing. Both direct
+paths passed; both managed paths completed preparation, deterministic execution and exact-session
+assessment. Process observations confirmed preparation had exited before the tests started and
+assessment began after cleanup. An actual earlier released harness could list and start work after
+the new batch completed. Evidence and host-specific installation details remain outside this source
+checkout. Later narrow failure-path changes reuse this live proof with focused regression checks.
+
+The small synthetic comparison cost more through managed execution. It establishes the model-free
+interval, not token savings on project workloads. Quick checks remain direct, and a canonical project
+runner can retain its own parallelism inside a batch command. Unknown usage stays unknown; there is
+no recurring benchmark or invented threshold. Desktop/IDE automatic return and device qualification
+remain separate host/project acceptance, not implied by CLI or fixture success.
+
+Publication is authorized as a feature release. Automatic adoption is disabled because host routing
+changes. Adopters start fresh host sessions after deliberate setup. Keep live evidence outside source
+and complete the exact-ref source, tagged-wheel and published-artifact readbacks before claiming delivery.
 
 ## Interface Evidence
 
