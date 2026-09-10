@@ -67,6 +67,35 @@ class RuntimeSkillPayloadTests(unittest.TestCase):
                         f"{source.relative_to(ROOT)} names missing {reference}",
                     )
 
+    def test_long_running_guidance_is_reachable_in_an_installed_tree(self) -> None:
+        """Adopters must receive the resource and every lifecycle entry point that needs it."""
+        import yaml
+
+        from project_governance_runtime.installation import materialize_skills
+
+        reference = RUNTIME_PREFIX + "resources/efficient-execution.md"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            materialize_skills(root)
+            installed = root / ".governance/runtime/skills"
+            catalog = yaml.safe_load((installed / "catalog.yaml").read_text())
+            entry = next(
+                item for item in catalog["resources"]
+                if item["id"] == "efficient-execution"
+            )
+            self.assertEqual(entry["path"], reference)
+            self.assertEqual(
+                (root / entry["path"]).read_bytes(),
+                (SKILLS_SOURCE / "resources/efficient-execution.md").read_bytes(),
+            )
+            for path in (
+                "plan/SKILL.md", "work/SKILL.md", "review/SKILL.md",
+                "resources/implementation-plan-template.md",
+                "resources/harness-agent-operation.md",
+            ):
+                with self.subTest(path=path):
+                    self.assertIn(reference, (installed / path).read_text())
+
     def test_active_instructions_do_not_name_retired_machinery(self) -> None:
         """Keep the installed guidance aligned with the lean package authority."""
         text = "\n".join(

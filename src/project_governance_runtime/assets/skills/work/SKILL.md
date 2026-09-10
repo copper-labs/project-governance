@@ -20,6 +20,7 @@ after the work has been framed and scoped.
 - `CHARTER.md`
 - `docs/index.md`
 - The active plan or governing artifact
+- `.governance/runtime/skills/resources/efficient-execution.md` when supervising long-running commands
 - `.governance/runtime/skills/delegated-execution/SKILL.md`
 - `.governance/runtime/skills/resources/change-narrative.md` before any commit or pull request handoff
 - Route-selected pack manifests or policies
@@ -58,6 +59,9 @@ after the work has been framed and scoped.
    shared changes before expensive builds, bringing compilation or integration forward when risk
    requires it. On the stable candidate, run one branch-aware impacted pre-push sign-off;
    do not run a separate manual pre-commit or pre-PR gate.
+   Follow the efficient-execution resource for waits, process recovery, compact output, and retry
+   reasons. Serialize commands that share mutable build outputs or devices; never regenerate
+   dependencies while their consumers validate against them.
 8. Repair a failed focused owner. Use its named execution when diagnosis needs narrow feedback; on
    the final repair, let either the enclosing Git hook or the one impacted pre-push sign-off serve
    as the affected recheck. Do not run both immediately on the unchanged subject. If the same check

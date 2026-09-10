@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-02-16
-updated: 2026-09-06
+updated: 2026-09-10
 summary: Active and completed execution plans for the current source repository.
 ---
 
@@ -21,6 +21,8 @@ Git remains the implementation history and recovery mechanism.
 
 ## Completed
 
+- [Efficient execution](completed/2026-09-10-efficient-execution.md) closes long-running command
+  supervision gaps through existing policy and packaged skills.
 - [Evidence-first efficiency](completed/2026-09-07-evidence-first-efficiency.md) adds on-demand repeat
   diagnosis and a project-wide principle of evidence-led simplicity.
 - [Selective read-only support](completed/2026-09-06-selective-readers.md) adds bounded reader

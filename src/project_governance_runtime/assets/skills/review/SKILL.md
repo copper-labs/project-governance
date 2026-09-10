@@ -21,6 +21,7 @@ authoring, or migration changes.
 - `.governance/runtime/skills/catalog.yaml`
 - `.governance/runtime/skills/review-finding.schema.yaml`
 - The changed diff or artifact under review
+- `.governance/runtime/skills/resources/efficient-execution.md` when the batch used long-running commands
 
 ## Workflow
 
@@ -52,6 +53,9 @@ authoring, or migration changes.
    at this point, before broad validation or the commit hook.
 7. Reuse exact subject-valid evidence. After one complete proof cycle, require a recorded reason
    before repeating an equivalent gate.
+   Within this pass, use available execution records to assess efficient-execution compliance.
+   Report concrete exceptions or unknowns; do not add a separate audit or rerun work to reconstruct
+   missing observations.
 8. Keep provider adapters as launch pointers only.
 
 ## Validation
