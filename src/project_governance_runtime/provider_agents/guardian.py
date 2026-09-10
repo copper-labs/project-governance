@@ -6,6 +6,7 @@ import sys
 import time
 
 from .config import TERMINAL
+from .completion import attempt
 from .jobs import finish_cleanup
 from .processes import collect, record, same_process, terminate_owned
 from .storage import atomic_json, read_json, validate_record
@@ -24,10 +25,13 @@ def main():
         value = validate_record(read_json(path / "status.json"))
         if value["state"] in TERMINAL:
             if terminate_owned(path, provider, grace=.1):
+                attempt(path)
                 return
         elif not same_process(worker):
             if terminate_owned(path, provider, grace=.2):
-                if finish_cleanup(path)["state"] in TERMINAL:
+                recovered = finish_cleanup(path)
+                attempt(path)
+                if recovered["state"] in TERMINAL:
                     return
         time.sleep(.25)
 

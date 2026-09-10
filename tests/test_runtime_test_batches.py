@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 from test_runtime_provider_agents import ProviderAgentCase, FIXTURE
 from project_governance_runtime import telemetry, skill_telemetry
-from project_governance_runtime.provider_agents import jobs, test_batches, test_cycle
+from project_governance_runtime.provider_agents import jobs, test_batches
 from project_governance_runtime.provider_agents.config import AgentError, TERMINAL
 from project_governance_runtime.provider_agents.processes import same_process
 from project_governance_runtime.provider_agents.storage import atomic_json, read_json
@@ -162,63 +162,9 @@ class TestBatchTests(ProviderAgentCase):
         with self.assertRaisesRegex(AgentError, "nested job conflicts"):
             self.batch()
 
-    def test_both_managed_hosts_return_to_exact_session_once(self):
-        for provider in ("codex", "claude"):
-            answer = self.root / "answer.json"
-            answer.write_text(json.dumps({"choice": "external", "note": "long batch", "batch": self.request()}))
-            os.environ["PROVIDER_AGENT_FIXTURE_ANSWER"] = str(answer)
-            result = test_cycle.run(task="Run the necessary tests", workspace=str(self.workspace), provider=provider,
-                                    model="fixture-model", effort="high", executable=str(FIXTURE),
-                                    authorized_full_access=True, store=self.store)
-            self.assertEqual(result["state"], "succeeded", result)
-            preparation = jobs.result(result["preparation_job"])
-            assessment = jobs.result(result["assessment_job"])
-            self.assertEqual(preparation["conversation_id"], assessment["conversation_id"])
-            batch = jobs.result(result["batch_job"])
-            assessment_request = read_json(self.store.job(result["assessment_job"]) / "request.json")
-            self.assertIn(test_batches.digest_file(self.store.job(result["batch_job"]) / "result.json"), assessment_request["task"])
-            self.assertLessEqual(preparation["finished_at"], batch["started_at"])
-            self.assertLessEqual(batch["finished_at"], jobs.status(result["assessment_job"])["created_at"])
-            again = test_cycle.run(prepared_job=result["preparation_job"], authorized_full_access=True, store=self.store)
-            self.assertEqual(again["batch_job"], result["batch_job"])
-            self.assertEqual(again["assessment_job"], result["assessment_job"])
 
-    def test_managed_quick_choice_avoids_batch_and_assessment(self):
-        answer = self.root / "answer.json"
-        answer.write_text(json.dumps({"choice": "direct", "note": "quick assertion completed"}))
-        os.environ["PROVIDER_AGENT_FIXTURE_ANSWER"] = str(answer)
-        result = test_cycle.run(task="Run quick test", workspace=str(self.workspace), provider="claude",
-                                model="fixture-model", effort="high", executable=str(FIXTURE),
-                                authorized_full_access=True, store=self.store)
-        self.assertEqual(result["state"], "succeeded")
-        self.assertNotIn("batch_job", result)
-        self.assertEqual(len(list(self.store.records())), 1)
 
-    def test_host_drift_and_missing_authority_block_before_launch(self):
-        with self.assertRaisesRegex(AgentError, "full-access"):
-            test_cycle.run(task="test", workspace=str(self.workspace), provider="claude", store=self.store)
-        self.assertEqual(len(list(self.store.records())), 0)
-        host = test_cycle.host_binding("claude", str(self.workspace), str(FIXTURE))
-        (self.workspace / "CLAUDE.md").write_text("Changed instructions")
-        with self.assertRaisesRegex(AgentError, "configuration or instructions changed"):
-            test_cycle.validate_host(host)
 
-    def test_preparation_startup_interrupt_returns_and_cancels_owned_job(self):
-        os.environ["PROVIDER_AGENT_FIXTURE_SCENARIO"] = "sleep"
-        original, interrupted = jobs.status, []
-        def interrupt_once(*args, **kwargs):
-            if not interrupted:
-                interrupted.append(True)
-                raise KeyboardInterrupt
-            return original(*args, **kwargs)
-        with patch.object(jobs, "status", side_effect=interrupt_once):
-            result = test_cycle.run(task="Prepare tests", workspace=str(self.workspace), provider="claude",
-                                    model="fixture-model", effort="high", executable=str(FIXTURE),
-                                    authorized_full_access=True, store=self.store)
-        self.assertEqual(result["state"], "cancelled")
-        self.assertIsNotNone(result["preparation_job"])
-        self.assertEqual(self.await_result(result["preparation_job"])["state"], "cancelled")
-        self.assertEqual(len(list(self.store.records())), 1)
 
     def test_terminal_transition_retains_guard_until_last_publication(self):
         request = jobs.normalize("Execute tests", str(self.workspace), batch=test_batches.normalize(self.request()))
@@ -280,53 +226,3 @@ class TestBatchTests(ProviderAgentCase):
             with self.subTest(value=type(value).__name__), self.assertRaises(AgentError):
                 self.batch(value)
         self.assertEqual(len(list(self.store.records())), 0)
-
-    def test_failed_assessment_is_not_automatically_retried(self):
-        answer = self.root / "answer.json"
-        answer.write_text(json.dumps({"choice": "external", "note": "batch", "batch": self.request()}))
-        os.environ["PROVIDER_AGENT_FIXTURE_ANSWER"] = str(answer)
-        first = test_cycle.prepare("Run tests", str(self.workspace), provider="claude", model="fixture-model",
-                                   effort="high", executable=str(FIXTURE), store=self.store)
-        self.await_result(first["job_id"])
-        os.environ["PROVIDER_AGENT_FIXTURE_SCENARIO"] = "startup_error"
-        failed = test_cycle.run(prepared_job=first["job_id"], authorized_full_access=True, store=self.store)
-        self.assertEqual(failed["state"], "failed")
-        os.environ["PROVIDER_AGENT_FIXTURE_SCENARIO"] = "normal"
-        repeated = test_cycle.run(prepared_job=first["job_id"], authorized_full_access=True, store=self.store)
-        self.assertEqual(repeated["assessment_job"], failed["assessment_job"])
-        self.assertEqual(repeated["state"], "failed")
-        jobs.cancel(failed["batch_job"])
-        with self.assertRaisesRegex(AgentError, "assessment suppressed"):
-            test_cycle.run(prepared_job=first["job_id"], authorized_full_access=True, store=self.store)
-
-    def test_cancel_terminal_batch_also_cancels_its_active_assessment(self):
-        answer = self.root / "answer.json"
-        answer.write_text(json.dumps({"choice": "external", "note": "batch", "batch": self.request()}))
-        os.environ["PROVIDER_AGENT_FIXTURE_ANSWER"] = str(answer)
-        first = test_cycle.prepare("Run tests", str(self.workspace), provider="claude", model="fixture-model",
-                                   effort="high", executable=str(FIXTURE), store=self.store)
-        self.await_result(first["job_id"])
-        batch = self.batch()
-        self.await_result(batch["job_id"])
-        os.environ["PROVIDER_AGENT_FIXTURE_SCENARIO"] = "sleep"
-        child = test_cycle.assess(first["job_id"], batch["job_id"], self.store, None)
-        jobs.cancel(batch["job_id"])
-        self.assertEqual(self.await_result(child["job_id"])["state"], "cancelled")
-
-    def test_known_usage_is_not_doubled_and_terminal_enrichment_keeps_timestamp(self):
-        codex = test_cycle.usage_totals("codex", {"usage": {"total": {"inputTokens": 10}}},
-                                      {"usage": {"total": {"inputTokens": 30, "cachedInputTokens": 4, "outputTokens": 8}}})
-        self.assertEqual(codex["input_tokens"], 30)
-        claude = {"usage": {"usage": {"input_tokens": 3, "output_tokens": 2},
-                            "models": {"primary": {"inputTokens": 3, "outputTokens": 2},
-                                       "auxiliary": {"inputTokens": 7, "outputTokens": 1}}}}
-        self.assertEqual(test_cycle.usage_totals("claude", claude, claude)["input_tokens"], 20)
-        identity = str(uuid.uuid4())
-        skill_telemetry.record_terminal(self.workspace, identity, "codex", "succeeded", 50, True)
-        path = self.workspace / ".governance/telemetry/runs.jsonl"
-        before = json.loads(path.read_text())["recorded_at"]
-        skill_telemetry.record_terminal(self.workspace, identity, "codex", "succeeded", 50, True, **codex)
-        rows = path.read_text().splitlines()
-        self.assertEqual(len(rows), 1)
-        self.assertEqual(json.loads(rows[0])["recorded_at"], before)
-        self.assertEqual(telemetry.status(self.workspace)["test_execution"]["known_usage"]["input_tokens"]["total"], 30)

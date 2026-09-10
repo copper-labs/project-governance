@@ -15,8 +15,11 @@ Test Execution selects necessary proof and its cheapest reliable execution path.
 directly. Long batches can use a deterministic job in the existing harness registry. The job owns
 processes, workspace/output exclusion, deadlines and durable results; it never invokes a model.
 Projects own test commands, assertions, input completeness and device management.
-The [completed implementation plan](../exec-plans/completed/2026-09-10-shared-test-execution.md)
-records the review reconciliation and acceptance boundaries.
+The active agent owns submission, waiting and assessment by default, for both Codex and Claude.
+The operator does not need to execute terminal commands to use this skill. Test duration alone
+does not select a separate provider lifecycle.
+The [completion-return plan](../exec-plans/active/2026-09-10-test-completion-return.md)
+records the replacement workflow and its acceptance boundaries.
 
 ## Commands
 
@@ -25,27 +28,27 @@ events, wait and cancel commands operate on its job ID. `wait --until-terminal` 
 command without emitting intermediate events; terminating the observer does not cancel the job.
 Host instructions still determine tool wait limits and whether detached jobs survive host exit.
 
-`harness-agent cycle --workspace ROOT --provider codex|claude --model MODEL --effort EFFORT
---task-file FILE --authorized-full-access` starts an externally owned prepare/batch/assess cycle.
-Existing `--config` provider bindings can supply model, effort and executable. This command uses
-the existing full-access native adapters and requires explicit authority for them. It must start
-outside the provider's managed tool tree. It does not change global settings or bypass a restricted
-parent's authority. `--prepared-job ID` consumes a terminal harness preparation job without another
-preparation call. A bare session ID is not accepted as a preparation job.
+`batch --notify-codex` binds the initiating `CODEX_THREAD_ID`, installed queue-capable executable
+and Codex home before submission. `--codex-executable PATH` selects the executable when needed.
+After durable terminal publication and cleanup, the worker/guardian queues one bounded trusted
+message to that exact task. No provider job, model/effort override or operator command is involved.
+The former `cycle` interface and its preparation/assessment implementation are removed.
 
-Preparation returns an answer containing JSON with `choice`, `note` and, for `external`, `batch`.
-It may complete a quick direct check or reuse proof instead; those choices end the cycle without
-another provider invocation. External preparation only selects commands; it does not start them.
-The coordinator verifies successful preparation, exited provider/worker/guardian, exact binding,
-and the request before starting the batch. Assessment uses the existing exact-session follow-up
-with a deterministic idempotency key based on batch/result identity. A deduplicated failed or
-cancelled assessment remains that attempt; it is never silently replaced.
+Delivery has a separate private receipt: `sending`, `queued`, or `failed`. A per-job lock prevents
+competing worker/recovery paths from delivering twice. `sending` is persisted before the native
+call; a crash leaves an uncertain attempt rather than silently retrying. `deliver JOB_ID --retry`
+allows deliberate recovery of failed/uncertain delivery without rerunning tests. A queued receipt
+is never automatically resent and does not claim agent consumption. Result summaries expose it.
+The native call is bounded and executable/home drift fails delivery. Test outcomes remain intact.
+Status/recovery reads never dispatch notifications or wait on their lock. Worker/guardian dispatch
+runs outside registry and completion locks. After loss of both supervisors, explicit `deliver`
+from the initiating host recovers delivery; arbitrary observers cannot consume that attempt.
+A separate deduplicated cleanup-attention notice prevents an unresolved resource claim from silently
+stranding the task. The terminal notice follows only when cleanup is confirmed.
 
-The coordinator blocks on changed executable/configuration or unsafe/malformed results and retains
-all evidence. Relevant configuration references are recorded as digests, never copied content.
-Native model/effort/workspace/permission readback remains the provider adapter's responsibility.
-Cancellation suppresses pending assessment and also cancels an already-created assessment job.
-There is no automatic repair/retry loop, scheduler, daemon, or second session chosen by recency.
+Claude uses its native Monitor tool around `wait JOB_ID --until-terminal`. Its one-line output
+returns to the original interactive session. No separate observer agent, hooks or scheduled model
+polling is required. Host capability and lifetime must be qualified before unattended use.
 
 ## Request
 
@@ -124,15 +127,16 @@ process identity/guardian recovery remains shared with provider jobs; uncertain 
 
 ## Host Integration And Evidence
 
-The current-session route uses one batch and the host's cheapest supported wait/notification. A host
-may terminate detached descendants even after setsid; survival requires actual host proof. Bounded
-model-driven waits are not a zero-call guarantee. Keep the active turn when work remains unless the
-operator hands it off or the host interrupts it. Preserve exact job/result pointers on interruption.
+The initiating agent selects commands, submits once, and receives completion through Codex queue
+or Claude Monitor. With a qualified return path it may end its model turn while the host stays
+open. Keep exact job/result pointers and stable tested inputs. No supervising-model calls are
+required while waiting; intentional product-model calls inside tests are a separate concern.
 
-The managed cycle supplies the stronger interval: preparation processes are gone before tests start,
-and assessment starts after durable results and cleanup. Preserve their timestamps and process records.
-There are no supervising-model calls in that interval. This does not ban intentional product-model calls
-inside project tests. Native desktop/IDE automatic return is unverified unless separately demonstrated.
+Qualification must prove return to the initiating session after its turn ends, plus failure,
+timeout, cleanup and duplicate behavior. Queue acceptance alone does not prove consumption.
+Closed hosts, restarts and remote sessions are not covered by a local open-host demonstration.
+If the active host lacks a qualified return path, use supported bounded waits in the same task.
+Do not turn that limitation into an operator terminal assignment or launch a competing agent.
 
 Result summaries preserve all case identities and point to full private records; they do not replay
 logs. Check failures, input validity and cleanup before accepting evidence or choosing repairs.

@@ -16,6 +16,8 @@ Git remains the implementation history and recovery mechanism.
 
 ## Active
 
+- [Return test completion to the initiating agent](active/2026-09-10-test-completion-return.md)
+
 - [Optional provider agent skills](active/2026-09-06-provider-agent-skills.md) builds and releases
   Gemini, Claude, and Codex wrappers independently of later implementation-plan improvements.
 
@@ -59,3 +61,4 @@ Git remains the implementation history and recovery mechanism.
   telemetry, and clean-wheel proof.
 - [Governance streamlining](completed/2026-08-14-governance-streamlining.md) completed its source
   implementation and proof. Any shadow adoption is target-owned work outside this checkout.
+

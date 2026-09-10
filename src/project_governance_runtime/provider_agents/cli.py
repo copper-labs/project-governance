@@ -74,6 +74,11 @@ def parser():
             p.add_argument("--idempotency-key")
     p = sub.add_parser("batch", help="Start a deterministic test batch using the existing job lifecycle.")
     p.add_argument("--request-file", type=Path, required=True)
+    p.add_argument("--notify-codex", action="store_true", help="Queue completion to the initiating CODEX_THREAD_ID.")
+    p.add_argument("--codex-executable", help="Installed CLI with queue support; requires --notify-codex.")
+    p = sub.add_parser("deliver", help="Inspect or explicitly retry delivery without rerunning tests.")
+    p.add_argument("job_id")
+    p.add_argument("--retry", action="store_true")
     p = sub.add_parser("record-use", help="Report one advisory Test Execution decision.")
     p.add_argument("--workspace", type=Path, required=True)
     p.add_argument("--decision-id", required=True)
@@ -82,19 +87,6 @@ def parser():
     p.add_argument("--choice", choices=sorted(CHOICES), required=True)
     p.add_argument("--host", choices=sorted(HOSTS), default="unknown")
     p.add_argument("--reason", choices=sorted(REASONS), required=True)
-    p = sub.add_parser("cycle", help="External prepare/batch/assess cycle on Codex or Claude.")
-    p.add_argument("--prepared-job")
-    p.add_argument("--workspace")
-    p.add_argument("--provider", choices=("codex", "claude"))
-    task = p.add_mutually_exclusive_group()
-    task.add_argument("--task-file", type=Path)
-    task.add_argument("--task")
-    for name in ("model", "effort", "executable", "idempotency-key"):
-        p.add_argument("--" + name)
-    p.add_argument("--config", type=Path)
-    p.add_argument("--config-input", type=Path, action="append", default=[])
-    p.add_argument("--timeout", default="900")
-    p.add_argument("--authorized-full-access", action="store_true")
     p = sub.add_parser("doctor")
     p.add_argument("--provider", choices=PROVIDERS, required=True)
     p = sub.add_parser("list")
@@ -134,19 +126,6 @@ def main(argv=None, environment_fd=None):
     args = parser().parse_args(argv)
     try:
         command = args.command
-        if command == "cycle":
-            from .test_cycle import run
-
-            if not args.prepared_job and not (args.workspace and args.provider and (args.task or args.task_file)):
-                raise AgentError("cycle requires workspace/provider/task, or an exact prepared-job")
-            value = run(task=read_text(args.task_file) if args.task_file else args.task,
-                        workspace=args.workspace, provider=args.provider, model=args.model, effort=args.effort,
-                        executable=args.executable, config=args.config, config_inputs=args.config_input,
-                        timeout_seconds=args.timeout, idempotency_key=args.idempotency_key,
-                        prepared_job=args.prepared_job, authorized_full_access=args.authorized_full_access,
-                        environment_fd=environment_fd, notify=dump)
-            dump(value)
-            return {"succeeded": 0, "cancelled": 130, "timed_out": 124}.get(value["state"], 1)
         if command in {"start", "run"}:
             value = _start(args, environment_fd)
             dump(value)
@@ -176,7 +155,16 @@ def _dispatch(args, environment_fd):
     if args.command == "batch":
         from .test_batches import start
 
-        return start(json.loads(read_text(args.request_file)), environment_fd=environment_fd)
+        if args.codex_executable and not args.notify_codex:
+            raise AgentError("--codex-executable requires --notify-codex")
+        from .completion import codex_target
+
+        target = codex_target(args.codex_executable) if args.notify_codex else None
+        return start(json.loads(read_text(args.request_file)), completion=target, environment_fd=environment_fd)
+    if args.command == "deliver":
+        from .completion import deliver
+
+        return deliver(Store().job(args.job_id), retry=args.retry)
     if args.command == "record-use":
         from ..skill_telemetry import record_use
 
@@ -188,7 +176,7 @@ def _dispatch(args, environment_fd):
         return jobs.events(args.job_id, args.after, args.limit)
     if args.command == "wait":
         if args.until_terminal:
-            from .test_cycle import wait_terminal
+            from .jobs import wait_terminal
 
             return compact_result(wait_terminal(args.job_id, Store()))
         return jobs.wait(args.job_id, args.after, args.seconds)
@@ -200,7 +188,7 @@ def _dispatch(args, environment_fd):
 
 def compact_result(value):
     """Return every case outcome without replaying private logs and provider tool transcripts."""
-    fields = ("job_id", "state", "ready", "summary", "input_binding", "input_validity", "cleanup_confirmed", "paths", "error")
+    fields = ("job_id", "state", "ready", "summary", "input_binding", "input_validity", "cleanup_confirmed", "paths", "error", "completion_delivery")
     result = {k: value[k] for k in fields if k in value}
     if "cases" in value:
         result["cases"] = [{k: c[k] for k in ("id", "outcome", "exit_code", "reason") if k in c} for c in value["cases"]]

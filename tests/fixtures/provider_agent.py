@@ -34,8 +34,6 @@ def reply(request, result):
 def completion():
     value = {"outcome": "completed", "answer": "Completed: café 🦉", "artifacts": [],
              "checks": [], "sources": [], "remaining": []}
-    if not RESUMED and os.environ.get("PROVIDER_AGENT_FIXTURE_ANSWER"):
-        value["answer"] = Path(os.environ["PROVIDER_AGENT_FIXTURE_ANSWER"]).read_text()
     if SCENARIO == "blocked":
         value.update(outcome="blocked", remaining=["Missing task input"])
     if SCENARIO == "remaining":

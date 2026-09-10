@@ -165,10 +165,6 @@ class Worker:
         from .runtime import validate
 
         validate(self.request)
-        if self.request.get("host_binding"):
-            from .test_cycle import validate_host
-
-            validate_host(self.request["host_binding"])
         if self.is_batch:
             from .test_batches import execute
 

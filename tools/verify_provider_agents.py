@@ -129,10 +129,22 @@ class _InstalledProviderProof:
             "cases": [{"id": "installed", "argv": [str(self.python), "-c", "from project_governance_runtime import __version__; assert __version__"],
                        "timeout_seconds": 5, "expected_exit_codes": [0]}]}))
         before = len(list((self.scratch / "logs").glob("*.argv.json")))
-        job = json.loads(self.invoke(self.agent, "batch", "--request-file", request))
+        queue = self.scratch / "codex-queue"
+        receipt = self.scratch / "queue-receipt.json"
+        queue.write_text(f"#!{self.python}\nimport json,sys\nfrom pathlib import Path\n"
+                         "if '--help' in sys.argv: print('--thread --message')\n"
+                         f"else: Path({str(receipt)!r}).write_text(json.dumps(sys.argv[1:]))\n")
+        queue.chmod(0o700)
+        self.environment["CODEX_THREAD_ID"] = "f7e9be56-b5b7-491f-8d2d-78cec3472ea6"
+        job = json.loads(self.invoke(self.agent, "batch", "--request-file", request,
+                                    "--notify-codex", "--codex-executable", queue))
         result = json.loads(self.invoke(self.agent, "wait", job["job_id"], "--until-terminal"))
         if result["state"] != "succeeded" or result["summary"]["passed"] != 1:
             raise RuntimeError("installed test batch did not preserve its assertion")
+        delivery = json.loads(self.invoke(self.agent, "deliver", job["job_id"]))
+        if delivery["state"] != "queued" or json.loads(receipt.read_text())[:3] != [
+                "queue", "--thread", self.environment["CODEX_THREAD_ID"]]:
+            raise RuntimeError("installed completion did not target its initiating task")
         if len(list((self.scratch / "logs").glob("*.argv.json"))) != before:
             raise RuntimeError("deterministic batch unexpectedly invoked a provider")
         if not (self.runtime / "skills/test-execution/SKILL.md").is_file():

@@ -6,12 +6,12 @@ capabilities:
     tasks:
       - execute a deterministic batch without provider polling
       - return a test result to the selected Codex or Claude session
-    symbols: [harness-agent batch, harness-agent cycle]
+    symbols: [harness-agent batch, harness-agent deliver]
     reference: docs/specs/test-execution.md
     guides: [docs/guides/provider-agents.md]
     sources:
       - src/project_governance_runtime/provider_agents/test_batches.py
-      - src/project_governance_runtime/provider_agents/test_cycle.py
+      - src/project_governance_runtime/provider_agents/completion.py
       - src/project_governance_runtime/skill_telemetry.py
   - id: startup-runtime-updates
     title: Adopt compatible governance updates at top-level task startup
