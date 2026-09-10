@@ -27,6 +27,15 @@ canonical_roots:
   pattern_packs: .governance/runtime/skills/pattern-packs
 
 standard_skills:
+  - id: test-execution
+    category: governance
+    path: .governance/runtime/skills/test-execution/SKILL.md
+    description: Choose direct proof or deterministic external batches with trustworthy results and bounded cost.
+    activation:
+      mode: governed
+      default_level: recommended
+    applicability:
+      task_terms: [long test batch, test execution, device qualification, test-execution, expensive build]
   - id: harness-gemini-agent
     category: provider
     path: .governance/runtime/skills/harness-gemini-agent/SKILL.md
@@ -173,6 +182,9 @@ pattern_packs:
     description: Deep workflow and review skills for discovery, risk, implementation quality, CI, docs, and delivery.
 
 resources:
+  - id: test-batch-contract
+    path: .governance/runtime/skills/resources/test-batch-contract.md
+    description: Request, cleanup, evidence and managed-host contract for external test execution.
   - id: efficient-execution
     path: .governance/runtime/skills/resources/efficient-execution.md
     description: Portable long-running command supervision, process recovery, and compact evidence output.

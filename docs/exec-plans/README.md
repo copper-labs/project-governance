@@ -21,6 +21,8 @@ Git remains the implementation history and recovery mechanism.
 
 ## Completed
 
+- [Shared test execution](completed/2026-09-10-shared-test-execution.md) delivers deterministic
+  batches, Codex and Claude CLI handoff, proactive skill routing, and bounded usage observations.
 - [Efficient execution](completed/2026-09-10-efficient-execution.md) closes long-running command
   supervision gaps through existing policy and packaged skills.
 - [Evidence-first efficiency](completed/2026-09-07-evidence-first-efficiency.md) adds on-demand repeat

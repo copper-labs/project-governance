@@ -16,6 +16,7 @@ SCENARIO = os.environ.get("PROVIDER_AGENT_FIXTURE_SCENARIO", "normal")
 LOG = Path(os.environ["PROVIDER_AGENT_FIXTURE_LOG"])
 LOG.mkdir(exist_ok=True)
 SESSION = str(uuid.uuid4())
+RESUMED = False
 
 
 def arg(name):
@@ -33,6 +34,8 @@ def reply(request, result):
 def completion():
     value = {"outcome": "completed", "answer": "Completed: café 🦉", "artifacts": [],
              "checks": [], "sources": [], "remaining": []}
+    if not RESUMED and os.environ.get("PROVIDER_AGENT_FIXTURE_ANSWER"):
+        value["answer"] = Path(os.environ["PROVIDER_AGENT_FIXTURE_ANSWER"]).read_text()
     if SCENARIO == "blocked":
         value.update(outcome="blocked", remaining=["Missing task input"])
     if SCENARIO == "remaining":
@@ -101,6 +104,8 @@ def gemini():
 
 
 def claude():
+    global RESUMED
+    RESUMED = bool(arg("--resume"))
     session = arg("--resume") or SESSION
     selected = "wrong-model" if SCENARIO == "wrong_model" else arg("--model")
     if SCENARIO == "startup_error":
@@ -157,6 +162,7 @@ def _codex_turn(request, session, selected):
 
 
 def codex():
+    global RESUMED
     session = SESSION
     selected = None
     for line in sys.stdin:
@@ -168,6 +174,7 @@ def codex():
                 emit({"id": 90, "method": "mcpServer/elicitation/request", "params": {"serverName": "fixture"}})
             reply(request, {"userAgent": "fixture", "platformFamily": "unix", "platformOs": "linux"})
         elif method in {"thread/start", "thread/resume"}:
+            RESUMED = method == "thread/resume"
             if SCENARIO == "startup_error":
                 emit({"id": request["id"], "error": {"code": -1, "message": "Authentication required"}})
                 continue

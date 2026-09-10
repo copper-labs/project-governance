@@ -1,7 +1,7 @@
 {
-  "automatic": true,
+  "automatic": false,
   "from_version": "2.5.0",
   "before_version": "3.0.0",
   "startup_contract": 1,
-  "integration_change": false
+  "integration_change": true
 }

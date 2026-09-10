@@ -134,3 +134,32 @@ Evidence lives outside the installed wheel in a private user data directory. Set
 `HARNESS_AGENT_STATE` to select another private location. The original task is retained;
 keep credentials out of it. Finish or cancel queued and running jobs before upgrading. Bootstrap
 refuses to replace an environment still used by workers or their cleanup guardians.
+
+## Run Tests Without Model Polling
+
+Use the installed Test Execution skill before a substantial build/test batch. It keeps quick checks
+direct and uses project-owned assertions for external batches. The
+[Test Execution contract](../specs/test-execution.md) defines the request format and recovery limits.
+
+Submit `harness-agent batch --request-file FILE`, retain its job ID, then observe with
+`harness-agent wait ID --until-terminal`. The observer produces a bounded terminal summary and does
+not launch a model. Host wait/cleanup rules still apply; detachment is not proof of survival.
+
+For a fully managed cycle, launch `harness-agent cycle` from an operator terminal outside the native
+provider's tool tree. Choose `--provider codex` or `--provider claude`, workspace/task and the existing
+model/effort binding. `--authorized-full-access` requires actual authority for the native adapters.
+Preparation exits, the batch runs, then one exact-session follow-up assesses its result. The command
+prints durable phase job IDs; interrupted cycles can use `--prepared-job ID` without another preparation.
+This supports the two CLI hosts, not transparent takeover of arbitrary desktop/IDE sessions.
+
+The feature release refreshes the existing managed instruction block. Adopt it deliberately and
+start a fresh host session. Live batches and uncertain cleanup use protocol 2, so older harness
+executables sharing the store temporarily refuse operations while that state exists. Confirmed
+terminal publication restores protocol-1 records; older repositories can then use the shared store
+again. Use the current helper to inspect or recover a pending batch. Ordinary governance checks are
+unaffected. Do not delete unknown records or split a shared workspace across independent stores to
+evade ownership.
+
+`project-governance telemetry status` includes retained Test Execution use, path choices, outcomes,
+durations and available token totals. It does not observe every skill read or prove savings. Data
+stays in the existing bounded local file. No separate collector or background audit is installed.

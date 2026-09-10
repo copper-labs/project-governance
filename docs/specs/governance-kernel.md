@@ -246,7 +246,8 @@ normal pinned-wheel update path.
 
 ## Telemetry
 
-Telemetry is one ignored validation JSONL file bounded by both 1,000 records and one mebibyte. Each
+Telemetry is one ignored JSONL file for validation and bounded Test Execution observations, limited
+by both 1,000 records and one mebibyte. Each
 append reads at most the newest one mebibyte, including when stale or externally modified state is
 larger. It records only run identity, runtime version, stage, mode, non-reversible scope and subject
 digests, changed-path and selected-pack counts, terminal status and reason, total duration, total pack
@@ -261,7 +262,12 @@ A nonzero exit code accompanied by a valid blocking finding is a check rejection
 of a crash. Selection blockers are terminal observations even when no pack executes; planning
 duration is separate from execution duration. Argument parsing and process startup are not timed.
 It never records paths, commands, output,
-findings, prompts, documentation activity, skill activity, agent activity, or source content.
+findings, prompts, documentation activity, general agent activity, or source content. Schema 4 adds
+only the two content-free Test Execution events defined in the
+[Test Execution contract](test-execution.md#skill-routing-and-telemetry): a reported decision and an
+observed batch result. Fixed skill/host/choice/reason enums, opaque decision identity, outcomes,
+duration and already-available aggregate token counts support later evaluation. Native session IDs,
+model configuration and job evidence stay private. This is not automatic observation of skill reads.
 Writes are concurrency-safe and fail open; telemetry cannot weaken or approve a check. The single
 `telemetry status` view reports retained bytes, outcomes, durations, runner overhead, modes, broad
 runs, repeated scopes and subjects, unmatched starts, and slow packs. Filters select runtime version,

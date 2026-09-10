@@ -45,6 +45,9 @@ is deliberate by default, with an optional compatible-update policy for top-leve
 
 ## Reference Areas
 
+The [Test Execution contract](specs/test-execution.md) defines direct/external proof, deterministic
+batches, Codex/Claude completion handoff and bounded usage observations.
+
 The [optional provider agent contract](specs/provider-agent-skills.md) defines the standalone
 Gemini, Claude, and Codex wrappers in 2.4.0, including the scoped Gemini live-validation exception.
 

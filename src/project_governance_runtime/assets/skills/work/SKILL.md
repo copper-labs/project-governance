@@ -21,6 +21,7 @@ after the work has been framed and scoped.
 - `docs/index.md`
 - The active plan or governing artifact
 - `.governance/runtime/skills/resources/efficient-execution.md` when supervising long-running commands
+- `.governance/runtime/skills/test-execution/SKILL.md` before the first substantial test batch or a material change in its execution needs
 - `.governance/runtime/skills/delegated-execution/SKILL.md`
 - `.governance/runtime/skills/resources/change-narrative.md` before any commit or pull request handoff
 - Route-selected pack manifests or policies
