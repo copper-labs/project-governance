@@ -67,6 +67,8 @@ class TestBatchTests(ProviderAgentCase):
         request["cases"][0]["argv"][-1] = "print('changed')"
         with self.assertRaisesRegex(AgentError, "different request"):
             self.batch(request)
+        # Proof is published before advisory telemetry; assert observations after worker closeout.
+        self.wait_for(lambda: not same_process(read_json(self.store.job(first["job_id"]) / "worker.json")))
         report = telemetry.status(self.workspace)["test_execution"]
         self.assertEqual(report["reported_uses"], 1)
         self.assertEqual(report["observed_batches"], 1)
