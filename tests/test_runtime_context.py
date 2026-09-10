@@ -53,7 +53,7 @@ def routing_profile(*, context: list[str]) -> dict[str, object]:
                     "match": {"prompt_terms": ["governance"], "path_globs": ["docs/governance/**"]},
                     "primary_context": ["docs/governance/guide.md"],
                     "token_budget": {
-                        "primary_context_tokens": 100,
+                        "primary_context_tokens": 200,
                         "active_plan_context_tokens": 100,
                         "expansion_context_tokens": 100,
                         "total_context_tokens": 10000,

@@ -182,6 +182,9 @@ pattern_packs:
     description: Deep workflow and review skills for discovery, risk, implementation quality, CI, docs, and delivery.
 
 resources:
+  - id: test-batch-contract
+    path: .governance/runtime/skills/resources/test-batch-contract.md
+    description: Request, cleanup, evidence and managed-host contract for external test execution.
   - id: efficient-execution
     path: .governance/runtime/skills/resources/efficient-execution.md
     description: Portable long-running command supervision, process recovery, and compact evidence output.
