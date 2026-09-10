@@ -101,5 +101,5 @@ def harness_routing_status(root: Path) -> dict:
             "instruction_files": entries, "resource": RESOURCE, "executable": str(executable.resolve()),
             "skills": {p: f"harness-{p}-agent" for p in ("gemini", "claude", "codex")},
             "test_execution": {"skill": "test-execution", "batch": "available" if not issues else "needs-setup",
-                               "managed_cycle": "operator launches harness-agent cycle; live host proof not certified"},
+                               "completion": "Codex queue or Claude native Monitor; qualify the active host"},
             "issues": issues, "global_instruction_conflicts": "not automatically certified"}

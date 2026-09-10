@@ -22,7 +22,7 @@ from .storage import Events, Store, atomic_json, events_since, read_json, valida
 def normalize(task, workspace, *, provider=None, model=None, effort=None, executable=None, config=None,
               context="", role="general", constraints="", additional_roots=None, access="exclusive",
               required_tools=None, timeout_seconds=0, idle_timeout_seconds=0, idempotency_key=None,
-              conversation_id=None, parent_job_id=None, enclosing_jobs=None, batch=None, host_binding=None):
+              conversation_id=None, parent_job_id=None, enclosing_jobs=None, batch=None):
     """Validate the assignment and explicit binding before creating durable state."""
     _validate_text(task, context, role, constraints)
     roots, required = additional_roots or [], required_tools or []
@@ -46,8 +46,7 @@ def normalize(task, workspace, *, provider=None, model=None, effort=None, execut
                 additional_roots=sorted(set(directory(r) for r in roots)), required_tools=required,
                 timeout_seconds=duration(timeout_seconds), idle_timeout_seconds=duration(idle_timeout_seconds),
                 idempotency_key=idempotency_key, conversation_id=conversation_id, parent_job_id=parent_job_id,
-                enclosing_jobs=ancestry, runner_digest=code_digest(), runtime_binding=pinned_runtime,
-                host_binding=host_binding)
+                enclosing_jobs=ancestry, runner_digest=code_digest(), runtime_binding=pinned_runtime)
 
 
 def _validate_text(task, context, role, constraints):
@@ -94,7 +93,12 @@ def conflicts(request, other):
 def recover(path):
     """Reclaim abandoned ownership only after recorded native programs stop."""
     value = validate_record(read_json(path / "status.json"))
-    if value["state"] in TERMINAL or time.time() - value["created_at"] < 5:
+    if value["state"] in TERMINAL:
+        from .completion import attempt
+
+        attempt(path)
+        return value
+    if time.time() - value["created_at"] < 5:
         return value
     worker = read_json(path / "worker.json") or read_json(path / "launch.json")
     if same_process(worker) or same_process(read_json(path / "guardian.json")):
@@ -119,6 +123,9 @@ def finish_cleanup(path):
             if value.get("stage") != stage:
                 value.update(stage=stage)
                 atomic_json(path / "status.json", value)
+            from .completion import attempt
+
+            attempt(path)
             return value
         partial = read_json(path / "result.json", {})
         if value.get("kind") == "test-batch":
@@ -152,6 +159,9 @@ def finish_cleanup(path):
             from .test_batches import terminal_telemetry
 
             terminal_telemetry(path)
+            from .completion import attempt
+
+            attempt(path)
         return value
     finally:
         os.close(fd)
@@ -263,7 +273,10 @@ def result(job_id, *, store=None):
     if current["state"] not in TERMINAL:
         return {"job_id": job_id, "state": current["state"], "ready": False}
     value = validate_record(read_json(store.job(job_id) / "result.json"))
-    return {**value, "state": current["state"], "ready": True, "paths": current["paths"]}
+    path = store.job(job_id)
+    notification = read_json(path / "notification.json", {})
+    return {**value, "state": current["state"], "ready": True, "paths": current["paths"],
+            **({"completion_delivery": notification} if notification else {})}
 
 
 def events(job_id, after=0, limit=100, *, store=None):
@@ -292,10 +305,6 @@ def cancel(job_id, *, store=None):
         current = recover(path)
         if current["state"] not in TERMINAL or current.get("kind") == "test-batch":
             atomic_json(path / "cancel.json", {"requested_at": time.time()})
-        children = [p.name for p, _ in store.records()
-                    if read_json(p / "request.json", {}).get("idempotency_key", "") == "assessment:" + job_id]
-    for child in children:
-        cancel(child, store=store)
     return status(job_id, store=store)
 
 
@@ -317,4 +326,15 @@ def follow_up(job_id, task, *, store=None, environment_fd=None, timeout_seconds=
                  **options, executable=prior["backend"],
                  timeout_seconds=prior["timeout_seconds"] if timeout_seconds is None else timeout_seconds,
                  conversation_id=current["conversation_id"], parent_job_id=job_id,
-                 idempotency_key=idempotency_key, host_binding=prior.get("host_binding"))
+                 idempotency_key=idempotency_key)
+
+
+def wait_terminal(job_id, store):
+    """Block inside one command and return one terminal result, including failures."""
+    while True:
+        current = status(job_id, store=store)
+        if current["state"] in TERMINAL:
+            return result(job_id, store=store)
+        if current.get("stage", "").startswith(("Awaiting confirmed", "Awaiting project")):
+            raise AgentError("cleanup needs project recovery; preserve batch " + job_id)
+        time.sleep(.2)

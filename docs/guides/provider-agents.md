@@ -135,22 +135,21 @@ Evidence lives outside the installed wheel in a private user data directory. Set
 keep credentials out of it. Finish or cancel queued and running jobs before upgrading. Bootstrap
 refuses to replace an environment still used by workers or their cleanup guardians.
 
-## Run Tests Without Model Polling
+## Run Tests With Bounded Supervision
 
 Use the installed Test Execution skill before a substantial build/test batch. It keeps quick checks
 direct and uses project-owned assertions for external batches. The
 [Test Execution contract](../specs/test-execution.md) defines the request format and recovery limits.
 
-Submit `harness-agent batch --request-file FILE`, retain its job ID, then observe with
-`harness-agent wait ID --until-terminal`. The observer produces a bounded terminal summary and does
-not launch a model. Host wait/cleanup rules still apply; detachment is not proof of survival.
+The active agent runs these commands itself. In Codex, submit `harness-agent batch --request-file
+FILE --notify-codex`; completion is queued to its initiating task. In Claude, submit without that
+flag and use native Monitor around `harness-agent wait ID --until-terminal`. The agent can end
+its model turn while awaiting the event, keeping the host open. Unsupported hosts use bounded waits.
 
-For a fully managed cycle, launch `harness-agent cycle` from an operator terminal outside the native
-provider's tool tree. Choose `--provider codex` or `--provider claude`, workspace/task and the existing
-model/effort binding. `--authorized-full-access` requires actual authority for the native adapters.
-Preparation exits, the batch runs, then one exact-session follow-up assesses its result. The command
-prints durable phase job IDs; interrupted cycles can use `--prepared-job ID` without another preparation.
-This supports the two CLI hosts, not transparent takeover of arbitrary desktop/IDE sessions.
+The old `cycle` command is removed. No separate provider preparation/assessment or manual terminal
+handoff is required. A Codex delivery failure leaves test results intact; inspect `harness-agent
+deliver ID` and use `--retry` only after reconciling failed/uncertain delivery. Do not rerun tests
+because a notice was missed. Queued means accepted by the host, not necessarily consumed yet.
 
 The feature release refreshes the existing managed instruction block. Adopt it deliberately and
 start a fresh host session. Live batches and uncertain cleanup use protocol 2, so older harness

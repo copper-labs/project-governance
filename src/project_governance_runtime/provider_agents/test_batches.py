@@ -14,7 +14,7 @@ import uuid
 
 from .config import AgentError, directory, duration
 from .processes import collect, record, terminate_owned
-from .storage import atomic_json, read_json
+from .storage import Store, atomic_json, read_json
 
 
 def digest_file(path):
@@ -176,11 +176,15 @@ def verify_inputs(batch):
             raise AgentError("test input changed: manifest digest mismatch")
 
 
-def start(value, *, store=None, environment_fd=None):
+def start(value, *, store=None, environment_fd=None, completion=None):
     """Submit a deterministic job through the shared registry and startup guard."""
     from . import jobs
 
     batch = normalize(value)
+    if completion:
+        if batch["host"] not in {"unknown", "codex"}:
+            raise AgentError("Codex completion cannot be attached to another host")
+        batch.update(completion=completion, host="codex")
     roots = sorted(set(batch["inputs"]["roots"] + batch["output_roots"]))
     result = jobs.start("Execute the declared test batch", batch["workspace"], batch=batch,
                         additional_roots=roots, timeout_seconds=batch["timeout_seconds"],
@@ -188,6 +192,9 @@ def start(value, *, store=None, environment_fd=None):
     from ..skill_telemetry import record_use
 
     record_use(Path(batch["workspace"]), result["job_id"], "external", batch["host"], "long-batch")
+    from .completion import attempt
+
+    attempt((store or Store()).job(result["job_id"]))
     return result
 
 
@@ -326,10 +333,16 @@ def finish(worker, state, error, cleaned):
     if not cleaned:
         worker.state["stage"] = "Awaiting confirmed process/project cleanup"
         worker.heartbeat(force=True)
+        from .completion import attempt
+
+        attempt(worker.path)
         return
     worker.state.update(state=state, stage=error or state, finished_at=value["finished_at"])
     worker.emit("finished", state=state, message=error or state)
     terminal_telemetry(worker.path)
+    from .completion import attempt
+
+    attempt(worker.path)
 
 
 def terminal_protocol(path):

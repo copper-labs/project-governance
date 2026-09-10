@@ -9,6 +9,9 @@ Choose the cheapest reliable proof once per coherent batch. Keep the operator's 
 session in charge. The project owns commands, assertions and device rules; the installed harness
 owns execution and results. Do not weaken tests or delivery gates to save tokens.
 
+The active agent executes the commands below, waits and assesses the results. Ordinary test work
+does not require the operator to run a terminal command or start a separate provider session.
+
 ## Select
 
 - Reuse evidence only when its inputs and claim remain valid.
@@ -28,28 +31,32 @@ Use the project's canonical commands and accepted exit/result contracts. Group a
 declare inputs, output claims, expected negatives, dependencies and deadlines. Project device runners
 keep their existing locks and cleanup acknowledgments. A Git HEAD alone does not identify test inputs.
 
-From the current session, submit the request with the pinned executable:
+For a batch, write the request and use the current host's completion path:
 
-```sh
-.governance/runtime/bin/harness-agent batch --request-file /absolute/batch.json
-.governance/runtime/bin/harness-agent wait JOB_ID --until-terminal
-```
+- **Codex:** invoke `.governance/runtime/bin/harness-agent batch --request-file /absolute/batch.json
+  --notify-codex`. This binds `CODEX_THREAD_ID` and queues completion back to this task. Supply
+  `--codex-executable /absolute/codex` if the host's CLI is not on PATH. Keep the job ID, then do
+  independent work or end the turn while awaiting the completion message. Do not poll for status.
+- **Claude:** submit the same batch without `--notify-codex`, then use the native **Monitor** tool
+  to run `.governance/runtime/bin/harness-agent wait JOB_ID --until-terminal`. It emits one JSON
+  line at completion (or when cleanup needs attention). Keep the interactive session open; do
+  independent work or end the turn and let Monitor deliver the event. Do not launch `claude -p`.
+- **Unsupported host:** use the supported bounded wait in the same turn and state the limitation.
+  Do not substitute operator terminal work, a custom launcher, or another provider session.
 
-Keep the returned job ID. The second command observes the job without returning every heartbeat.
-Use the host's supported wait/notification limits. Do not end the working turn just because tests
-remain active. A detached process may still be killed by native host cleanup; claim survival only
-where verified. Never wait for a child while holding a conflicting enclosing harness job claim.
-
-For automatic assessment with no model alive during the batch, the operator can start the external
-managed `cycle` command described in the contract. It uses the chosen provider and exact session;
-it is not a way to spawn a competing agent or escape a restricted parent's permissions.
+A model turn can end while its host session remains open. Closing the host or stopping its task can
+terminate owned processes; do not claim survival across exit/restart without proof. Never wait for
+a child while holding a conflicting enclosing harness job claim. Keep tested inputs stable while
+working independently. Preserve the operator's provider/model/effort; this path selects none.
 
 ## Assess
 
 Read `harness-agent result JOB_ID --summary`. Inspect every failed/not-run case, input validity and
 cleanup before accepting proof. Open targeted full logs when needed; diagnose before rerunning.
-Unknown cleanup keeps the resource claim. Recovery uses the same job; a lost observer is not authority
-to duplicate it. A successful launch or a telemetry record does not prove a test passed.
+Unknown cleanup keeps the resource claim and emits one attention notice. Recovery uses the same job; a lost observer is not authority
+to duplicate it. `harness-agent deliver JOB_ID` shows the recorded Codex delivery attempt; use
+`--retry` only after reconciling failed/uncertain delivery, without rerunning tests. Queued means
+accepted by the host, not already read by the agent. A successful launch or a telemetry record does not prove a test passed.
 
 ## Light Usage Observation
 
