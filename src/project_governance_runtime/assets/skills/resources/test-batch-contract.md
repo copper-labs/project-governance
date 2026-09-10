@@ -53,6 +53,8 @@ process exit alone does not establish cleanup. The authorized runner must write 
 cleanup/release. Missing or invalid acknowledgment retains ownership, including after worker death.
 An authorized project recovery runner can complete cleanup and publish that acknowledgment; the
 existing guardian/status recovery then closes the job. Never forge a receipt to unblock a device.
+Each case start invalidates the previous acknowledgment, so it must be present after the last
+executed case, including a later reporting case that does not use the device.
 
 ## Managed Codex Or Claude Cycle
 

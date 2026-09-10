@@ -153,10 +153,12 @@ prints durable phase job IDs; interrupted cycles can use `--prepared-job ID` wit
 This supports the two CLI hosts, not transparent takeover of arbitrary desktop/IDE sessions.
 
 The feature release refreshes the existing managed instruction block. Adopt it deliberately and
-start a fresh host session. Batch records use protocol 2; older harness executables sharing that
-job store refuse unfamiliar records. Use the matching current helper for that store; ordinary
-governance checks are unaffected. Do not delete unknown records or split a shared workspace across
-independent stores to evade ownership.
+start a fresh host session. Live batches and uncertain cleanup use protocol 2, so older harness
+executables sharing the store temporarily refuse operations while that state exists. Confirmed
+terminal publication restores protocol-1 records; older repositories can then use the shared store
+again. Use the current helper to inspect or recover a pending batch. Ordinary governance checks are
+unaffected. Do not delete unknown records or split a shared workspace across independent stores to
+evade ownership.
 
 `project-governance telemetry status` includes retained Test Execution use, path choices, outcomes,
 durations and available token totals. It does not observe every skill read or prove savings. Data

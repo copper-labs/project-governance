@@ -115,8 +115,10 @@ def finish_cleanup(path):
         from .test_batches import cleanup_confirmed
 
         if not cleanup_confirmed(path):
-            value.update(stage="Awaiting project resource cleanup acknowledgment")
-            atomic_json(path / "status.json", value)
+            stage = "Awaiting project resource cleanup acknowledgment"
+            if value.get("stage") != stage:
+                value.update(stage=stage)
+                atomic_json(path / "status.json", value)
             return value
         partial = read_json(path / "result.json", {})
         if value.get("kind") == "test-batch":
@@ -133,6 +135,10 @@ def finish_cleanup(path):
             remaining.append(error)
         finished_at = time.time()
         partial.pop("pending_state", None)
+        if value.get("kind") == "test-batch":
+            from .test_batches import terminal_protocol
+
+            value["protocol_version"] = terminal_protocol(path)
         atomic_json(path / "result.json", {**partial, "protocol_version": value["protocol_version"],
                     "job_id": path.name, "state": state, "answer": partial.get("answer", ""),
                     "error": error, "remaining": remaining, "cleanup_confirmed": True, "finished_at": finished_at})

@@ -135,12 +135,15 @@ class TestBatchTests(ProviderAgentCase):
         path = self.store.job(job["job_id"])
         self.wait_for(lambda: "Awaiting" in jobs.status(job["job_id"])["stage"])
         self.assertFalse(jobs.result(job["job_id"])["ready"])
+        self.assertEqual(read_json(path / "status.json")["protocol_version"], 2)
         second = self.batch()
         self.assertEqual(jobs.status(second["job_id"])["state"], "queued")
         atomic_json(path / "resource-cleanup.json", {"batch_id": "wrong", "cleanup_confirmed": True})
         self.assertFalse(jobs.result(job["job_id"])["ready"])
         atomic_json(path / "resource-cleanup.json", {"batch_id": path.name, "cleanup_confirmed": True})
         self.assertEqual(self.await_result(job["job_id"])["state"], "succeeded")
+        for name in ("request.json", "status.json", "result.json"):
+            self.assertEqual(read_json(path / name)["protocol_version"], 1)
         self.assertEqual(self.await_result(second["job_id"])["state"], "succeeded")
 
     def test_cancel_preserves_partial_case_result(self):
@@ -170,6 +173,8 @@ class TestBatchTests(ProviderAgentCase):
             assessment = jobs.result(result["assessment_job"])
             self.assertEqual(preparation["conversation_id"], assessment["conversation_id"])
             batch = jobs.result(result["batch_job"])
+            assessment_request = read_json(self.store.job(result["assessment_job"]) / "request.json")
+            self.assertIn(test_batches.digest_file(self.store.job(result["batch_job"]) / "result.json"), assessment_request["task"])
             self.assertLessEqual(preparation["finished_at"], batch["started_at"])
             self.assertLessEqual(batch["finished_at"], jobs.status(result["assessment_job"])["created_at"])
             again = test_cycle.run(prepared_job=result["preparation_job"], authorized_full_access=True, store=self.store)
@@ -195,6 +200,45 @@ class TestBatchTests(ProviderAgentCase):
         (self.workspace / "CLAUDE.md").write_text("Changed instructions")
         with self.assertRaisesRegex(AgentError, "configuration or instructions changed"):
             test_cycle.validate_host(host)
+
+    def test_preparation_startup_interrupt_returns_and_cancels_owned_job(self):
+        os.environ["PROVIDER_AGENT_FIXTURE_SCENARIO"] = "sleep"
+        original, interrupted = jobs.status, []
+        def interrupt_once(*args, **kwargs):
+            if not interrupted:
+                interrupted.append(True)
+                raise KeyboardInterrupt
+            return original(*args, **kwargs)
+        with patch.object(jobs, "status", side_effect=interrupt_once):
+            result = test_cycle.run(task="Prepare tests", workspace=str(self.workspace), provider="claude",
+                                    model="fixture-model", effort="high", executable=str(FIXTURE),
+                                    authorized_full_access=True, store=self.store)
+        self.assertEqual(result["state"], "cancelled")
+        self.assertIsNotNone(result["preparation_job"])
+        self.assertEqual(self.await_result(result["preparation_job"])["state"], "cancelled")
+        self.assertEqual(len(list(self.store.records())), 1)
+
+    def test_terminal_transition_retains_guard_until_last_publication(self):
+        request = jobs.normalize("Execute tests", str(self.workspace), batch=test_batches.normalize(self.request()))
+        job_id, path = self.store.create(request)
+        test_batches.terminal_protocol(path)
+        self.assertEqual(read_json(path / "request.json")["protocol_version"], 1)
+        self.assertEqual(read_json(path / "status.json")["protocol_version"], 2)
+        jobs.finish_cleanup(path)
+        for name in ("request.json", "status.json", "result.json"):
+            self.assertEqual(read_json(path / name)["protocol_version"], 1)
+        self.assertEqual(jobs.status(job_id)["state"], "failed")
+
+    def test_launcher_failure_cannot_pass_as_an_expected_negative_exit(self):
+        executable = self.workspace / "negative"
+        executable.write_text("#!/bin/sh\nexit 127\n")
+        executable.chmod(0o755)
+        change = self.case("change", source="from pathlib import Path; Path('negative').chmod(0o644)")
+        negative = {**self.case("negative"), "argv": [str(executable)], "expected_exit_codes": [1, 126, 127]}
+        result = self.await_result(self.batch(self.request([change, negative, self.case("later")]))["job_id"])
+        self.assertEqual(result["state"], "failed")
+        self.assertLess(result["cases"][1]["exit_code"], 0)
+        self.assertEqual(result["cases"][2]["outcome"], "not-run")
 
     def test_telemetry_is_content_free_bounded_and_fail_open(self):
         identity = str(uuid.uuid4())
@@ -269,6 +313,10 @@ class TestBatchTests(ProviderAgentCase):
         codex = test_cycle.usage_totals("codex", {"usage": {"total": {"inputTokens": 10}}},
                                       {"usage": {"total": {"inputTokens": 30, "cachedInputTokens": 4, "outputTokens": 8}}})
         self.assertEqual(codex["input_tokens"], 30)
+        claude = {"usage": {"usage": {"input_tokens": 3, "output_tokens": 2},
+                            "models": {"primary": {"inputTokens": 3, "outputTokens": 2},
+                                       "auxiliary": {"inputTokens": 7, "outputTokens": 1}}}}
+        self.assertEqual(test_cycle.usage_totals("claude", claude, claude)["input_tokens"], 20)
         identity = str(uuid.uuid4())
         skill_telemetry.record_terminal(self.workspace, identity, "codex", "succeeded", 50, True)
         path = self.workspace / ".governance/telemetry/runs.jsonl"

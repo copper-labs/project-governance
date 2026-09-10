@@ -107,6 +107,13 @@ for such resources. It must write `resource-cleanup.json` in the private batch d
 project's lock. Missing or malformed acknowledgment retains the runtime claim, including after worker
 death. An authorized recovery runner can finish cleanup and write the same receipt; the guardian or
 status recovery then publishes completion. Never manufacture an acknowledgment to clear a stale claim.
+The acknowledgment must exist after the last executed case: every case start invalidates the earlier
+receipt, including a later reporting case that uses no device.
+
+Live batches and unconfirmed cleanup use protocol 2 to block older harness recovery code. After
+confirmed cleanup, request and result records return to protocol 1 before terminal status is published
+last. A crash before that last write retains the guard until the current runner completes recovery.
+Older executables sharing the store are blocked only during live or unresolved batch ownership.
 
 Commands receive `HARNESS_BATCH_ID`, `HARNESS_BATCH_DIR`, `HARNESS_CASE_ID`, and `HARNESS_CASE_DIR`.
 Logs and optional `result.json` receipts use those new private directories. They never reuse a prior

@@ -197,9 +197,10 @@ def execute(worker):
     cases = [{"id": c["id"], "outcome": "not-run"} for c in batch["cases"]]
     worker.batch_result = {"cases": cases, "input_binding": batch["inputs"]["mode"],
                            "input_fingerprint": fingerprint(batch["inputs"]), "input_validity": "unchecked",
-                           "assessment_allowed": True}
+                           "assessment_allowed": False}
     atomic_json(worker.path / "batch-progress.json", worker.batch_result)
     verify_inputs(batch)
+    worker.batch_result["assessment_allowed"] = True
     worker.batch_result["input_validity"] = "manifest-verified" if batch["inputs"]["mode"] == "manifest" else "declared-scope-only"
     outcomes, failed = {}, False
     for index, case in enumerate(batch["cases"]):
@@ -255,8 +256,11 @@ def _run_case(worker, case, result):
 def _wait_case(worker, case, start_time):
     """Enforce execution deadlines and confirm the owned process tree has stopped."""
     issue = None
+    last_collect = 0
     while worker.proc.poll() is None:
-        collect(worker.path, record(worker.proc.pid))
+        if time.monotonic() - last_collect >= 1:
+            collect(worker.path, record(worker.proc.pid))
+            last_collect = time.monotonic()
         worker.heartbeat()
         issue = worker.interrupted()
         if not issue and time.monotonic() - start_time >= case["timeout_seconds"]:
@@ -271,6 +275,8 @@ def _wait_case(worker, case, start_time):
         cleaned = False
     if not cleaned:
         issue = "failed", "Process cleanup remains unconfirmed"
+    elif worker.proc.returncode is not None and worker.proc.returncode < 0 and not issue:
+        issue = "failed", "Canonical command or launcher terminated by signal; remaining cases stopped"
     return issue
 
 
@@ -313,6 +319,9 @@ def finish(worker, state, error, cleaned):
                         for outcome in ("passed", "failed", "blocked", "not-run")}
     if not cleaned:
         value.update(pending_state=state, state=worker.state["state"], finished_at=None)
+    else:
+        value["protocol_version"] = terminal_protocol(worker.path)
+        worker.state["protocol_version"] = value["protocol_version"]
     atomic_json(worker.path / "result.json", worker.redactor.clean(value))
     if not cleaned:
         worker.state["stage"] = "Awaiting confirmed process/project cleanup"
@@ -321,6 +330,15 @@ def finish(worker, state, error, cleaned):
     worker.state.update(state=state, stage=error or state, finished_at=value["finished_at"])
     worker.emit("finished", state=state, message=error or state)
     terminal_telemetry(worker.path)
+
+
+def terminal_protocol(path):
+    """Retire the live ownership guard only after cleanup, publishing terminal status last."""
+    request = read_json(path / "request.json")
+    request["protocol_version"] = 1
+    atomic_json(path / "request.json", request)
+    # Until terminal status is published, its version-2 guard still excludes old recovery code.
+    return 1
 
 
 def recover_result(path, partial):

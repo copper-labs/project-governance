@@ -282,8 +282,10 @@ local data; do not copy credentials into it or send job evidence to governance t
 silently delete artifacts, logs, or partial work as part of an upgrade.
 The [Test Execution contract](test-execution.md) reuses this lifecycle for deterministic batches;
 only its explicitly allowlisted aggregate observations enter local telemetry. Batch records use
-protocol 2 with kind test-batch so older runners refuse them rather than release unfamiliar resource
-claims. Existing provider records retain protocol 1. Both share the same registry and process owner.
+protocol 2 with kind test-batch while live or awaiting cleanup, so older runners refuse them rather
+than release unfamiliar resource claims. Confirmed terminal publication restores protocol 1, with
+terminal status written last so interruption cannot expose an active claim to old recovery code.
+Existing provider records retain protocol 1. Both share the same registry and process owner.
 Redact recognizable credential fields inside JSON and Python dictionary text as well as structured
 objects, including public tool events and terminal receipts. Repeated redaction is idempotent.
 
