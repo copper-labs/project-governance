@@ -19,13 +19,16 @@ if sys.platform not in {"darwin", "linux"}:
     raise unittest.SkipTest("optional provider execution requires macOS or Linux")
 
 import fcntl
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
 from project_governance_runtime.provider_agents import jobs
 from project_governance_runtime.provider_agents.config import AgentError, TERMINAL, binding
 from project_governance_runtime.provider_agents.processes import collect, record, same_process, signal_record
 from project_governance_runtime.provider_agents.storage import Store, atomic_json, events_since, read_json
 
 
-ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "tests/fixtures/provider_agent.py"
 
 
