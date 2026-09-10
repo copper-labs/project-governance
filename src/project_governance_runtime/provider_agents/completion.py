@@ -25,8 +25,12 @@ def codex_target(executable=None):
     if not command or not Path(command).is_file() or not os.access(command, os.X_OK):
         raise AgentError("Codex completion requires an installed codex executable")
     command = str(Path(command).resolve())
-    check = subprocess.run([command, "queue", "--help"], capture_output=True, text=True, timeout=10)
-    if check.returncode or "--thread" not in check.stdout or "--message" not in check.stdout:
+    try:
+        check = subprocess.run([command, "queue", "--help"], capture_output=True, text=True, timeout=10)
+    except subprocess.TimeoutExpired as error:
+        raise AgentError("Codex queue capability probe timed out; no batch was submitted") from error
+    help_text = check.stdout + check.stderr
+    if check.returncode or "--thread" not in help_text or "--message" not in help_text:
         raise AgentError("This Codex executable does not support queue; use a supported host wait")
     return {"thread_id": thread, "executable": command, "sha256": digest_file(command),
             "codex_home": str(Path(os.environ.get("CODEX_HOME", Path.home() / ".codex")).resolve())}

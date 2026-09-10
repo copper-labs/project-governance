@@ -94,9 +94,6 @@ def recover(path):
     """Reclaim abandoned ownership only after recorded native programs stop."""
     value = validate_record(read_json(path / "status.json"))
     if value["state"] in TERMINAL:
-        from .completion import attempt
-
-        attempt(path)
         return value
     if time.time() - value["created_at"] < 5:
         return value
@@ -123,9 +120,6 @@ def finish_cleanup(path):
             if value.get("stage") != stage:
                 value.update(stage=stage)
                 atomic_json(path / "status.json", value)
-            from .completion import attempt
-
-            attempt(path)
             return value
         partial = read_json(path / "result.json", {})
         if value.get("kind") == "test-batch":
@@ -159,9 +153,6 @@ def finish_cleanup(path):
             from .test_batches import terminal_telemetry
 
             terminal_telemetry(path)
-            from .completion import attempt
-
-            attempt(path)
         return value
     finally:
         os.close(fd)

@@ -73,10 +73,12 @@ A separate one-time notice reports uncertain cleanup so the original agent can p
 recovery. Ownership stays held; that notice is not a terminal pass. Once cleanup completes, the
 normal terminal notice is sent. Failures, timeouts and cancellations also produce terminal notices.
 
-`harness-agent deliver JOB_ID` reports the saved attempt. `--retry` explicitly retries failed or
+`harness-agent deliver JOB_ID` delivers an unattempted notice or reports the saved attempt. `--retry` explicitly retries failed or
 uncertain delivery; a queued receipt is not resent. A process crash during sending can leave an
 uncertain `sending` receipt: reconcile before retrying because the host may already have accepted
-it. Duplicate notices must reuse the same job/result. `result JOB_ID --summary` includes the
+it. Status/result reads never dispatch notices. If both worker and guardian were stopped,
+reconcile cleanup and invoke `deliver` from the initiating host; arbitrary observers must not
+consume a delivery attempt using another host environment. Duplicate notices must reuse the same job/result. `result JOB_ID --summary` includes the
 terminal delivery receipt. Queued proves host acceptance, not agent consumption. Keep the host
 session available; closed/restarted hosts and remote sessions require their own qualification.
 

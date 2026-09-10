@@ -40,6 +40,9 @@ call; a crash leaves an uncertain attempt rather than silently retrying. `delive
 allows deliberate recovery of failed/uncertain delivery without rerunning tests. A queued receipt
 is never automatically resent and does not claim agent consumption. Result summaries expose it.
 The native call is bounded and executable/home drift fails delivery. Test outcomes remain intact.
+Status/recovery reads never dispatch notifications or wait on their lock. Worker/guardian dispatch
+runs outside registry and completion locks. After loss of both supervisors, explicit `deliver`
+from the initiating host recovers delivery; arbitrary observers cannot consume that attempt.
 A separate deduplicated cleanup-attention notice prevents an unresolved resource claim from silently
 stranding the task. The terminal notice follows only when cleanup is confirmed.
 

@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import signal
+import subprocess
 import sys
 import time
 import uuid
@@ -113,3 +114,71 @@ sys.exit(1 if Path({str(self.root / 'reject')!r}).exists() else 0)
             with self.assertRaisesRegex(AgentError, "initiating CODEX_THREAD_ID"):
                 completion.codex_target(str(self.queue))
         self.assertEqual(list(self.store.records()), [])
+
+    def test_observation_never_dispatches_under_registry_lock(self):
+        job, path = self.batch()
+        self.await_result(job["job_id"])
+        with patch.object(completion, "attempt", side_effect=AssertionError("observer dispatched")):
+            self.assertEqual(jobs.status(job["job_id"])["state"], "succeeded")
+            # Recovery can also run under the registry lock; it must only publish evidence.
+            state = read_json(path / "status.json")
+            atomic_json(path / "status.json", {**state, "state": "running"})
+            with self.store.lock():
+                self.assertEqual(jobs.finish_cleanup(path)["state"], "failed")
+
+    def test_terminal_wait_reports_cleanup_attention_and_then_result(self):
+        job, path = self.batch(cleanup_required=True)
+        try:
+            with self.assertRaisesRegex(AgentError, "cleanup needs project recovery"):
+                jobs.wait_terminal(job["job_id"], self.store)
+        finally:
+            atomic_json(path / "resource-cleanup.json", {"batch_id": path.name, "cleanup_confirmed": True})
+        # Acknowledgement is asynchronous; wait for the supervisor to consume it.
+        self.await_result(job["job_id"])
+        result = jobs.wait_terminal(job["job_id"], self.store)
+        self.assertTrue(result["ready"])
+        self.assertEqual(result["state"], "succeeded")
+        self.assertEqual(completion.deliver(path)["state"], "queued")
+        self.assertEqual(jobs.result(job["job_id"])["completion_delivery"]["state"], "queued")
+
+    def test_timeout_and_cancellation_deliver_terminal_state(self):
+        for cancel in (False, True):
+            with self.subTest(cancel=cancel):
+                job, path = self.batch("import time;time.sleep(20)")
+                if cancel:
+                    jobs.cancel(job["job_id"])
+                result = jobs.wait_terminal(job["job_id"], self.store)
+                expected = "cancelled" if cancel else "timed_out"
+                self.assertEqual(result["state"], expected)
+                self.assertTrue(result["cleanup_confirmed"])
+                self.assertEqual(completion.deliver(path)["state"], "queued")
+                self.assertIn(f"completed with state {expected}", self.calls.read_text())
+
+    def test_probe_timeout_is_bounded_before_any_job(self):
+        with patch.dict(os.environ, CODEX_THREAD_ID=self.thread):
+            with patch.object(subprocess, "run", side_effect=subprocess.TimeoutExpired("queue", 10)):
+                with self.assertRaisesRegex(AgentError, "probe timed out"):
+                    completion.codex_target(str(self.queue))
+        self.assertEqual(list(self.store.records()), [])
+
+    def test_queue_timeout_kills_owned_process_group_without_retrying_tests(self):
+        job, path = self.batch()
+        self.await_result(job["job_id"])
+        completion.deliver(path)
+        before = (path / "result.json").read_bytes()
+        atomic_json(path / "notification.json", {"state": "sending"})
+        real_popen = subprocess.Popen
+        children = []
+        def launch(*args, **kwargs):
+            child = real_popen([sys.executable, "-c", "import time;time.sleep(60)"],
+                               stdout=kwargs["stdout"], stderr=kwargs["stderr"],
+                               start_new_session=kwargs["start_new_session"])
+            children.append(child)
+            real_wait = child.wait
+            child.wait = lambda timeout=None: real_wait(timeout=.1 if timeout else None)
+            return child
+        with patch.object(subprocess, "Popen", side_effect=launch):
+            value = completion.deliver(path, retry=True)
+        self.assertEqual(value["state"], "failed")
+        self.assertEqual(children[0].returncode, -signal.SIGKILL)
+        self.assertEqual((path / "result.json").read_bytes(), before)

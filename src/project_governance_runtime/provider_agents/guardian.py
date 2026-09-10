@@ -29,8 +29,9 @@ def main():
                 return
         elif not same_process(worker):
             if terminate_owned(path, provider, grace=.2):
-                if finish_cleanup(path)["state"] in TERMINAL:
-                    attempt(path)
+                recovered = finish_cleanup(path)
+                attempt(path)
+                if recovered["state"] in TERMINAL:
                     return
         time.sleep(.25)
 
