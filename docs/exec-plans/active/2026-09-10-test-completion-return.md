@@ -35,8 +35,8 @@ agent consumption are distinct facts. Unsupported hosts retain bounded waits and
 - [x] Add bounded Codex delivery, deduplication, failure receipts and cleanup-attention delivery.
 - [x] Run focused batch/completion tests and the installed skill materialization seam.
 - [x] Prove native Codex batch delivery and Claude Monitor return after a model turn ends.
-- [ ] Run one Claude Fable 5 high-effort QA boundary; reconcile material findings and recheck fixes.
-- [ ] Run staged impacted governance and the release's existing broad/clean-wheel gates.
+- [x] Run one Claude Fable 5 high-effort QA boundary; reconcile material findings and recheck fixes.
+- [x] Run staged impacted governance and the release's existing broad/clean-wheel gates.
 - [ ] Publish the authorized patch and verify its source, assets and fresh installation.
 
 Keep live evidence outside the source checkout. The earlier queue-to-Desktop self-message proved
@@ -61,3 +61,12 @@ validity and cleanup were checked. Claude Code 2.1.263, Fable 5 at low effort, s
 started native Monitor, ended its turn and then wrote the result receipt after the native event.
 Its transcript has no intervening status/tool polls. These establish local open-host behavior,
 not closed-host, restart, remote support or a causal token-savings benchmark.
+
+## QA And Release Readiness
+
+Claude Fable 5 at high effort approved the focused reconciliation. Delivery no longer runs from
+status or cleanup recovery under shared locks; worker and guardian dispatch outside those locks.
+Added coverage proves cleanup attention, timeout/cancellation delivery and notification-process
+cleanup. The final runtime suite passed 449 tests with one existing skip, and clean-wheel verification
+passed. Native host acceptance remains valid because the transport is unchanged. Publication and
+asset readback remain the final delivery step, tracked by the 2.7.1 release workflow.
