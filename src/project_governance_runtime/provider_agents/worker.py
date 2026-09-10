@@ -48,7 +48,9 @@ class Worker:
         self.redactor = Redactor()
         self.last_activity, self.last_heartbeat = time.monotonic(), 0
         self.cancelled, self.proc, self.guardian = False, None, None
-        self.protocol = {"gemini": Gemini, "claude": Claude, "codex": Codex}[self.request["provider"]](self.request, self.emit)
+        self.is_batch = self.request.get("kind") == "test-batch"
+        self.protocol = None if self.is_batch else {"gemini": Gemini, "claude": Claude, "codex": Codex}[self.request["provider"]](self.request, self.emit)
+        self.batch_result = {}
         self.before, self.provider_version = {}, None
         self.expected_shutdown = False
         self.environment_fd = os.environ.get("HARNESS_AGENT_ENV_FD")
@@ -58,7 +60,7 @@ class Worker:
         now = time.monotonic()
         if force or now - self.last_heartbeat >= 1:
             self.state.update(updated_at=time.time(), heartbeat_at=time.time(),
-                              conversation_id=self.protocol.conversation_id)
+                              conversation_id=self.protocol.conversation_id if self.protocol else None)
             atomic_json(self.path / "status.json", self.redactor.clean(self.state))
             self.last_heartbeat = now
 
@@ -137,12 +139,12 @@ class Worker:
             if issue:
                 state, error = issue
             else:
-                state, completion = self.protocol.finish()
-                if self.proc.returncode:
+                state, completion = ("succeeded", self.batch_result) if self.is_batch else self.protocol.finish()
+                if not self.is_batch and self.proc.returncode:
                     state, error = "failed", f"Provider exited {self.proc.returncode}"
         except Exception as exc:
             state, error = self.interrupted() or (
-                "blocked" if self.protocol.denied else "failed", f"{type(exc).__name__}: {exc}")
+                "blocked" if self.protocol and self.protocol.denied else "failed", f"{type(exc).__name__}: {exc}")
         finally:
             self._finish_after_cleanup(state, completion, error)
 
@@ -163,6 +165,14 @@ class Worker:
         from .runtime import validate
 
         validate(self.request)
+        if self.request.get("host_binding"):
+            from .test_cycle import validate_host
+
+            validate_host(self.request["host_binding"])
+        if self.is_batch:
+            from .test_batches import execute
+
+            return execute(self)
         self.before = snapshot(self.request["workspace"])
         version = subprocess.run([self.request["backend"], "--version"], capture_output=True, text=True, timeout=10)
         if version.returncode:
@@ -174,7 +184,14 @@ class Worker:
         return self.pump()
 
     def _launch_provider(self):
+        self.launch_command(self.protocol.command(self.path))
+
+    def launch_command(self, command, *, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                       stdin=subprocess.PIPE, extra_env=None):
+        """Gate every owned root on durable identity before it can execute user code."""
         env = dict(os.environ)
+        env.update(extra_env or {})
+        env["HARNESS_AGENT_JOB_DIR"] = str(self.path)
         ancestry = [*self.request["enclosing_jobs"], {"state_root": str(self.store.root), "job_id": self.path.name}]
         env["HARNESS_AGENT_ANCESTRY"] = json.dumps(ancestry)
         pin = self.request.get("runtime_binding")
@@ -185,8 +202,8 @@ class Worker:
         try:
             self.proc = subprocess.Popen([
                 sys.executable, "-m", "project_governance_runtime.provider_agents.launcher",
-                str(gate_read), *self.protocol.command(self.path)], cwd=self.request["workspace"],
-                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
+                str(gate_read), *command], cwd=self.request["workspace"],
+                stdin=stdin, stdout=stdout, stderr=stderr, env=env,
                 start_new_session=True, close_fds=True, pass_fds=(gate_read,))
             atomic_json(self.path / "provider.json", record(self.proc.pid))
             # Queueing and preflight consume the overall deadline, not provider inactivity.
@@ -203,7 +220,11 @@ class Worker:
                 self.proc.wait(timeout=3)
             except subprocess.TimeoutExpired:
                 cleaned = False
-        if self.proc and self.proc.returncode and state == "succeeded" and not self.expected_shutdown:
+        if self.is_batch:
+            from .test_batches import cleanup_confirmed
+
+            cleaned = cleaned and cleanup_confirmed(self.path)
+        if not self.is_batch and self.proc and self.proc.returncode and state == "succeeded" and not self.expected_shutdown:
             state, error = "failed", f"Provider exited {self.proc.returncode}"
         self.finish(state, completion, error, cleanup_confirmed=cleaned)
         if not cleaned:
@@ -217,6 +238,10 @@ class Worker:
 
     def finish(self, state, completion, error, cleanup_confirmed=True):
         """Persist completion evidence even when the guardian must finish cleanup."""
+        if self.is_batch:
+            from .test_batches import finish
+
+            return finish(self, state, error, cleanup_confirmed)
         artifacts = artifact_evidence(completion.get("artifacts", []), self.request["workspace"])
         remaining = [*completion.get("remaining", []), *([error] if error else [])]
         if state == "succeeded" and any(not a["exists"] for a in artifacts):

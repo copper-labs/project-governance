@@ -14,6 +14,7 @@ RESOURCE = ".governance/runtime/skills/resources/harness-delegation.md"
 BLOCK = f"""{START}
 Cross-model work defaults to the provided harness skills. Before selecting a system wrapper,
 read `{RESOURCE}`. If missing, bootstrap; do not fall back.
+Before substantial builds or test batches, read `.governance/runtime/skills/test-execution/SKILL.md` and choose the cheapest reliable proof path.
 {END}"""
 
 
@@ -89,6 +90,7 @@ def harness_routing_status(root: Path) -> dict:
     executable = root / ".governance/runtime" / (
         "Scripts/harness-agent.exe" if sys.platform == "win32" else "bin/harness-agent")
     required = [RESOURCE, ".governance/runtime/skills/resources/harness-agent-operation.md"]
+    required += [".governance/runtime/skills/test-execution/SKILL.md", ".governance/runtime/skills/resources/test-batch-contract.md"]
     required.extend(f".governance/runtime/skills/harness-{p}-agent/SKILL.md" for p in ("gemini", "claude", "codex"))
     for relative in required:
         if not (root / relative).is_file():
@@ -98,4 +100,6 @@ def harness_routing_status(root: Path) -> dict:
     return {"default_route": "harness", "status": "ready" if not issues else "needs-attention",
             "instruction_files": entries, "resource": RESOURCE, "executable": str(executable.resolve()),
             "skills": {p: f"harness-{p}-agent" for p in ("gemini", "claude", "codex")},
+            "test_execution": {"skill": "test-execution", "batch": "available" if not issues else "needs-setup",
+                               "managed_cycle": "operator launches harness-agent cycle; live host proof not certified"},
             "issues": issues, "global_instruction_conflicts": "not automatically certified"}

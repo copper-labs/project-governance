@@ -22,6 +22,7 @@ multiple files, or requires validation and review evidence.
 - `docs/governance/validation-strategy.md`
 - `.governance/runtime/skills/resources/implementation-plan-template.md`
 - `.governance/runtime/skills/resources/efficient-execution.md` for long-running proof
+- `.governance/runtime/skills/test-execution/SKILL.md` when defining substantial build/test proof; select its path within the existing proof budget
 - `.governance/runtime/skills/delegated-execution/SKILL.md`
 - `docs/governance/apple-dependency-policy.md` when Apple platforms may be in scope
 - The governing spec, PRD, issue, plan, or decision

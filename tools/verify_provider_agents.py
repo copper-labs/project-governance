@@ -18,6 +18,7 @@ def verify_provider_agents(root):
         proof.default_route()
         proof.absent_provider()
         proof.native_protocols()
+        proof.test_batch()
         proof.cooperating_writer()
         proof.upgrade_exclusion()
         proof.released_environment()
@@ -118,6 +119,24 @@ class _InstalledProviderProof:
             self.invoke(self.core, "--version")
         finally:
             self.cancel_jobs(jobs)
+
+    def test_batch(self):
+        """Prove deterministic execution and telemetry from the installed wheel without a model."""
+        request = self.scratch / "batch.json"
+        request.write_text(json.dumps({"version": 1, "workspace": str(self.workspace),
+            "idempotency_key": "installed-batch", "timeout_seconds": 10,
+            "inputs": {"mode": "declared-roots", "roots": [str(self.workspace)]},
+            "cases": [{"id": "installed", "argv": [str(self.python), "-c", "from project_governance_runtime import __version__; assert __version__"],
+                       "timeout_seconds": 5, "expected_exit_codes": [0]}]}))
+        before = len(list((self.scratch / "logs").glob("*.argv.json")))
+        job = json.loads(self.invoke(self.agent, "batch", "--request-file", request))
+        result = json.loads(self.invoke(self.agent, "wait", job["job_id"], "--until-terminal"))
+        if result["state"] != "succeeded" or result["summary"]["passed"] != 1:
+            raise RuntimeError("installed test batch did not preserve its assertion")
+        if len(list((self.scratch / "logs").glob("*.argv.json"))) != before:
+            raise RuntimeError("deterministic batch unexpectedly invoked a provider")
+        if not (self.runtime / "skills/test-execution/SKILL.md").is_file():
+            raise RuntimeError("installed Test Execution skill is missing")
 
     def cooperating_writer(self):
         """Prove installed flags reach native providers concurrently without losing exclusive isolation."""

@@ -17,9 +17,9 @@ MAX_TELEMETRY_BYTES = 1024 * 1024
 MAX_PACK_SUMMARIES = 10
 MAX_REPEAT_EXAMPLES = 5
 MAX_ID_LENGTH = 256
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 _SHA256_DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
-_EVENTS = {"run-started", "run-terminal", "run-reviewed"}
+_EVENTS = {"run-started", "run-terminal", "run-reviewed", "skill-decision", "test-batch-terminal"}
 TRIGGERS = {"manual", "hook", "test"}
 EXPECTED_STATUSES = {"passed", "failed", "warning", "blocked"}
 DISPOSITIONS = {"confirmed-issue", "false-positive", "mixed", "unreviewed"}
@@ -91,6 +91,11 @@ def _sanitize(event: Any) -> dict[str, Any] | None:
         "schema_version": SCHEMA_VERSION,
         "event": event["event"],
     }
+    if event["event"] in {"skill-decision", "test-batch-terminal"}:
+        from .skill_telemetry import sanitize
+
+        fields = sanitize(event)
+        return {**result, **fields} if fields else None
     if event["event"] == "run-reviewed":
         run_id = _text(event.get("run_id"))
         if not run_id or _text(event.get("disposition")) not in DISPOSITIONS:
@@ -208,6 +213,18 @@ def append(root: Path, event: dict[str, Any]) -> bool:
         path.parent.mkdir(parents=True, exist_ok=True)
         with path_lock(path):
             existing = _existing_records(path)
+            recorded_at = _now()
+            if sanitized["event"] in {"skill-decision", "test-batch-terminal"}:
+                # Upsert the one observation; recovery must not consume the retention budget.
+                prior = next((json.loads(line) for line in existing if
+                              json.loads(line).get("event") == sanitized["event"] and
+                              json.loads(line).get("decision_id") == sanitized["decision_id"]), None)
+                if prior:
+                    recorded_at = prior.pop("recorded_at", recorded_at)
+                    sanitized = {**prior, **sanitized}
+                existing = [line for line in existing if not (
+                    json.loads(line).get("event") == sanitized["event"]
+                    and json.loads(line).get("decision_id") == sanitized["decision_id"])]
             if sanitized["event"] == "run-reviewed" and not any(
                 record.get("event") == "run-terminal"
                 and record.get("run_id") == sanitized["run_id"]
@@ -215,7 +232,7 @@ def append(root: Path, event: dict[str, Any]) -> bool:
             ):
                 return False
             rendered = json.dumps(
-                {"recorded_at": _now(), **sanitized},
+                {"recorded_at": recorded_at, **sanitized},
                 sort_keys=True,
                 separators=(",", ":"),
             )
@@ -454,7 +471,7 @@ def status(root: Path, **filters: str) -> dict[str, Any]:
         parse_since(filters["since"])
     selected_runs = [
         record for record in records
-        if record.get("event") != "run-reviewed" and _matches_filters(record, filters)
+        if record.get("event") in {"run-started", "run-terminal"} and _matches_filters(record, filters)
     ]
     selected_ids = {record.get("run_id") for record in selected_runs}
     selected = [
@@ -464,12 +481,18 @@ def status(root: Path, **filters: str) -> dict[str, Any]:
         retained_bytes = path.stat().st_size
     except OSError:
         retained_bytes = 0
-    return {
+    from .skill_telemetry import EVENTS, summary
+
+    skill_records = [r for r in records if r.get("event") in EVENTS and _matches_filters(r, filters)]
+    value = {
         "status": "available" if records else "empty",
         "record_count": len(records),
         "retained_bytes": retained_bytes,
         "filters": filters,
-        "selected_record_count": len(selected),
+        "selected_record_count": len(selected) + len(skill_records),
         "path": path.relative_to(root).as_posix(),
         "validation": _validation_status(selected),
     }
+    if skill_records:
+        value["test_execution"] = summary(skill_records)
+    return value

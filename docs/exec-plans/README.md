@@ -16,6 +16,8 @@ Git remains the implementation history and recovery mechanism.
 
 ## Active
 
+- [Shared test execution](active/2026-09-10-shared-test-execution.md) plans deterministic external
+  batches, Codex and Claude CLI handoff, proactive skill routing, and bounded execution cost.
 - [Optional provider agent skills](active/2026-09-06-provider-agent-skills.md) builds and releases
   Gemini, Claude, and Codex wrappers independently of later implementation-plan improvements.
 

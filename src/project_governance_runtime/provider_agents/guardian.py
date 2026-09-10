@@ -27,8 +27,8 @@ def main():
                 return
         elif not same_process(worker):
             if terminate_owned(path, provider, grace=.2):
-                finish_cleanup(path)
-                return
+                if finish_cleanup(path)["state"] in TERMINAL:
+                    return
         time.sleep(.25)
 
 

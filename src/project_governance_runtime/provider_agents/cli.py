@@ -65,9 +65,36 @@ def parser():
             p.add_argument("--limit", type=int, default=100)
         if name == "wait":
             p.add_argument("--seconds", type=float, default=30)
+            p.add_argument("--until-terminal", action="store_true", help="Observe within this process; no intermediate output or model polling.")
+        if name == "result":
+            p.add_argument("--summary", action="store_true")
         if name == "follow-up":
             p.add_argument("--task-file", type=Path, required=True)
             p.add_argument("--timeout")
+            p.add_argument("--idempotency-key")
+    p = sub.add_parser("batch", help="Start a deterministic test batch using the existing job lifecycle.")
+    p.add_argument("--request-file", type=Path, required=True)
+    p = sub.add_parser("record-use", help="Report one advisory Test Execution decision.")
+    p.add_argument("--workspace", type=Path, required=True)
+    p.add_argument("--decision-id", required=True)
+    from ..skill_telemetry import CHOICES, HOSTS, REASONS
+
+    p.add_argument("--choice", choices=sorted(CHOICES), required=True)
+    p.add_argument("--host", choices=sorted(HOSTS), default="unknown")
+    p.add_argument("--reason", choices=sorted(REASONS), required=True)
+    p = sub.add_parser("cycle", help="External prepare/batch/assess cycle on Codex or Claude.")
+    p.add_argument("--prepared-job")
+    p.add_argument("--workspace")
+    p.add_argument("--provider", choices=("codex", "claude"))
+    task = p.add_mutually_exclusive_group()
+    task.add_argument("--task-file", type=Path)
+    task.add_argument("--task")
+    for name in ("model", "effort", "executable", "idempotency-key"):
+        p.add_argument("--" + name)
+    p.add_argument("--config", type=Path)
+    p.add_argument("--config-input", type=Path, action="append", default=[])
+    p.add_argument("--timeout", default="900")
+    p.add_argument("--authorized-full-access", action="store_true")
     p = sub.add_parser("doctor")
     p.add_argument("--provider", choices=PROVIDERS, required=True)
     p = sub.add_parser("list")
@@ -107,6 +134,19 @@ def main(argv=None, environment_fd=None):
     args = parser().parse_args(argv)
     try:
         command = args.command
+        if command == "cycle":
+            from .test_cycle import run
+
+            if not args.prepared_job and not (args.workspace and args.provider and (args.task or args.task_file)):
+                raise AgentError("cycle requires workspace/provider/task, or an exact prepared-job")
+            value = run(task=read_text(args.task_file) if args.task_file else args.task,
+                        workspace=args.workspace, provider=args.provider, model=args.model, effort=args.effort,
+                        executable=args.executable, config=args.config, config_inputs=args.config_input,
+                        timeout_seconds=args.timeout, idempotency_key=args.idempotency_key,
+                        prepared_job=args.prepared_job, authorized_full_access=args.authorized_full_access,
+                        environment_fd=environment_fd, notify=dump)
+            dump(value)
+            return {"succeeded": 0, "cancelled": 130, "timed_out": 124}.get(value["state"], 1)
         if command in {"start", "run"}:
             value = _start(args, environment_fd)
             dump(value)
@@ -133,16 +173,41 @@ def _start(args, environment_fd):
 
 
 def _dispatch(args, environment_fd):
+    if args.command == "batch":
+        from .test_batches import start
+
+        return start(json.loads(read_text(args.request_file)), environment_fd=environment_fd)
+    if args.command == "record-use":
+        from ..skill_telemetry import record_use
+
+        return {"recorded": record_use(args.workspace, args.decision_id, args.choice, args.host, args.reason)}
     if args.command == "follow-up":
         return jobs.follow_up(args.job_id, read_text(args.task_file), timeout_seconds=args.timeout,
-                              environment_fd=environment_fd)
+                              environment_fd=environment_fd, idempotency_key=args.idempotency_key)
     if args.command == "events":
         return jobs.events(args.job_id, args.after, args.limit)
     if args.command == "wait":
+        if args.until_terminal:
+            from .test_cycle import wait_terminal
+
+            return compact_result(wait_terminal(args.job_id, Store()))
         return jobs.wait(args.job_id, args.after, args.seconds)
     if args.command == "list":
         return _list_jobs(args.limit)
-    return getattr(jobs, args.command)(args.job_id)
+    value = getattr(jobs, args.command)(args.job_id)
+    return compact_result(value) if args.command == "result" and args.summary else value
+
+
+def compact_result(value):
+    """Return every case outcome without replaying private logs and provider tool transcripts."""
+    fields = ("job_id", "state", "ready", "summary", "input_binding", "input_validity", "cleanup_confirmed", "paths", "error")
+    result = {k: value[k] for k in fields if k in value}
+    if "cases" in value:
+        result["cases"] = [{k: c[k] for k in ("id", "outcome", "exit_code", "reason") if k in c} for c in value["cases"]]
+    if "answer" in value:
+        result["answer"] = value["answer"][:4000]
+        result["answer_truncated"] = len(value["answer"]) > 4000
+    return result
 
 
 def _list_jobs(limit):

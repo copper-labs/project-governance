@@ -305,7 +305,7 @@ class RuntimeTelemetryTests(unittest.TestCase):
             )
             records = [json.loads(line) for line in text.splitlines()]
 
-        self.assertEqual(records[0]["schema_version"], 3)
+        self.assertEqual(records[0]["schema_version"], 4)
         self.assertEqual(records[0]["selected_pack_count"], 12)
         self.assertEqual(len(records[1]["packs"]), MAX_PACK_SUMMARIES)
         self.assertEqual(records[1]["packs"][0], {"id": "pack-14", "duration_ms": 14})

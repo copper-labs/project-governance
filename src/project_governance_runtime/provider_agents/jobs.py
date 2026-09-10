@@ -19,10 +19,10 @@ from .processes import cleanup_stage, record, same_process, terminate_owned
 from .storage import Events, Store, atomic_json, events_since, read_json, validate_record
 
 
-def normalize(task, workspace, *, provider, model=None, effort=None, executable=None, config=None,
+def normalize(task, workspace, *, provider=None, model=None, effort=None, executable=None, config=None,
               context="", role="general", constraints="", additional_roots=None, access="exclusive",
               required_tools=None, timeout_seconds=0, idle_timeout_seconds=0, idempotency_key=None,
-              conversation_id=None, parent_job_id=None, enclosing_jobs=None):
+              conversation_id=None, parent_job_id=None, enclosing_jobs=None, batch=None, host_binding=None):
     """Validate the assignment and explicit binding before creating durable state."""
     _validate_text(task, context, role, constraints)
     roots, required = additional_roots or [], required_tools or []
@@ -38,14 +38,16 @@ def normalize(task, workspace, *, provider, model=None, effort=None, executable=
     from .runtime import binding as runtime_binding
 
     pinned_runtime = runtime_binding(directory(workspace))
-    selected = binding(provider, model, effort, executable, config)
-    return dict(protocol_version=PROTOCOL_VERSION, **selected, task=task, workspace=directory(workspace),
+    selected = binding(provider, model, effort, executable, config) if batch is None else {
+        "kind": "test-batch", "batch": batch, "provider": None, "model": None, "effort": None}
+    return dict(protocol_version=PROTOCOL_VERSION if batch is None else 2, **selected, task=task, workspace=directory(workspace),
                 context=context, role=role, constraints=constraints,
                 access="exclusive" if access == "writer" else access, allow_readers=access == "writer",
                 additional_roots=sorted(set(directory(r) for r in roots)), required_tools=required,
                 timeout_seconds=duration(timeout_seconds), idle_timeout_seconds=duration(idle_timeout_seconds),
                 idempotency_key=idempotency_key, conversation_id=conversation_id, parent_job_id=parent_job_id,
-                enclosing_jobs=ancestry, runner_digest=code_digest(), runtime_binding=pinned_runtime)
+                enclosing_jobs=ancestry, runner_digest=code_digest(), runtime_binding=pinned_runtime,
+                host_binding=host_binding)
 
 
 def _validate_text(task, context, role, constraints):
@@ -110,7 +112,17 @@ def finish_cleanup(path):
         value = validate_record(read_json(path / "status.json"))
         if value["state"] in TERMINAL:
             return value
+        from .test_batches import cleanup_confirmed
+
+        if not cleanup_confirmed(path):
+            value.update(stage="Awaiting project resource cleanup acknowledgment")
+            atomic_json(path / "status.json", value)
+            return value
         partial = read_json(path / "result.json", {})
+        if value.get("kind") == "test-batch":
+            from .test_batches import recover_result
+
+            partial = recover_result(path, partial)
         pending = partial.get("pending_state")
         state = pending if pending in TERMINAL else "failed"
         error = partial.get("error") if pending in TERMINAL else "Worker exited without a terminal result; partial work is preserved"
@@ -121,7 +133,7 @@ def finish_cleanup(path):
             remaining.append(error)
         finished_at = time.time()
         partial.pop("pending_state", None)
-        atomic_json(path / "result.json", {**partial, "protocol_version": PROTOCOL_VERSION,
+        atomic_json(path / "result.json", {**partial, "protocol_version": value["protocol_version"],
                     "job_id": path.name, "state": state, "answer": partial.get("answer", ""),
                     "error": error, "remaining": remaining, "cleanup_confirmed": True, "finished_at": finished_at})
         events = Events(path / "events.jsonl", value["provider"])
@@ -130,6 +142,10 @@ def finish_cleanup(path):
         value.update(state=state, stage=error or state, finished_at=finished_at,
                      last_event=event["sequence"], current_tool=None)
         atomic_json(path / "status.json", value)
+        if value.get("kind") == "test-batch":
+            from .test_batches import terminal_telemetry
+
+            terminal_telemetry(path)
         return value
     finally:
         os.close(fd)
@@ -211,9 +227,13 @@ def _launch_worker(store, job_id, path, environment_fd):
         if child:
             child.wait(timeout=10)
         value = read_json(path / "status.json")
-        atomic_json(path / "result.json", {
-            "protocol_version": PROTOCOL_VERSION, "job_id": job_id, "state": "failed",
-            "answer": "", "error": launch_error, "remaining": [launch_error], "cleanup_confirmed": True})
+        result = {"protocol_version": value["protocol_version"], "job_id": job_id, "state": "failed",
+                  "answer": "", "error": launch_error, "remaining": [launch_error], "cleanup_confirmed": True}
+        if value.get("kind") == "test-batch":
+            from .test_batches import recover_result
+
+            result = recover_result(path, result)
+        atomic_json(path / "result.json", result)
         atomic_json(path / "status.json", {**value, "state": "failed", "finished_at": time.time(), "error": launch_error})
     else:
         threading.Thread(target=child.wait, daemon=True).start()
@@ -262,12 +282,17 @@ def cancel(job_id, *, store=None):
     store = store or Store()
     with store.lock():
         path = store.job(job_id)
-        if recover(path)["state"] not in TERMINAL:
+        current = recover(path)
+        if current["state"] not in TERMINAL or current.get("kind") == "test-batch":
             atomic_json(path / "cancel.json", {"requested_at": time.time()})
+        children = [p.name for p, _ in store.records()
+                    if read_json(p / "request.json", {}).get("idempotency_key", "") == "assessment:" + job_id]
+    for child in children:
+        cancel(child, store=store)
     return status(job_id, store=store)
 
 
-def follow_up(job_id, task, *, store=None, environment_fd=None, timeout_seconds=None):
+def follow_up(job_id, task, *, store=None, environment_fd=None, timeout_seconds=None, idempotency_key=None):
     """Resume the exact recorded session with its binding and authority constraints."""
     store = store or Store()
     current = status(job_id, store=store)
@@ -284,4 +309,5 @@ def follow_up(job_id, task, *, store=None, environment_fd=None, timeout_seconds=
     return start(task, prior["workspace"], store=store, environment_fd=environment_fd,
                  **options, executable=prior["backend"],
                  timeout_seconds=prior["timeout_seconds"] if timeout_seconds is None else timeout_seconds,
-                 conversation_id=current["conversation_id"], parent_job_id=job_id)
+                 conversation_id=current["conversation_id"], parent_job_id=job_id,
+                 idempotency_key=idempotency_key, host_binding=prior.get("host_binding"))

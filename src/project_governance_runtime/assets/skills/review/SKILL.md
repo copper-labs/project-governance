@@ -22,6 +22,7 @@ authoring, or migration changes.
 - `.governance/runtime/skills/review-finding.schema.yaml`
 - The changed diff or artifact under review
 - `.governance/runtime/skills/resources/efficient-execution.md` when the batch used long-running commands
+- `.governance/runtime/skills/test-execution/SKILL.md` when assessing the batch's proof choice, results, and cleanup; reuse its existing receipts
 
 ## Workflow
 

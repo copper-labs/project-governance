@@ -14,6 +14,7 @@ summary: Active specifications for the package runtime, KMP surface validation, 
 | Specification | Purpose |
 | --- | --- |
 | [Governance runtime](governance-kernel.md) | CLI, packs, selection, execution, configuration, distribution, and telemetry |
+| [Test Execution](test-execution.md) | Deterministic batches, provider-preserving completion, input/cleanup evidence and usage observations |
 | [KMP Surface Validation](kmp-surface-validation.md) | Opt-in catalog-driven KMP completeness through the existing pack runner, guarded target proof, and agent discovery |
 | [Reader-first technical authoring](technical-authoring-harness.md) | Reader contracts, progressive explanation, grounded procedures, and editorial boundaries |
 | [On-demand developer documentation](developer-documentation-system.md) | Installable documentation structure, one human and agent corpus, exact catalog routing, research handoff, and deterministic validation |

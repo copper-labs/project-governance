@@ -45,7 +45,9 @@ def read_json(path, default=None):
 
 def validate_record(value):
     """Refuse unknown protocol versions before state can influence ownership."""
-    if not isinstance(value, dict) or type(value.get("protocol_version")) is not int or value["protocol_version"] != PROTOCOL_VERSION:
+    if (not isinstance(value, dict) or type(value.get("protocol_version")) is not int or
+            not (value["protocol_version"] == PROTOCOL_VERSION or
+                 (value["protocol_version"] == 2 and value.get("kind") == "test-batch"))):
         raise AgentError("unsupported job state version; preserve state and use its matching runner")
     if ("access" in value or "allow_readers" in value) and (value.get("access") not in ("exclusive", "shared") or
             type(value.get("allow_readers", False)) is not bool or
@@ -135,11 +137,12 @@ class Store:
         path.mkdir(mode=0o700)
         atomic_json(path / "request.json", request)
         atomic_json(path / "status.json", {
-            "protocol_version": PROTOCOL_VERSION, "job_id": job_id, "state": "queued",
+            "protocol_version": request["protocol_version"], "job_id": job_id, "state": "queued",
             "created_at": time.time(), "updated_at": time.time(), "heartbeat_at": None,
             "stage": "Waiting for workspace ownership", "provider": request["provider"],
             "model": request["model"], "workspace": request["workspace"],
             "conversation_id": request.get("conversation_id"), "last_event": 0,
+            "kind": request.get("kind", "provider"),
         })
         return job_id, path
 
