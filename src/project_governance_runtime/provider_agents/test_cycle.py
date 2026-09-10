@@ -75,10 +75,15 @@ def prepare(task, workspace, *, provider, model=None, effort=None, executable=No
         "Return the final answer field as a JSON object with choice (direct, reuse, external, attended, bounded-fallback), "
         "note (a short explanation), and batch (the request object only for external). Do not delegate. "
         "Use project-owned assertion contracts and explicit deadlines. Do not change source or instructions. "
-        "External test commands execute later, after this invocation exits."
+        "External test commands execute later, after this invocation exits. "
+        "Your assignment is ONLY preparation, not completion of the original testing task. "
+        "When a valid batch is prepared, report outer outcome completed and remaining []; "
+        "describe the pending execution in the answer note. This does not claim that tests passed. "
+        "Use blocked only for an actual preparation obstacle."
     )
-    return jobs.start(task, workspace, provider=provider, model=selected["model"], effort=selected["effort"],
-                      executable=selected["backend"], context=context, role="test-preparation",
+    assignment = context + "\n\nOriginal testing task to prepare:\n" + task
+    return jobs.start(assignment, workspace, provider=provider, model=selected["model"], effort=selected["effort"],
+                      executable=selected["backend"], role="test-preparation",
                       constraints="Select and prepare authorized proof; no source edits, delegation, publication or long batch execution.",
                       timeout_seconds=timeout_seconds, idempotency_key=idempotency_key or "prepare:" + str(uuid.uuid4()),
                       host_binding=host, store=store, environment_fd=environment_fd)
@@ -153,7 +158,9 @@ def _run_prepared(prepared_job, store, environment_fd, progress, notify):
         raise AgentError("prepared-job must name a harness test-preparation job with a recorded host binding")
     result = wait_terminal(prepared_job, store, exited=True)
     if result["state"] != "succeeded":
-        return {"state": result["state"], "preparation_job": prepared_job, "result": result}
+        from .cli import compact_result
+
+        return {"state": result["state"], "preparation_job": prepared_job, "result": compact_result(result)}
     validate_host(prior["host_binding"])
     choice = json.loads(result["answer"])
     from ..skill_telemetry import CHOICES, record_use
