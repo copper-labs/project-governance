@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
 
+from dependency_registry import npm_url_matches, registry_policy_errors
+
 from dependency_primitives import (
     AUTHORITATIVE_HOSTS,
     DEPENDENCY_KEYS,
@@ -79,9 +81,11 @@ def maven_source_matches(name: str, version: str, path: str, host: str) -> bool:
         return path == f"/artifact/{group}/{artifact}/{version}"
     expected = f"/maven2/{group.replace('.', '/')}/{artifact}/{version}"
     return path == expected or path.startswith(expected + "/")
-def authoritative_source_matches(coordinate: tuple[str, str, str, str], raw_url: Any) -> bool:
+def authoritative_source_matches(coordinate: tuple[str, str, str, str], raw_url: Any, npm_registries: dict[str, str] | None = None) -> bool:
     """Validate that evidence links to an authoritative exact-coordinate URL."""
     ecosystem, name, version, _artifact_type = coordinate
+    if ecosystem == "npm":
+        return npm_url_matches(name, f"/{version}", raw_url, npm_registries, allow_trailing_slash=True)
     parsed = urlparse(str(raw_url or ""))
     if (
         parsed.scheme != "https"
@@ -100,7 +104,7 @@ def authoritative_source_matches(coordinate: tuple[str, str, str, str], raw_url:
         "maven": maven_source_matches,
     }.get(ecosystem)
     return matcher is not None and matcher(name, version, path, str(parsed.hostname))
-def evidence_dependency_errors(item: Any, label: str, evaluated: datetime, minimum_age: int) -> tuple[tuple[str, str, str, str] | None, list[str]]:
+def evidence_dependency_errors(item: Any, label: str, evaluated: datetime, minimum_age: int, npm_registries: dict[str, str] | None = None) -> tuple[tuple[str, str, str, str] | None, list[str]]:
     """Validate one evidence dependency and return its coordinate."""
     if not isinstance(item, dict):
         return None, [f"{label}: expected a mapping"]
@@ -118,12 +122,12 @@ def evidence_dependency_errors(item: Any, label: str, evaluated: datetime, minim
             errors.append(f"{label}: release was younger than {minimum_age} full days at evaluated_at")
     except ValueError as exc:
         errors.append(str(exc))
-    if not authoritative_source_matches(coordinate, item["source_url"]):
+    if not authoritative_source_matches(coordinate, item["source_url"], npm_registries):
         errors.append(
             f"{label}.source_url: expected an authoritative HTTPS URL bound to the exact dependency coordinate"
         )
     return coordinate, errors
-def evidence_record_result(record: Any, label: str, minimum_age: int, as_of: datetime) -> tuple[tuple[str, str, str, str] | None, dict[str, Any] | None, list[str]]:
+def evidence_record_result(record: Any, label: str, minimum_age: int, as_of: datetime, npm_registries: dict[str, str] | None = None) -> tuple[tuple[str, str, str, str] | None, dict[str, Any] | None, list[str]]:
     """Validate one coordinate evidence record without indexing invalid data."""
     if not isinstance(record, dict):
         return None, None, [f"{label}: expected a mapping"]
@@ -136,7 +140,7 @@ def evidence_record_result(record: Any, label: str, minimum_age: int, as_of: dat
         return None, None, [*errors, str(exc)]
     dependency_record = {key: record[key] for key in DEPENDENCY_KEYS}
     coordinate, coordinate_errors = evidence_dependency_errors(
-        dependency_record, label, evaluated, minimum_age
+        dependency_record, label, evaluated, minimum_age, npm_registries
     )
     errors.extend(coordinate_errors)
     if evaluated > as_of:
@@ -157,6 +161,7 @@ def index_evidence(
     minimum_age: int,
     as_of: datetime,
     relevant_coordinates: set[tuple[str, str, str, str]],
+    npm_registries: dict[str, str] | None = None,
 ) -> tuple[
     dict[tuple[str, str, str, str], dict[str, Any]],
     set[tuple[str, str, str, str]],
@@ -174,7 +179,7 @@ def index_evidence(
             continue
         matched.add(selected_coordinate)
         label = f"evidence.records[{number}]"
-        coordinate, record, record_errors = evidence_record_result(raw_record, label, minimum_age, as_of)
+        coordinate, record, record_errors = evidence_record_result(raw_record, label, minimum_age, as_of, npm_registries)
         errors.extend(record_errors)
         if coordinate and record and not record_errors:
             if coordinate in indexed:
@@ -198,7 +203,7 @@ def override_timing_errors(record: dict[str, Any], label: str, override_max_days
     if expires < as_of:
         return [f"{label}: override has expired"]
     return []
-def override_record_result(record: Any, label: str, override_max_days: int, as_of: datetime) -> tuple[tuple[str, str, str, str] | None, dict[str, Any] | None, list[str]]:
+def override_record_result(record: Any, label: str, override_max_days: int, as_of: datetime, npm_registries: dict[str, str] | None = None) -> tuple[tuple[str, str, str, str] | None, dict[str, Any] | None, list[str]]:
     """Validate one override before making it eligible for reconciliation."""
     if not isinstance(record, dict):
         return None, None, [f"{label}: expected a mapping"]
@@ -218,7 +223,7 @@ def override_record_result(record: Any, label: str, override_max_days: int, as_o
             errors.append(f"{label}.published_at: cannot be later than approved_at")
     except ValueError as exc:
         errors.append(str(exc))
-    if not authoritative_source_matches(coordinate, record["source_url"]):
+    if not authoritative_source_matches(coordinate, record["source_url"], npm_registries):
         errors.append(
             f"{label}.source_url: expected an authoritative HTTPS URL bound to the exact dependency coordinate"
         )
@@ -233,6 +238,7 @@ def index_overrides(
     override_max_days: int,
     as_of: datetime,
     relevant_coordinates: set[tuple[str, str, str, str]],
+    npm_registries: dict[str, str] | None = None,
 ) -> tuple[
     dict[tuple[str, str, str, str], dict[str, Any]],
     set[tuple[str, str, str, str]],
@@ -250,7 +256,7 @@ def index_overrides(
             continue
         matched.add(selected_coordinate)
         label = f"overrides.overrides[{number}]"
-        coordinate, record, record_errors = override_record_result(raw_record, label, override_max_days, as_of)
+        coordinate, record, record_errors = override_record_result(raw_record, label, override_max_days, as_of, npm_registries)
         errors.extend(record_errors)
         if coordinate and record and not record_errors:
             if coordinate in indexed:
@@ -273,12 +279,14 @@ def finding(rule_id: str, path: str, message: str) -> dict[str, str]:
 def validate_policy(document: dict[str, Any], path: Path, evidence_path: Path) -> tuple[int, int, list[dict[str, str]]]:
     """Validate policy fields and return safe evaluation limits."""
     findings: list[dict[str, str]] = []
-    for error in field_errors(document, POLICY_KEYS, POLICY_KEYS, "policy"):
+    for error in field_errors(document, POLICY_KEYS | {"npm_registries"}, POLICY_KEYS, "policy"):
         findings.append(finding("dependency.policy-invalid", path.as_posix(), error))
     if document.get("version") != 1:
         findings.append(finding("dependency.policy-invalid", path.as_posix(), "version must be 1"))
     if not isinstance(document.get("owner"), str) or not document.get("owner", "").strip():
         findings.append(finding("dependency.policy-invalid", path.as_posix(), "owner must be a non-empty string"))
+    for error in registry_policy_errors(document.get("npm_registries", {})):
+        findings.append(finding("dependency.policy-invalid", path.as_posix(), error))
     minimum = document.get("minimum_age_days")
     if not isinstance(minimum, int) or isinstance(minimum, bool) or minimum < 14:
         findings.append(finding("dependency.policy-invalid", path.as_posix(), "minimum_age_days must be an integer of at least 14"))

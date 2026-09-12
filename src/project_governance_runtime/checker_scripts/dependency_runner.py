@@ -41,7 +41,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--overrides", type=Path, required=True)
     parser.add_argument("--as-of", help="ISO date or timestamp used to evaluate override expiry")
     return parser.parse_args()
-def load_policy(args: argparse.Namespace) -> tuple[int, int, list[dict[str, str]]]:
+def load_policy(args: argparse.Namespace) -> tuple[int, int, dict[str, str], list[dict[str, str]]]:
     """Load policy limits and normalize configuration failures."""
     findings: list[dict[str, str]] = []
     try:
@@ -50,7 +50,8 @@ def load_policy(args: argparse.Namespace) -> tuple[int, int, list[dict[str, str]
         policy = {}
         findings.append(finding("dependency.policy-invalid", args.policy.as_posix(), str(exc)))
     minimum, maximum, policy_findings = validate_policy(policy, args.policy, args.evidence)
-    return minimum, maximum, [*findings, *policy_findings]
+    registries = {} if findings or policy_findings else policy.get("npm_registries", {})
+    return minimum, maximum, registries, [*findings, *policy_findings]
 def evaluation_time(value: str | None) -> tuple[datetime, list[dict[str, str]]]:
     """Resolve an explicit or current evaluation time without raising."""
     try:
@@ -83,13 +84,14 @@ def load_evidence_index(
     minimum_age: int,
     as_of: datetime,
     relevant_coordinates: set[Coordinate],
+    npm_registries: dict[str, str] | None = None,
 ) -> tuple[dict[Coordinate, dict[str, Any]], set[Coordinate], list[dict[str, str]]]:
     """Load optional target evidence and validate only changed-coordinate records."""
     if not path.exists():
         return {}, set(), []
     try:
         indexed, matched, errors = index_evidence(
-            load_yaml(path), minimum_age, as_of, relevant_coordinates
+            load_yaml(path), minimum_age, as_of, relevant_coordinates, npm_registries
         )
     except ValueError as exc:
         return {}, set(), [finding("dependency.evidence-invalid", path.as_posix(), str(exc))]
@@ -103,13 +105,14 @@ def load_override_index(
     maximum_days: int,
     as_of: datetime,
     relevant_coordinates: set[Coordinate],
+    npm_registries: dict[str, str] | None = None,
 ) -> tuple[dict[Coordinate, dict[str, Any]], set[Coordinate], list[dict[str, str]]]:
     """Load optional overrides and validate only changed-coordinate records."""
     if not path.exists():
         return {}, set(), []
     try:
         indexed, matched, errors = index_overrides(
-            load_yaml(path), maximum_days, as_of, relevant_coordinates
+            load_yaml(path), maximum_days, as_of, relevant_coordinates, npm_registries
         )
     except ValueError as exc:
         return {}, set(), [finding("dependency.override-invalid", path.as_posix(), str(exc))]
@@ -151,11 +154,11 @@ def candidate_records(args: argparse.Namespace) -> tuple[list[dict[str, Any]], l
         return [], [finding("dependency.unresolved-subject", "<change-scope>", str(exc))]
 
 
-def _extract_image(relative: str, raw_path: Any) -> tuple[list[dict[str, str]], list[dict[str, Any]]]:
+def _extract_image(relative: str, raw_path: Any, npm_registries: dict[str, str] | None = None) -> tuple[list[dict[str, str]], list[dict[str, Any]]]:
     """Parse one packet image with content-stable npm entry defects kept separate."""
     content_path = Path(str(raw_path))
     try:
-        return extract_npm_dependencies(content_path, logical_path=relative)
+        return extract_npm_dependencies(content_path, logical_path=relative, npm_registries=npm_registries)
     except (OSError, UnicodeError, UnsupportedDependencyFormat) as exc:
         raise UnsupportedDependencyFormat(str(exc).replace(content_path.as_posix(), relative)) from exc
 
@@ -176,6 +179,7 @@ def npm_repair_keys(relative: str, coordinate: Coordinate) -> set[tuple[str, ...
 
 def resolve_candidate_changes(
     candidates: list[dict[str, Any]],
+    npm_registries: dict[str, str] | None = None,
 ) -> tuple[list[dict[str, Any]], set[Coordinate], list[dict[str, str]]]:
     """Compute exact before/after tuple changes before reading registry records."""
     changes: list[dict[str, Any]] = []
@@ -190,8 +194,8 @@ def resolve_candidate_changes(
             changes.append({"path": relative, "after": [], "changed": set(), "removed": True})
             continue
         try:
-            before, before_defects = ([], []) if record.get("before_path") is None else _extract_image(relative, record["before_path"])
-            after, after_defects = _extract_image(relative, record["after_path"])
+            before, before_defects = ([], []) if record.get("before_path") is None else _extract_image(relative, record["before_path"], npm_registries)
+            after, after_defects = _extract_image(relative, record["after_path"], npm_registries)
         except UnsupportedDependencyFormat as exc:
             findings.append(finding("dependency.unsupported-format", relative, f"{exc}; add a deterministic parser before this governed syntax can pass"))
             continue
@@ -287,15 +291,15 @@ def main() -> int:
     """Coordinate dependency proof loading, evaluation, and reporting."""
     args = parse_args()
 
-    minimum_age, override_max_days, findings = load_policy(args)
+    minimum_age, override_max_days, npm_registries, findings = load_policy(args)
     as_of, time_findings = evaluation_time(args.as_of)
     candidates, discovery_findings = candidate_records(args)
-    changes, relevant_coordinates, candidate_findings = resolve_candidate_changes(candidates)
+    changes, relevant_coordinates, candidate_findings = resolve_candidate_changes(candidates, npm_registries)
     evidence_index, evidence_matches, evidence_findings = load_evidence_index(
-        args.evidence, minimum_age, as_of, relevant_coordinates
+        args.evidence, minimum_age, as_of, relevant_coordinates, npm_registries
     )
     override_index, override_matches, override_findings = load_override_index(
-        args.overrides, override_max_days, as_of, relevant_coordinates
+        args.overrides, override_max_days, as_of, relevant_coordinates, npm_registries
     )
     checked, reconciliation_findings = evaluate_candidate_changes(
         changes,

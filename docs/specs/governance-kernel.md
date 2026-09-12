@@ -213,6 +213,32 @@ patterns cannot establish membership. Missing, ambiguous, unsafe, or mismatched 
 retain external evidence checks. Organization prefixes confer no exemption. Overrides, toolchains,
 and external lock entries keep their existing checks; publication evidence schemas do not change.
 
+### Explicit npm Registry Trust
+
+Public npm remains the default. A target may add an optional `npm_registries` mapping to its
+version-1 `config/policies/dependency-freshness.yaml`:
+
+```yaml
+npm_registries:
+  "@example": https://packages.example.test/registry/npm/
+```
+
+Each exact lowercase scope selects one HTTPS registry base for that scope. This is source trust,
+not a freshness exemption. No wildcard scopes, credentials, ports, query strings, fragments,
+encoded base paths, or traversal segments are accepted. Unconfigured scopes and unscoped packages
+continue to use public npm. A configured scope cannot silently use public npm instead.
+
+The npm lockfile parser requires the exact configured origin, base path, package, version, and
+SHA-512 integrity. Evidence and operator overrides must use that same registry's exact
+`<base>/<package>/<version>` metadata URL. Existing release-age limits and override expiry remain
+unchanged. Invalid policy blocks even when dependency coordinates did not change.
+
+Scoped `.npmrc` registry declarations use the same binding; global registry redirects and existing
+credential-bearing or transport-weakening settings remain prohibited. This extension does not
+add private Yarn configuration support or new lockfile formats. Those still fail closed under the
+existing parser contract. The target owns registry choice; the reusable wheel contains no adopter
+registry names or package scopes.
+
 ## Configuration And Distribution
 
 An adopting repository tracks:

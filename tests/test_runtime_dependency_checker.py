@@ -408,6 +408,127 @@ class RuntimeDependencyCheckerTests(unittest.TestCase):
         self.assertEqual(report["finding_count"], 1)
         self.assertEqual(report["findings"][0]["rule_id"], "dependency.unresolved-subject")
 
+    def test_scoped_registry_requires_explicit_policy_and_exact_evidence(self) -> None:
+        """Private lock sources pass only with matching scope trust and release evidence."""
+        package = "@example/widget"
+        base = "https://packages.example.test/registry/npm"
+        row = self._lock_entry("widget", "1.2.3", resolved=f"{base}/{package}/-/widget-1.2.3.tgz")
+        lock = json.dumps({"lockfileVersion": 3, "packages": {f"node_modules/{package}": row}})
+        for configured in (False, True):
+            with self.subTest(configured=configured), self._fixture({"package-lock.json": (None, lock)}) as root:
+                if configured:
+                    self._write_registry_policy(root, {"@example": base})
+                evidence = self._npm_evidence(package, "1.2.3")
+                evidence.update(artifact_type="transitive", source_url=f"{base}/{package}/1.2.3")
+                self._write_evidence(root, [evidence])
+                code, report = self._run_checker(root)
+                self.assertEqual(code, 0 if configured else 1, report)
+                if configured:
+                    self.assertEqual(report["checked"][0]["status"], "evidence-verified")
+
+    def test_scoped_registry_rejects_wrong_source_and_missing_integrity(self) -> None:
+        """Scope trust never authorizes other origins, prefixes, credentials, or weak locks."""
+        package = "@example/widget"
+        base = "https://packages.example.test/registry/npm"
+        valid = f"{base}/{package}/-/widget-1.2.3.tgz"
+        invalid = [
+            valid.replace("packages.example.test", "packages.example.test.evil.test"),
+            valid.replace("/registry/npm/", "/registry/npm-other/"),
+            valid.replace("https://", "https://user:secret@"),
+            valid + "?token=hidden", valid + "#fragment",
+            valid.replace("/registry/", "/other/../registry/"),
+            valid.replace("@example", "@other"),
+            f"https://registry.npmjs.org/{package}/-/widget-1.2.3.tgz",
+        ]
+        for source in [*invalid, valid]:
+            with self.subTest(source=source):
+                row = self._lock_entry("widget", "1.2.3", resolved=source)
+                if source == valid:
+                    row.pop("integrity")
+                lock = json.dumps({"lockfileVersion": 3, "packages": {f"node_modules/{package}": row}})
+                with self._fixture({"package-lock.json": (None, lock)}) as root:
+                    self._write_registry_policy(root, {"@example": base})
+                    code, report = self._run_checker(root)
+                self.assertEqual(code, 1, report)
+                self.assertIn("dependency.unsupported-format", [item["rule_id"] for item in report["findings"]])
+
+    def test_public_metadata_trailing_slash_remains_valid(self) -> None:
+        """Existing public npm metadata links retain their accepted trailing-slash spelling."""
+        with self._fixture({"package.json": (None, json.dumps({"dependencies": {"widget": "1.2.3"}}))}) as root:
+            evidence = self._npm_evidence("widget", "1.2.3")
+            evidence["source_url"] += "/"
+            self._write_evidence(root, [evidence])
+            code, report = self._run_checker(root)
+        self.assertEqual(code, 0, report)
+
+    def test_scoped_registry_evidence_cannot_use_public_or_other_release(self) -> None:
+        """Private coordinates bind release age to their configured authoritative registry."""
+        package = "@example/widget"
+        base = "https://packages.example.test/registry/npm"
+        manifest = json.dumps({"dependencies": {package: "1.2.3"}})
+        for url in [f"https://registry.npmjs.org/{package}/1.2.3", f"{base}/{package}/1.2.4", f"{base}/{package}/1.2.3?x=1"]:
+            with self.subTest(url=url), self._fixture({"package.json": (None, manifest)}) as root:
+                self._write_registry_policy(root, {"@example": base})
+                evidence = self._npm_evidence(package, "1.2.3")
+                evidence["source_url"] = url
+                self._write_evidence(root, [evidence])
+                code, report = self._run_checker(root)
+                self.assertEqual(code, 1, report)
+                self.assertIn("dependency.evidence-invalid", [item["rule_id"] for item in report["findings"]])
+
+    def test_registry_configuration_is_scope_bound_and_fail_closed(self) -> None:
+        """npmrc accepts an exact trusted scope but not global or unknown scope redirects."""
+        base = "https://packages.example.test/registry/npm/"
+        for scope in ["@example", "@other", ""]:
+            key = f"{scope}:registry" if scope else "registry"
+            with self.subTest(scope=scope), self._fixture({".npmrc": (None, f"{key}={base}\n")}) as root:
+                self._write_registry_policy(root, {"@example": base})
+                code, report = self._run_checker(root)
+                self.assertEqual(code, 0 if scope == "@example" else 1, report)
+
+    def test_invalid_registry_policy_blocks_even_without_dependency_changes(self) -> None:
+        """Malformed trust declarations cannot silently widen source acceptance."""
+        for registries in [None, [], {"*": "https://example.test"}, {"@example": "http://example.test"},
+                           {"@example": "https://user@example.test"}, {"@example": "https://example.test/a/../b"},
+                           {"@example": "https://example.test/a%2fb"}, {"@example": "https://example.test/a//"}]:
+            with self.subTest(registries=registries), self._fixture({"package.json": ("{}", "{}")}) as root:
+                self._write_registry_policy(root, registries)
+                code, report = self._run_checker(root)
+                self.assertEqual(code, 1, report)
+                self.assertIn("dependency.policy-invalid", [item["rule_id"] for item in report["findings"]])
+
+    def test_private_registry_preserves_age_gate_and_scoped_override(self) -> None:
+        """Trust changes source admission, never publication-age or override expiry policy."""
+        package = "@example/widget"
+        base = "https://packages.example.test/registry/npm"
+        manifest = json.dumps({"dependencies": {package: "1.2.3"}})
+        for mode in ["changed", "staged", "all"]:
+            with self.subTest(mode=mode), self._fixture({"package.json": (None, manifest)}, mode=mode) as root:
+                self._write_registry_policy(root, {"@example": base})
+                evidence = self._npm_evidence(package, "1.2.3")
+                evidence.update(source_url=f"{base}/{package}/1.2.3", published_at="2026-08-09T00:00:00Z", evaluated_at="2026-08-10T00:00:00Z")
+                self._write_evidence(root, [evidence])
+                code, report = self._run_checker(root, mode=mode, arguments=["--all", "--path", "package.json"] if mode == "all" else None)
+                self.assertEqual(code, 1, report)
+                self.assertIn("younger than", str(report["findings"]))
+                self._write_evidence(root, [])
+                override = {key: value for key, value in evidence.items() if key != "evaluated_at"}
+                override.update(reason="Required integration fix", risk_owner="test", approved_by="operator",
+                                approver_role="operator", approved_at="2026-08-10T00:00:00Z", expires_at="2026-08-20",
+                                follow_up="Replace with mature release evidence", evidence="Operator-approved integration test")
+                self._write_overrides(root, [override])
+                code, report = self._run_checker(root, mode=mode, arguments=["--all", "--path", "package.json"] if mode == "all" else None)
+                self.assertEqual(code, 0, report)
+                self.assertEqual(report["checked"][0]["status"], "operator-override")
+
+    @staticmethod
+    def _write_registry_policy(root: Path, registries: object) -> None:
+        """Exercise target-owned registry trust through the normal checker policy route."""
+        policy = yaml.safe_load((ROOT / "src/project_governance_runtime/defaults/policies/dependency-freshness.yaml").read_text())
+        policy["owner"] = "test"
+        policy["npm_registries"] = registries
+        (root / "config/policies/dependency-freshness.yaml").write_text(yaml.safe_dump(policy), encoding="utf-8")
+
     @contextlib.contextmanager
     def _fixture(
         self,
