@@ -15,6 +15,7 @@ import tempfile
 import urllib.request
 import uuid
 import venv
+import zipfile
 from pathlib import Path
 from urllib.parse import quote, unquote
 
@@ -96,6 +97,18 @@ def install_locked(destination: Path = RUNTIME_ROOT, *, isolated: bool = False) 
         actual = hashlib.sha256(wheel.read_bytes()).hexdigest()
         if actual != lock["sha256"]:
             raise SystemExit("Locked governance wheel SHA256 does not match the downloaded bytes.")
+        # The already-verified wheel owns the dependency lock; never trust a target-side copy.
+        with zipfile.ZipFile(wheel) as archive:
+            try:
+                dependencies = archive.read(
+                    "project_governance_runtime/assets/runtime-requirements.txt"
+                ).decode("utf-8")
+            except KeyError:
+                raise SystemExit("Governance wheel has no dependency lock; use a locked release.")
+        requirements = Path(directory) / "requirements.txt"
+        requirements.write_text(
+            f"{wheel.as_uri()} --hash=sha256:{actual}\n" + dependencies, encoding="utf-8"
+        )
         # Resolve the base executable before activation; nested macOS venvs can otherwise
         # link back through the stable runtime pointer and become circular after its switch.
         base_python = str(Path(sys._base_executable).resolve())
@@ -104,13 +117,17 @@ def install_locked(destination: Path = RUNTIME_ROOT, *, isolated: bool = False) 
             return created.returncode
         python = destination / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
         result = subprocess.run(
-            [str(python), "-m", "pip", "install", str(wheel)],
+            [str(python), "-m", "pip", "--isolated", "install",
+             "--require-hashes", "--only-binary=:all:", "-r", str(requirements)],
             cwd=ROOT,
             env={**os.environ, "PIP_DISABLE_PIP_VERSION_CHECK": "1"},
             check=False,
         )
         if result.returncode != 0:
             return result.returncode
+        checked = subprocess.run([str(python), "-m", "pip", "check"], cwd=ROOT, check=False)
+        if checked.returncode:
+            return checked.returncode
         result = subprocess.run(
             [
                 str(python),

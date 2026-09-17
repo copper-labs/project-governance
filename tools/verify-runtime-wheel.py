@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import venv
+import zipfile
 from pathlib import Path
 
 from verify_kmp_surface import verify_kmp_surface
@@ -198,7 +199,13 @@ def initialize_target(root: Path, wheel: Path) -> tuple[Path, Path]:
     environment = root / ".venv"
     venv.EnvBuilder(with_pip=True, clear=True).create(environment)
     python = runtime_python(environment)
-    run([str(python), "-m", "pip", "install", str(wheel)], root=root, expected=0)
+    with zipfile.ZipFile(wheel) as archive:
+        dependencies = archive.read("project_governance_runtime/assets/runtime-requirements.txt").decode()
+    requirements = root / "runtime-requirements.txt"
+    requirements.write_text(f"{wheel.as_uri()} --hash=sha256:{hashlib.sha256(wheel.read_bytes()).hexdigest()}\n" + dependencies)
+    run([str(python), "-m", "pip", "--isolated", "install", "--require-hashes",
+         "--only-binary=:all:", "-r", str(requirements)], root=root, expected=0)
+    requirements.unlink()
     executable = "Scripts/project-governance.exe" if sys.platform == "win32" else "bin/project-governance"
     command = environment / executable
     installed_version = run(
@@ -263,6 +270,15 @@ def initialize_target(root: Path, wheel: Path) -> tuple[Path, Path]:
         root=root,
         expected=0,
     )
+    # Exercise the bootstrapped environment, not the preparatory installer environment.
+    snapshot = "import json; from importlib.metadata import distributions; print(json.dumps(sorted((d.metadata['Name'].lower(), d.version) for d in distributions() if d.metadata['Name'].lower() not in {'pip', 'setuptools'})))"
+    before = run([str(python), "-c", snapshot], root=root, expected=0).stdout
+    python = runtime_python(root / ".governance/runtime")
+    command = root / ".governance/runtime" / executable
+    after = run([str(python), "-c", snapshot], root=root, expected=0).stdout
+    if before != after:
+        raise RuntimeError("Clean installations resolved different runtime dependencies")
+    run([str(python), "-m", "pip", "check"], root=root, expected=0)
     run([str(command), "doctor"], root=root, expected=0)
     run(["git", "config", "user.email", "runtime@example.invalid"], root=root, expected=0)
     run(["git", "config", "user.name", "Runtime Wheel Verification"], root=root, expected=0)

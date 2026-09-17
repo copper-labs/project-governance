@@ -175,6 +175,31 @@ required, and shipping the policy alone does not establish a measured improvemen
 
 The [research basis](../reference/selective-reader-research.md) records the evidence and its limits.
 
+## Adoption Efficiency Proof
+
+When adopting or changing project validation, prove the wiring with focused project-owned tests:
+
+- Staged checks select their intended narrow commands; integration stages retain the required full
+  proof. Command names alone do not establish cost or justify a generic build detector.
+- Local proof lanes enforce a deadline from their existing CI owner by default. A different local
+  budget needs an explicit project-owned reason. Prove timeout status, terminal evidence, and cleanup
+  of owned processes without terminating unrelated work.
+- The normal commit entry point rejects an invalid prepared message before expensive source hooks.
+  Use the existing message check; a project may wrap it for convenience.
+
+These are adoption review criteria, not another runtime gate or a new deadline registry. Review
+existing machinery first and record what to keep, adapt, or retire before adding a replacement.
+
+Evaluate efficiency changes over the next 20 comparable commit-hook runs using existing telemetry.
+Compare the affected pack's observed durations and long outliers with a saved project-local baseline;
+keep stage, trigger, runtime version, and changed-work differences visible. Check late message
+rejections and project-owned lane receipts separately. A timeout proves containment, not repair of
+its underlying cause. Temporal proximity alone does not prove two runs belong to one commit.
+
+Retain the baseline outside the shared runtime checkout before the bounded stream rotates. Missing
+pack observations are not zero durations; only the slowest ten packs per run are retained. This
+review does not require a new telemetry schema, collector, alert, or automatic policy adjustment.
+
 ## Publication Candidate
 
 A publication candidate is one exact integration snapshot whose content is intended for release.

@@ -52,3 +52,26 @@ covers its one-time integration. Git hooks remain update-free; updater-owned val
 the exclusive runtime transaction. Runtime generations are installed at their final paths and
 retained for recovery. Manual bootstrap also preserves the existing generation until installation
 succeeds.
+
+## Locked Runtime Dependencies
+
+The release wheel contains `assets/runtime-requirements.txt` with exact versions and SHA256 hashes
+for the complete runtime dependency closure, including transitive packages and Python markers.
+Bootstrap reads that lock only after verifying the enclosing wheel and installs the runtime and
+its dependencies together with pip hash checking and binary-only resolution. Missing pins, missing
+hashes, altered archives, or unavailable compatible wheels fail installation. Source builds cannot
+introduce an unchecked build dependency chain.
+
+The package metadata retains compatibility ranges for ordinary Python packaging; those ranges alone
+are not a reproducible adoption install. The supported adoption path is the refreshed bootstrap
+launcher. Older launchers do not gain hash enforcement just by changing the runtime version. Refresh
+them deliberately from the new release, review their diff, and rerun bootstrap before declaring CI
+adoption reproducible. The new launcher rejects older wheels without an embedded dependency lock.
+
+Dependency updates replace the embedded pins and approved wheel hashes together. Obtain hashes from
+the pinned releases, review package metadata for the full closure and supported Python versions,
+and prove a clean bootstrap, `pip check`, and the runtime suite before release. Platform wheels may
+have different approved hashes; repeatability means the same pinned dependency versions and approved
+artifacts for the same Python/platform. Availability on every future Python or platform is not implied.
+The host Python, its bundled pip, and source-development/build tooling remain separate prerequisites;
+this lock covers installed runtime dependencies, not reproducible construction of the release wheel.
