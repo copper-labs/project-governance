@@ -20,13 +20,12 @@ ALLOWED_REASONS = {
     "migration-bridge",
     "emergency",
 }
-APPLE_PLANNING_TERMS = (
+COCOAPODS_PLANNING_TERMS = (
     "cocoapods",
     "podfile",
     ".podspec",
-    "swiftpm",
-    "swift package manager",
 )
+APPLE_PLANNING_TERMS = (*COCOAPODS_PLANNING_TERMS, "swiftpm", "swift package manager")
 
 
 def valid_exception(path: str, work_id: str, exceptions: dict[str, Any]) -> tuple[bool, str]:
@@ -89,17 +88,17 @@ def _expiry(item: dict[str, Any]) -> date | None:
 
 def approved_planning_decision(path: str, work_id: str, exceptions: dict[str, Any]) -> bool:
     """Return whether a CocoaPods plan is backed by a current governed exception."""
-    if not _mentions_apple_dependency(path):
+    if not _mentions_cocoapods(path):
         return True
     if not work_id:
         return False
     return any(_active_planning_exception(item, work_id) for item in exceptions.get("exceptions", []))
 
 
-def _mentions_apple_dependency(path: str) -> bool:
-    """Detect dependency planning terms in an existing plan file."""
+def _mentions_cocoapods(path: str) -> bool:
+    """Detect CocoaPods planning terms in an existing plan file."""
     lowered = Path(path).read_text(encoding="utf-8", errors="replace").lower()
-    return any(term in lowered for term in APPLE_PLANNING_TERMS)
+    return any(term in lowered for term in COCOAPODS_PLANNING_TERMS)
 
 
 def _active_planning_exception(item: object, work_id: str) -> bool:
