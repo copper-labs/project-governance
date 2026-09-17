@@ -819,5 +819,32 @@ class PackStageCoverageTests(unittest.TestCase):
             )
 
 
+class ProviderRoutingPlanningTests(unittest.TestCase):
+    """Keep provider entry-point selection separate from general runtime planning."""
+
+    def test_provider_adapter_paths_select_context_routing(self) -> None:
+        """Keep every declared provider pointer under the shared routing owner."""
+        for path in (
+            "AGENTS.md",
+            "CODEX.md",
+            "CLAUDE.md",
+            "GEMINI.md",
+            ".codex/config.toml",
+            ".codex/agents/reviewer.md",
+            ".claude/CLAUDE.md",
+            ".claude/agents/reviewer.md",
+        ):
+            with self.subTest(path=path):
+                plan = build_plan(
+                    load_packs(ROOT / "tests/fixtures/empty-target"),
+                    stage="pre-commit",
+                    mode="impacted",
+                    changed_paths=[path],
+                    explicit_pack_ids=[],
+                )
+                self.assertEqual(plan["status"], "ready", plan["blockers"])
+                self.assertIn("context-router", plan["selected_packs"])
+
+
 if __name__ == "__main__":
     unittest.main()

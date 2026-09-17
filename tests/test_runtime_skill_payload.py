@@ -80,7 +80,7 @@ class RuntimeSkillPayloadTests(unittest.TestCase):
 
     def test_source_provider_adapters_reference_only_live_shared_skills(self) -> None:
         """Prevent thin source adapters from outliving the runtime skills they reference."""
-        sources = [ROOT / "CLAUDE.md", ROOT / "CODEX.md"]
+        sources = [ROOT / "CLAUDE.md", ROOT / "CODEX.md", ROOT / "GEMINI.md"]
         for directory in (ROOT / ".claude/agents", ROOT / ".codex/agents"):
             if directory.is_dir():
                 sources.extend(path for path in directory.iterdir() if path.is_file())
