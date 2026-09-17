@@ -1,5 +1,52 @@
 version: 1
 capabilities:
+  - id: test-execution
+    title: Run necessary tests with bounded supervision cost
+    aliases: [external-test-batch]
+    tasks:
+      - execute a deterministic batch without provider polling
+      - return a test result to the selected Codex or Claude session
+    symbols: [harness-agent batch, harness-agent deliver]
+    reference: docs/specs/test-execution.md
+    guides: [docs/guides/provider-agents.md]
+    sources:
+      - src/project_governance_runtime/provider_agents/test_batches.py
+      - src/project_governance_runtime/provider_agents/completion.py
+      - src/project_governance_runtime/skill_telemetry.py
+  - id: startup-runtime-updates
+    title: Adopt compatible governance updates at top-level task startup
+    aliases: [startup-updates, automatic-governance-updates]
+    tasks:
+      - enable compatible startup updates once for a repository
+      - assess ongoing work before an isolated runtime lock update
+      - recover an interrupted startup update
+    symbols: [project-governance startup]
+    reference: docs/specs/startup-runtime-updates.md
+    guides: [docs/guides/startup-runtime-updates.md]
+    sources:
+      - src/project_governance_runtime/process_identity.py
+      - src/project_governance_runtime/startup.py
+      - src/project_governance_runtime/startup_transaction.py
+      - src/project_governance_runtime/startup_releases.py
+      - src/project_governance_runtime/startup_installation.py
+      - src/project_governance_runtime/startup_integration.py
+      - src/project_governance_runtime/startup_git.py
+      - src/project_governance_runtime/startup_state.py
+      - src/project_governance_runtime/runtime_access.py
+      - src/project_governance_runtime/runtime_entry.py
+  - id: provider-agents
+    title: Delegate work to an optional native provider agent
+    aliases: [harness-gemini-agent, harness-claude-agent, harness-codex-agent]
+    tasks:
+      - start a native provider job from a shell-capable parent
+      - follow progress and recover a delegated provider assignment
+    symbols: [harness-agent]
+    reference: docs/specs/provider-agent-skills.md
+    guides: [docs/guides/provider-agents.md]
+    sources:
+      - src/project_governance_runtime/provider_agents/entry.py
+      - src/project_governance_runtime/provider_agents/jobs.py
+      - src/project_governance_runtime/provider_agents/worker.py
   - id: first-governed-check
     title: Install the runtime and run the first affected check
     aliases: [runtime-first-check]

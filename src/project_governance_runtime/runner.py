@@ -50,7 +50,7 @@ def execute(
     })
     try:
         with execution_environment(root, plan, run_id=run_id) as environment:
-            evidence, overall, termination = execute_packs(
+            evidence, overall, termination, blocked = execute_packs(
                 root,
                 packs,
                 plan,
@@ -84,6 +84,7 @@ def execute(
         "subject_digest": digest,
         "plan": public_plan(plan),
         "evidence": evidence,
+        "blocked_packs": blocked,
     }
     _record_terminal(
         root,

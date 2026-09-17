@@ -12,7 +12,7 @@ summary: Preserve verified upstream license and notice bytes during formatting v
 # Preserve Upstream Notices
 
 The formatter normally rejects trailing whitespace in selected text files. There is no existing
-format waiver in 2.6.4. The preservation registry described here requires the updated runtime;
+format waiver in 2.6.4. The preservation registry described here requires runtime 2.6.5 or later;
 adding it to an older installation does not grant an exemption.
 
 ## Register Exact Upstream Bytes

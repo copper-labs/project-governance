@@ -43,7 +43,8 @@ packs without running them. Their optional `--summary` projection omits path inv
 lines, and process output while retaining bounded active findings; default output and
 `--json-output` remain full machine receipts. `doctor` reports the running package version, locked
 version, their match state, invalid configuration, and tracked launcher drift plainly. `init`
-creates only missing integration files. `init --refresh-launchers` deliberately replaces only the
+creates missing integration files and refreshes only marked harness-routing sections in host
+agent instructions. `init --refresh-launchers` deliberately replaces only the
 tracked bootstrap and hook launchers with the installed wheel's versions; it does not change
 project configuration. `update` advances the runtime lock only after required
 target-owned configuration is ready; schema changes remain blocked in dry-run output until an
@@ -57,8 +58,10 @@ half the configured total context allowance; a required skill outside that bound
 Target files and skills are read only through their remaining byte allowance. The runtime retains
 at most eight ignored packets, rebuilds a corrupted cache entry, and removes interrupted staging
 under one blocking local materialization lock rather than imposing an elapsed-time policy.
-Delegation remains a host-agent concern: the wheel owns no launch state, provider catalog, writer
-lease, role receipt, retry loop, or per-skill closeout workflow.
+Delegation decisions remain a host-agent concern. The governance kernel owns no launch state,
+provider catalog, role receipt, retry loop, or per-skill closeout workflow. The separately invoked
+[optional provider helper](provider-agent-skills.md) owns the lifecycle of jobs explicitly submitted
+to it. Checks, routing, and core doctor never import that helper or invoke a provider.
 
 Stages remain command boundaries, not selectable profiles:
 
@@ -148,7 +151,13 @@ output. Duration policy belongs to the target repository or operator. The runner
 deadline, but an explicitly supplied timeout remains blocking and terminates the owned process
 group. It does not maintain a second cache around a repository's build, test, device, or language
 tool. It resolves one immutable change packet before execution and supplies one run ID and one
-isolated evidence root per selected pack.
+isolated evidence root per selected pack. Ordinary checker failures (valid findings with a normal
+exit of zero or one) remain failures but do not prevent independent packs from running on that
+same packet. A failed pack blocks its declared dependents, including transitive dependents;
+`blocked_packs` names those omitted checks and their failed prerequisites. Blocking dependents
+keep the run failed. Malformed output, packet or evidence integrity failures, crashes, abnormal
+exits, cancellation, and timeouts still stop execution immediately. Command-level `fail_fast`
+within a pack is unchanged. No completed result is reused across runs.
 
 The runtime owns no evidence-retention policy. It prunes only its empty directory scaffolding;
 nonempty evidence remains target-owned and must be retained or removed by target policy.
@@ -195,6 +204,15 @@ JSON, document shapes, and structural errors always block, and all mode stays st
 no before-image authority. A non-`node_modules` lock package with no resolved tarball is a local
 workspace member, not a registry coordinate; linked `node_modules` entries are also skipped.
 
+An exact npm manifest dependency needs no external publication evidence when its consumer is the
+root or a declared root npm workspace, and its name and version match one unique declared local
+workspace package. Resolve membership from the validation subject (immutable base plus packet
+images for changed/staged checks), never from unstaged replacements. Root `workspaces` arrays and
+`workspaces.packages` lists support exact paths and ordinary `*`, `?`, and `**` patterns. Unsupported
+patterns cannot establish membership. Missing, ambiguous, unsafe, or mismatched local packages
+retain external evidence checks. Organization prefixes confer no exemption. Overrides, toolchains,
+and external lock entries keep their existing checks; publication evidence schemas do not change.
+
 ## Configuration And Distribution
 
 An adopting repository tracks:
@@ -228,7 +246,8 @@ normal pinned-wheel update path.
 
 ## Telemetry
 
-Telemetry is one ignored validation JSONL file bounded by both 1,000 records and one mebibyte. Each
+Telemetry is one ignored JSONL file for validation and bounded Test Execution observations, limited
+by both 1,000 records and one mebibyte. Each
 append reads at most the newest one mebibyte, including when stale or externally modified state is
 larger. It records only run identity, runtime version, stage, mode, non-reversible scope and subject
 digests, changed-path and selected-pack counts, terminal status and reason, total duration, total pack
@@ -243,7 +262,12 @@ A nonzero exit code accompanied by a valid blocking finding is a check rejection
 of a crash. Selection blockers are terminal observations even when no pack executes; planning
 duration is separate from execution duration. Argument parsing and process startup are not timed.
 It never records paths, commands, output,
-findings, prompts, documentation activity, skill activity, agent activity, or source content.
+findings, prompts, documentation activity, general agent activity, or source content. Schema 4 adds
+only the two content-free Test Execution events defined in the
+[Test Execution contract](test-execution.md#skill-routing-and-telemetry): a reported decision and an
+observed batch result. Fixed skill/host/choice/reason enums, opaque decision identity, outcomes,
+duration and already-available aggregate token counts support later evaluation. Native session IDs,
+model configuration and job evidence stay private. This is not automatic observation of skill reads.
 Writes are concurrency-safe and fail open; telemetry cannot weaken or approve a check. The single
 `telemetry status` view reports retained bytes, outcomes, durations, runner overhead, modes, broad
 runs, repeated scopes and subjects, unmatched starts, and slow packs. Filters select runtime version,
@@ -254,3 +278,19 @@ fails the command. `telemetry review --run-id <id> --disposition <value>` append
 Only retained runs can be annotated, and the latest retained annotation wins. Reviews do not change
 the observed outcome or run timestamp. A passing retry never automatically classifies a prior
 failure. The view does not declare a run hung or a repeat unnecessary.
+
+The same on-demand view includes at most five `repeat_examples` from impacted runs, each with the
+latest pair of distinct run IDs for one known runtime version, stage, trigger, mode, scope digest,
+and subject digest. Explicit test triggers and incomplete identities are excluded. Filters apply
+before pairing; file order defines the latest retained observation. Examples prioritize the
+longest current-run durations and expose only retained timestamps, outcomes, termination reasons,
+and durations beside the pair's identity. Missing durations remain absent. These references help
+locate original logs; they do not establish unchanged build inputs, redundant work, or permission
+to reuse evidence. No extra event, persistent index, or execution-time history lookup is added.
+
+## Compatible Startup Adoption
+
+The optional `startup` command family follows the [startup update contract](startup-runtime-updates.md).
+It adds once-authorized compatible selection and an isolated local commit at a native top-level
+task boundary. Existing `update --to` semantics remain deliberate. Ordinary Git hooks never discover
+or apply updates; hooks invoked by the updater may join only its validation transaction.

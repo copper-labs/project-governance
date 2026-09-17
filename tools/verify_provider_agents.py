@@ -1,0 +1,199 @@
+"""Prove the installed optional command without provider accounts or native binaries."""
+
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import time
+
+
+def verify_provider_agents(root):
+    """Exercise installed entry points, detached jobs, and bootstrap exclusion."""
+    if sys.platform not in {"darwin", "linux"}:
+        return
+    with tempfile.TemporaryDirectory(prefix="provider-wheel-proof-") as temporary:
+        proof = _InstalledProviderProof(root, Path(temporary))
+        proof.default_route()
+        proof.absent_provider()
+        proof.native_protocols()
+        proof.test_batch()
+        proof.cooperating_writer()
+        proof.upgrade_exclusion()
+        proof.released_environment()
+
+
+class _InstalledProviderProof:
+    """Keep one installed-wheel fixture isolated from native accounts and caller state."""
+
+    def __init__(self, root, scratch):
+        self.root, self.scratch = root, scratch
+        self.runtime = root / ".governance/runtime"
+        self.agent = self.runtime / "bin/harness-agent"
+        self.core = self.runtime / "bin/project-governance"
+        self.python = self.runtime / "bin/python"
+        self.workspace = scratch / "workspace"
+        self.workspace.mkdir()
+        fixture = Path(__file__).resolve().parents[1] / "tests/fixtures/provider_agent.py"
+        self.native = scratch / "provider-fixture"
+        self.native.write_text(f"#!{self.python}\n" + fixture.read_text().split("\n", 1)[1])
+        self.native.chmod(0o700)
+        self.environment = {**os.environ, "HARNESS_AGENT_STATE": str(scratch / "state"),
+                           "HARNESS_AGENT_ANCESTRY": "[]",
+                           "PROVIDER_AGENT_FIXTURE_LOG": str(scratch / "logs"),
+                           "PROVIDER_AGENT_FIXTURE_SCENARIO": "normal"}
+        self.environment.pop("PYTHONPATH", None)
+        self.environment.pop("HARNESS_AGENT_ENV_FD", None)
+
+    def invoke(self, command, *arguments, expected=0, env=None):
+        """Run only the installed command and keep its diagnostic output bounded."""
+        result = subprocess.run([str(command), *map(str, arguments)], cwd=self.root,
+                                env=env or self.environment, capture_output=True, text=True, timeout=30)
+        if result.returncode != expected:
+            raise RuntimeError(f"installed provider seam failed: {result.stdout}\n{result.stderr}")
+        return result.stdout
+
+    def completed(self, job_id):
+        """Read the terminal receipt through the installed public interface."""
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline:
+            value = json.loads(self.invoke(self.agent, "result", job_id))
+            if value.get("ready"):
+                return value
+            time.sleep(.05)
+        raise RuntimeError("installed provider job did not finish")
+
+    def launch(self, provider, *access):
+        """Use the same explicit binding and fixture for every native protocol."""
+        return json.loads(self.invoke(self.agent, "start", "--provider", provider, "--model", "fixture-model",
+            "--effort", "high", "--workspace", self.workspace, "--task", "Exercise installed provider",
+            "--executable", self.native, "--require-tool", "command", *access))["job_id"]
+
+    def absent_provider(self):
+        """Keep ordinary governance usable when no native provider binary is discoverable."""
+        absent = {**self.environment, "PATH": str(self.scratch / "empty-path")}
+        self.invoke(self.core, "doctor", env=absent)
+        missing = json.loads(self.invoke(self.agent, "doctor", "--provider", "gemini", expected=1, env=absent))
+        if missing["available"]:
+            raise RuntimeError("missing provider was incorrectly reported available")
+
+    def default_route(self):
+        """Check the adopted default while a competing command remains on PATH."""
+        competing = self.scratch / "system-bin"
+        competing.mkdir()
+        marker = self.scratch / "wrong-route"
+        wrapper = competing / "harness-agent"
+        wrapper.write_text(f"#!{self.python}\nfrom pathlib import Path\nPath({str(marker)!r}).touch()\n")
+        wrapper.chmod(0o700)
+        self.environment["PATH"] = str(competing) + os.pathsep + self.environment.get("PATH", "")
+        report = json.loads(self.invoke(self.core, "doctor"))["harness_delegation"]
+        if report["status"] != "ready" or report["executable"] != str(self.agent.resolve()):
+            raise RuntimeError(f"installed harness default is incomplete: {report}")
+        self.invoke(self.agent, "--help")
+        if marker.exists():
+            raise RuntimeError("a competing system command replaced the installed harness route")
+
+    def native_protocols(self):
+        """Require the installed skills and successful execution through all three adapters."""
+        for provider in ("gemini", "claude", "codex"):
+            if not (self.runtime / "skills" / f"harness-{provider}-agent/SKILL.md").is_file():
+                raise RuntimeError(f"installed provider skill is missing: {provider}")
+            value = self.completed(self.launch(provider))
+            if value["state"] != "succeeded" or not value["cleanup_confirmed"]:
+                raise RuntimeError(f"installed provider failed: {value}")
+
+    def upgrade_exclusion(self):
+        """Refuse actual bootstrap replacement while running and queued workers hold the environment."""
+        self.environment["PROVIDER_AGENT_FIXTURE_SCENARIO"] = "sleep"
+        jobs = []
+        try:
+            for _ in range(2):
+                jobs.append(self.launch("gemini"))
+            if json.loads(self.invoke(self.agent, "status", jobs[1]))["state"] != "queued":
+                raise RuntimeError("overlapping installed job did not queue")
+            refusal = subprocess.run([str(self.python), str(self.root / "tools/governance-bootstrap.py")],
+                cwd=self.root, env=self.environment, capture_output=True, text=True, timeout=10)
+            if refusal.returncode == 0 or "environment is in use" not in refusal.stderr:
+                raise RuntimeError("bootstrap did not refuse replacement during installed jobs")
+            self.invoke(self.core, "--version")
+        finally:
+            self.cancel_jobs(jobs)
+
+    def test_batch(self):
+        """Prove deterministic execution and telemetry from the installed wheel without a model."""
+        request = self.scratch / "batch.json"
+        request.write_text(json.dumps({"version": 1, "workspace": str(self.workspace),
+            "idempotency_key": "installed-batch", "timeout_seconds": 10,
+            "inputs": {"mode": "declared-roots", "roots": [str(self.workspace)]},
+            "cases": [{"id": "installed", "argv": [str(self.python), "-c", "from project_governance_runtime import __version__; assert __version__"],
+                       "timeout_seconds": 5, "expected_exit_codes": [0]}]}))
+        before = len(list((self.scratch / "logs").glob("*.argv.json")))
+        queue = self.scratch / "codex-queue"
+        receipt = self.scratch / "queue-receipt.json"
+        queue.write_text(f"#!{self.python}\nimport json,sys\nfrom pathlib import Path\n"
+                         "if '--help' in sys.argv: print('--thread --message')\n"
+                         f"else: Path({str(receipt)!r}).write_text(json.dumps(sys.argv[1:]))\n")
+        queue.chmod(0o700)
+        self.environment["CODEX_THREAD_ID"] = "f7e9be56-b5b7-491f-8d2d-78cec3472ea6"
+        job = json.loads(self.invoke(self.agent, "batch", "--request-file", request,
+                                    "--notify-codex", "--codex-executable", queue))
+        result = json.loads(self.invoke(self.agent, "wait", job["job_id"], "--until-terminal"))
+        if result["state"] != "succeeded" or result["summary"]["passed"] != 1:
+            raise RuntimeError("installed test batch did not preserve its assertion")
+        delivery = json.loads(self.invoke(self.agent, "deliver", job["job_id"]))
+        if delivery["state"] != "queued" or json.loads(receipt.read_text())[:3] != [
+                "queue", "--thread", self.environment["CODEX_THREAD_ID"]]:
+            raise RuntimeError("installed completion did not target its initiating task")
+        if len(list((self.scratch / "logs").glob("*.argv.json"))) != before:
+            raise RuntimeError("deterministic batch unexpectedly invoked a provider")
+        if not (self.runtime / "skills/test-execution/SKILL.md").is_file():
+            raise RuntimeError("installed Test Execution skill is missing")
+
+    def cooperating_writer(self):
+        """Prove installed flags reach native providers concurrently without losing exclusive isolation."""
+        previous = len(list((self.scratch / "logs").glob("*.argv.json")))
+        self.environment["PROVIDER_AGENT_FIXTURE_SCENARIO"] = "sleep"
+        jobs, exclusive = [], None
+        try:
+            for flag in ("--writer", "--shared", "--shared"):
+                jobs.append(self.launch("codex", flag))
+            deadline = time.monotonic() + 5
+            while len(list((self.scratch / "logs").glob("*.argv.json"))) < previous + 3:
+                if time.monotonic() >= deadline:
+                    raise RuntimeError("installed writer and both readers did not overlap")
+                time.sleep(.05)
+            self.environment["PROVIDER_AGENT_FIXTURE_SCENARIO"] = "normal"
+            exclusive = self.launch("codex")
+            if json.loads(self.invoke(self.agent, "status", exclusive))["state"] != "queued":
+                raise RuntimeError("exclusive job ran during installed writer/reader work")
+        finally:
+            self.cancel_jobs(jobs)
+        if self.completed(exclusive)["state"] != "succeeded":
+            raise RuntimeError("exclusive work did not resume after writer and reader cleanup")
+
+    def cancel_jobs(self, jobs):
+        """Stop every test job before releasing its temporary workspace."""
+        for job_id in jobs:
+            self.invoke(self.agent, "cancel", job_id)
+        for job_id in jobs:
+            if self.completed(job_id)["state"] != "cancelled":
+                raise RuntimeError("installed cancellation did not complete")
+
+    def released_environment(self):
+        """Verify that cleanup guardians release the installed environment lock."""
+        import fcntl
+
+        fd = os.open(self.root / ".governance/runtime-use.lock", os.O_RDWR)
+        try:
+            deadline = time.monotonic() + 5
+            while True:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    if time.monotonic() >= deadline:
+                        raise RuntimeError("installed environment lock outlived job cleanup")
+                    time.sleep(.05)
+        finally:
+            os.close(fd)

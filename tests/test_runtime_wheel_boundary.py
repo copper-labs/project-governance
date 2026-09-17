@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import hashlib
+import ast
 import os
 import re
 import subprocess
@@ -132,6 +133,20 @@ def build_wheel(destination: Path) -> Path:
 
 class RuntimeWheelBoundaryTests(unittest.TestCase):
     """Keep the release artifact deterministic, generic, and free of retired machinery."""
+
+    def test_core_runtime_cannot_import_optional_provider_execution(self) -> None:
+        """Keep model execution outside hooks, checks, routing, installation, and core doctor."""
+        package = ROOT / "src/project_governance_runtime"
+        for source in package.glob("*.py"):
+            tree = ast.parse(source.read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    names = [value.name for value in node.names]
+                elif isinstance(node, ast.ImportFrom):
+                    names = [node.module or "", *(value.name for value in node.names)]
+                else:
+                    continue
+                self.assertFalse(any("provider_agents" in name.split(".") for name in names), str(source))
 
     def test_skill_payload_is_catalog_or_manifest_owned(self) -> None:
         """Require every shipped skill asset to have one discovery or support owner."""

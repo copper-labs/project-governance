@@ -11,8 +11,9 @@ Review behavior, tests, fixtures, and regression risk.
 
 ## Trigger
 
-Use this skill when a change affects user-visible behavior, core logic, contracts, regression tests,
-fixtures, or release readiness.
+Use this skill at the planned batch review boundary when a change affects user-visible behavior,
+core logic, contracts, regression tests, fixtures, or release readiness. Review earlier for a named
+risk or unresolved decision; a completed helper, file, or focused test is not a review trigger.
 
 ## Required Reads
 
@@ -24,8 +25,8 @@ fixtures, or release readiness.
 
 ## Workflow
 
-1. Confirm the integrated revision or tree digest under review and remain independent from its
-   implementation.
+1. Confirm the completed batch, its acceptance claims, and the integrated revision or tree digest
+   under review. Remain independent from its implementation.
 2. Identify the behavior promised by the governing artifact or work item.
 3. Review changed tests and fixtures against edge cases and failure modes.
 4. Check whether impacted validation covers the changed paths.
@@ -35,7 +36,9 @@ fixtures, or release readiness.
 
 ## Validation
 
-Consume the stable candidate's existing affected sign-off evidence. Run one focused unit,
+Consume the stable candidate's existing affected sign-off evidence. Check its relevant inputs and
+expiry before reuse. Review the batch once; corrections reopen the affected claims and checks,
+without automatically starting another general review. Run one focused unit,
 integration, or smoke check only for a named changed seam with no evidence. If no test maps to the
 change, report the gap; release checks remain at the release boundary.
 

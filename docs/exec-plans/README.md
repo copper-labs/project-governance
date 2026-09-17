@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-02-16
-updated: 2026-08-24
+updated: 2026-09-10
 summary: Active and completed execution plans for the current source repository.
 ---
 
@@ -16,9 +16,23 @@ Git remains the implementation history and recovery mechanism.
 
 ## Active
 
-No implementation plan is currently active.
+- [Return test completion to the initiating agent](active/2026-09-10-test-completion-return.md)
+
+- [Optional provider agent skills](active/2026-09-06-provider-agent-skills.md) builds and releases
+  Gemini, Claude, and Codex wrappers independently of later implementation-plan improvements.
 
 ## Completed
+
+- [Shared test execution](completed/2026-09-10-shared-test-execution.md) delivers deterministic
+  batches, Codex and Claude CLI handoff, proactive skill routing, and bounded usage observations.
+- [Efficient execution](completed/2026-09-10-efficient-execution.md) closes long-running command
+  supervision gaps through existing policy and packaged skills.
+- [Evidence-first efficiency](completed/2026-09-07-evidence-first-efficiency.md) adds on-demand repeat
+  diagnosis and a project-wide principle of evidence-led simplicity.
+- [Selective read-only support](completed/2026-09-06-selective-readers.md) adds bounded reader
+  assignments to planning and a cooperating writer mode to the optional provider helper.
+- [Automatic governance updates at top-level task startup](completed/2026-09-06-top-level-startup-updates.md)
+  implements compatible updates with contextual worktree assessment and isolated local commits.
 
 - [Lean Governance Operating Model](completed/2026-08-27-lean-governance-operating-model.md)
   removed the runtime control plane, bounded workspace and telemetry overhead, and aligned hooks
@@ -47,3 +61,4 @@ No implementation plan is currently active.
   telemetry, and clean-wheel proof.
 - [Governance streamlining](completed/2026-08-14-governance-streamlining.md) completed its source
   implementation and proof. Any shadow adoption is target-owned work outside this checkout.
+

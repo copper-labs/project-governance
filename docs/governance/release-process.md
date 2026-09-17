@@ -5,7 +5,7 @@ type: governance
 status: current
 owner: project-governance
 created: 2026-08-15
-updated: 2026-08-27
+updated: 2026-09-06
 summary: Defines semantic release identity and the automated immutable wheel publication boundary.
 ---
 
@@ -55,3 +55,20 @@ such as `1.1.2.dev3+gabcdef123456`. They are CI or local artifacts, not GitHub r
 The runtime lock version equals the GitHub tag so `project-governance update --to <version>` resolves
 one unambiguous release directory. Existing hash-named releases remain historical; new releases do
 not reuse that convention.
+
+When `.github/release-notes/<version>.md` exists, publication includes that authored text before
+the generated change list. Record operator-authorized validation exceptions there before publication.
+
+## Startup Compatibility Metadata
+
+Every release publishes `runtime-update.json` beside its wheel and exact runtime lock. The
+release builder binds the metadata to the lock digest. Review `.github/runtime-update-policy.json`
+as part of release classification: its source-version range must include skipped-version paths,
+and startup integration changes or migrations require `automatic: false` with an appropriate
+source boundary. Equal configuration schema versions alone do not establish compatibility.
+The initial automatic source floor is 2.5.0. Earlier adopters require deliberate integration.
+
+The [startup contract](../specs/startup-runtime-updates.md) requires immutable release assets and
+same-major stable selection. Clean-wheel proof exercises setup and a two-version local fixture
+upgrade with an ordinary Git hook, preserving unrelated staged and unstaged work. Fixture wheels
+are never published. Source release proof and independent review remain required.

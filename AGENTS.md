@@ -3,6 +3,10 @@
 This repository defines a reusable, project-neutral governance runtime. Keep this file compact;
 durable decisions and plans live under `docs/**`.
 
+Follow the [charter's design principle](CHARTER.md#design-principle): diagnose first, add the smallest
+change that earns its cost, and remove what no longer helps. Apply it to every proposed change;
+do not turn it into another checklist or approval layer.
+
 ## Non-Negotiables
 
 - Markdown is the active governance authority. Git history preserves removed implementation.
@@ -45,8 +49,9 @@ tools/run-source-governance.sh check --summary --stage pre-commit --mode impacte
 
 ## Validation
 
-- Change one owning component, run its focused test, then run one directly affected integration
-  seam.
+- Plan coherent implementation batches and their test checkpoints using the
+  [validation strategy](docs/governance/validation-strategy.md). Run focused checks during work;
+  consolidate QA, documentation, and integrated proof at the declared batch boundary.
 - Run broad proof only for a wheel release, configuration-schema migration, hook or selection
   contract change, security/process-isolation boundary, scheduled reconciliation, or explicit
   operator request.

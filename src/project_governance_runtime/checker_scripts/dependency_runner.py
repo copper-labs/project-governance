@@ -25,6 +25,7 @@ from dependency_evidence import (
     validate_policy,
 )
 from dependency_extractors import extract_npm_dependencies
+from dependency_workspaces import local_workspace_coordinates
 
 def parse_args() -> argparse.Namespace:
     """Parse dependency selection, policy, evidence, and evaluation-time inputs."""
@@ -180,6 +181,7 @@ def resolve_candidate_changes(
     changes: list[dict[str, Any]] = []
     relevant_coordinates: set[Coordinate] = set()
     findings: list[dict[str, str]] = []
+    consumers, workspace_versions = local_workspace_coordinates()
     for record in sorted(candidates, key=lambda item: str(item.get("path", ""))):
         relative = str(record.get("path", ""))
         if not is_governed(relative):
@@ -204,8 +206,14 @@ def resolve_candidate_changes(
         for defect in after_defects:
             if tuple(defect["identity"]) not in before_identities:
                 findings.append(finding("dependency.unsupported-format", relative, str(defect["message"])))
-        relevant_coordinates.update(changed)
-        changes.append({"path": relative, "after": after, "changed": changed, "removed": False})
+        local = {
+            coordinate for coordinate in changed
+            if relative in consumers and coordinate[0] == "npm"
+            and coordinate[3] in {"direct", "development", "optional", "peer"}
+            and workspace_versions.get(coordinate[1]) == coordinate[2]
+        }
+        relevant_coordinates.update(changed - local)
+        changes.append({"path": relative, "after": after, "changed": changed, "local": local, "removed": False})
     return changes, relevant_coordinates, findings
 
 
@@ -226,17 +234,20 @@ def evaluate_candidate_changes(
         if change["removed"]:
             checked.append({"path": relative, "status": "removed", "changed_dependency_count": 0})
             continue
-        evidence_coordinates = changed & set(evidence_index)
-        override_coordinates = changed & set(override_index)
+        local = change.get("local", set())
+        external = changed - local
+        evidence_coordinates = external & set(evidence_index)
+        override_coordinates = external & set(override_index)
         matching_records = evidence_matches | override_matches
-        missing = changed - matching_records
+        missing = external - matching_records
         for coordinate in sorted(missing):
             uncovered.setdefault(coordinate, relative)
         status = "no-coordinate-changes"
         if changed:
             status = (
                 "evidence-missing" if missing
-                else "evidence-invalid" if changed - evidence_coordinates - override_coordinates
+                else "evidence-invalid" if external - evidence_coordinates - override_coordinates
+                else "local-workspace" if not external
                 else "operator-override" if override_coordinates and not evidence_coordinates
                 else "evidence-verified"
             )
@@ -245,6 +256,7 @@ def evaluate_candidate_changes(
             "status": status,
             "dependency_count": len(change["after"]),
             "changed_dependency_count": len(changed),
+            "local_workspace_dependency_count": len(local),
             "changed_dependencies": [
                 {"ecosystem": item[0], "name": item[1], "version": item[2], "artifact_type": item[3]}
                 for item in sorted(changed)

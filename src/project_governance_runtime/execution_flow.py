@@ -211,12 +211,21 @@ def execute_packs(
     timeout_seconds: float | None,
     environment: dict[str, str],
     command_arguments: dict[str, str],
-) -> tuple[list[dict[str, Any]], str, str]:
-    """Run selected packs in order and stop only at a blocking failed pack."""
+) -> tuple[list[dict[str, Any]], str, str, dict[str, list[str]]]:
+    """Collect independent findings on one packet without running failed dependents."""
     evidence: list[dict[str, Any]] = []
     overall = "passed"
     termination = "completed"
+    failed: set[str] = set()
+    blocked: dict[str, list[str]] = {}
     for pack_id in plan["execution_order"]:
+        prerequisites = failed.intersection(packs[pack_id].get("depends_on", []))
+        if prerequisites:
+            blocked[pack_id] = sorted(prerequisites)
+            failed.add(pack_id)
+            if packs[pack_id].get("enforcement") == "blocking":
+                overall = "failed"
+            continue
         item, pack_termination = execute_pack(
             root,
             pack_id,
@@ -229,17 +238,27 @@ def execute_packs(
         evidence.append(item)
         if pack_termination is not None:
             termination = pack_termination
-        if item["evidence_manifest"]["status"] == "invalid":
-            return evidence, "failed", termination
-        if item["process_failure_count"]:
-            return evidence, "failed", termination
-        if item["integrity_failure_count"]:
-            return evidence, "failed", termination
-        if item["status"] == "failed" and packs[pack_id].get("enforcement") == "blocking":
-            return evidence, "failed", termination
+        if _diagnostic_stop(item):
+            return evidence, "failed", termination, blocked
+        if item["status"] == "failed":
+            failed.add(pack_id)
+            if item["process_failure_count"] or packs[pack_id].get("enforcement") == "blocking":
+                overall = "failed"
         if item["status"] in {"failed", "warning"} and overall == "passed":
             overall = "warning"
-    return evidence, overall, termination
+    return evidence, overall, termination, blocked
+
+
+def _diagnostic_stop(item: dict[str, Any]) -> bool:
+    """Continue only ordinary checker verdicts; infrastructure failures stop the run."""
+    if item["evidence_manifest"]["status"] == "invalid" or item["integrity_failure_count"]:
+        return True
+    return any(
+        command.get("failure_kind") not in {None, "check"}
+        or command["exit_code"] not in {0, 1}
+        or command["termination_reason"] != "completed"
+        for command in item["commands"]
+    )
 
 
 def execute_pack(

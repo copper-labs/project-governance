@@ -160,8 +160,8 @@ Blocking checks enforce only facts the runtime can determine consistently:
 
 Automation does not decide whether prose is plain enough, whether a product area name is correct,
 or whether a conceptual description is sufficiently insightful. The installed authoring workflow
-guides those judgements, and the author or reviewer owns them. The wheel invokes no model and does
-not perform code review.
+guides those judgements, and the author or reviewer owns them. Narrative checks invoke no model
+and do not perform code review.
 
 ## Runtime And Adopter Ownership
 
