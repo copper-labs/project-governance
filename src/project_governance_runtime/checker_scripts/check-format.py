@@ -4,11 +4,13 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
 
 from governance_changed_paths import changed_path_views
+from project_governance_runtime.format_preservation import REGISTRY_PATH, verified_notices
 
 
 TEXT_SUFFIXES = {".cfg", ".json", ".md", ".py", ".sh", ".toml", ".txt", ".yaml", ".yml"}
@@ -54,6 +56,50 @@ def selected_paths(selection_file: Path | None, mode: str) -> list[tuple[Path, P
     )
 
 
+def check_selected(
+    selected: list[tuple[Path, Path]],
+) -> tuple[list[dict[str, object]], list[str]]:
+    """Check selected bytes while keeping verified upstream notices unchanged."""
+    errors: list[dict[str, object]] = []
+    try:
+        notices = verified_notices()
+    except (OSError, ValueError, RuntimeError) as error:
+        notices = {}
+        errors.append({
+            "rule_id": "format.preservation-invalid",
+            "severity": "blocking",
+            "path": REGISTRY_PATH,
+            "message": str(error),
+        })
+    preserved: list[str] = []
+    for repository_path, content_path in selected:
+        content = content_path.read_bytes()
+        digest = notices.get(repository_path.as_posix())
+        if digest is not None and hashlib.sha256(content).hexdigest() == digest:
+            preserved.append(repository_path.as_posix())
+            continue
+        if digest is not None:
+            errors.append({
+                "rule_id": "format.preservation-invalid",
+                "severity": "blocking",
+                "path": repository_path.as_posix(),
+                "message": "selected notice bytes do not match the preserved SHA256",
+            })
+        for index, line in enumerate(
+            content.decode("utf-8").splitlines(),
+            1,
+        ):
+            if line.rstrip() != line:
+                errors.append({
+                    "rule_id": "format.drift",
+                    "severity": "blocking",
+                    "path": repository_path.as_posix(),
+                    "line": index,
+                    "message": "trailing whitespace",
+                })
+    return errors, preserved
+
+
 def main() -> int:
     """Check text files for trailing whitespace."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -95,20 +141,7 @@ def main() -> int:
         }
         print(json.dumps(payload, indent=2, sort_keys=True))
         return 1 if selection_error else 0
-    errors: list[dict[str, object]] = []
-    for repository_path, content_path in selected:
-        for index, line in enumerate(
-            content_path.read_text(encoding="utf-8").splitlines(),
-            1,
-        ):
-            if line.rstrip() != line:
-                errors.append({
-                    "rule_id": "format.drift",
-                    "severity": "blocking",
-                    "path": repository_path.as_posix(),
-                    "line": index,
-                    "message": "trailing whitespace",
-                })
+    errors, preserved = check_selected(selected)
     if selection_error:
         errors.append({
             "rule_id": "format.selection-failed",
@@ -121,6 +154,7 @@ def main() -> int:
         "status": "failed" if errors else "passed",
         "finding_count": len(errors),
         "findings": errors,
+        "preserved_notices": preserved,
     }
     if args.json or args.governance_selection_file:
         print(json.dumps(payload, indent=2, sort_keys=True))

@@ -226,3 +226,9 @@ identity or product rules in the shared runtime.
 
 For agent usage, see [Agent setup](agent-setup-instructions.md). For the exact operational rules,
 see [Validation strategy](../governance/validation-strategy.md).
+
+## Preserve Upstream Notices
+
+Use the [upstream notice preservation guide](preserve-upstream-notices.md) when selected third-party
+licenses must retain their original bytes despite trailing whitespace. The opt-in registry binds
+each formatting exemption to an exact notice path, SHA256, and upstream source URL.
