@@ -45,7 +45,9 @@ The architecture intentionally has two owners.
     [provider-agent skills](../specs/provider-agent-skills.md) use one separately invoked helper for
     native Gemini, Claude, and Codex jobs. That helper owns only their process lifecycle, local
     workspace coordination, progress, and results. Governance checks and routing never invoke it.
-    Model selection, role assignments, retries, and review policy remain host-owned. Adoption and
+    Model selection, role assignments, retries, and review policy remain host-owned. The wheel ships
+    [Markdown model recommendations](../../src/project_governance_runtime/assets/skills/resources/model-selection.md)
+    that the coordinator applies subject to explicit task choices and project overrides. Adoption and
     bootstrap maintain a marked routing pointer in host entry files, making the supplied harness
     skills the cross-model default. The wheel owns only that section; authored instructions remain
     repository-owned. Explicit operator route choices override the default.
