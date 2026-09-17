@@ -28,3 +28,12 @@ dispositions:
     approved_on: 2026-08-15
     responsibility: Prove the runtime command execution and evidence-normalization contract.
     rationale: The test class covers one narrow public execution boundary, and splitting it solely by file length would reduce navigability without isolating an independent fixture or responsibility.
+  - finding: quality.large-type
+    path: tests/test_runtime_dependency_checker.py
+    symbol: RuntimeDependencyCheckerTests
+    disposition: cohesion-accepted
+    owner: project-governance-maintainers
+    reviewer: Codex architecture review
+    approved_on: 2026-09-12
+    responsibility: Prove dependency admission through the public checker and its immutable change-packet fixture.
+    rationale: Scope trust, release evidence and defect ratcheting exercise one admission boundary and reuse the same isolated target fixture. Keeping the scenarios together preserves that relationship; splitting the test class solely by line count would not isolate a separate responsibility.

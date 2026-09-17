@@ -13,6 +13,8 @@ from urllib.parse import unquote, urlparse
 
 import yaml
 
+from dependency_registry import npm_url_matches, npm_config_registry_matches
+
 from dependency_primitives import (
     ACTION_SHA,
     CANONICAL_MAVEN_REPOSITORIES,
@@ -104,6 +106,7 @@ def append_npm_manifest_entries(
     artifact_type: str,
     values: list[dict[str, str]],
     defects: list[dict[str, Any]],
+    npm_registries: dict[str, str] | None = None,
 ) -> None:
     """Collect one manifest coordinate map while retaining entry-local defects."""
     if raw is None:
@@ -210,18 +213,9 @@ def valid_sha512_integrity(value: Any) -> bool:
         return len(base64.b64decode(text[7:], validate=True)) == 64
     except (ValueError, TypeError):
         return False
-def validate_npm_lock_source(path: Path, name: str, version: str, entry: dict[str, Any], label: str) -> None:
-    """Reject lock entries whose tarball origin or integrity is not canonical and immutable."""
-    parsed = urlparse(str(entry.get("resolved", "")))
-    leaf = name.rsplit("/", 1)[-1]
-    expected = f"/{name}/-/{leaf}-{version}.tgz"
-    if parsed.scheme != "https" or parsed.netloc != "registry.npmjs.org" or parsed.username or parsed.password or parsed.query or parsed.fragment or unquote(parsed.path) != expected:
-        raise UnsupportedDependencyFormat(f"{path.as_posix()}: {label} must resolve from canonical npm tarball {expected}")
-    if not valid_sha512_integrity(entry.get("integrity")):
-        raise UnsupportedDependencyFormat(f"{path.as_posix()}: {label} requires valid sha512 integrity")
-def parse_package_lock(path: Path) -> list[dict[str, str]]:
+def parse_package_lock(path: Path, npm_registries: dict[str, str] | None = None) -> list[dict[str, str]]:
     """Extract direct and override coordinates from an npm lockfile."""
-    values, defects = parse_package_lock_npm_entries(path)
+    values, defects = parse_package_lock_npm_entries(path, npm_registries)
     if defects:
         raise UnsupportedDependencyFormat(str(defects[0]["message"]))
     return values
@@ -271,20 +265,11 @@ def lock_version_defect(path: Path, name: str, value: Any) -> dict[str, Any] | N
     )
 
 
-def lock_source_defect(path: Path, name: str, version: str, value: Any) -> dict[str, Any] | None:
+def lock_source_defect(path: Path, name: str, version: str, value: Any, npm_registries: dict[str, str] | None = None) -> dict[str, Any] | None:
     """Return the canonical-tarball defect for one lock entry when present."""
     leaf = name.rsplit("/", 1)[-1]
     expected = f"/{name}/-/{leaf}-{version}.tgz"
-    parsed = urlparse(str(value or ""))
-    valid = (
-        parsed.scheme == "https"
-        and parsed.netloc == "registry.npmjs.org"
-        and not parsed.username
-        and not parsed.password
-        and not parsed.query
-        and not parsed.fragment
-        and unquote(parsed.path) == expected
-    )
+    valid = npm_url_matches(name, f"/-/{leaf}-{version}.tgz", value, npm_registries)
     if valid:
         return None
     return npm_defect(
@@ -292,7 +277,7 @@ def lock_source_defect(path: Path, name: str, version: str, value: Any) -> dict[
         name,
         "source",
         value,
-        f"{path.as_posix()}: lock package {name!r} must resolve from canonical npm tarball {expected}",
+        f"{path.as_posix()}: lock package {name!r} must resolve from its trusted npm registry tarball {expected}",
     )
 
 
@@ -315,6 +300,7 @@ def append_package_lock_entry(
     raw_entry: Any,
     values: list[dict[str, str]],
     defects: list[dict[str, Any]],
+    npm_registries: dict[str, str] | None = None,
 ) -> None:
     """Classify one lock row and append either a coordinate or all of its defects."""
     if entry_path == "":
@@ -335,7 +321,7 @@ def append_package_lock_entry(
         defect
         for defect in (
             lock_version_defect(path, name, raw_version),
-            lock_source_defect(path, name, version, raw_entry.get("resolved")),
+            lock_source_defect(path, name, version, raw_entry.get("resolved"), npm_registries),
             lock_integrity_defect(path, name, raw_entry.get("integrity")),
         )
         if defect is not None
@@ -353,7 +339,7 @@ def append_package_lock_entry(
     values.append(dependency(name, "npm", version, artifact_type))
 
 
-def parse_package_lock_npm_entries(path: Path) -> tuple[list[dict[str, str]], list[dict[str, Any]]]:
+def parse_package_lock_npm_entries(path: Path, npm_registries: dict[str, str] | None = None) -> tuple[list[dict[str, str]], list[dict[str, Any]]]:
     """Extract npm lock coordinates while preserving entry-level legacy defects for ratcheting."""
     try:
         document = json.loads(path.read_text(encoding="utf-8"))
@@ -364,21 +350,23 @@ def parse_package_lock_npm_entries(path: Path) -> tuple[list[dict[str, str]], li
     values: list[dict[str, str]] = []
     defects: list[dict[str, Any]] = []
     for entry_path, raw_entry in package_lock_rows(path, document):
-        append_package_lock_entry(path, str(entry_path), raw_entry, values, defects)
+        append_package_lock_entry(path, str(entry_path), raw_entry, values, defects, npm_registries)
     return values, defects
 
 
-def extract_npm_dependencies(path: Path, *, logical_path: str | None = None) -> tuple[list[dict[str, str]], list[dict[str, Any]]]:
+def extract_npm_dependencies(path: Path, *, logical_path: str | None = None, npm_registries: dict[str, str] | None = None) -> tuple[list[dict[str, str]], list[dict[str, Any]]]:
     """Return entry-level defects needed to ratchet supported dependency repairs."""
     name = Path(logical_path).name if logical_path is not None else path.name
     if name == "package.json":
         return parse_package_json_npm_entries(path)
     if name == "package-lock.json":
-        return parse_package_lock_npm_entries(path)
+        return parse_package_lock_npm_entries(path, npm_registries)
+    if name == ".npmrc":
+        return parse_npmrc(path, npm_registries), []
     relative = Path(logical_path).as_posix() if logical_path is not None else path.as_posix()
     if relative.startswith(".github/workflows/") and path.suffix in {".yml", ".yaml"}:
         return parse_workflow_entries(path)
-    return extract_dependencies(path, logical_path=logical_path), []
+    return extract_dependencies(path, logical_path=logical_path, npm_registries=npm_registries), []
 def xml_child(element: ET.Element, name: str) -> ET.Element | None:
     """Find a direct Maven XML child without exposing namespace details."""
     return next((child for child in element if child.tag.rsplit("}", 1)[-1] == name), None)
@@ -511,7 +499,7 @@ def unsafe_yarn_transport(key: str, value: Any) -> bool:
     """Identify Yarn settings that weaken or replace the canonical TLS transport."""
     lowered = key.lower()
     return (lowered == "enablestrictssl" and value is not True) or (lowered != "enablestrictssl" and any(token in lowered for token in ("proxy", "unsafehttp", "cafile", "cert", "tls")))
-def parse_npmrc(path: Path) -> list[dict[str, str]]:
+def parse_npmrc(path: Path, npm_registries: dict[str, str] | None = None) -> list[dict[str, str]]:
     """Validate npm registry configuration; it carries no release-age coordinates itself."""
     for number, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
         stripped = raw.strip()
@@ -525,8 +513,9 @@ def parse_npmrc(path: Path) -> list[dict[str, str]]:
         if violation:
             raise UnsupportedDependencyFormat(f"{path.as_posix()}:{number}: npm {violation} configuration {key!r} is prohibited")
         if lowered == "registry" or lowered.endswith(":registry"):
-            if not canonical_npm_registry(value):
-                raise UnsupportedDependencyFormat(f"{path.as_posix()}:{number}: registry must be {CANONICAL_NPM_REGISTRY}/")
+            scope = lowered[:-len(":registry")] if lowered.endswith(":registry") else ""
+            if not npm_config_registry_matches(scope, value, npm_registries):
+                raise UnsupportedDependencyFormat(f"{path.as_posix()}:{number}: registry must match the trusted npm scope registry")
         elif "registry" in lowered:
             raise UnsupportedDependencyFormat(f"{path.as_posix()}:{number}: ambiguous registry configuration key {key!r}")
     return []
@@ -648,7 +637,7 @@ def parse_workflow(path: Path) -> list[dict[str, str]]:
     if defects:
         raise UnsupportedDependencyFormat(str(defects[0]["message"]))
     return values
-def extract_dependencies(path: Path, *, logical_path: str | None = None) -> list[dict[str, str]]:
+def extract_dependencies(path: Path, *, logical_path: str | None = None, npm_registries: dict[str, str] | None = None) -> list[dict[str, str]]:
     """Extract the complete supported dependency surface or fail closed."""
     identity = Path(logical_path) if logical_path is not None else path
     name = identity.name
@@ -659,7 +648,7 @@ def extract_dependencies(path: Path, *, logical_path: str | None = None) -> list
         parser = parse_workflow
     if parser is None:
         raise UnsupportedDependencyFormat(f"{relative}: governed dependency format has no deterministic starter parser")
-    values = parser(path)
+    values = parser(path, npm_registries) if name in {"package-lock.json", ".npmrc"} else parser(path)
     unique = {
         (item["ecosystem"], item["name"], item["version"], item["artifact_type"]): item
         for item in values
