@@ -160,6 +160,37 @@ The apply command swaps only the tracked lock. Bootstrap then safely replaces th
 environment after the old runtime command has exited. Requesting the already locked version returns
 `no-op`; the same version resolving to different bytes fails closed.
 
+### Adopt Dependency Locking from 2.8.1
+
+An upgrade from a release before 2.8.1 needs a launcher refresh and a second bootstrap. Updating
+only the tracked lock or installed version does not enable dependency hash checking in an older
+launcher. After the normal preview and review, use the existing-installation path:
+
+```sh
+project-governance update --to 2.8.1 --apply
+python3 tools/governance-bootstrap.py
+.governance/runtime/bin/project-governance init --refresh-launchers
+python3 tools/governance-bootstrap.py
+.governance/runtime/bin/python -m pip check
+.governance/runtime/bin/project-governance --version
+.governance/runtime/bin/project-governance doctor
+```
+
+Review project-owned launcher customizations before accepting the refresh; it replaces all shipped
+launcher surfaces, not just bootstrap. If customizations must remain, reconcile them with the new
+hash-enforcing bootstrap before the second install. Preserve unrelated staged and unstaged work.
+The first install uses the old launcher's dependency behavior to load the new runtime and template;
+only the second install establishes the new hash-checked guarantee.
+
+For CI that must never perform that transitional range-resolved install, obtain the new bootstrap
+script directly from the release wheel after verifying it against the exact release lock SHA256,
+review and install that launcher, then run bootstrap once. Do not execute or extract code from an
+unverified archive. Required CI must consume the refreshed tracked launcher and exact runtime lock.
+
+Report the old and new lock identities, final runtime version, launcher refresh or reviewed
+customization, successful hash-enforcing bootstrap, `pip check`, and `doctor`. A passing `doctor`
+alone is not proof that the dependency hashes were enforced during installation.
+
 ### Upgrade from 1.x to 2.x
 
 The update preview is produced by the version currently installed. Version 1.3.0 emitted an

@@ -33,7 +33,15 @@ reviewing a requested runtime update.
 4. For an update, run `project-governance update --to <version> --dry-run` first.
 5. Stop when a configuration-schema migration needs a project decision.
 6. Apply an approved lock-only update with `project-governance update --to <version> --apply`.
-7. Run the one affected installation seam. Add an impacted closeout only when it proves a distinct
+7. When adopting dependency locking from a pre-2.8.1 release, updating the lock or version alone
+   is insufficient. Bootstrap the new runtime, review and refresh launchers with
+   `project-governance init --refresh-launchers`, then bootstrap again and run the installed
+   runtime's `python -m pip check` and `project-governance doctor`. The first pass retains the old
+   install behavior; only the second establishes hash enforcement. Review all refreshed launchers
+   and preserve deliberate customizations and unrelated work. If CI forbids even that transitional
+   install, take bootstrap directly from the new wheel only after verifying its locked SHA256,
+   review the launcher, and bootstrap once. Do not claim hash enforcement from `doctor` alone.
+8. Run the one affected installation seam. Add an impacted closeout only when it proves a distinct
    changed-path claim rather than replaying the same installation proof.
 
 ## Validation

@@ -8,6 +8,7 @@ import signal
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import time
 import zipfile
 from email.parser import Parser
@@ -103,6 +104,20 @@ def describe(root: Path) -> dict:
     return {"version": __version__, "integration": integration_digest(), "findings": findings}
 
 
+def install_dependencies(root: Path, wheel: Path, sha256: str, python: str, deadline: float) -> None:
+    """Use the verified candidate's complete hash lock within the existing install deadline."""
+    with zipfile.ZipFile(wheel) as archive:
+        try:
+            dependencies = archive.read("project_governance_runtime/assets/runtime-requirements.txt").decode()
+        except KeyError as error:
+            raise StartupError("Candidate wheel has no runtime dependency lock") from error
+    with tempfile.TemporaryDirectory(prefix="governance-dependencies-") as directory:
+        requirements = Path(directory) / "requirements.txt"
+        requirements.write_text(f"{wheel.as_uri()} --hash=sha256:{sha256}\n" + dependencies)
+        _run([python, "-m", "pip", "install", "--disable-pip-version-check",
+              "--require-hashes", "--only-binary=:all:", "-r", str(requirements)], root, deadline)
+
+
 def prepare(root: Path, candidate: dict, settings: dict) -> Path:
     """Install verified wheel bytes at their final path and prove target compatibility."""
     lock = json.loads(candidate["lock_text"])
@@ -132,7 +147,7 @@ def prepare(root: Path, candidate: dict, settings: dict) -> Path:
             raise StartupError("Candidate wheel identity does not match its lock")
         _run([str(Path(sys._base_executable).resolve()), "-m", "venv", str(destination)], root, deadline)
         python = str(destination / "bin/python")
-        _run([python, "-m", "pip", "install", "--disable-pip-version-check", str(wheel)], root, deadline)
+        install_dependencies(root, wheel, lock["sha256"], python, deadline)
         _run([python, "-c", "from pathlib import Path; import sys; from project_governance_runtime.installation import materialize_skills; materialize_skills(Path.cwd(), destination=Path(sys.prefix)/'skills', refresh_instructions=False)"], root, deadline)
         write_json(marker, expected)
     python = str(destination / "bin/python")

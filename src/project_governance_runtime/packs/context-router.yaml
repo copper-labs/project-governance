@@ -6,6 +6,13 @@ stages: [pre-commit, pre-push, pre-pr, ci-pr]
 run_when: matched
 path_globs:
   - "AGENTS.md"
+  - "CODEX.md"
+  - "CLAUDE.md"
+  - "GEMINI.md"
+  - ".codex/config.toml"
+  - ".codex/agents/**"
+  - ".claude/CLAUDE.md"
+  - ".claude/agents/**"
   - "config/governance/profile.yaml"
   - "config/governance/facts.lock.yaml"
   - ".governance/runtime/skills/**"

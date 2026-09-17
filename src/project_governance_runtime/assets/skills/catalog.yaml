@@ -3,8 +3,8 @@ id: agent-context-catalog
 display_name: Agent Context Catalog
 agent_neutral: true
 purpose: >
-  Repo-native discovery catalog for Codex, Claude, and future agents. This file lets an agent
-  discover shared skills and optional packs without requiring user-level local configuration.
+  Repo-native discovery catalog for Codex, Claude, Gemini, and future agents. This file lets an
+  agent discover shared skills and optional packs without requiring user-level local configuration.
 
 target_input_contract: >
   Paths outside .governance/runtime/skills are optional inputs owned by the target repository.
@@ -231,3 +231,7 @@ provider_adapters:
       - .claude/CLAUDE.md
       - .claude/agents
     role: Thin adapter and review launch prompts that point to shared skills, resources, and schema.
+  - id: gemini
+    optional_target_files:
+      - GEMINI.md
+    role: Thin adapter that points Gemini and Antigravity agents to AGENTS.md and shared docs.
