@@ -226,7 +226,10 @@ npm_registries:
 Each exact lowercase scope selects one HTTPS registry base for that scope. This is source trust,
 not a freshness exemption. No wildcard scopes, credentials, ports, query strings, fragments,
 encoded base paths, or traversal segments are accepted. Unconfigured scopes and unscoped packages
-continue to use public npm. A configured scope cannot silently use public npm instead.
+continue to use public npm. New or changed lockfile source defects block when they do not match
+that binding. Unchanged source defects retain the existing changed/staged ratchet described above;
+adding a registry declaration does not retroactively audit every existing lock entry. Use an explicit
+all-mode dependency check when adopting a binding to audit the complete selected dependency surface.
 
 The npm lockfile parser requires the exact configured origin, base path, package, version, and
 SHA-512 integrity. Evidence and operator overrides must use that same registry's exact
