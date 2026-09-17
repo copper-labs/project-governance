@@ -117,7 +117,7 @@ def install_locked(destination: Path = RUNTIME_ROOT, *, isolated: bool = False) 
             return created.returncode
         python = destination / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
         result = subprocess.run(
-            [str(python), "-m", "pip", "--isolated", "install",
+            [str(python), "-m", "pip", "install", "--disable-pip-version-check",
              "--require-hashes", "--only-binary=:all:", "-r", str(requirements)],
             cwd=ROOT,
             env={**os.environ, "PIP_DISABLE_PIP_VERSION_CHECK": "1"},

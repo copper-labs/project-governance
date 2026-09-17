@@ -203,7 +203,7 @@ def initialize_target(root: Path, wheel: Path) -> tuple[Path, Path]:
         dependencies = archive.read("project_governance_runtime/assets/runtime-requirements.txt").decode()
     requirements = root / "runtime-requirements.txt"
     requirements.write_text(f"{wheel.as_uri()} --hash=sha256:{hashlib.sha256(wheel.read_bytes()).hexdigest()}\n" + dependencies)
-    run([str(python), "-m", "pip", "--isolated", "install", "--require-hashes",
+    run([str(python), "-m", "pip", "install", "--disable-pip-version-check", "--require-hashes",
          "--only-binary=:all:", "-r", str(requirements)], root=root, expected=0)
     requirements.unlink()
     executable = "Scripts/project-governance.exe" if sys.platform == "win32" else "bin/project-governance"

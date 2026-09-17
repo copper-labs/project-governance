@@ -49,8 +49,8 @@ class DependencyLockTests(unittest.TestCase):
 
     def test_startup_uses_candidate_lock_and_existing_deadline(self):
         """Startup cannot fall back to range resolution when a candidate omits its lock."""
-        sys.path.insert(0, str(ROOT / "src"))
-        from project_governance_runtime import startup_installation as startup
+        with patch.object(sys, "path", [str(ROOT / "src"), *sys.path]):
+            from project_governance_runtime import startup_installation as startup
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             wheel = fixture_wheel(root, "project_governance_runtime")
@@ -64,7 +64,7 @@ class DependencyLockTests(unittest.TestCase):
                     self.assertEqual((actual_root, deadline), (root, 123))
                     self.assertIn("--require-hashes", arguments)
                     self.assertIn("--only-binary=:all:", arguments)
-                    self.assertIn("b" * 64, Path(arguments[-1]).read_text())
+                    self.assertIn("b" * 64, Path(arguments[arguments.index("-r") + 1]).read_text())
                 run.side_effect = capture
                 startup.install_dependencies(root, wheel, "a" * 64, "python", 123)
                 run.assert_called_once()
@@ -91,7 +91,7 @@ class DependencyLockTests(unittest.TestCase):
                 write_lock()
                 def capture(arguments, **kwargs):
                     if "--require-hashes" in arguments:
-                        contents = Path(arguments[-1]).read_text()
+                        contents = Path(arguments[arguments.index("-r") + 1]).read_text()
                         self.assertIn(dependencies, contents)
                         self.assertIn(hashlib.sha256(wheel.read_bytes()).hexdigest(), contents)
                         self.assertIn("--only-binary=:all:", arguments)

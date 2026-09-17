@@ -114,7 +114,7 @@ def install_dependencies(root: Path, wheel: Path, sha256: str, python: str, dead
     with tempfile.TemporaryDirectory(prefix="governance-dependencies-") as directory:
         requirements = Path(directory) / "requirements.txt"
         requirements.write_text(f"{wheel.as_uri()} --hash=sha256:{sha256}\n" + dependencies)
-        _run([python, "-m", "pip", "--isolated", "install", "--disable-pip-version-check",
+        _run([python, "-m", "pip", "install", "--disable-pip-version-check",
               "--require-hashes", "--only-binary=:all:", "-r", str(requirements)], root, deadline)
 
 

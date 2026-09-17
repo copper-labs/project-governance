@@ -50,8 +50,11 @@ configuration. `--apply` changes only the lock. A runtime release never pushes a
 Native task startup is distinct from Git hooks. The [startup update guide](../guides/startup-runtime-updates.md)
 covers its one-time integration. Git hooks remain update-free; updater-owned validation can join
 the exclusive runtime transaction. Runtime generations are installed at their final paths and
-retained for recovery. Manual bootstrap also preserves the existing generation until installation
-succeeds.
+retained for recovery. Manual bootstrap preserves the existing generation until installation succeeds when the runtime
+uses the generation/symlink layout. Legacy ordinary-directory installations are cleared in place;
+a later dependency-install failure can leave that runtime unavailable. Keep the tracked lock and
+launcher, repair the artifact/network availability, and rerun bootstrap. Do not claim rollback for
+that older layout.
 
 ## Locked Runtime Dependencies
 
@@ -75,3 +78,8 @@ have different approved hashes; repeatability means the same pinned dependency v
 artifacts for the same Python/platform. Availability on every future Python or platform is not implied.
 The host Python, its bundled pip, and source-development/build tooling remain separate prerequisites;
 this lock covers installed runtime dependencies, not reproducible construction of the release wheel.
+
+Pip retains the adopter's existing index and mirror configuration. Regardless of transport, only
+artifacts matching the release's embedded hashes are accepted. Do not direct installs outside the
+repository runtime with target/prefix overrides. The local Python 3.9 proof used pip 21.2.4; CI also
+proves the current Python 3.14 environment. Older bundled installers are not separately certified.
