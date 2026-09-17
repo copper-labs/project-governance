@@ -24,6 +24,7 @@ multiple files, or requires validation and review evidence.
 - `.governance/runtime/skills/resources/efficient-execution.md` for long-running proof
 - `.governance/runtime/skills/test-execution/SKILL.md` when defining substantial build/test proof; select its path within the existing proof budget
 - `.governance/runtime/skills/delegated-execution/SKILL.md`
+- `.governance/runtime/skills/resources/model-selection.md` when assigning a model and effort
 - `docs/governance/apple-dependency-policy.md` when Apple platforms may be in scope
 - The governing spec, PRD, issue, plan, or decision
 

@@ -7,7 +7,8 @@ description: Delegate an authorized task to Claude Code with full native tools, 
 
 Read `.governance/runtime/skills/resources/harness-agent-operation.md` for the shared launch,
 capability, continuation, and evidence contract. Use provider `claude` with an explicit installed
-model ID and effort, or the host's caller-selected configuration. No model is a package default.
+model ID and effort selected through `.governance/runtime/skills/resources/model-selection.md`.
+The helper itself has no implicit model default.
 
 This adapter uses authenticated Claude Code (`claude`). `claude auth status --json` checks login;
 `claude auth login` establishes it interactively. Preserve ordinary native tools, skills, hooks,

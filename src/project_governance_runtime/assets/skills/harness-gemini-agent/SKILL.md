@@ -7,7 +7,8 @@ description: Delegate an authorized task to Gemini through Antigravity with full
 
 Read `.governance/runtime/skills/resources/harness-agent-operation.md` for the shared launch,
 capability, continuation, and evidence contract. Use provider `gemini` with an explicit installed
-model ID and effort, or the host's caller-selected configuration. No model is a package default.
+model ID and effort selected through `.governance/runtime/skills/resources/model-selection.md`.
+The helper itself has no implicit model default.
 
 This adapter uses authenticated Antigravity CLI (`agy`). `agy models` lists current selections;
 an interactive `agy` session establishes login. Keep native tools, rules, and configured MCP

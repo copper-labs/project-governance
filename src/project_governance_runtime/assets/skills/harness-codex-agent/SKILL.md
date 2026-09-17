@@ -7,7 +7,8 @@ description: Delegate an authorized task to Codex from Claude or another parent 
 
 Read `.governance/runtime/skills/resources/harness-agent-operation.md` for the shared launch,
 capability, continuation, and evidence contract. Use provider `codex` with an explicit installed
-model ID and effort, or the host's caller-selected configuration. No model is a package default.
+model ID and effort selected through `.governance/runtime/skills/resources/model-selection.md`.
+The helper itself has no implicit model default.
 
 This adapter uses the authenticated local Codex CLI's stdio app server. `codex login` establishes
 native login. It preserves ordinary native tools, skills, hooks, and configured MCP connections.

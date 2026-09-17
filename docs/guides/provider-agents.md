@@ -111,9 +111,15 @@ completion, or remaining work prevent success. The parent still verifies the act
 
 Pass `--config` with a host-owned or ignored personal JSON file containing `version: 1` and a
 `providers` object. A provider entry accepts `model`, `effort`, and `executable`; command arguments
-take precedence. No model, effort floor, role policy, or task-to-model assignment ships as a default.
-Future model changes are ordinary host configuration changes, not new wheel releases, unless the
-native protocol itself changes.
+take precedence. The helper does not select a model implicitly.
+
+For task planning, follow the wheel's [model-selection policy](../../src/project_governance_runtime/assets/skills/resources/model-selection.md).
+It ships a provisional model-and-effort table. An adopting repository can override individual rows
+or replace the table in tracked `config/governance/model-selection.md`; explicit task instructions
+come first. The coordinator reads that Markdown and passes the selected pair to the helper. This
+is agent guidance, not a CLI resolver or availability guarantee. The policy contains merge and
+replacement examples and explains unsupported choices. Project policy changes need no wheel
+release. Installation and upgrades preserve the project file.
 
 `--timeout` and `--idle-timeout` are caller-owned deadlines and default to disabled. Native Gemini
 uses a recorded maximum print ceiling when the overall deadline is disabled, because native zero

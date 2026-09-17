@@ -18,8 +18,10 @@ observe progress, and collect a result. The same commands work from any parent w
 For example, Claude can start Codex, then wait for its code changes and test evidence.
 
 This contract defines the standalone 2.4.0 capability release. Implementation-plan templates,
-task-to-model planning, role presets, model rankings, and price comparisons are separate work.
-They are not prerequisites for these wrappers.
+role presets, model rankings, and price comparisons are not prerequisites for these wrappers.
+Task-to-model guidance now lives in the shared
+[model-selection policy](../../src/project_governance_runtime/assets/skills/resources/model-selection.md);
+the parent applies it before calling this helper.
 
 For 2.4.0, the operator explicitly waived Gemini live capability and Gemini-parent routing
 acceptance because provider quota prevented execution. Deterministic coverage remains required;
@@ -50,7 +52,7 @@ owns coordination and reconciliation; the helper supervises only jobs explicitly
 
 Implementation amends the runtime architecture, kernel specification, and delegated-execution skill
 to give this helper that ownership explicitly. The existing prohibitions remain for governance
-check execution, model selection, and automatic delegation.
+check execution, automatic model selection by the helper, and automatic delegation.
 
 ## Ownership
 
@@ -63,8 +65,9 @@ check execution, model selection, and automatic delegation.
 | Whether work satisfies the task and may be published | Parent and existing host policy |
 
 The runner accepts explicit model and effort values or a caller-selected JSON configuration file.
-Arguments override that file. No personal model mix ships as a default. Configuration contains
-provider bindings only; it does not prescribe which model a future implementation-plan task uses.
+Arguments override that file. This helper configuration contains provider bindings only; it does
+not implement the separate Markdown model-selection policy. The coordinator applies explicit task
+choices, project overrides, and then wheel recommendations, and passes the selected pair explicitly.
 Model IDs and effort names remain provider-specific. Unsupported selections fail visibly.
 
 ## Repository Default And Host Activation

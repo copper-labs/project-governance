@@ -79,6 +79,8 @@ standard_skills:
     category: governance
     path: .governance/runtime/skills/delegated-execution/SKILL.md
     description: Adaptively select and operate provider-neutral specialist roles for implementation work.
+    references:
+      - .governance/runtime/skills/resources/model-selection.md
   - id: review
     category: loop
     path: .governance/runtime/skills/review/SKILL.md
@@ -182,6 +184,9 @@ pattern_packs:
     description: Deep workflow and review skills for discovery, risk, implementation quality, CI, docs, and delivery.
 
 resources:
+  - id: model-selection
+    path: .governance/runtime/skills/resources/model-selection.md
+    description: Default model and effort recommendations with project overrides and task precedence.
   - id: test-batch-contract
     path: .governance/runtime/skills/resources/test-batch-contract.md
     description: Request, cleanup, evidence and managed-host contract for external test execution.

@@ -21,8 +21,9 @@ location enforce precedence. Missing harness support, credentials, quota, or too
 blocker; do not silently change wrappers, providers, models, or effort.
 
 Same-model native subagents remain available through the parent's native controls. This default
-governs cross-model access, not whether to delegate, how many agents to run, or which model a
-future plan should assign. The host owns its available models, effort settings, and account access.
+governs cross-model access, not whether to delegate or how many agents to run. Use
+`.governance/runtime/skills/resources/model-selection.md` for assignment recommendations and project
+overrides. The host owns its available models, effort settings, and account access.
 
 Bootstrap installs these instructions and maintains only its marked sections in host entry files.
 After adoption or upgrade, start a fresh parent session so its startup instructions are reloaded.

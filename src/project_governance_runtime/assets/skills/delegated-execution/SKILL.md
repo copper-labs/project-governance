@@ -65,11 +65,10 @@ For example, while the writer implements a settled API, one reader can identify 
 and another can examine an independent platform constraint. Two agents broadly reviewing the same
 unfinished patch are usually duplicated work.
 
-Choose roles before models. Use a faster, less expensive model for bounded discovery only when it
-can reliably perform that assignment; use sufficient reasoning capability for complex risk and
-verification questions. Follow explicit operator and host model/effort choices. Do not hard-code
-brands, silently substitute models, or presume that cheaper tokens mean lower total token use.
-Different evidence and questions matter more than superficial role names or model variety.
+Choose roles before models. Read `.governance/runtime/skills/resources/model-selection.md` for
+the default table, project overrides, explicit task precedence, and availability checks. Keep the
+model recommendations in that one resource. Different evidence and questions matter more than
+superficial role names or model variety.
 
 ## Cost Discipline
 
