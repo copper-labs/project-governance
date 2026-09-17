@@ -18,8 +18,9 @@ is not a filesystem sandbox, and an additional root or shared-workspace flag doe
 Use an appropriately authorized host when the current parent cannot grant native full access.
 
 Give the child the outcome, workspace, existing authorization, constraints, relevant references,
-and required evidence. Select the exact model and effort from the user's instructions or host
-configuration. Never infer a cheap fallback. Inspect current work before assigning edits.
+and required evidence. Follow `.governance/runtime/skills/resources/model-selection.md` to select
+the exact model and effort from task instructions, project overrides, or the default table. Pass
+the chosen pair explicitly. Never infer a cheap fallback. Inspect current work before assigning edits.
 
 Pass required tool names or categories when the task requires observed use. Native categories
 include `read`, `edit`, `command`, `web`, and `browser`; their availability varies by provider.

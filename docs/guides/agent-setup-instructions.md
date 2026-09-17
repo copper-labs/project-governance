@@ -35,7 +35,10 @@ For substantial governed work, resolve bounded context before editing with `cont
 --json-output .governance/runtime/context-result.json` and read the selected materialized skills.
 The runtime records no per-skill utilization receipt.
 
-Planning and work read the installed delegated-execution skill. At batch planning, identify useful
+Planning and work read the installed delegated-execution skill. When assigning models, follow
+`.governance/runtime/skills/resources/model-selection.md`: explicit task choice, then optional
+project `config/governance/model-selection.md`, then the wheel defaults. The coordinator applies
+this Markdown policy; the runtime does not select or switch models automatically. At batch planning, identify useful
 independent reader assignments or a brief solo rationale. Reconsider at material blockers or long
 builds without inventing busywork. Keep one writer and zero to two readers, with distinct questions
 and evidence. The primary may be the writer; no extra manager role is required.

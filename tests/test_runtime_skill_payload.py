@@ -67,6 +67,33 @@ class RuntimeSkillPayloadTests(unittest.TestCase):
                         f"{source.relative_to(ROOT)} names missing {reference}",
                     )
 
+    def test_model_policy_is_installed_without_owning_project_overrides(self) -> None:
+        """Refresh shared guidance while leaving each adopter's selection authority intact."""
+        import yaml
+
+        from project_governance_runtime.installation import materialize_skills
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            override = root / "config/governance/model-selection.md"
+            materialize_skills(root)
+            self.assertFalse(override.exists())
+            override.parent.mkdir(parents=True)
+            policy = b"# Project Model Selection\n\nMode: replace\n\nProject-owned choices.\n"
+            override.write_bytes(policy)
+            installed = root / RUNTIME_PREFIX
+            resource = installed / "resources/model-selection.md"
+            resource.write_text("stale installed resource")
+            materialize_skills(root)
+            self.assertEqual(override.read_bytes(), policy)
+            self.assertEqual(
+                resource.read_bytes(),
+                (SKILLS_SOURCE / "resources/model-selection.md").read_bytes(),
+            )
+            catalog = yaml.safe_load((installed / "catalog.yaml").read_text())
+            entry = next(item for item in catalog["standard_skills"] if item["id"] == "delegated-execution")
+            self.assertIn(RUNTIME_PREFIX + "resources/model-selection.md", entry["references"])
+
     def test_long_running_guidance_is_reachable_in_an_installed_tree(self) -> None:
         """Adopters must receive the resource and every lifecycle entry point that needs it."""
         import yaml
