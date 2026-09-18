@@ -61,7 +61,9 @@ under one blocking local materialization lock rather than imposing an elapsed-ti
 Delegation decisions remain a host-agent concern. The governance kernel owns no launch state,
 provider catalog, role receipt, retry loop, or per-skill closeout workflow. The separately invoked
 [optional provider helper](provider-agent-skills.md) owns the lifecycle of jobs explicitly submitted
-to it. Checks, routing, and core doctor never import that helper or invoke a provider.
+to it. Checks, routing, and core doctor never import that helper. Checks and core doctor never invoke a provider.
+The off-by-default [semantic context selector](semantic-context-selection.md) is the sole routing
+exception: explicitly authorized optional text may be scored by JEV outside validation.
 
 Stages remain command boundaries, not selectable profiles:
 

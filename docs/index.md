@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-07-05
-updated: 2026-09-06
+updated: 2026-09-17
 summary: Entry point for the reusable, package-based project governance runtime.
 ---
 
@@ -56,6 +56,14 @@ Gemini, Claude, and Codex wrappers in 2.4.0, including the scoped Gemini live-va
 - [Specifications](specs/README.md) contain the active generic contracts.
 - [Guides](guides/README.md) provide task-oriented instructions for operators and agents.
 - [Decisions](decisions/README.md) records durable generic boundary decisions.
+- [TypeSafe JEV research](reference/typesafe-jev-research.md) examines optional semantic assistance
+  and a small proposed comparison. It is provisional and changes no runtime contract.
+
+## Approved Work
+
+- [Optional context selection](specs/semantic-context-selection.md) defines approved off-by-default JEV
+  relevance selection, with a [implementation plan](exec-plans/active/2026-09-17-semantic-context-selection.md).
+  Experimental implementation stays off by default; quality evaluation and adopter rollout remain pending.
 
 ## Boundaries
 

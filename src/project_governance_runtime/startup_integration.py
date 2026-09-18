@@ -46,6 +46,23 @@ def _merge_block(content: str) -> str:
     return content[:content.index(START)] + BLOCK + content[content.index(END) + len(END):]
 
 
+def _context_hook(groups, existing, expected, event, timeout, context_enabled):
+    """Upgrade only exact managed hook definitions when context is explicitly enabled."""
+    enhanced = {**expected, 'additionalContextLimit': 0, 'timeout': max(timeout, 15)}
+    if event in {"SessionStart", "UserPromptSubmit"}:
+        if context_enabled:
+            if existing == [expected]:
+                existing[0].update(enhanced)
+            expected.update(enhanced)
+        elif existing == [enhanced]:
+            existing[0].clear()
+            existing[0].update(expected)
+    if context_enabled:
+        groups[:] = [group for group in groups if not (
+            len(group.get('hooks', [])) == 1 and group['hooks'][0].get('command') ==
+            '"$(git rev-parse --show-toplevel)/.governance/runtime/bin/project-governance" context-delivery event')]
+
+
 def hook_config(root: Path, provider: str) -> tuple[Path, str]:
     """Merge only our stable command definitions without replacing other hook handlers."""
     relative = ".codex/hooks.json" if provider == "codex" else ".claude/settings.json"
@@ -55,6 +72,8 @@ def hook_config(root: Path, provider: str) -> tuple[Path, str]:
         raise StartupError("Host hook configuration is not an object")
     events = value.setdefault("hooks", {})
     command = HOOK_COMMAND.format(provider=provider)
+    from .context_delivery import settings
+    context_enabled = (root / 'config/governance/profile.yaml').is_file() and settings(root)['enabled']
     for event, timeout in HOOK_TIMEOUTS.items():
         groups = events.setdefault(event, [])
         if not isinstance(groups, list):
@@ -65,6 +84,7 @@ def hook_config(root: Path, provider: str) -> tuple[Path, str]:
         existing = [handler for group in groups for handler in group.get("hooks", [])
                     if "tools/governance-startup.py" in str(handler.get("command", ""))]
         expected = {"type": "command", "command": command, "timeout": timeout}
+        _context_hook(groups, existing, expected, event, timeout, context_enabled)
         if existing and existing != [expected]:
             raise StartupError("Existing startup hook differs; reconcile its configuration deliberately")
         if not existing:

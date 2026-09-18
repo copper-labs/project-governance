@@ -31,3 +31,11 @@ Agents do not discover broad historical material during routine work.
 
 Runtime materialization is local and ignored by Git. It is a convenience copy of installed generic
 skills, never a second policy authority.
+
+## Optional Main-Agent Delivery And Selection
+
+The [semantic context selection contract](../specs/semantic-context-selection.md) adds explicit
+Codex full-text hook submission and off-by-default JEV scoring of authorized optional context.
+Required sources and skills remain deterministic. `context --emit-text` returns the actual packet;
+a materialized path alone is not evidence of receipt. Hook submission and measured model usage are
+separate evidence levels. Other hosts and child-agent delivery remain caller-owned.

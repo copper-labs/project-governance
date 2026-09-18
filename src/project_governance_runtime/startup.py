@@ -231,7 +231,8 @@ def dispatch(args, root: Path) -> dict:
 
         raw = sys.stdin.buffer.read(65537)
         event = json.loads(raw) if len(raw) <= 65536 else {}
-        return hook_output(event, handle_event(root, args.provider, event))
+        from .context_delivery import compose
+        return compose(root, args.provider, event, hook_output(event, handle_event(root, args.provider, event)))
     if delegated():
         raise StartupError("Delegated workers never initiate runtime updates")
     root = repository(root)

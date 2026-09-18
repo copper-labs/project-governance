@@ -87,8 +87,15 @@ def _parser() -> argparse.ArgumentParser:
     context.add_argument("--task", required=True)
     context.add_argument("--changed-path", action="append", default=[])
     context.add_argument("--include-expansion", action="store_true")
+    context.add_argument("--emit-text", action="store_true")
+    context.add_argument("--semantic-off", action="store_true")
     context.add_argument("--json", action="store_true")
     context.add_argument("--json-output", type=Path)
+    jev = commands.add_parser("jev")
+    jev.add_argument("jev_command", choices=["setup", "status", "disable"])
+    delivery = commands.add_parser("context-delivery")
+    delivery.add_argument("delivery_command", choices=["enable", "event", "refresh", "status"])
+    delivery.add_argument("--session-id")
     commands.add_parser("doctor")
     telemetry = commands.add_parser("telemetry")
     telemetry_commands = telemetry.add_subparsers(dest="telemetry_command", required=True)
@@ -561,8 +568,12 @@ def _run_context(args: argparse.Namespace, root: Path) -> int:
         args.task,
         args.changed_path,
         include_expansion=args.include_expansion,
+        semantic_off=args.semantic_off,
     )
-    if args.json or args.json_output:
+    if args.emit_text:
+        from .context_delivery import render
+        print(render(root, output))
+    elif args.json or args.json_output:
         _emit(output, args.json_output)
     else:
         print(
@@ -649,11 +660,43 @@ def _run_administration(args: argparse.Namespace, root: Path) -> int:
     return _result_exit_code(output)
 
 
+def _run_jev(args, root):
+    """Handle explicit account setup and local readiness."""
+    from . import jev, context_storage
+    if args.jev_command == "disable":
+        context_storage.write(root, "jev-readiness.json", {})
+        output = {"status": "inactive", "reason": "disabled-locally"}
+    else:
+        output = jev.setup(root) if args.jev_command == "setup" else jev.readiness(root)
+    _emit(output)
+    return 0 if output['status'] == 'ready' or args.jev_command != 'setup' else 1
+
+
+def _run_context_delivery(args, root):
+    """Handle explicit context integration and host events."""
+    from . import context_delivery, context_storage
+    if args.delivery_command == 'event':
+        raw = sys.stdin.buffer.read(65537)
+        output = context_delivery.compose(root, 'codex', json.loads(raw) if len(raw) <= 65536 else {})
+    elif args.delivery_command == 'enable':
+        output = context_delivery.enable(root)
+    elif args.delivery_command == 'refresh':
+        output = context_delivery.refresh(root, args.session_id)
+    else:
+        output = context_storage.read(root, 'observations.json')
+    _emit(output)
+    return 0
+
+
 def main() -> int:
     """Dispatch one public runtime command and return its stable exit code."""
     args = _parser().parse_args()
     root = _root()
     try:
+        if args.command == "jev":
+            return _run_jev(args, root)
+        if args.command == "context-delivery":
+            return _run_context_delivery(args, root)
         if args.command == "startup":
             from .startup import dispatch
             from .startup_state import StartupError
