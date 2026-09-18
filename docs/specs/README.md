@@ -5,11 +5,18 @@ type: spec
 status: current
 owner: project-governance
 created: 2026-02-16
-updated: 2026-09-06
+updated: 2026-09-17
 summary: Active specifications for the package runtime, KMP surface validation, change narratives, and durable documentation.
 ---
 
 # Specifications Index
+
+## Approved Designs In Progress
+
+- [Optional semantic context selection](semantic-context-selection.md): off-by-default relevance
+  selection of optional background. Approved; not yet implemented.
+
+## Current Specifications
 
 | Specification | Purpose |
 | --- | --- |

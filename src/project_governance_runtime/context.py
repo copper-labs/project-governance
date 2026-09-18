@@ -2,7 +2,8 @@
 
 The runtime reads only child-owned profile and facts files. It keeps route selection,
 skill discovery, and local file materialization deterministic without a generated profile or
-provider client. Ignored materializations are bounded by count.
+provider client by default. Explicit optional semantic selection uses a separate adapter.
+Ignored materializations are bounded by count.
 """
 
 from __future__ import annotations
@@ -636,6 +637,25 @@ def _prune_materializations(runtime_root: Path, current: Path) -> None:
         shutil.rmtree(path, ignore_errors=True)
 
 
+def _select_optional(root, router, task, route, groups, route_budget, items, omissions, blockers, semantic_off, request_allowance):
+    """Keep optional provider selection outside deterministic route and skill resolution."""
+    from .context_options import options, delivery_options
+
+    semantic_settings = options(router)
+    delivery_options(router)
+    semantic = None
+    if not semantic_off and semantic_settings["mode"] != "off":
+        if blockers:
+            semantic = {"mode": semantic_settings["mode"], "status": "fallback", "reason": "context-blocked", "requests": 0}
+        else:
+            from .semantic_context import select
+
+            items, omissions, semantic = select(root, router, task, route, groups, route_budget, items, omissions, request_allowance)
+            # A concurrent edit may invalidate a required source during fallback reconstruction.
+            blockers.extend(_skill_blockers(omissions, [], [], [], [], {"unresolved_facts": [], "conflicts": []}))
+    return items, omissions, semantic
+
+
 def resolve_context(
     root: Path,
     task: str,
@@ -643,6 +663,8 @@ def resolve_context(
     *,
     include_expansion: bool = False,
     include_evaluation_skills: bool = False,
+    semantic_off: bool = False,
+    request_allowance: int | None = None,
 ) -> dict[str, Any]:
     """Resolve one route and materialize its bounded local packet for the coordinator."""
     profile = _load_mapping(root / "config/governance/profile.yaml")
@@ -684,7 +706,6 @@ def resolve_context(
     stale_skills.extend(composed_stale)
     skill_items, budget_omissions, skill_limits = _bounded_skill_items(skills, route_budget)
     limits.update(skill_limits)
-    runtime_path, materialized, materialized_skills = _materialize(root, items, skill_items)
     blockers = _skill_blockers(
         omissions,
         missing_skills,
@@ -696,9 +717,11 @@ def resolve_context(
     outcome = str(decision["outcome"])
     if outcome in {"fallback", "ambiguous"}:
         blockers.append(f"route-{outcome}")
+    items, omissions, semantic = _select_optional(root, router, task, route, groups, route_budget, items, omissions, blockers, semantic_off, request_allowance)
+    runtime_path, materialized, materialized_skills = _materialize(root, items, skill_items)
     public_items = [{key: value for key, value in item.items() if key != "content"} for item in materialized]
     public_skills = _public_skills(skills, materialized_skills)
-    return {
+    output = {
         "status": "blocked" if blockers else "passed",
         "route": {
             "id": route_id, "outcome": outcome,
@@ -725,3 +748,7 @@ def resolve_context(
         "external_content": "target-owned provider boundary" if router.get("external_provider") else None,
         "blockers": _unique(blockers),
     }
+
+    if semantic is not None:
+        output["semantic_selection"] = semantic
+    return output

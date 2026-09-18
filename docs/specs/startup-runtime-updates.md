@@ -117,3 +117,10 @@ compatible lock update uses deterministic installation proof and its ordinary co
 does not add another independent agent review or application-wide test run. Development and
 acceptance cadence follow the approved
 [implementation plan](../exec-plans/completed/2026-09-06-top-level-startup-updates.md).
+
+## Independent Context Submission
+
+Optional [context delivery](semantic-context-selection.md) may compose a packet after startup
+handling releases its locks, including compact/resume replay. This never initiates release discovery
+or applies an update. Empty update guidance does not suppress enabled context submission. The context
+integration may be installed independently and does not opt a repository into runtime updates.

@@ -191,6 +191,13 @@ def validate_router(root: Path, profile: dict[str, Any], facts: dict[str, Any], 
     if not isinstance(router, dict):
         errors.append("context_router: expected a mapping")
         return
+    from project_governance_runtime.context_options import options, delivery_options
+
+    for validate in (options, delivery_options):
+        try:
+            validate(router)
+        except ValueError as error:
+            errors.append(str(error))
     profile_id = profile.get("profile_id")
     facts_id = facts.get("profile_id")
     if profile_id and facts_id and profile_id != facts_id:

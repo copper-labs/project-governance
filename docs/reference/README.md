@@ -5,7 +5,7 @@ type: reference
 status: current
 owner: project-governance
 created: 2026-07-05
-updated: 2026-08-24
+updated: 2026-09-17
 summary: Index for exact runtime reference material that has a distinct lookup job.
 ---
 
@@ -26,3 +26,7 @@ it has no duplicate operator reference.
   has distinct whole-of-KMP value, sufficient depth, current evidence, and a clear future role.
 - [KMP skill V0 evaluation](kmp-skill-v0-evaluation.md) records the frozen cross-provider behavior
   comparison, selected content digests, promotion recommendation, and residual proof boundary.
+- [TypeSafe JEV research](typesafe-jev-research.md) is a provisional assessment of optional bounded
+  judgments and a proposed shadow comparison; it authorizes no integration or adoption.
+
+- [Context-selection architectural review](semantic-context-selection-review.md) records Opus 5 findings and reconciliation of the draft design.
