@@ -22,6 +22,10 @@ investigation stays available throughout.
 **Non-goals:** a classifier, worker dispatch, a second host, a second ecosystem, verdict reuse,
 lane reordering.
 
+Several conversations may share one worktree, so this step also delivers the awareness described in
+[Concurrency](../../specs/concurrency.md): job modes, session identity, and file-overlap detection.
+It is advisory by construction — see that contract for why a lock would be dishonest.
+
 **The harness writes nothing to a working tree in this step.** Its Actions read, run declared
 checks, and record. The host performs every edit, exactly as it does today. Patch application and
 its recovery machinery are Pass C.

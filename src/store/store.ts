@@ -12,6 +12,7 @@ import {
   type Evidence,
   type Task,
   type TaskItem,
+  type TaskMode,
   type Usage,
 } from "../model/types.ts";
 
@@ -67,7 +68,7 @@ export class Store {
   createTask(
     outcome: string,
     items: Omit<TaskItem, "seq" | "revoked">[],
-    meta: { worktree?: string | undefined; branch?: string | null | undefined; session?: string | undefined; parentTask?: string | undefined } = {},
+    meta: { worktree?: string | undefined; branch?: string | null | undefined; session?: string | undefined; parentTask?: string | undefined; mode?: TaskMode | undefined } = {},
   ): Task {
     const taskId = randomUUID();
     return this.#writeTaskVersion(taskId, 1, null, outcome, "open", items, meta);
@@ -82,7 +83,7 @@ export class Store {
    */
   forkTask(
     taskId: string,
-    meta: { worktree?: string | undefined; branch?: string | null | undefined; session?: string | undefined } = {},
+    meta: { worktree?: string | undefined; branch?: string | null | undefined; session?: string | undefined; mode?: TaskMode | undefined } = {},
     opts: { outcome?: string | undefined } = {},
   ): Task {
     const parent = this.readTask(taskId);
@@ -96,7 +97,9 @@ export class Store {
           ? { kind: i.kind, provenance: i.provenance, body: meta.worktree }
           : { kind: i.kind, provenance: i.provenance, body: i.body },
       );
-    return this.createTask(opts.outcome ?? parent.outcome, inherited, { ...meta, parentTask: taskId });
+    return this.createTask(opts.outcome ?? parent.outcome, inherited, {
+      ...meta, parentTask: taskId, mode: meta.mode ?? parent.mode,
+    });
   }
 
   /**
@@ -124,7 +127,7 @@ export class Store {
       opts.outcome ?? current.outcome,
       opts.status ?? current.status,
       [...carried, ...added.map((a) => ({ ...a, revoked: false }))],
-      { worktree: current.worktree ?? undefined, branch: current.branch, parentTask: current.parentTask ?? undefined, session: opts.session },
+      { worktree: current.worktree ?? undefined, branch: current.branch, parentTask: current.parentTask ?? undefined, session: opts.session, mode: current.mode },
     );
   }
 
@@ -135,7 +138,7 @@ export class Store {
     outcome: string,
     status: Task["status"],
     items: (Omit<TaskItem, "seq" | "revoked"> & { revoked?: boolean })[],
-    meta: { worktree?: string | undefined; branch?: string | null | undefined; session?: string | undefined; parentTask?: string | undefined } = {},
+    meta: { worktree?: string | undefined; branch?: string | null | undefined; session?: string | undefined; parentTask?: string | undefined; mode?: TaskMode | undefined } = {},
   ): Task {
     const createdAt = now();
     try {
@@ -143,10 +146,11 @@ export class Store {
       this.#db
         .prepare(
           `INSERT INTO task (task_id, version, supersedes, outcome, status, created_at,
-             worktree, branch, parent_task, session) VALUES (?,?,?,?,?,?,?,?,?,?)`,
+             worktree, branch, parent_task, session, mode) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
         )
         .run(taskId, version, supersedes, outcome, status, createdAt,
-             meta.worktree ?? null, meta.branch ?? null, meta.parentTask ?? null, meta.session ?? null);
+             meta.worktree ?? null, meta.branch ?? null, meta.parentTask ?? null, meta.session ?? null,
+             meta.mode ?? "implement");
       const ins = this.#db.prepare(
         "INSERT INTO task_item (task_id, version, seq, kind, provenance, body, revoked) VALUES (?,?,?,?,?,?,?)",
       );
@@ -185,6 +189,7 @@ export class Store {
       branch: (t["branch"] as string | null) ?? null,
       parentTask: (t["parent_task"] as string | null) ?? null,
       session: (t["session"] as string | null) ?? null,
+      mode: ((t["mode"] as string | null) ?? "implement") as TaskMode,
       items: items.map((i) => ({
         seq: i["seq"] as number,
         kind: i["kind"] as TaskItem["kind"],
@@ -416,9 +421,108 @@ export class Store {
     };
   }
 
+  // ------------------------------------------------------- concurrency
+
+  recordActivity(a: {
+    session: string;
+    worktree: string;
+    taskId: string | null;
+    treeDigest: string | null;
+  }): void {
+    try {
+      this.#db
+        .prepare(
+          `INSERT INTO session_activity (session, worktree, task_id, tree_digest, last_seen)
+           VALUES (?,?,?,?,?)
+           ON CONFLICT(session, worktree) DO UPDATE SET
+             task_id = excluded.task_id,
+             tree_digest = excluded.tree_digest,
+             last_seen = excluded.last_seen`,
+        )
+        .run(a.session, a.worktree, a.taskId, a.treeDigest, now());
+    } catch {
+      /* awareness is best-effort and never blocks work */
+    }
+  }
+
+  readActivity(
+    session: string,
+    worktree: string,
+  ): { taskId: string | null; treeDigest: string | null; lastSeen: string } | null {
+    const r = this.#db
+      .prepare("SELECT * FROM session_activity WHERE session = ? AND worktree = ?")
+      .get(session, worktree) as Record<string, unknown> | undefined;
+    if (!r) return null;
+    return {
+      taskId: (r["task_id"] as string | null) ?? null,
+      treeDigest: (r["tree_digest"] as string | null) ?? null,
+      lastSeen: r["last_seen"] as string,
+    };
+  }
+
+  activeSessions(
+    worktree: string,
+    excludingSession: string,
+    since: string,
+  ): { session: string; taskId: string | null; lastSeen: string }[] {
+    return (
+      this.#db
+        .prepare(
+          `SELECT session, task_id, last_seen FROM session_activity
+           WHERE worktree = ? AND session != ? AND last_seen >= ?
+           ORDER BY last_seen DESC`,
+        )
+        .all(worktree, excludingSession, since) as Record<string, unknown>[]
+    ).map((r) => ({
+      session: r["session"] as string,
+      taskId: (r["task_id"] as string | null) ?? null,
+      lastSeen: r["last_seen"] as string,
+    }));
+  }
+
+  /** Record that a job touched a path, so overlap between concurrent jobs is detectable. */
+  recordTaskPath(taskId: string, path: string, session: string | null): void {
+    try {
+      this.#db
+        .prepare(
+          "INSERT OR IGNORE INTO task_path (task_id, path, session, first_seen) VALUES (?,?,?,?)",
+        )
+        .run(taskId, path, session, now());
+    } catch {
+      /* best-effort */
+    }
+  }
+
+  /** Paths this job touched that another named session's job in this worktree also touched. */
+  overlappingPaths(
+    taskId: string,
+    worktree: string,
+    otherSessions: string[],
+  ): { path: string; session: string; taskId: string }[] {
+    if (otherSessions.length === 0) return [];
+    const placeholders = otherSessions.map(() => "?").join(",");
+    return (
+      this.#db
+        .prepare(
+          `SELECT tp.path, tp.session, tp.task_id FROM task_path tp
+             JOIN task t ON t.task_id = tp.task_id AND t.version = 1
+           WHERE tp.path IN (SELECT path FROM task_path WHERE task_id = ?)
+             AND tp.task_id != ?
+             AND t.worktree = ?
+             AND COALESCE(t.mode, 'implement') != 'explore'
+             AND tp.session IN (${placeholders})`,
+        )
+        .all(taskId, taskId, worktree, ...otherSessions) as Record<string, unknown>[]
+    ).map((r) => ({
+      path: r["path"] as string,
+      session: r["session"] as string,
+      taskId: r["task_id"] as string,
+    }));
+  }
+
   /** Readable JSON export, a first-class command rather than an occasional convenience. */
   exportJson(): Record<string, unknown> {
-    const tables = ["task", "task_item", "action", "artifact", "evidence", "usage"];
+    const tables = ["task", "task_item", "action", "artifact", "evidence", "usage", "session_activity", "task_path"];
     const out: Record<string, unknown> = { schemaVersion: SCHEMA_VERSION, exportedAt: now() };
     for (const t of tables) out[t] = this.#db.prepare(`SELECT * FROM ${t}`).all();
     return out;

@@ -25,6 +25,25 @@ same source and must not carry the same permission to write.
 - **Known limits:** A Task records stated intent; it does not infer unstated intent.
 - **Ledger:** [Research index](../research/concept.md).
 
+## Mode
+
+A job declares whether it will change code. `implement` is the default; `explore` means the job
+produces understanding, a spec or a plan and changes nothing. The distinction is used by
+[Concurrency](concurrency.md): a job that changes nothing cannot collide with one that does.
+
+## Lineage
+
+A job may be **forked**, as when a conversation is branched into another worktree. The child
+inherits the operator's constraints, the declared scope, the acceptance criteria and the ruled-out
+findings — the expensive knowledge — and starts its own progress. Session-specific handoff notes do
+not carry.
+
+The child records its parent. Git deliberately keeps no relationship between a branch and the
+branch it came from, so lineage between jobs is the runtime's to hold or it is lost.
+
+Scope is rewritten to the forking worktree. Inheriting the parent's path would refuse every action
+the child takes in its own checkout.
+
 ## Contents
 
 | Part | Meaning | Who may change it |
@@ -58,6 +77,9 @@ or relax a constraint; a proposed change to any of those is reviewable output.
 - Ruled-out hypotheses survive into later Actions, so a fresh worker does not repeat a paid-for dead
   end.
 - Equal source bytes do not imply the same Task; a changed file does not imply a new one.
+- A Task records the worktree and branch it was started from. One repository's jobs share one store,
+  so a job is legible about where it belongs.
+- Forking produces a separate Task. Closing one does not close the other.
 - A Task reaches **accepted** when its acceptance criteria are satisfied — automatically where the
   criteria are fully covered by evidence, and by review where they are not.
 

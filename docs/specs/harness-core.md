@@ -76,7 +76,10 @@ authority constrains.
    build scheduler, or mandatory classifier.
 7. **Model use is optional and removable.** Any decision the runtime makes with a model must be
    removable without disturbing the working system.
-8. **Narrowing never applies to a release gate**, and no domain code may lower a gate.
+8. **Awareness, never a lock.** Several conversations may share one worktree. The runtime does not
+   write files, so it cannot prevent them overwriting each other and must not imply that it can. It
+   detects and reports; separate worktrees remain the only real isolation.
+9. **Narrowing never applies to a release gate**, and no domain code may lower a gate.
 
 ## What The Tier Preference Is Now
 
@@ -110,6 +113,7 @@ recreated here.
 | [Artifact](artifact.md) | Versioned inputs and outputs, subject binding, bounded retrieval |
 | [Evidence](evidence.md) | What observations establish; decision annotations; calibration |
 | [Operational Store](operational-store.md) | Where the four objects live |
+| [Concurrency](concurrency.md) | Several conversations in one worktree: awareness, never a lock |
 | [Execution](execution.md) | The seam to the execution owner; coordination, reuse, ordering |
 | [Ecosystem Adapters](ecosystem-adapters.md) | Toolchain boundary |
 | [Host Integration](host-integration.md) | Invocation from an agent host |

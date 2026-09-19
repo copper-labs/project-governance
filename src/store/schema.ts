@@ -6,7 +6,7 @@
  * deployment change atomic, which is why Action carries prepared / in-progress /
  * outcome-unknown regardless.
  */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 4;
 
 export const SCHEMA = `
 CREATE TABLE IF NOT EXISTS meta (
@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS task (
   branch     TEXT,
   parent_task TEXT,
   session    TEXT,
+  mode       TEXT,
   PRIMARY KEY (task_id, version)
 ) STRICT;
 
@@ -103,4 +104,28 @@ CREATE TABLE IF NOT EXISTS usage (
 ) STRICT;
 
 CREATE INDEX IF NOT EXISTS usage_by_task ON usage(task_id);
+
+-- Who is working where, so concurrent sessions in one worktree are visible to each other.
+-- This is awareness, not a lock: the harness does not hold the pen and must not pretend to.
+CREATE TABLE IF NOT EXISTS session_activity (
+  session     TEXT NOT NULL,
+  worktree    TEXT NOT NULL,
+  task_id     TEXT,
+  tree_digest TEXT,
+  last_seen   TEXT NOT NULL,
+  PRIMARY KEY (session, worktree)
+) STRICT;
+
+CREATE INDEX IF NOT EXISTS activity_by_worktree ON session_activity(worktree, last_seen);
+
+-- Which paths a job has actually touched, so overlap between concurrent jobs is detectable.
+CREATE TABLE IF NOT EXISTS task_path (
+  task_id    TEXT NOT NULL,
+  path       TEXT NOT NULL,
+  session    TEXT,
+  first_seen TEXT NOT NULL,
+  PRIMARY KEY (task_id, path)
+) STRICT;
+
+CREATE INDEX IF NOT EXISTS path_by_path ON task_path(path);
 `;

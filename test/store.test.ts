@@ -99,7 +99,7 @@ test("JSON export is readable and complete", () => {
   const s = newStore();
   const t = s.createTask("export me", [{ kind: "scope", provenance: "operator", body: "/tmp" }]);
   const dump = s.exportJson();
-  assert.equal(dump["schemaVersion"], 2);
+  assert.equal(dump["schemaVersion"], 4);
   assert.equal((dump["task"] as unknown[]).length, 1);
   assert.equal((dump["task_item"] as unknown[]).length, 1);
   assert.ok(JSON.stringify(dump).includes(t.taskId));

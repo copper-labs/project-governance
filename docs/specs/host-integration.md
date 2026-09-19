@@ -50,6 +50,17 @@ assembles, and records.
 **Step two, later.** The same core is driven by a front door of our own. Nothing in the core may
 assume which step is active. The invocation contract is identical; only the caller changes.
 
+## The Adapter Is Written By The Runtime
+
+`init` writes one marked block into a repository's agent instruction files. It touches only files
+already present, preserves everything authored around its markers, and is idempotent. The block is
+routing only: it names the commands and when to use them, and carries no policy, taxonomy or
+threshold.
+
+It also carries the practice guidance that belongs with the host rather than the contracts:
+sharing a workspace is fine for exploring and risky for implementing, and a branched conversation
+that is about to implement should be offered a worktree.
+
 ## Behavioral Requirements
 
 - The harness exposes one invocation surface, callable as a subprocess with JSON on stdout, so any

@@ -8,6 +8,16 @@ export type Provenance = "operator" | "observed" | "hypothesis";
 
 export type TaskStatus = "open" | "needs-input" | "accepted" | "cancelled";
 
+/**
+ * What kind of work a job is.
+ *
+ * `explore` means the job produces understanding, specs or plans and will not change code.
+ * It matters because two threads sharing one folder collide only when one of them writes:
+ * an exploring job neither raises nor receives file-overlap warnings, which removes the
+ * main source of false alarms in the shared-workspace case.
+ */
+export type TaskMode = "implement" | "explore";
+
 export type TaskItemKind =
   | "constraint"
   | "acceptance"
@@ -40,6 +50,7 @@ export interface Task {
   parentTask: string | null;
   /** Which conversation created this version. */
   session: string | null;
+  mode: TaskMode;
 }
 
 /**

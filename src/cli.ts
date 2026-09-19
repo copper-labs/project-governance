@@ -11,20 +11,23 @@ import { runCheck } from "./ops/execution.ts";
 import { changedPaths, resolveSubject, retrieve, routeByDeclaredTarget, type SubjectRef } from "./ops/retrieval.ts";
 import { initRepo } from "./ops/adapter.ts";
 import { defaultDbPath, sessionId, workContext } from "./store/location.ts";
+import { report as concurrencyReport, touch as touchActivity } from "./ops/concurrency.ts";
 import { existsSync } from "node:fs";
 import type { Action, TaskItem } from "./model/types.ts";
 
 const USAGE = `harness <command>
 
   init          [--file AGENTS.md]...      write the block that makes your agent use this
-  task fork     --task <id> [--outcome <text>]   branch a job into this worktree
+  task fork     --task <id> [--outcome <text>] [--exploring]   branch a job into this worktree
   task create   --outcome <text> [--constraint <text>]... [--scope <path>]... [--acceptance <text>]...
+                [--exploring]   this job produces understanding, specs or plans; it will not change code
   task show     --task <id>
   task list     [--all]
   task revise   --task <id> [--constraint <text>]... [--ruled-out <text>]... [--note <text>]...
                 [--open-question <text>]... [--revoke <seq>]... [--status <status>]
   context get   --task <id> [--at staged|worktree|<rev>] [--path <p>]... [--mandatory <p>]... [--budget <bytes>]
   check run     --task <id> --claim <text> [--subject <digest>] -- <command> [args...]
+  status        [--task <id>]               who else is working in this worktree
   recover
   usage         [--task <id>]
   export
@@ -90,14 +93,18 @@ function main(argv: string[]): void {
       ];
       return emit({
         ok: true,
-        task: store.createTask(outcome, items, { ...where, session: who }),
+        task: store.createTask(outcome, items, {
+          ...where, session: who, mode: flags["exploring"] ? "explore" : "implement",
+        }),
         store: dbPath,
       });
     }
 
     if (group === "task" && verb === "fork") {
       const id = one(flags, "task") ?? fail("task fork requires --task");
-      const forked = store.forkTask(id, { ...where, session: who }, {
+      const forked = store.forkTask(id, {
+        ...where, session: who, ...(flags["exploring"] ? { mode: "explore" as const } : {}),
+      }, {
         ...(one(flags, "outcome") ? { outcome: one(flags, "outcome")! } : {}),
       });
       return emit({
@@ -110,7 +117,15 @@ function main(argv: string[]): void {
     if (group === "task" && verb === "show") {
       const id = one(flags, "task") ?? fail("task show requires --task");
       const task = store.readTask(id) ?? fail(`no task ${id}`);
-      return emit({ ok: true, task, actions: store.listActions(id), evidence: store.listEvidence(id), usage: store.usageTotals(id) });
+      const conc = concurrencyReport(store, {
+        session: who, worktree: where.worktree, cwd: root,
+        taskId: task.mode === "explore" ? null : id,
+      });
+      return emit({
+        ok: true, task,
+        ...(conc.warning ? { concurrency: conc } : {}),
+        actions: store.listActions(id), evidence: store.listEvidence(id), usage: store.usageTotals(id),
+      });
     }
 
     if (group === "task" && verb === "list") {
@@ -120,10 +135,13 @@ function main(argv: string[]): void {
         worktree: t.worktree, branch: t.branch, parentTask: t.parentTask,
         thisWorktree: t.worktree === where.worktree,
       }));
+      const conc = concurrencyReport(store, { session: who, worktree: where.worktree, taskId: null, cwd: root });
+      const visible = mine ? all.filter((t) => t.thisWorktree) : all;
       return emit({
-        ok: true, store: dbPath, worktree: where.worktree, branch: where.branch,
-        tasks: mine ? all.filter((t) => t.thisWorktree) : all,
+        ok: true, store: dbPath, worktree: where.worktree, branch: where.branch, session: who,
+        tasks: visible,
         otherWorktrees: mine ? all.filter((t) => !t.thisWorktree).length : 0,
+        ...(conc.others.length ? { alsoActiveHere: conc.others, concurrency: conc } : {}),
         hint: mine ? "Jobs from other worktrees of this repository are hidden. Use --all to see them, and 'task fork' to branch one into this worktree." : undefined,
       });
     }
@@ -189,8 +207,16 @@ function main(argv: string[]): void {
         establishes: `this request spent ${result.budget.usedBytes - spent} of the task's ${budgetBytes} byte budget`,
         confirmation: "confirmed", criticality: "analytics",
       });
+      for (const a of result.artifacts) {
+        if (a.path) store.recordTaskPath(id, a.path, who);
+      }
+      const concurrency = concurrencyReport(store, {
+        session: who, worktree: where.worktree, cwd: root,
+        taskId: task.mode === "explore" ? null : id,
+      });
       return emit({
         ok: result.blocked === null,
+        ...(concurrency.warning ? { concurrency } : {}),
         subject: { digest: subject.digest, label: subject.label },
         route,
         blocked: result.blocked,
@@ -247,11 +273,32 @@ function main(argv: string[]): void {
       return emit({ ok: true, recovered: recoverAll(store, inspect).map((a) => ({ actionId: a.actionId, status: a.status, note: a.refusedReason })) });
     }
 
+    if (group === "status") {
+      const conc = concurrencyReport(store, {
+        session: who, worktree: where.worktree, taskId: one(flags, "task") ?? null, cwd: root,
+      });
+      return emit({
+        ok: true, session: who, worktree: where.worktree, branch: where.branch,
+        alsoActiveHere: conc.others,
+        overlappingPaths: conc.overlappingPaths,
+        treeChangedSinceYouLastActed: conc.treeChangedSinceYouLastActed,
+        warning: conc.warning,
+      });
+    }
+
     if (group === "usage") return emit({ ok: true, usage: store.usageTotals(one(flags, "task")) });
     if (group === "export") return emit(store.exportJson());
 
     fail(`unknown command: ${[group, verb].filter(Boolean).join(" ")}`);
   } finally {
+    try {
+      touchActivity(store, {
+        session: who, worktree: where.worktree,
+        taskId: one(flags, "task") ?? null, cwd: root,
+      });
+    } catch {
+      /* awareness is best-effort */
+    }
     store.close();
   }
 }

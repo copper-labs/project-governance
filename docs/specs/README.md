@@ -34,6 +34,7 @@ Start with [the umbrella](harness-core.md). Everything the runtime owns is one o
 | --- | --- |
 | [Harness Core](harness-core.md) | Thesis, fixed decisions, ownership boundary, invariants |
 | [Operational Store](operational-store.md) | SQLite for state, Markdown for briefs, files for artifacts |
+| [Concurrency](concurrency.md) | Several conversations in one worktree; modes; overlap detection |
 | [Execution](execution.md) | The seam to the existing execution owner; coordination, reuse, ordering |
 | [Ecosystem Adapters](ecosystem-adapters.md) | Toolchain boundary across Kotlin, npm and Python units |
 | [Host Integration](host-integration.md) | Invocation from an agent host |

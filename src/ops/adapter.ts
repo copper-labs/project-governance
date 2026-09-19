@@ -43,6 +43,19 @@ Keep the returned \`taskId\` for the rest of the session.
 | Holding findings in your head | \`harness task revise --task <id> --note "<what you established>"\` | Survives this session ending |
 | Assuming a dead end is forgotten | \`harness task revise --task <id> --ruled-out "<what and why>"\` | Carried into any branched thread, so nobody pays for it twice |
 
+**If this conversation is exploring rather than implementing** — working out an approach, writing a
+spec or a plan, getting up to speed — create the job with \`--exploring\`. It will not raise or
+receive file-overlap warnings, because a job that changes nothing cannot collide with one that does.
+
+**If implementation is about to start in a branched conversation that shares this folder**, say so
+to the operator and suggest a new worktree. Two threads writing to one folder on one branch can
+overwrite each other and git cannot help; a worktree costs a checkout and removes the problem
+entirely. Sharing a folder is fine for exploring, and risky for implementing.
+
+**If you are warned that another session has touched a file you are about to change**, stop and
+confirm with the operator rather than proceeding. The warning means exactly what it says: it is
+awareness, not a lock, and nothing prevents the overwrite but you.
+
 **If the operator branches this conversation**, or you are working in a different git worktree of
 this repository, run \`harness task list --all\` to see jobs from sibling worktrees, then
 \`harness task fork --task <id>\` to carry their constraints and ruled-out findings into this one.

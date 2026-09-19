@@ -186,6 +186,29 @@ harness export > snapshot.json
 
 `export` dumps everything as readable JSON.
 
+## When two chats share one folder
+
+Forking a chat "in this workspace" gives both threads the same folder and the same branch. They can
+overwrite each other's edits, and git cannot help — it is one branch in one checkout.
+
+The harness will not stop that. It does not write files, so it never sees the write, and a lock
+would be a promise it cannot keep. What it does is tell you quickly:
+
+```
+Another active session in this worktree has touched src/export.ts.
+You share one folder and one branch, so edits can overwrite each other.
+```
+
+If the branched thread is only exploring — working out an approach, writing a spec — create its job
+with `--exploring`. A job that changes nothing cannot collide with one that does, so it is left
+alone rather than nagged about.
+
+```sh
+harness status          # who else is working in this folder right now
+```
+
+**Practice worth keeping:** share a workspace for exploring, use a new worktree for implementing.
+
 ## What it does not do
 
 **It does not edit your code.** Codex still does that. The harness reads, runs checks you name, and
@@ -194,9 +217,12 @@ records. If it is wrong, you get a wrong note — never a mangled file.
 ## The whole command list
 
 ```
-harness task create   --outcome <text> [--constraint <text>]... [--scope <path>]... [--acceptance <text>]...
+harness init
+harness task create   --outcome <text> [--constraint <text>]... [--scope <path>]... [--exploring]
 harness task show     --task <id>
-harness task list
+harness task list     [--all]
+harness task fork     --task <id> [--outcome <text>] [--exploring]
+harness status        [--task <id>]
 harness task revise   --task <id> [--constraint <text>]... [--note <text>]... [--revoke <seq>]...
 harness context get   --task <id> [--at staged|worktree|<rev>] [--path <p>]... [--budget <bytes>]
 harness check run     --task <id> --claim <text> [--subject <rev>] -- <command> [args...]

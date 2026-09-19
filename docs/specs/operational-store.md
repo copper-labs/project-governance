@@ -41,6 +41,20 @@ Two things this does **not** mean:
   deployment is still not atomic, so the prepared, in-progress and outcome-unknown machinery in
   [Action](action.md) stays exactly as it is.
 
+## The Store Belongs To The Repository
+
+A job belongs to a repository, not to a folder. Git worktrees are separate folders sharing one
+repository, and branching a conversation into a new worktree is ordinary practice — so a store kept
+beside the working files would hand every branched thread an empty history, which is precisely the
+failure this runtime exists to prevent.
+
+The store therefore lives beside the shared git directory, which every worktree of a repository
+resolves to. A repository without git falls back to the folder, which is all there is to key on.
+
+Jobs are tagged with the worktree and branch they were started from, so one shared store stays
+legible: a conversation sees its own worktree's jobs by default, and other worktrees' jobs are
+listed as available to fork rather than silently mixed in.
+
 ## Division Of Storage
 
 | Content | Where | Why |
