@@ -26,7 +26,9 @@ adapter must not need to reimplement the loop.
   selection in their own vocabulary. Those selectors are the shape an adapter wraps.
 - **Evidence:** none for the adapter layer.
 - **Known limits:** Three ecosystems are enough to find the wrong abstraction, not enough to be
-  confident of the right one.
+  confident of the right one. A fourth candidate repository,
+  `coaching-intelligence-sdk-parallel-development`, has not been inspected; its ecosystem and build
+  shape are unknown and this contract is not yet designed against them.
 - **Ledger:** [Research index](../research/concept.md).
 
 ## Scope

@@ -77,6 +77,24 @@ because the gate invariant it carries applies to any domain code, plugin or not,
 - **Plugin engine.** Deferred until several consumers justify it. The gate invariant survives
   without it.
 
+## Candidate Repositories
+
+The harness serves several projects that do not share a toolchain. Naming them here keeps the
+sample honest and stops one ecosystem quietly becoming the design.
+
+| Repository | Role | Ecosystem |
+| --- | --- | --- |
+| `project-governance` | The deterministic fact and check layer the harness consumes | Python |
+| `portal-webapp` | First real adopter; also the Track R subject | TypeScript, npm |
+| `asensei-mnemos` | Multiplatform SDK; the hardest build shape | Kotlin Multiplatform, Gradle |
+| `coaching-intelligence-sdk-parallel-development` | A major project, named by the operator as a primary source of recurring cost | **Not yet inspected** |
+
+The last row is a deliberate gap rather than an omission. Its ecosystem, build shape and failure
+profile have not been examined, so nothing in these contracts is designed around it yet. Step 1
+samples it before any design claim rests on it, and if it turns out to be a fourth ecosystem or a
+fourth build shape, that is a finding for [Ecosystem Adapters](../specs/ecosystem-adapters.md)
+rather than a surprise during Step 5.
+
 ## Environment Limit
 
 The working machine has Node 22 and a JDK 11 with no Gradle, so real KMP builds cannot run there.

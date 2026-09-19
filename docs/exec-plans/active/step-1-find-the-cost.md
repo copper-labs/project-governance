@@ -35,9 +35,13 @@ bottleneck.
 - Semantic contract: settled
 - Model class: diagnosis-review (gpt-5.6-sol, medium; source: default table)
 - Fixed decisions: the sample covers both failing and all-pass paths; anything unmeasurable is
-  reported as unknown rather than estimated
+  reported as unknown rather than estimated; the sample draws from every candidate repository named
+  in the master plan, including `coaching-intelligence-sdk-parallel-development`, which the operator
+  identifies as a major source of recurring cost and which has not yet been inspected
 - Acceptance: a cost account naming repeated discovery, log reading, duplicate execution, rework
-  and human intervention, each with its share of elapsed time and tokens, and its uncertainty
+  and human intervention, each with its share of elapsed time and tokens, and its uncertainty; the
+  account reports per repository as well as in aggregate, so one project's profile cannot be
+  mistaken for the general case
 - Development checkpoints: an interim read on a quarter of the sample, to catch a mis-specified
   measure before the whole pass is spent
 - Build and integration point: none
@@ -46,7 +50,8 @@ bottleneck.
 - Invalidates prior proof when: the workflow or its tooling materially changes
 - Proof state: not-run
 - Split early or stop when: the largest cost turns out to be something none of this proposal
-  addresses, which is a result worth having and is reported as one
+  addresses, which is a result worth having and is reported as one; or an uninspected repository
+  turns out to dominate the cost, in which case it is examined before the intervention is chosen
 - Documentation: the cost account is durable
 - Acceptance milestone: operator agreement on the selected intervention before Step 2
 
