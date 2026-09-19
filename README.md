@@ -9,6 +9,7 @@ optional optimization that must stay removable.
 
 The host keeps the reasoning and the pen: the harness does not write to a working tree.
 
+- **[How to use it](HOW-TO-USE.md)** — start here.
 - [Charter](CHARTER.md)
 - [Specifications](docs/specs/README.md)
 - [Plans](docs/exec-plans/README.md)

@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Wrapper so you can type `harness ...` instead of the node incantation.
+set -euo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+need=22
+have="$(node -v 2>/dev/null | sed 's/^v//' | cut -d. -f1 || echo 0)"
+if [ "${have:-0}" -lt "$need" ]; then
+  echo "This needs Node $need or newer. You have: $(node -v 2>/dev/null || echo 'none found')." >&2
+  echo "Install with:  brew install node   (or use nvm: nvm install 22 && nvm use 22)" >&2
+  exit 1
+fi
+
+# The database lives with the repo you are working in, unless you say otherwise.
+exec node --experimental-strip-types --no-warnings "$HERE/src/cli.ts" "$@"

@@ -32,8 +32,15 @@ export class Store {
   constructor(path: string) {
     if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
     this.#db = new DatabaseSync(path);
+    // WAL is preferred, but it needs shared memory the filesystem may not provide -- network
+    // shares and some mounted volumes refuse it. Fall back rather than failing to start; the
+    // rollback journal is slower but equally durable, which is what actually matters here.
+    try {
+      this.#db.exec("PRAGMA journal_mode = WAL");
+    } catch {
+      this.#db.exec("PRAGMA journal_mode = DELETE");
+    }
     // FULL keeps execution-critical commits durable across a crash, which is the whole point.
-    this.#db.exec("PRAGMA journal_mode = WAL");
     this.#db.exec("PRAGMA synchronous = FULL");
     this.#db.exec("PRAGMA foreign_keys = ON");
     this.#db.exec(SCHEMA);

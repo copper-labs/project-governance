@@ -6,7 +6,7 @@
 import { resolve } from "node:path";
 import { Store } from "./store/store.ts";
 import { authorizeAction, proposeAction, recoverAll, type Inspection } from "./ops/actions.ts";
-import { defaultPolicy, type AuthorityRequest } from "./ops/authority.ts";
+import { defaultPolicy, withinScope, type AuthorityRequest } from "./ops/authority.ts";
 import { runCheck } from "./ops/execution.ts";
 import { changedPaths, resolveSubject, retrieve, routeByDeclaredTarget, type SubjectRef } from "./ops/retrieval.ts";
 import { existsSync } from "node:fs";
@@ -108,6 +108,20 @@ function main(argv: string[]): void {
       const changed = requested.length ? [] : changedPaths(root, subject);
       const paths = requested.length ? requested : changed;
       const route = paths.length ? "declared-or-changed" : "no-diff";
+      // Requested paths go through the same authority check as anything else: a path the
+      // task's scope does not cover is refused here, not quietly read.
+      const taskScope = task.items.filter((i) => !i.revoked && i.kind === "scope").map((i) => i.body);
+      if (taskScope.length && requested.length) {
+        const outside = requested.filter((p) => !withinScope(p, taskScope, root));
+        if (outside.length) {
+          return emit({
+            ok: false,
+            refused: `outside the task's scope: ${outside.join(", ")}`,
+            scope: taskScope,
+          });
+        }
+      }
+
       const budgetBytes = Number(one(flags, "budget") ?? 256 * 1024);
       const spent = store
         .listEvidence(id)
@@ -195,4 +209,18 @@ function main(argv: string[]): void {
   }
 }
 
-main(process.argv.slice(2));
+try {
+  main(process.argv.slice(2));
+} catch (err) {
+  // A stack trace is not a useful answer. Say what went wrong and what to do about it.
+  const message = err instanceof Error ? err.message : String(err);
+  const hint = /disk I\/O|unable to open|readonly|permission/i.test(message)
+    ? "The harness could not open its database. Check the folder is writable, or pass --db <path> to put it somewhere else."
+    : /no task/i.test(message)
+      ? "Run 'harness task list' to see the jobs that exist."
+      : null;
+  process.stdout.write(
+    JSON.stringify({ ok: false, error: message, ...(hint ? { hint } : {}) }, null, 2) + "\n",
+  );
+  process.exit(1);
+}
