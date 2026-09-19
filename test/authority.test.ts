@@ -22,6 +22,7 @@ function fixture(): { root: string; inside: string; outside: string; link: strin
 const task = (items: Task["items"]): Task => ({
   taskId: "t", version: 1, supersedes: null, outcome: "investigate",
   status: "open", createdAt: "", items,
+  worktree: null, branch: null, parentTask: null, session: null,
 });
 
 const item = (kind: Task["items"][number]["kind"], body: string) => ({

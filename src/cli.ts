@@ -10,16 +10,19 @@ import { defaultPolicy, withinScope, type AuthorityRequest } from "./ops/authori
 import { runCheck } from "./ops/execution.ts";
 import { changedPaths, resolveSubject, retrieve, routeByDeclaredTarget, type SubjectRef } from "./ops/retrieval.ts";
 import { initRepo } from "./ops/adapter.ts";
+import { defaultDbPath, sessionId, workContext } from "./store/location.ts";
 import { existsSync } from "node:fs";
 import type { Action, TaskItem } from "./model/types.ts";
 
 const USAGE = `harness <command>
 
   init          [--file AGENTS.md]...      write the block that makes your agent use this
+  task fork     --task <id> [--outcome <text>]   branch a job into this worktree
   task create   --outcome <text> [--constraint <text>]... [--scope <path>]... [--acceptance <text>]...
   task show     --task <id>
-  task list
-  task revise   --task <id> [--constraint <text>]... [--note <text>]... [--revoke <seq>]... [--status <status>]
+  task list     [--all]
+  task revise   --task <id> [--constraint <text>]... [--ruled-out <text>]... [--note <text>]...
+                [--open-question <text>]... [--revoke <seq>]... [--status <status>]
   context get   --task <id> [--at staged|worktree|<rev>] [--path <p>]... [--mandatory <p>]... [--budget <bytes>]
   check run     --task <id> --claim <text> [--subject <digest>] -- <command> [args...]
   recover
@@ -58,8 +61,11 @@ const fail = (message: string, code = 1): never => {
 function main(argv: string[]): void {
   const { flags, rest } = parse(argv);
   const [group, verb] = rest;
-  const dbPath = resolve(one(flags, "db") ?? ".harness/harness.db");
   const root = process.cwd();
+  // The store follows the repository, so every worktree of it finds the same jobs.
+  const dbPath = one(flags, "db") ? resolve(one(flags, "db")!) : defaultDbPath(root);
+  const who = sessionId();
+  const where = workContext(root);
 
   if (!group || group === "help" || flags["help"]) { process.stdout.write(USAGE + "\n"); return; }
 
@@ -82,7 +88,23 @@ function main(argv: string[]): void {
         ...(flags["scope"] ?? []).map((b) => ({ kind: "scope" as const, provenance: "operator" as const, body: resolve(b) })),
         ...(flags["acceptance"] ?? []).map((b) => ({ kind: "acceptance" as const, provenance: "operator" as const, body: b })),
       ];
-      return emit({ ok: true, task: store.createTask(outcome, items) });
+      return emit({
+        ok: true,
+        task: store.createTask(outcome, items, { ...where, session: who }),
+        store: dbPath,
+      });
+    }
+
+    if (group === "task" && verb === "fork") {
+      const id = one(flags, "task") ?? fail("task fork requires --task");
+      const forked = store.forkTask(id, { ...where, session: who }, {
+        ...(one(flags, "outcome") ? { outcome: one(flags, "outcome")! } : {}),
+      });
+      return emit({
+        ok: true, task: forked, forkedFrom: id,
+        inherited: forked.items.map((i) => `${i.kind}: ${i.body}`),
+        note: "Constraints and ruled-out findings were carried over. Progress starts fresh.",
+      });
     }
 
     if (group === "task" && verb === "show") {
@@ -92,7 +114,18 @@ function main(argv: string[]): void {
     }
 
     if (group === "task" && verb === "list") {
-      return emit({ ok: true, tasks: store.listTasks().map((t) => ({ taskId: t.taskId, version: t.version, status: t.status, outcome: t.outcome })) });
+      const mine = flags["all"] ? null : where.worktree;
+      const all = store.listTasks().map((t) => ({
+        taskId: t.taskId, version: t.version, status: t.status, outcome: t.outcome,
+        worktree: t.worktree, branch: t.branch, parentTask: t.parentTask,
+        thisWorktree: t.worktree === where.worktree,
+      }));
+      return emit({
+        ok: true, store: dbPath, worktree: where.worktree, branch: where.branch,
+        tasks: mine ? all.filter((t) => t.thisWorktree) : all,
+        otherWorktrees: mine ? all.filter((t) => !t.thisWorktree).length : 0,
+        hint: mine ? "Jobs from other worktrees of this repository are hidden. Use --all to see them, and 'task fork' to branch one into this worktree." : undefined,
+      });
     }
 
     if (group === "task" && verb === "revise") {
@@ -100,6 +133,8 @@ function main(argv: string[]): void {
       const added: Omit<TaskItem, "seq" | "revoked">[] = [
         ...(flags["constraint"] ?? []).map((b) => ({ kind: "constraint" as const, provenance: "operator" as const, body: b })),
         ...(flags["note"] ?? []).map((b) => ({ kind: "handoff" as const, provenance: "observed" as const, body: b })),
+        ...(flags["ruled-out"] ?? []).map((b) => ({ kind: "ruled-out" as const, provenance: "observed" as const, body: b })),
+        ...(flags["open-question"] ?? []).map((b) => ({ kind: "open-question" as const, provenance: "hypothesis" as const, body: b })),
       ];
       const revoke = (flags["revoke"] ?? []).map(Number).filter((n) => Number.isInteger(n));
       const status = one(flags, "status") as "open" | "needs-input" | "accepted" | "cancelled" | undefined;

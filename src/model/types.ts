@@ -33,6 +33,13 @@ export interface Task {
   status: TaskStatus;
   items: TaskItem[];
   createdAt: string;
+  /** Which worktree and branch this job was started from. A store is shared across worktrees. */
+  worktree: string | null;
+  branch: string | null;
+  /** Set when this job was forked from another, such as a branched conversation. */
+  parentTask: string | null;
+  /** Which conversation created this version. */
+  session: string | null;
 }
 
 /**

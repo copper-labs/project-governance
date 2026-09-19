@@ -6,7 +6,7 @@
  * deployment change atomic, which is why Action carries prepared / in-progress /
  * outcome-unknown regardless.
  */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const SCHEMA = `
 CREATE TABLE IF NOT EXISTS meta (
@@ -21,6 +21,10 @@ CREATE TABLE IF NOT EXISTS task (
   outcome    TEXT    NOT NULL,
   status     TEXT    NOT NULL,
   created_at TEXT    NOT NULL,
+  worktree   TEXT,
+  branch     TEXT,
+  parent_task TEXT,
+  session    TEXT,
   PRIMARY KEY (task_id, version)
 ) STRICT;
 
@@ -51,7 +55,8 @@ CREATE TABLE IF NOT EXISTS action (
   reconcile        TEXT,
   refused_reason   TEXT,
   created_at       TEXT    NOT NULL,
-  updated_at       TEXT    NOT NULL
+  updated_at       TEXT    NOT NULL,
+  session          TEXT
 ) STRICT;
 
 CREATE INDEX IF NOT EXISTS action_by_task ON action(task_id);
@@ -78,7 +83,8 @@ CREATE TABLE IF NOT EXISTS evidence (
   establishes  TEXT NOT NULL,
   confirmation TEXT NOT NULL,
   criticality  TEXT NOT NULL,
-  created_at   TEXT NOT NULL
+  created_at   TEXT NOT NULL,
+  session      TEXT
 ) STRICT;
 
 CREATE INDEX IF NOT EXISTS evidence_by_task ON evidence(task_id);

@@ -64,9 +64,39 @@ export class Store {
 
   // ---------------------------------------------------------------- tasks
 
-  createTask(outcome: string, items: Omit<TaskItem, "seq" | "revoked">[]): Task {
+  createTask(
+    outcome: string,
+    items: Omit<TaskItem, "seq" | "revoked">[],
+    meta: { worktree?: string | undefined; branch?: string | null | undefined; session?: string | undefined; parentTask?: string | undefined } = {},
+  ): Task {
     const taskId = randomUUID();
-    return this.#writeTaskVersion(taskId, 1, null, outcome, "open", items);
+    return this.#writeTaskVersion(taskId, 1, null, outcome, "open", items, meta);
+  }
+
+  /**
+   * Fork a job, as when a conversation is branched into a new thread or worktree.
+   *
+   * The child inherits the expensive knowledge - the operator's constraints and what has
+   * already been ruled out - and starts its own progress. It is not the same job: closing
+   * one does not close the other, and notes do not bleed between them.
+   */
+  forkTask(
+    taskId: string,
+    meta: { worktree?: string | undefined; branch?: string | null | undefined; session?: string | undefined } = {},
+    opts: { outcome?: string | undefined } = {},
+  ): Task {
+    const parent = this.readTask(taskId);
+    if (!parent) throw new ExecutionStateUnavailable(`no task ${taskId}`);
+    // Scope is rewritten to the forking worktree: a branched thread works in its own
+    // checkout, and inheriting the parent's path would refuse every action it takes.
+    const inherited = parent.items
+      .filter((i) => !i.revoked && (i.kind === "constraint" || i.kind === "ruled-out" || i.kind === "scope" || i.kind === "acceptance"))
+      .map((i) =>
+        i.kind === "scope" && meta.worktree && parent.worktree && i.body === parent.worktree
+          ? { kind: i.kind, provenance: i.provenance, body: meta.worktree }
+          : { kind: i.kind, provenance: i.provenance, body: i.body },
+      );
+    return this.createTask(opts.outcome ?? parent.outcome, inherited, { ...meta, parentTask: taskId });
   }
 
   /**
@@ -76,7 +106,7 @@ export class Store {
   reviseTask(
     taskId: string,
     added: Omit<TaskItem, "seq" | "revoked">[],
-    opts: { outcome?: string; status?: Task["status"]; revoke?: number[] } = {},
+    opts: { outcome?: string; status?: Task["status"]; revoke?: number[]; session?: string } = {},
   ): Task {
     const current = this.readTask(taskId);
     if (!current) throw new ExecutionStateUnavailable(`no task ${taskId}`);
@@ -94,6 +124,7 @@ export class Store {
       opts.outcome ?? current.outcome,
       opts.status ?? current.status,
       [...carried, ...added.map((a) => ({ ...a, revoked: false }))],
+      { worktree: current.worktree ?? undefined, branch: current.branch, parentTask: current.parentTask ?? undefined, session: opts.session },
     );
   }
 
@@ -104,15 +135,18 @@ export class Store {
     outcome: string,
     status: Task["status"],
     items: (Omit<TaskItem, "seq" | "revoked"> & { revoked?: boolean })[],
+    meta: { worktree?: string | undefined; branch?: string | null | undefined; session?: string | undefined; parentTask?: string | undefined } = {},
   ): Task {
     const createdAt = now();
     try {
       this.#db.exec("BEGIN IMMEDIATE");
       this.#db
         .prepare(
-          "INSERT INTO task (task_id, version, supersedes, outcome, status, created_at) VALUES (?,?,?,?,?,?)",
+          `INSERT INTO task (task_id, version, supersedes, outcome, status, created_at,
+             worktree, branch, parent_task, session) VALUES (?,?,?,?,?,?,?,?,?,?)`,
         )
-        .run(taskId, version, supersedes, outcome, status, createdAt);
+        .run(taskId, version, supersedes, outcome, status, createdAt,
+             meta.worktree ?? null, meta.branch ?? null, meta.parentTask ?? null, meta.session ?? null);
       const ins = this.#db.prepare(
         "INSERT INTO task_item (task_id, version, seq, kind, provenance, body, revoked) VALUES (?,?,?,?,?,?,?)",
       );
@@ -147,6 +181,10 @@ export class Store {
       outcome: t["outcome"] as string,
       status: t["status"] as Task["status"],
       createdAt: t["created_at"] as string,
+      worktree: (t["worktree"] as string | null) ?? null,
+      branch: (t["branch"] as string | null) ?? null,
+      parentTask: (t["parent_task"] as string | null) ?? null,
+      session: (t["session"] as string | null) ?? null,
       items: items.map((i) => ({
         seq: i["seq"] as number,
         kind: i["kind"] as TaskItem["kind"],

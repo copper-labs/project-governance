@@ -41,7 +41,12 @@ Keep the returned \`taskId\` for the rest of the session.
 | Reading files ad hoc | \`harness context get --task <id> --at staged --path <p>\` | Gives the exact version, and tracks the budget across the job |
 | Running tests or checks yourself | \`harness check run --task <id> --claim "<what this tests>" -- <command>\` | Keeps the receipt, so nothing is re-run to find out what happened |
 | Holding findings in your head | \`harness task revise --task <id> --note "<what you established>"\` | Survives this session ending |
-| Assuming a dead end is forgotten | \`harness task revise --task <id> --note "ruled out: <what and why>"\` | Stops the next session paying for it again |
+| Assuming a dead end is forgotten | \`harness task revise --task <id> --ruled-out "<what and why>"\` | Carried into any branched thread, so nobody pays for it twice |
+
+**If the operator branches this conversation**, or you are working in a different git worktree of
+this repository, run \`harness task list --all\` to see jobs from sibling worktrees, then
+\`harness task fork --task <id>\` to carry their constraints and ruled-out findings into this one.
+The store is shared across every worktree of a repository, so branched work is never blind.
 
 **If the operator changes what they want**, revise the job rather than carrying on:
 \`harness task revise --task <id> --constraint "<their new instruction>"\`.

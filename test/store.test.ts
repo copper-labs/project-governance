@@ -99,9 +99,41 @@ test("JSON export is readable and complete", () => {
   const s = newStore();
   const t = s.createTask("export me", [{ kind: "scope", provenance: "operator", body: "/tmp" }]);
   const dump = s.exportJson();
-  assert.equal(dump["schemaVersion"], 1);
+  assert.equal(dump["schemaVersion"], 2);
   assert.equal((dump["task"] as unknown[]).length, 1);
   assert.equal((dump["task_item"] as unknown[]).length, 1);
   assert.ok(JSON.stringify(dump).includes(t.taskId));
+  s.close();
+});
+
+test("a fork inherits constraints and ruled-out findings, with scope rewritten", () => {
+  const s = newStore();
+  const parent = s.createTask("add bulk export", [
+    { kind: "constraint", provenance: "operator", body: "use the job queue" },
+    { kind: "scope", provenance: "operator", body: "/repo/main" },
+  ], { worktree: "/repo/main", branch: "master" });
+  s.reviseTask(parent.taskId, [
+    { kind: "ruled-out", provenance: "observed", body: "streaming CSV: the app queues bulk work" },
+    { kind: "handoff", provenance: "observed", body: "session-specific chatter" },
+  ]);
+
+  const child = s.forkTask(parent.taskId, { worktree: "/repo/feature", branch: "feature" });
+  const bodies = child.items.map((i) => `${i.kind}:${i.body}`);
+  assert.ok(bodies.includes("constraint:use the job queue"), "constraints carry");
+  assert.ok(bodies.includes("ruled-out:streaming CSV: the app queues bulk work"), "dead ends carry");
+  assert.ok(bodies.includes("scope:/repo/feature"), "scope points at the forking worktree");
+  assert.ok(!bodies.some((b) => b.includes("session-specific")), "handoff chatter does not carry");
+  assert.equal(child.parentTask, parent.taskId);
+  assert.notEqual(child.taskId, parent.taskId, "a fork is a separate job");
+  s.close();
+});
+
+test("two sessions are distinguishable in one shared store", () => {
+  const s = newStore();
+  const a = s.createTask("job A", [], { worktree: "/repo/main", branch: "master", session: "thread-1" });
+  const b = s.createTask("job B", [], { worktree: "/repo/feature", branch: "feature", session: "thread-2" });
+  assert.equal(s.readTask(a.taskId)?.session, "thread-1");
+  assert.equal(s.readTask(b.taskId)?.branch, "feature");
+  assert.equal(s.listTasks().length, 2, "one store holds both worktrees' jobs");
   s.close();
 });
