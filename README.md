@@ -15,3 +15,4 @@ The host keeps the reasoning and the pen: the harness does not write to a workin
 - [Baseline findings](docs/research/pass-a-baseline.md)
 
 Requires Node 22.18 or newer. No runtime dependencies.
+// scratch

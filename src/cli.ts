@@ -8,6 +8,7 @@ import { Store } from "./store/store.ts";
 import { authorizeAction, proposeAction, recoverAll, type Inspection } from "./ops/actions.ts";
 import { defaultPolicy, type AuthorityRequest } from "./ops/authority.ts";
 import { runCheck } from "./ops/execution.ts";
+import { changedPaths, resolveSubject, retrieve, routeByDeclaredTarget, type SubjectRef } from "./ops/retrieval.ts";
 import { existsSync } from "node:fs";
 import type { Action, TaskItem } from "./model/types.ts";
 
@@ -17,6 +18,7 @@ const USAGE = `harness <command>
   task show     --task <id>
   task list
   task revise   --task <id> [--constraint <text>]... [--note <text>]... [--revoke <seq>]... [--status <status>]
+  context get   --task <id> [--at staged|worktree|<rev>] [--path <p>]... [--mandatory <p>]... [--budget <bytes>]
   check run     --task <id> --claim <text> [--subject <digest>] -- <command> [args...]
   recover
   usage         [--task <id>]
@@ -90,6 +92,52 @@ function main(argv: string[]): void {
       const revoke = (flags["revoke"] ?? []).map(Number).filter((n) => Number.isInteger(n));
       const status = one(flags, "status") as "open" | "needs-input" | "accepted" | "cancelled" | undefined;
       return emit({ ok: true, task: store.reviseTask(id, added, { revoke, ...(status ? { status } : {}) }) });
+    }
+
+    if (group === "context" && verb === "get") {
+      const id = one(flags, "task") ?? fail("context get requires --task");
+      const task = store.readTask(id) ?? fail(`no task ${id}`);
+      const at = one(flags, "at") ?? "staged";
+      const ref: SubjectRef =
+        at === "staged" ? { kind: "staged" } : at === "worktree" ? { kind: "worktree" } : { kind: "commit", rev: at };
+      const subject = resolveSubject(root, ref);
+      if ("error" in subject) return emit({ ok: false, error: subject.error });
+
+      // Start with what the task declares; fall back to the no-diff route when there is no diff.
+      const requested = flags["path"] ?? [];
+      const changed = requested.length ? [] : changedPaths(root, subject);
+      const paths = requested.length ? requested : changed;
+      const route = paths.length ? "declared-or-changed" : "no-diff";
+      const budgetBytes = Number(one(flags, "budget") ?? 256 * 1024);
+      const spent = store
+        .listEvidence(id)
+        .filter((e) => e.claim === "context budget")
+        .reduce((n, e) => n + Number(e.observed || 0), 0);
+
+      const result = retrieve(
+        store, root, subject,
+        paths.length ? paths : routeByDeclaredTarget(task),
+        { maxBytes: budgetBytes, usedBytes: spent },
+        { mandatory: flags["mandatory"] ?? [] },
+      );
+      // The budget binds to the task, so what this request spent is recorded against it.
+      store.recordEvidence({
+        taskId: id, actionId: null, artifactId: null,
+        claim: "context budget",
+        observed: String(result.budget.usedBytes - spent),
+        establishes: `this request spent ${result.budget.usedBytes - spent} of the task's ${budgetBytes} byte budget`,
+        confirmation: "confirmed", criticality: "analytics",
+      });
+      return emit({
+        ok: result.blocked === null,
+        subject: { digest: subject.digest, label: subject.label },
+        route,
+        blocked: result.blocked,
+        artifacts: result.artifacts.map((a) => ({ path: a.path, bytes: a.bytes, subject: a.subject })),
+        deferred: result.deferred,
+        unavailable: result.unavailable,
+        budget: result.budget,
+      });
     }
 
     if (group === "check" && verb === "run") {

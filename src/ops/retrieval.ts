@@ -112,7 +112,7 @@ export function retrieve(
         return {
           artifacts, deferred, unavailable,
           budget: { ...budget, usedBytes: used },
-          blocked: `mandatory context does not fit the task budget: ${path} needs ${bytes} bytes, ${budget.maxBytes - used} remain`,
+          blocked: `mandatory context does not fit the task budget: ${path} needs ${bytes} bytes, ${Math.max(0, budget.maxBytes - used)} of ${budget.maxBytes} remain`,
         };
       }
       deferred.push(path);
