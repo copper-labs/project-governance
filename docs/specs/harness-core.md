@@ -50,10 +50,16 @@ authority constrains.
 
 ## Fixed Decisions
 
-1. **The host keeps the reasoning.** It investigates, plans and writes. The runtime supplies
-   reliable operations: retrieve the right source version, run declared checks, record results,
-   prepare a handoff. Two competing coordinators is the failure to avoid. Harness-owned dispatch
-   arrives only when a real workflow needs it.
+1. **The host keeps the reasoning and the pen.** It investigates, plans and edits. The runtime
+   supplies reliable operations: retrieve the right source version, run declared checks, record
+   results, prepare a handoff. Two competing coordinators is the failure to avoid.
+
+   **The harness does not write to a working tree in the first implementation.** Every Action it
+   takes is a read, a check, or a record. This is a staged decision, not a permanent one: writing
+   is the better end state and is planned, but it brings staleness detection, partial-write
+   recovery and concurrent-writer arbitration with it, and those are earned after continuity is
+   proven rather than alongside it. The contracts for them are already written, and stay unused
+   until then.
 2. **Both execution patterns are first class.** A predictable workflow and an open investigation are
    different shapes and neither is forced into the other.
 3. **SQLite for operational state.** Markdown for human-authored briefs, ordinary files for large

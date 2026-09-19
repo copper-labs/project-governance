@@ -44,6 +44,24 @@ evidence and continuity.
 A negative result at step 3 removes one feature and leaves a working tool behind. Under the old
 plan it would have invalidated the premise after the build.
 
+## Three Passes
+
+The five steps below are the unit of work; **passes** are the unit of delivery and review. The
+dependencies are narrower than the step list suggests, so more lands per pass.
+
+| Pass | Contains | Ends when |
+| --- | --- | --- |
+| **A** | Step 1 baseline and Track R Batch 1, together. Read-only, no code. | Real numbers on the four measures, and the Track R gap list |
+| **B** | Step 2 in full: bootstrap, store, Task and Action, retrieval, execution seam, receipts, fault tests. The host still does all editing. | The slice runs on the TypeScript adopter and is compared against Pass A's baseline |
+| **C** | Step 3's one decision, measured; then Step 4's writing and recovery; then Step 5's second seam. | Each measured on its own evidence |
+
+**Prove it on the TypeScript adopter, not the movement SDK.** That repository's scale and mixed
+ecosystems would consume a pass on environment alone, and this machine cannot build its Kotlin
+targets at all. It becomes a stress test once the slice works.
+
+**Verification is the limiter, not authorship.** A pass that writes Pass B and fault-tests none of
+it has delivered nothing; the recovery paths are where the value is.
+
 ## Sequence
 
 | Step | Plan | Question it answers |
@@ -78,6 +96,9 @@ because the gate invariant it carries applies to any domain code, plugin or not,
 - **Host language.** TypeScript on Node.
 - **Store.** Files - JSON for records, Markdown for prose.
 - **Front door.** The agent host, not a CLI of our own.
+- **The host holds the pen.** The harness reads, checks and records; it does not write to a working
+  tree in the first implementation. Harness-owned writing is planned for Pass C, after continuity
+  is proven.
 - **Plugin engine.** Deferred until several consumers justify it. The gate invariant survives
   without it.
 

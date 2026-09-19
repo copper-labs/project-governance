@@ -26,6 +26,16 @@ everything the harness could do, and no verification afterwards undoes an unauth
 - **Known limits:** A routing instruction in a host file is advisory coverage, not enforcement.
 - **Ledger:** [Research index](../research/concept.md).
 
+## Writing Is Staged
+
+In the first implementation, Actions **read, execute declared checks, and record**. None writes to
+a working tree; the host performs every edit.
+
+Everything below is written to hold when that changes, and the `prepared` / `in-progress` /
+`outcome-unknown` machinery exists for that day. Until then it governs only the effects the harness
+does cause — executing a check, transmitting to a provider, writing its own records — which are
+real effects with real recovery problems, and are enough to prove the machinery honestly.
+
 ## Every Action Declares
 
 | Field | Meaning |
