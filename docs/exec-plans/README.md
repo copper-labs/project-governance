@@ -87,13 +87,25 @@ sample honest and stops one ecosystem quietly becoming the design.
 | `project-governance` | The deterministic fact and check layer the harness consumes | Python |
 | `portal-webapp` | First real adopter; also the Track R subject | TypeScript, npm |
 | `asensei-mnemos` | Multiplatform SDK; the hardest build shape | Kotlin Multiplatform, Gradle |
-| `coaching-intelligence-sdk-parallel-development` | A major project, named by the operator as a primary source of recurring cost | **Not yet inspected** |
+| `coaching-intelligence-sdk-parallel-development` | `asensei-movement-sdk`; the hardest shape by a wide margin | Kotlin/KMP **and** npm **and** React Native, web, Ionic, Expo, in one repository |
 
-The last row is a deliberate gap rather than an omission. Its ecosystem, build shape and failure
-profile have not been examined, so nothing in these contracts is designed around it yet. Step 1
-samples it before any design claim rests on it, and if it turns out to be a fourth ecosystem or a
-fourth build shape, that is a finding for [Ecosystem Adapters](../specs/ecosystem-adapters.md)
-rather than a surprise during Step 5.
+That last repository resets several assumptions and should be treated as the design's stress case,
+not an afterthought:
+
+- **75 Gradle modules and 28 npm workspaces in one tree.** The adapter boundary assumed roughly one
+  ecosystem per repository, with a repository able to register more than one. Here several coexist
+  and interleave, so unit-to-adapter routing is load-bearing rather than incidental.
+- **It is a git worktree** of a parent repository, which is how parallel development is already
+  done. A workspace is therefore not the same thing as a repository, and several workspaces exist
+  per checkout.
+- **Machine-global resources are shared across those workspaces.** Metro ports, simulators and
+  physical devices are owned per machine, not per workspace. A per-workspace claim does not cover
+  them, which is a real gap in [Build Orchestration](../specs/build-orchestration.md).
+- **A dev loop already exists** at `tools/dev-loop`, with durable state tracking device bindings,
+  port ownership by process id, and deployment digests. That is prior art for exactly the
+  operational state this proposal describes, and the harness should reference its receipts rather
+  than recreate them.
+- CI already runs mutation sweeps, nightly soaks and cross-platform compatibility releases.
 
 ## Environment Limit
 
