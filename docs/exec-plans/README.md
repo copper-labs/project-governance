@@ -3,7 +3,7 @@ id: plan.harness.master
 title: Decision-First Harness Master Plan
 type: exec-plan
 status: draft
-owner: project-governance
+owner: project-harness
 created: 2026-09-19
 updated: 2026-09-19
 summary: Sequenced phases for the decision-first harness, each with its own child plan and exit evidence.
@@ -14,7 +14,8 @@ summary: Sequenced phases for the decision-first harness, each with its own chil
 All phases are governed by [the umbrella contract](../specs/harness-core.md), whose fixed decisions
 and invariants no phase may revisit.
 
-Draft, pending independent review. Child plans follow the canonical implementation-plan template;
+Revised against [the secondary review](../reviews/2026-09-19-secondary-review.md); see
+[the reconciliation](../reviews/2026-09-19-reconciliation.md). Child plans follow the canonical implementation-plan template;
 they become `active` one at a time, as the phase before them produces its exit evidence.
 
 ## Final State
@@ -40,14 +41,33 @@ to discover whether the idea works would invert the whole argument.
 
 | Phase | Plan | Exit evidence | Owning specs |
 | --- | --- | --- | --- |
-| 0 | [Measure](phase-0-measure.md) | Accuracy and calibration per question on our own decisions | [Decision Interface](../specs/decision-interface.md) |
-| 1 | [Build hygiene](phase-1-build-hygiene.md) | No colliding or duplicate builds; failures arriving earlier; builds recorded | [Build Orchestration](../specs/build-orchestration.md), [State Store](../specs/state-store.md), [Ecosystem Adapters](../specs/ecosystem-adapters.md) |
-| 2 | [Decision interface](phase-2-decision-interface.md) | Triage accuracy against recorded outcomes; retries bounded | [Decision Interface](../specs/decision-interface.md), [Failure Triage](../specs/failure-triage.md), [Decision Record](../specs/decision-record.md) |
-| 3 | [Harness as a tool](phase-3-harness-as-tool.md) | Packet misses measured and falling | [Host Integration](../specs/host-integration.md), [Context Packet](../specs/context-packet.md), [Worker Invocation](../specs/worker-invocation.md) |
-| 4 | [Tighten on evidence](phase-4-tighten-on-evidence.md) | Threshold and map changes justified by the record | [Decision Record](../specs/decision-record.md), [Ecosystem Adapters](../specs/ecosystem-adapters.md) |
-| 5 | [Release plugin](phase-5-release-plugin.md) | One gated staging promotion, compared to hand-written runbooks | [Plugin Contract](../specs/plugin-contract.md), [Release Management](../specs/release-management.md) |
+| 0 | [Measure](active/phase-0-measure.md) | Held-out accuracy, calibration, harmful-error rate and cost per accepted task, against two comparators | [Decision Interface](../specs/decision-interface.md) |
+| 1 | [Build hygiene](active/phase-1-build-hygiene.md) | No colliding or duplicate builds; failures arriving earlier; builds recorded | [Build Orchestration](../specs/build-orchestration.md), [State Store](../specs/state-store.md), [Ecosystem Adapters](../specs/ecosystem-adapters.md) |
+| 2 | [Decision interface](active/phase-2-decision-interface.md) | Triage accuracy against recorded outcomes; retries bounded | [Decision Interface](../specs/decision-interface.md), [Failure Triage](../specs/failure-triage.md), [Decision Record](../specs/decision-record.md) |
+| 3 | [Harness as a tool](active/phase-3-harness-as-tool.md) | Packet misses measured and falling | [Host Integration](../specs/host-integration.md), [Context Packet](../specs/context-packet.md), [Worker Invocation](../specs/worker-invocation.md) |
+| 4 | [Tighten on evidence](active/phase-4-tighten-on-evidence.md) | Threshold and map changes justified by the record | [Decision Record](../specs/decision-record.md), [Ecosystem Adapters](../specs/ecosystem-adapters.md) |
+| 5 | [Release plugin](active/phase-5-release-plugin.md) | One gated staging promotion, compared to hand-written runbooks | [Plugin Contract](../specs/plugin-contract.md), [Release Management](../specs/release-management.md) |
 
-A phase does not start until the prior phase's exit evidence exists. Phase 0 may end the effort.
+A phase does not start until the prior phase's exit evidence exists, with one deliberate exception:
+**Phase 0 does not gate Phase 1.** A provider no-go stops model adoption; it does not cancel
+deterministic build hygiene, which is justified on its own terms.
+
+## Settled Decisions
+
+- **Repository.** `project-harness`, its own repository, consuming the governance runtime through
+  that runtime's published CLI and JSON surface only. Anything further is an upstream contribution,
+  never a fork or a vendored copy.
+- **Host language.** TypeScript on Node. It matches the TypeScript adopter, is the natural host if a
+  richer substrate is ever adopted through its JS runtime, and subprocesses the Python governance
+  CLI cleanly.
+- **Store.** Files - JSON for records, Markdown for prose - until a tuned baseline exists.
+- **Front door.** The agent host, not a CLI of our own.
+
+## Environment Limit
+
+The working machine has Node 22 and a JDK 11 with no Gradle. Real KMP builds cannot run there.
+Phases 1 to 4 prove on a fixture adapter and the TypeScript adopter; the KMP adapter is declared but
+its real-build proof waits for an environment that can run it, and is not claimed until then.
 
 ## Model Class Legend
 

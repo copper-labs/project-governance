@@ -9,7 +9,7 @@ updated: 2026-09-19
 summary: Release and deployment modelled as one gated state machine delivered as an optional plugin.
 ---
 
-> Part of the [Decision-First Harness](../2026-09-18-decision-first-harness.md) research
+> Part of the [Decision-First Harness](concept.md) research
 > effort. That page carries the concept, the risks, and the sequence.
 
 # Release Management As A Plugin

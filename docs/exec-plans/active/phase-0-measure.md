@@ -3,77 +3,107 @@ id: plan.harness.phase-0
 title: Phase 0 - Measure
 type: exec-plan
 status: draft
-owner: project-governance
+owner: project-harness
 created: 2026-09-19
 updated: 2026-09-19
-summary: Measure decision accuracy and calibration on our own decisions before building anything.
+summary: An evaluation with declared labels, a held-out split and an inconclusive option, answering whether a decision model is good enough on our decisions.
 ---
 
-> Child of [the master plan](README.md).
+> Child of [the master plan](../README.md). Rebuilt in response to finding R7.
 
 # Phase 0 - Measure
 
 ## Final State
 
-A recorded answer to one question: is a decision model accurate and calibrated enough, on the
-decisions we actually make, to be worth building around. The phase ends in a go or no-go, and a
-no-go is a successful outcome that costs two weeks.
+A defensible answer to one question: is a decision model accurate and calibrated enough, on our own
+decisions, to be worth adopting. Three outcomes are possible and all three are successes: go,
+no-go, or **inconclusive for insufficient evidence**.
 
 **Non-goals:** any harness component, any change to existing tooling, any production use.
+
+**Independence:** a no-go here stops *model adoption*. It does not cancel Phase 1, which is
+deterministic build hygiene justified on its own terms.
 
 ## Delivery
 
 - Delivery: local-only
 
-## Batch 1: A probe and fixture sets exist for real decisions
+## Evaluation Design, Declared Before The Run
+
+An earlier draft measured agreement with whatever the previous actor decided. Agreement is not
+correctness, so the design below replaces it. Every item here is fixed before any provider call.
+
+- **Labels are outcome-based.** A case is labelled by what was subsequently established - the fix
+  that actually worked, the lane that actually broke - not by what an agent or a person chose at the
+  time.
+- **Held-out split.** Cases are partitioned before question design. The evaluation split is never
+  used for wording questions, choosing options, or tuning thresholds.
+- **Per-class coverage.** A minimum case count per class is declared. A class below it is reported
+  as uncovered rather than scored.
+- **Harmful-error tolerance.** Errors are not symmetric. A declared maximum rate is set for errors
+  that would cause an unsafe action, separately from errors that merely waste a cycle.
+- **Abstention is an outcome.** Cases the model declines or answers below threshold are reported as
+  abstentions, never dropped.
+- **Unresolved outcomes are reported**, not excluded. They are exactly the cases where correctness
+  could not be established, and hiding them flatters the result.
+- **Two comparators.** Every question is scored against a deterministic rule and against the
+  existing workflow. A question that cannot beat a rule does not need a model.
+- **Frozen versions.** Question, provider, threshold and fixture versions are pinned per comparison
+  and recorded in an evaluation manifest.
+- **Cost is per accepted task**, including repairs and human intervention, not per call.
+
+## Batch 1: An evaluation manifest and a labelled corpus
 
 - Depends on: none
 - Ownership: ignored local research state only; no tracked source changes
 - Execution: sequential
-- Parallel support: one bounded read-only assignment to collect real failure samples from existing
-  build and CI logs across both candidate repositories, needed before the triage fixture set
+- Parallel support: two bounded read-only assignments - one harvesting real failures from existing
+  build and CI history across the candidate repositories, one harvesting real task intents from
+  recorded history; both needed before labelling starts
 - Semantic contract: settled
 - Model class: routine (gpt-5.6-luna, high; source: default table)
-- Fixed decisions: probe lives in ignored state; no tracked file changes; the provider key is read
-  from ignored local configuration and never committed
-- Acceptance: probes exist for intent routing and failure triage; each has a fixture set with
-  expected answers drawn from real history, not invented examples
-- Development checkpoints: probe runs end to end against the provider and prints per-case answers,
-  confidence, latency and cost
-- Build and integration point: none; this batch touches no build
-- Review boundary: fixture sets reviewed for realism before any accuracy claim is made
-- Proof budget: the probe run itself; no additional proof
-- Invalidates prior proof when: the fixture set changes or the provider version changes
+- Fixed decisions: cases come from real history, never invented; labels come from established
+  outcomes; the split is drawn before questions are written; the provider key is read from ignored
+  local configuration and never committed
+- Acceptance: a manifest declaring labels, split, per-class minimums, harmful-error tolerance, the
+  inconclusive criterion and both comparators; a labelled corpus meeting or explicitly missing its
+  per-class minimums
+- Development checkpoints: an inter-labeller check on a sample, because a corpus one person labelled
+  alone cannot detect its own bias
+- Build and integration point: none
+- Review boundary: the manifest and the corpus, reviewed before any provider call is made
+- Proof budget: labelling effort only; no provider cost in this batch
+- Invalidates prior proof when: the corpus, labels or split change
 - Proof state: not-run
-- Split early or stop when: fixtures cannot be drawn from real history, which would make every
-  later number meaningless
-- Documentation: consolidate at phase closeout
+- Split early or stop when: outcomes cannot be established for enough cases to meet the per-class
+  minimums, which is itself the inconclusive result and is reported as one
+- Documentation: the manifest is durable
 - Acceptance milestone: none
 
-## Batch 2: Shadow the decisions we already make
+## Batch 2: Run the evaluation and report it honestly
 
 - Depends on: Batch 1
 - Ownership: ignored local research state
 - Execution: sequential
-- Parallel support: solo; the work is one measurement pass and splitting it would fragment the data
+- Parallel support: solo; splitting one measurement pass fragments its data
 - Semantic contract: settled
 - Model class: diagnosis-review (gpt-5.6-sol, medium; source: default table)
-- Fixed decisions: the decision model decides nothing in this phase; it observes the same state and
-  its answer is recorded beside the real one
-- Acceptance: per question, an agreement rate against the real decision, a calibration curve
-  comparing stated confidence to observed correctness, and measured latency and cost on our work
-- Development checkpoints: an interim read after the first quarter of samples, to catch a broken
-  question before the whole run is wasted
+- Fixed decisions: the model decides nothing; the evaluation split is touched exactly once; no
+  threshold is changed to improve a result
+- Acceptance: on held-out cases, per-class accuracy and errors, harmful-error rate against its
+  tolerance, calibration with its uncertainty, abstention rate, unresolved-outcome count, latency,
+  and total cost per accepted task - each reported against both comparators
+- Development checkpoints: a dry run on the design split only, to catch a broken question before
+  the held-out split is spent
 - Build and integration point: none
-- Review boundary: the calibration report and the go or no-go recommendation
-- Proof budget: provider cost for the sample set, expected to be negligible; the real cost is
-  elapsed time
-- Invalidates prior proof when: questions are reworded, thresholds change, or the provider updates
+- Review boundary: the results and the go, no-go or inconclusive recommendation
+- Proof budget: provider cost for the corpus, expected to be small; elapsed time is the real cost
+- Invalidates prior proof when: any frozen version changes
 - Proof state: not-run
-- Split early or stop when: agreement is poor and uncorrelated with confidence, which is a no-go
-  rather than a tuning problem
-- Documentation: a calibration report and a recommendation, both durable
-- Acceptance milestone: operator review of the go or no-go before Phase 1 starts
+- Split early or stop when: the held-out split is exhausted; it is not re-run with adjusted
+  questions, because that converts an evaluation into tuning
+- Documentation: a results report and a recommendation, both durable
+- Acceptance milestone: operator review of the recommendation before any model adoption
 
 ## Stable-Candidate Proof
 

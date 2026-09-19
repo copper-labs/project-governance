@@ -1,5 +1,5 @@
 ---
-id: research.decision-first-harness
+id: research.concept
 title: Decision-First Harness
 type: research
 status: draft
@@ -10,6 +10,11 @@ summary: Conceptual proposal for a harness and governance system whose control p
 ---
 
 # Decision-First Harness
+
+> **Superseded in part.** This is the original concept note, kept for its reasoning. Where it
+> differs from the contracts, the contracts win: the store is files, not a richer substrate; the
+> front door is the agent host, not a CLI of our own; and execution state is recorded *before* the
+> action it covers, not after verification. See [the specifications](../specs/README.md).
 
 Conceptual proposal. Nothing here is a design or a commitment. The point is to agree on the idea
 and the first experiment.
@@ -154,7 +159,7 @@ fills. The two are complementary by design rather than by coincidence.
 richer substrate is reevaluated only once the harness is tuned and running, and only against the
 baseline the file implementation produces. That keeps the comparison honest and stops two hard
 problems being coupled on day one. The store boundary in
-[State Store](decision-first-harness/specs/state-store.md) exists so that later decision stays cheap.
+[State Store](../specs/state-store.md) exists so that later decision stays cheap.
 
 **Three cautions that informed it.**
 
@@ -339,20 +344,20 @@ runbooks it replaces.
 
 ## Notes In This Series
 
-- [The flow, end to end](decision-first-harness/flow.md) - how a task moves through the harness and
+- [The flow, end to end](flow.md) - how a task moves through the harness and
   where the tokens go.
-- [Builds and checks](decision-first-harness/builds-and-checks.md) - KMP multiplatform builds, lane
+- [Builds and checks](builds-and-checks.md) - KMP multiplatform builds, lane
   selection, failure triage, build identity.
-- [Release management as a plugin](decision-first-harness/release-management.md) - the gated state
+- [Release management as a plugin](release-management.md) - the gated state
   machine and the plugin contract.
-- [Portal case study](decision-first-harness/portal-case-study.md) - what one adopter already built
+- [Portal case study](portal-case-study.md) - what one adopter already built
   by hand, and the three moves with the clearest payoff.
 
 The concept above is now carried into draft contracts and plans:
 
-- [Specifications](decision-first-harness/specs/README.md) - an umbrella contract and eleven focused
+- [Specifications](../specs/README.md) - an umbrella contract and eleven focused
   children.
-- [Master plan](decision-first-harness/plans/README.md) - six phase plans, each with exit evidence
+- [Master plan](../exec-plans/README.md) - six phase plans, each with exit evidence
   and model work classes.
 
 ## Open Questions

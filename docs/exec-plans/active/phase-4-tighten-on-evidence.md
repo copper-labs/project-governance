@@ -3,13 +3,13 @@ id: plan.harness.phase-4
 title: Phase 4 - Tighten On Evidence
 type: exec-plan
 status: draft
-owner: project-governance
+owner: project-harness
 created: 2026-09-19
 updated: 2026-09-19
 summary: Change thresholds, lane maps and check selection only where the recorded history justifies it.
 ---
 
-> Child of [the master plan](README.md).
+> Child of [the master plan](../README.md).
 
 # Phase 4 - Tighten On Evidence
 
@@ -31,7 +31,7 @@ proves the adapter boundary was real.
 - Ownership: calibration reads over the record; one writer
 - Execution: sequential
 - Parallel support: solo
-- Semantic contract: settled by [Decision Record](../specs/decision-record.md)
+- Semantic contract: settled by [Decision Record](../../specs/decision-record.md)
 - Model class: diagnosis-review (gpt-5.6-sol, medium; source: default table)
 - Fixed decisions: a threshold may only be loosened against recorded outcomes; the change itself is
   recorded with its evidence; human corrections are the strongest signal; open decisions are
@@ -56,13 +56,14 @@ proves the adapter boundary was real.
 - Execution: parallel with Batch 1 only after Batch 1's reads exist
 - Parallel support: one bounded read-only assignment to identify lanes that ran repeatedly without
   ever failing, and paths never covered by any lane, needed at batch start
-- Semantic contract: settled by [Ecosystem Adapters](../specs/ecosystem-adapters.md)
+- Semantic contract: settled by [Ecosystem Adapters](../../specs/ecosystem-adapters.md)
 - Model class: ambiguous-integration (gpt-5.6-terra, high; source: default table)
 - Fixed decisions: maps narrow only where history supports it and widen wherever it does not;
   release and broad-proof boundaries are untouched; the second adapter adds no core change
-- Acceptance: family-level selection refined toward unit level where the graph supports it; a
-  second ecosystem runs the same loop with no core modification; dead lanes and uncovered paths
-  named explicitly
+- Acceptance: narrowing supported by dependency and coverage evidence, never by passing history
+  alone; a lane that never failed is prioritized for investigation rather than removed; periodic
+  broad comparison retained; a second ecosystem runs the same loop with no core modification;
+  uncovered paths named explicitly
 - Development checkpoints: fixture changes with expected lanes per adapter
 - Build and integration point: real builds in both ecosystems
 - Review boundary: the completed refinement against the recorded history it claims to follow

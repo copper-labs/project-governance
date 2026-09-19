@@ -3,20 +3,25 @@ id: plan.harness.phase-3
 title: Phase 3 - Harness As A Tool
 type: exec-plan
 status: draft
-owner: project-governance
+owner: project-harness
 created: 2026-09-19
 updated: 2026-09-19
 summary: The harness invoked from inside Codex, Claude Code and Cowork, assembling packets and dispatching bounded work.
 ---
 
-> Child of [the master plan](README.md).
+> Child of [the master plan](../README.md).
 
 # Phase 3 - Harness As A Tool
 
 ## Final State
 
 The operator keeps working inside the host they already use. That host calls the harness first,
-receives a bounded packet, and writes from it. Packet misses are recorded and falling.
+receives a bounded packet, and writes from it.
+
+**Success is measured by accepted task results, later-detected defects, rework, and total time and
+cost against the existing workflow.** Packet miss rate is a diagnostic split by cause, not the
+measure: a worker can miss an essential constraint without ever asking for it, so a falling request
+rate proves nothing on its own.
 
 **Non-goals:** a front door of our own, a desktop application, any release capability, semantic
 search infrastructure.
@@ -32,12 +37,14 @@ search infrastructure.
 - Execution: sequential
 - Parallel support: one bounded read-only assignment to inventory how each host expects to be
   instructed, needed before the marked section is generated
-- Semantic contract: settled by [Host Integration](../specs/host-integration.md)
+- Semantic contract: settled by [Host Integration](../../specs/host-integration.md)
 - Model class: routine (gpt-5.6-luna, high; source: default table)
 - Fixed decisions: one subprocess surface with JSON on stdout; adapters are thin and generated from
   one source; approvals and permissions stay host-owned; the harness parses no transcripts
-- Acceptance: the same task run from Codex, Claude Code and Cowork produces equivalent packets and
-  records; adapter generation is idempotent and touches only its marked section
+- Acceptance: transport proven with a **fixed fixture packet** - each host invokes, receives and
+  acts on it identically; adapter generation is idempotent and touches only its marked section. Real
+  packet equivalence across hosts moves to phase closeout, after Batch 3 exists. Support for each
+  host is a demonstrated capability, not a consequence of sharing instruction text
 - Development checkpoints: focused tests for the invocation surface; one manual run per host
 - Build and integration point: real use in one repository from each host
 - Review boundary: the three hosts compared on one identical task
@@ -78,13 +85,17 @@ search infrastructure.
 - Execution: sequential
 - Parallel support: one bounded read-only assignment to establish what a good packet contains for a
   sample of past tasks, needed as the comparison baseline
-- Semantic contract: settled by [Context Packet](../specs/context-packet.md)
+- Semantic contract: settled by [Context Packet](../../specs/context-packet.md)
 - Model class: ambiguous-integration (gpt-5.6-terra, high; source: default table)
 - Fixed decisions: no language model builds a packet; candidates are generated deterministically
   before anything is narrowed; packets are immutable and content-addressed; the escape hatch is
-  served deterministically and recorded as a miss
-- Acceptance: a fixed change produces a byte-identical packet; every included item states why;
-  misses are attributable to a specific narrowing decision; low confidence widens rather than narrows
+  served deterministically and recorded as a miss split by cause; **the subject-to-materialization
+  bridge is built in this batch and its absence is a blocker, not an assumption**; mandatory items
+  cannot be dropped by narrowing or budget
+- Acceptance: determinism holds over a frozen subject, catalog, history snapshot, budget and
+  recorded selection; staged and worktree bytes made to differ prove which the packet carried;
+  mandatory context overflow returns a blocker rather than a silent drop; a clean checkout with no
+  diff routes by declared target; misses are split by generation, ranking and budget cause
 - Development checkpoints: determinism and budget tests on change
 - Build and integration point: real tasks in both repositories
 - Review boundary: packets compared against the hand-built baseline
@@ -102,7 +113,7 @@ search infrastructure.
 - Ownership: worker invocation; one writer
 - Execution: sequential
 - Parallel support: solo
-- Semantic contract: settled by [Worker Invocation](../specs/worker-invocation.md)
+- Semantic contract: settled by [Worker Invocation](../../specs/worker-invocation.md)
 - Model class: difficult-implementation (gpt-5.6-luna, xhigh; source: default table)
 - Fixed decisions: input is a packet identity plus a bounded instruction, never a transcript; the
   operator's explicit choice wins over any recommendation; unavailable models are reported, never
@@ -117,7 +128,8 @@ search infrastructure.
 - Proof state: not-run
 - Split early or stop when: portability fails, which would mean statelessness is not real
 - Documentation: consolidate at phase closeout
-- Acceptance milestone: operator review of packet miss trend before Phase 4
+- Acceptance milestone: operator review of accepted-result and rework measures, with miss causes as
+  supporting diagnostics, before Phase 4
 
 ## Stable-Candidate Proof
 

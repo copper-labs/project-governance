@@ -3,13 +3,13 @@ id: plan.harness.phase-2
 title: Phase 2 - Decision Interface And First Decision
 type: exec-plan
 status: draft
-owner: project-governance
+owner: project-harness
 created: 2026-09-19
 updated: 2026-09-19
 summary: The provider-agnostic decision interface with fallbacks, proven on failure triage where a wrong answer costs one cycle.
 ---
 
-> Child of [the master plan](README.md).
+> Child of [the master plan](../README.md).
 
 # Phase 2 - Decision Interface And First Decision
 
@@ -31,7 +31,7 @@ classes resolve without reaching a language model.
 - Ownership: decision interface and question catalog; one writer
 - Execution: sequential
 - Parallel support: solo; the contract is the point and a second reader would not reduce its risk
-- Semantic contract: settled by [Decision Interface](../specs/decision-interface.md)
+- Semantic contract: settled by [Decision Interface](../../specs/decision-interface.md)
 - Model class: difficult-implementation (gpt-5.6-luna, xhigh; source: default table)
 - Fixed decisions: three question shapes; catalog entries are versioned data; every entry declares
   a fallback; no provider SDK outside a provider module; a timeout is a fallback, not an error
@@ -54,14 +54,16 @@ classes resolve without reaching a language model.
 - Execution: sequential
 - Parallel support: one bounded read-only assignment to classify the Phase 0 failure samples by
   hand, needed as the accuracy baseline
-- Semantic contract: settled by [Failure Triage](../specs/failure-triage.md)
+- Semantic contract: settled by [Failure Triage](../../specs/failure-triage.md)
 - Model class: deep-reasoning (gpt-5.6-sol, high; source: default table) for the taxonomy and
   remedy mapping, because a wrong class here becomes a wrong action everywhere downstream
 - Fixed decisions: eight shared classes; adapters may add subtypes but never remove or redefine a
-  class; remedies are declared data; retry bounded at one per class per task; a repeat is
-  reclassified as a source defect; low confidence resolves to unknown
+  class; remedies are declared data acting only on declared authorized scopes; remedies bounded per
+  failure episode, not per class; an exhausted allowance preserves the observed class and attaches
+  `remedy-exhausted`; low confidence resolves to unknown
 - Acceptance: every class has a declared remedy for at least one adapter; unknown is reachable and
-  never tuned away; the retry bound holds under a forced repeat
+  never tuned away; a repeated resource failure and a failure with alternating predicted classes
+  each stay within the episode allowance and trigger no source edit
 - Development checkpoints: focused tests per class and for the repeat rule
 - Build and integration point: none
 - Review boundary: the taxonomy itself, reviewed against the hand-classified samples
@@ -82,11 +84,14 @@ classes resolve without reaching a language model.
 - Semantic contract: settled
 - Model class: diagnosis-review (gpt-5.6-sol, medium; source: default table)
 - Fixed decisions: triage never edits source, installs packages, or marks a run successful; the
-  decision sees a signature, never a whole log
+  decision sees a signature, never a whole log; **a `source-defect` classification hands back to the
+  existing host workflow** until the dispatch path exists in Phase 3 - this phase does not call a
+  worker
 - Acceptance: classifications and outcomes recorded for every failure; measured accuracy per class;
   most classes resolving without a language model; a run with triage disabled behaves as today
 - Development checkpoints: focused tests, then a period of real use before any accuracy claim
-- Build and integration point: real failing builds across both repositories
+- Build and integration point: real failing builds in the one implemented ecosystem, plus the
+  offline failure fixtures from the Phase 0 corpus for classes that ecosystem does not produce
 - Review boundary: the accuracy report and whether any threshold should move
 - Proof budget: existing build logs supply the baseline; no separate benchmark is constructed
 - Invalidates prior proof when: the taxonomy, thresholds, or adapter signatures change

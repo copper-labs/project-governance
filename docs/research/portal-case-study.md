@@ -9,7 +9,7 @@ updated: 2026-09-19
 summary: What an adopting project already built by hand, and the three moves with the clearest payoff.
 ---
 
-> Part of the [Decision-First Harness](../2026-09-18-decision-first-harness.md) research
+> Part of the [Decision-First Harness](concept.md) research
 > effort. That page carries the concept, the risks, and the sequence.
 
 # Case Study: A Portal Adopter

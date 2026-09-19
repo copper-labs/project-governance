@@ -9,8 +9,12 @@ updated: 2026-09-19
 summary: How a task moves through the harness end to end, and where the tokens go.
 ---
 
-> Part of the [Decision-First Harness](../2026-09-18-decision-first-harness.md) research
-> effort. That page carries the concept, the risks, and the sequence.
+> Part of the [Decision-First Harness](concept.md) research effort.
+>
+> **Superseded in part.** Written before the store and front-door decisions were settled. Mnemos is
+> *not* the store - files are, until a tuned baseline exists. And execution state is recorded before
+> the action it covers, not after verification as step 7 below implies. The
+> [contracts](../specs/README.md) are authoritative.
 
 # The Flow, End To End
 

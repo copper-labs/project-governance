@@ -3,13 +3,13 @@ id: plan.harness.phase-5
 title: Phase 5 - Release Management Plugin
 type: exec-plan
 status: draft
-owner: project-governance
+owner: project-harness
 created: 2026-09-19
 updated: 2026-09-19
 summary: The plugin contract and one gated staging promotion, compared against the runbooks it replaces.
 ---
 
-> Child of [the master plan](README.md).
+> Child of [the master plan](../README.md).
 
 # Phase 5 - Release Management Plugin
 
@@ -24,7 +24,9 @@ tooling, a plugin ecosystem.
 
 ## Delivery
 
-- Delivery: local-only
+- Delivery: local-only for Batches 1 to 4. Batch 5 requires an explicitly authorized staging
+  execution against a real destination, with readback; that authorization is separate from this plan
+  and is obtained before the batch starts.
 
 ## Batch 1: The plugin host and gate evaluation
 
@@ -32,11 +34,11 @@ tooling, a plugin ecosystem.
 - Ownership: plugin host and gate evaluation in the core; one writer
 - Execution: sequential
 - Parallel support: solo; the invariant is the point of the batch
-- Semantic contract: settled by [Plugin Contract](../specs/plugin-contract.md)
+- Semantic contract: settled by [Plugin Contract](../../specs/plugin-contract.md)
 - Model class: difficult-implementation (gpt-5.6-luna, xhigh; source: default table)
 - Fixed decisions: a plugin declares states, gates, commands and records and nothing else; a plugin
-  may raise a gate and never lower one; the invariant is enforced at load; an unavailable fact is
-  never a satisfied gate
+  may raise a gate and never lower one; enforced at load **and** at evaluation, since load-time
+  validation cannot prove a live gate fact; an unavailable fact is never a satisfied gate
 - Acceptance: a plugin attempting to lower a gate fails to load with one clear reason; two plugins
   claiming one transition fail to load; removing a plugin restores prior core behavior exactly
 - Development checkpoints: focused tests for each refusal path
@@ -57,7 +59,7 @@ tooling, a plugin ecosystem.
 - Execution: sequential
 - Parallel support: one bounded read-only assignment to enumerate the live facts currently left for
   an operator and where each is obtainable, needed at batch start
-- Semantic contract: settled by [Release Management](../specs/release-management.md)
+- Semantic contract: settled by [Release Management](../../specs/release-management.md)
 - Model class: routine (gpt-5.6-luna, high; source: default table)
 - Fixed decisions: no decision model participates; the packet wraps the existing builder rather
   than replacing it; an unavailable fact is reported as unavailable, never inferred
@@ -86,9 +88,11 @@ tooling, a plugin ecosystem.
 - Fixed decisions: existing checkers are harvested, not deleted; each encodes a real lesson; a
   version-pinned checker for a shipped release is retired explicitly and recorded; a new concern
   adds a catalog entry rather than a script
-- Acceptance: catalog entries reproduce the verdicts of the checkers they replace on historical
-  subjects; retired checkers are named with their reason; coverage gaps for a change are reported
-  rather than assumed satisfied
+- Acceptance: the mandatory evidence set is computed from policy and change facts, never selected
+  by a decision; a forced wrong decision that omits a mandatory type still leaves the gate blocked;
+  catalog entries reproduce the verdicts of the checkers they replace; retired checkers are named
+  with their reason; checkers whose behavior resists declaration stay as code and are recorded as
+  exceptions
 - Development checkpoints: each harvested entry replayed against the history that produced it
 - Build and integration point: evaluator run against recorded subjects
 - Review boundary: the complete catalog against the original checker set, verdict for verdict

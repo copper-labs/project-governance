@@ -11,6 +11,9 @@ summary: Independent review of the draft harness contracts and phased plan, with
 
 # Decision-First Harness: Secondary Review
 
+> Copied verbatim from `project-governance` into this repository. Only relative link paths were
+> adjusted for the new location; `GOVERNANCE-RUNTIME:` marks a path in that other repository.
+
 ## Recommendation
 
 Proceed with a bounded measurement experiment after tightening its evaluation design. Revise the
@@ -43,9 +46,9 @@ design or delivery correction. A Phase 5 P1 need not delay a Phase 0 experiment.
 
 ### R1 — P1: Model-selected evidence can weaken a release gate
 
-**Sources:** [Release Management: Gates and Evidence Catalog](specs/release-management.md),
-[Harness Core: Fixed Decisions](specs/harness-core.md),
-[Plugin Contract: Gate Invariant](specs/plugin-contract.md).
+**Sources:** [Release Management: Gates and Evidence Catalog](../specs/release-management.md),
+[Harness Core: Fixed Decisions](../specs/harness-core.md),
+[Plugin Contract: Gate Invariant](../specs/plugin-contract.md).
 
 The release contract makes “which evidence types apply” a decision-model output. Complete catalog
 coverage is then checked against that selection. A model can omit a required evidence type and
@@ -63,9 +66,9 @@ policy or rejects the stale evaluation. Static load validation alone cannot prov
 
 ### R2 — P1: Mandatory recording and optional recording are incompatible
 
-**Sources:** [Harness Core: Invariants](specs/harness-core.md),
-[Decision Record: Failure Modes and Validation](specs/decision-record.md),
-[State Store: Failure Modes and Validation](specs/state-store.md).
+**Sources:** [Harness Core: Invariants](../specs/harness-core.md),
+[Decision Record: Failure Modes and Validation](../specs/decision-record.md),
+[State Store: Failure Modes and Validation](../specs/state-store.md).
 
 The umbrella requires every decision to be recorded before its action. The record spec says a
 failed write does not stop the action; both storage contracts require unchanged behavior with
@@ -82,10 +85,10 @@ checks remain available and that the action cannot be duplicated or lose its ret
 
 ### R3 — P1: The task lifecycle and apply/verify boundary have no owner
 
-**Sources:** [State Store: Scope and Behavioral Requirements](specs/state-store.md),
-[Host Integration: Two Steps](specs/host-integration.md),
-[Worker Invocation: Worker Contract](specs/worker-invocation.md),
-[Phase 3](plans/phase-3-harness-as-tool.md).
+**Sources:** [State Store: Scope and Behavioral Requirements](../specs/state-store.md),
+[Host Integration: Two Steps](../specs/host-integration.md),
+[Worker Invocation: Worker Contract](../specs/worker-invocation.md),
+[Phase 3](../exec-plans/active/phase-3-harness-as-tool.md).
 
 The store claims task lifecycle ownership but defines only record operations. The host is said to
 write, while the worker returns a diff. No contract states who applies that diff, detects intervening
@@ -104,9 +107,9 @@ the same patch twice. Checks must reference the resulting subject, not the origi
 
 ### R4 — P1: Build locking does not yet cover the concurrency it promises
 
-**Sources:** [Build Orchestration: Workspace Lock, Ladder, Failure Modes](specs/build-orchestration.md),
-[Phase 1: Batches 2–3](plans/phase-1-build-hygiene.md),
-[existing Test Execution: Inputs and Resources](../../specs/test-execution.md).
+**Sources:** [Build Orchestration: Workspace Lock, Ladder, Failure Modes](../specs/build-orchestration.md),
+[Phase 1: Batches 2–3](../exec-plans/active/phase-1-build-hygiene.md),
+[existing Test Execution: Inputs and Resources](GOVERNANCE-RUNTIME:docs/specs/test-execution.md).
 
 The spec allows one build per workspace, but Stage C starts remaining lanes in parallel. It does
 not distinguish one lock-owning orchestration request from its child tool invocations or declare
@@ -130,8 +133,8 @@ the existing execution claims before claiming collision prevention.
 
 ### R5 — P1: A repeated failure is not evidence of a source defect
 
-**Sources:** [Failure Triage: Behavioral Requirements and Retry Bound](specs/failure-triage.md),
-[Phase 2: Batch 2](plans/phase-2-decision-interface.md).
+**Sources:** [Failure Triage: Behavioral Requirements and Retry Bound](../specs/failure-triage.md),
+[Phase 2: Batch 2](../exec-plans/active/phase-2-decision-interface.md).
 
 The forced `source-defect` reclassification is wrong for a persistent disk shortage, dependency
 outage, or toolchain mismatch. It can send a worker to change correct source. It also conflicts with
@@ -150,10 +153,10 @@ an unsupported source edit or exceed the episode's remedy allowance.
 
 ### R6 — P1: The same low-confidence answer has three different outcomes
 
-**Sources:** [Harness Core: Fixed Decisions](specs/harness-core.md),
-[Decision Interface: Escalation Ladder](specs/decision-interface.md),
-[Context Packet: Failure Modes](specs/context-packet.md),
-[Failure Triage: Failure Modes](specs/failure-triage.md).
+**Sources:** [Harness Core: Fixed Decisions](../specs/harness-core.md),
+[Decision Interface: Escalation Ladder](../specs/decision-interface.md),
+[Context Packet: Failure Modes](../specs/context-packet.md),
+[Failure Triage: Failure Modes](../specs/failure-triage.md).
 
 The umbrella says a below-threshold answer takes a deterministic fallback and continues. The
 interface says it stops for a human. Packet selection widens; triage hands over as unknown. Thus
@@ -169,9 +172,9 @@ budget overflow, and low confidence. Assert the same disposition at interface an
 
 ### R7 — P1: Phase 0 cannot yet support an honest go/no-go decision
 
-**Sources:** [Phase 0](plans/phase-0-measure.md),
-[Decision Record: Calibration Reads](specs/decision-record.md),
-[Phase 4: Batch 1](plans/phase-4-tighten-on-evidence.md).
+**Sources:** [Phase 0](../exec-plans/active/phase-0-measure.md),
+[Decision Record: Calibration Reads](../specs/decision-record.md),
+[Phase 4: Batch 1](../exec-plans/active/phase-4-tighten-on-evidence.md).
 
 Agreement with the prior actor is not correctness. The plan leaves sample size, error tolerance,
 holdout data, and the baseline comparator undefined. Reusing the same small examples for question
@@ -190,9 +193,9 @@ stop model adoption, not automatically cancel independently justified determinis
 
 ### R8 — P2: The ledger lacks enough provenance for its calibration promise
 
-**Sources:** [Decision Record: Record Shape](specs/decision-record.md),
-[State Store: Retention](specs/state-store.md),
-[Phase 4: Rollback](plans/phase-4-tighten-on-evidence.md).
+**Sources:** [Decision Record: Record Shape](../specs/decision-record.md),
+[State Store: Retention](../specs/state-store.md),
+[Phase 4: Rollback](../exec-plans/active/phase-4-tighten-on-evidence.md).
 
 Question version and a state digest are insufficient to distinguish provider changes, threshold
 changes, packet-generator changes, or policy changes. The plan also promises rollback to old maps
@@ -211,10 +214,10 @@ references, and rollback restores exact prior configuration from retained eviden
 
 ### R9 — P1: Packet correctness depends on an unimplemented subject seam
 
-**Sources:** [Context Packet: Invariants and Failure Modes](specs/context-packet.md),
-[Phase 3: Batches 2–3](plans/phase-3-harness-as-tool.md),
-[existing context producer](../../../src/project_governance_runtime/context.py),
-[Governance Kernel: context contract](../../specs/governance-kernel.md).
+**Sources:** [Context Packet: Invariants and Failure Modes](../specs/context-packet.md),
+[Phase 3: Batches 2–3](../exec-plans/active/phase-3-harness-as-tool.md),
+[existing context producer](GOVERNANCE-RUNTIME:src/project_governance_runtime/context.py),
+[Governance Kernel: context contract](GOVERNANCE-RUNTIME:docs/specs/governance-kernel.md).
 
 The proposed packet must read the governance runtime's immutable subject. The existing
 `resolve_context(root, task, changed_paths, ...)` reads route files and content through the supplied
@@ -239,9 +242,9 @@ and submit a task in a clean checkout. Validate both the bytes and their subject
 
 ### R10 — P2: Packet misses and passing lanes are incomplete quality signals
 
-**Sources:** [Phase 3: Final State and Batch 3](plans/phase-3-harness-as-tool.md),
-[Phase 4: Batch 2](plans/phase-4-tighten-on-evidence.md),
-[Context Packet: Escape Hatch](specs/context-packet.md).
+**Sources:** [Phase 3: Final State and Batch 3](../exec-plans/active/phase-3-harness-as-tool.md),
+[Phase 4: Batch 2](../exec-plans/active/phase-4-tighten-on-evidence.md),
+[Context Packet: Escape Hatch](../specs/context-packet.md).
 
 A worker can miss an essential constraint without asking for it. A lower request rate therefore
 does not establish better packets. Likewise, a lane that never failed may cover a rare but important
@@ -258,9 +261,9 @@ rare-failure lane that appears redundant in routine history. The evaluation must
 
 ### R11 — P2: Several plan batches require work scheduled later
 
-**Sources:** [Master Plan](plans/README.md), [Phase 1](plans/phase-1-build-hygiene.md),
-[Phase 2](plans/phase-2-decision-interface.md), [Phase 3](plans/phase-3-harness-as-tool.md),
-[Phase 4](plans/phase-4-tighten-on-evidence.md), [Phase 5](plans/phase-5-release-plugin.md).
+**Sources:** [Master Plan](../exec-plans/active/README.md), [Phase 1](../exec-plans/active/phase-1-build-hygiene.md),
+[Phase 2](../exec-plans/active/phase-2-decision-interface.md), [Phase 3](../exec-plans/active/phase-3-harness-as-tool.md),
+[Phase 4](../exec-plans/active/phase-4-tighten-on-evidence.md), [Phase 5](../exec-plans/active/phase-5-release-plugin.md).
 
 These dependencies need correction before batches are called settled:
 

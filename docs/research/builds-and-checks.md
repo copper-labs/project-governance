@@ -9,7 +9,7 @@ updated: 2026-09-19
 summary: Applying the decision-first pattern to KMP multiplatform builds, check selection, and failure triage.
 ---
 
-> Part of the [Decision-First Harness](../2026-09-18-decision-first-harness.md) research
+> Part of the [Decision-First Harness](concept.md) research
 > effort. That page carries the concept, the risks, and the sequence.
 
 # Applied To Builds And Checks
