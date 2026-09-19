@@ -11,6 +11,10 @@ summary: Independent review of the draft harness contracts and phased plan, with
 
 # Decision-First Harness: Secondary Review
 
+> **Phase-plan references below are historical.** The six-phase plan this review discusses
+> was replaced by the five-step sequence in [the master plan](../exec-plans/README.md);
+> the superseded files remain in git history.
+
 > Copied verbatim from `project-governance` into this repository. Only relative link paths were
 > adjusted for the new location; `GOVERNANCE-RUNTIME:` marks a path in that other repository.
 
@@ -88,7 +92,7 @@ checks remain available and that the action cannot be duplicated or lose its ret
 **Sources:** [State Store: Scope and Behavioral Requirements](../specs/state-store.md),
 [Host Integration: Two Steps](../specs/host-integration.md),
 [Worker Invocation: Worker Contract](../specs/worker-invocation.md),
-[Phase 3](../exec-plans/active/phase-3-harness-as-tool.md).
+Phase 3 *(superseded phase plan)*.
 
 The store claims task lifecycle ownership but defines only record operations. The host is said to
 write, while the worker returns a diff. No contract states who applies that diff, detects intervening
@@ -108,7 +112,7 @@ the same patch twice. Checks must reference the resulting subject, not the origi
 ### R4 — P1: Build locking does not yet cover the concurrency it promises
 
 **Sources:** [Build Orchestration: Workspace Lock, Ladder, Failure Modes](../specs/build-orchestration.md),
-[Phase 1: Batches 2–3](../exec-plans/active/phase-1-build-hygiene.md),
+Phase 1: Batches 2–3 *(superseded phase plan)*,
 [existing Test Execution: Inputs and Resources](GOVERNANCE-RUNTIME:docs/specs/test-execution.md).
 
 The spec allows one build per workspace, but Stage C starts remaining lanes in parallel. It does
@@ -134,7 +138,7 @@ the existing execution claims before claiming collision prevention.
 ### R5 — P1: A repeated failure is not evidence of a source defect
 
 **Sources:** [Failure Triage: Behavioral Requirements and Retry Bound](../specs/failure-triage.md),
-[Phase 2: Batch 2](../exec-plans/active/phase-2-decision-interface.md).
+Phase 2: Batch 2 *(superseded phase plan)*.
 
 The forced `source-defect` reclassification is wrong for a persistent disk shortage, dependency
 outage, or toolchain mismatch. It can send a worker to change correct source. It also conflicts with
@@ -172,9 +176,9 @@ budget overflow, and low confidence. Assert the same disposition at interface an
 
 ### R7 — P1: Phase 0 cannot yet support an honest go/no-go decision
 
-**Sources:** [Phase 0](../exec-plans/active/phase-0-measure.md),
+**Sources:** Phase 0 *(superseded phase plan)*,
 [Decision Record: Calibration Reads](../specs/decision-record.md),
-[Phase 4: Batch 1](../exec-plans/active/phase-4-tighten-on-evidence.md).
+Phase 4: Batch 1 *(superseded phase plan)*.
 
 Agreement with the prior actor is not correctness. The plan leaves sample size, error tolerance,
 holdout data, and the baseline comparator undefined. Reusing the same small examples for question
@@ -195,7 +199,7 @@ stop model adoption, not automatically cancel independently justified determinis
 
 **Sources:** [Decision Record: Record Shape](../specs/decision-record.md),
 [State Store: Retention](../specs/state-store.md),
-[Phase 4: Rollback](../exec-plans/active/phase-4-tighten-on-evidence.md).
+Phase 4: Rollback *(superseded phase plan)*.
 
 Question version and a state digest are insufficient to distinguish provider changes, threshold
 changes, packet-generator changes, or policy changes. The plan also promises rollback to old maps
@@ -215,7 +219,7 @@ references, and rollback restores exact prior configuration from retained eviden
 ### R9 — P1: Packet correctness depends on an unimplemented subject seam
 
 **Sources:** [Context Packet: Invariants and Failure Modes](../specs/context-packet.md),
-[Phase 3: Batches 2–3](../exec-plans/active/phase-3-harness-as-tool.md),
+Phase 3: Batches 2–3 *(superseded phase plan)*,
 [existing context producer](GOVERNANCE-RUNTIME:src/project_governance_runtime/context.py),
 [Governance Kernel: context contract](GOVERNANCE-RUNTIME:docs/specs/governance-kernel.md).
 
@@ -242,8 +246,8 @@ and submit a task in a clean checkout. Validate both the bytes and their subject
 
 ### R10 — P2: Packet misses and passing lanes are incomplete quality signals
 
-**Sources:** [Phase 3: Final State and Batch 3](../exec-plans/active/phase-3-harness-as-tool.md),
-[Phase 4: Batch 2](../exec-plans/active/phase-4-tighten-on-evidence.md),
+**Sources:** Phase 3: Final State and Batch 3 *(superseded phase plan)*,
+Phase 4: Batch 2 *(superseded phase plan)*,
 [Context Packet: Escape Hatch](../specs/context-packet.md).
 
 A worker can miss an essential constraint without asking for it. A lower request rate therefore
@@ -261,9 +265,9 @@ rare-failure lane that appears redundant in routine history. The evaluation must
 
 ### R11 — P2: Several plan batches require work scheduled later
 
-**Sources:** [Master Plan](../exec-plans/README.md), [Phase 1](../exec-plans/active/phase-1-build-hygiene.md),
-[Phase 2](../exec-plans/active/phase-2-decision-interface.md), [Phase 3](../exec-plans/active/phase-3-harness-as-tool.md),
-[Phase 4](../exec-plans/active/phase-4-tighten-on-evidence.md), [Phase 5](../exec-plans/active/phase-5-release-plugin.md).
+**Sources:** [Master Plan](../exec-plans/README.md), Phase 1 *(superseded phase plan)*,
+Phase 2 *(superseded phase plan)*, Phase 3 *(superseded phase plan)*,
+Phase 4 *(superseded phase plan)*, Phase 5 *(superseded phase plan)*.
 
 These dependencies need correction before batches are called settled:
 

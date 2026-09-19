@@ -11,8 +11,11 @@ summary: Draft contract family for the decision-first harness, held in research 
 
 # Decision-First Harness Specifications
 
-Draft contracts, revised against [the secondary review](../reviews/2026-09-19-secondary-review.md);
-see [the reconciliation](../reviews/2026-09-19-reconciliation.md) for what changed and why. Not yet
+Draft contracts, revised against two independent reviews: the
+[secondary review](../reviews/2026-09-19-secondary-review.md) of the contracts, and the
+[architecture review](../reviews/2026-09-19-architecture-review.md) of the concept. See the
+reconciliations ([one](../reviews/2026-09-19-reconciliation.md),
+[two](../reviews/2026-09-19-reconciliation-architecture.md)) for what changed and why. Not yet
 accepted policy.
 
 This family now lives in its own repository. The harness consumes the governance runtime through
@@ -24,6 +27,8 @@ contract map.
 | Specification | Purpose |
 | --- | --- |
 | [Harness Core](harness-core.md) | Ownership boundary, tier rule, fixed decisions, invariants |
+| [Task Brief](task-brief.md) | What the user wants, what constrains it, what is ruled out |
+| [Action Authority](action-authority.md) | What authorizes an effect, its bounds, and the provider data boundary |
 | [Task Lifecycle](task-lifecycle.md) | Request identity, writer ownership, staleness, verification binding |
 | [Host Integration](host-integration.md) | Invocation from Codex, Claude Code, and Cowork |
 | [Decision Interface](decision-interface.md) | Question shapes, confidence, escalation, provider abstraction |

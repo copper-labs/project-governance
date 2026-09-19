@@ -30,9 +30,16 @@ no decision model at all, which is why it comes first.
 
 ## Scope
 
-- Build identity and reuse of a recorded result.
-- One build lock per workspace.
-- The staged ladder and lane selection.
+Three separable concerns, each of which must earn adoption on its own evidence. Bundling them was
+a mistake: they have different prerequisites and different risks.
+
+1. **Coordination** - stop concurrent interference. Start by using the existing execution owner's
+   resource claims and cleanup rather than inventing a second owner.
+2. **Evidence reuse** - return a recorded verdict instead of running. This is a **verdict cache**.
+   Storing no artifacts does not remove its completeness and freshness obligations, and calling it
+   "not a cache" was a naming dodge. Off by default, and in-flight deduplication is a different
+   thing that does not depend on it.
+3. **Ordering** - the staged ladder, which is a hypothesis rather than a fact.
 
 ## Non-Goals
 
@@ -82,8 +89,14 @@ orchestration request legitimately spawns several child tool invocations.
 | B | The single lane most likely to break for this change | Rule first, decision model later |
 | C | Remaining selected lanes, in parallel | Deterministic |
 
-Stage C runs only when A and B pass. The ladder does not make builds faster; it makes failures
-arrive sooner, which is the actual cost.
+Stage C runs only when A and B pass.
+
+**This is a hypothesis and it is not free.** Serializing a 10-second lane before an independent
+60-second lane makes the all-pass path 70 seconds instead of 60. It pays when early-failure
+probability or resource savings justify that delay, and "most likely to fail" alone ignores
+duration, shared warm-up, dependencies and contention. It is adopted only if the whole
+distribution improves: time to first actionable failure, time to complete passing proof, compute
+consumed, and queue time.
 
 Stage B starts as a static rule derived from the lane map. It becomes a decision only once the
 record holds enough history to show the rule is wrong.
@@ -100,7 +113,11 @@ record holds enough history to show the rule is wrong.
 
 - Narrowing never applies to a release gate.
 - A recorded result is reusable only within its adapter's declared input completeness.
-- The harness owns no build cache and deletes no build artifacts.
+- The harness owns no build cache and deletes no build artifacts. Artifact caching stays with the
+  build tool.
+- Source identity alone does not guarantee reproducible execution: build isolation and external
+  dependencies matter, so a mutable external service or test device can invalidate reuse even when
+  source bytes are identical. This is why reuse defaults off.
 - Cancellation terminates the owned process group and is recorded as cancellation, not failure.
 
 ## Failure Modes
@@ -121,7 +138,10 @@ record holds enough history to show the rule is wrong.
   callers, input drift, and deleted outputs after a recorded pass are each exercised.
 - Composition with the existing test-execution claims is tested before any collision-prevention
   claim is made.
-- A repeated identical request after a pass performs no work when reuse is enabled and proven.
+- A repeated identical request after a pass performs no work when reuse is enabled and proven, and
+  an explicit request to rerun is honored rather than answered from history.
+- Coordination, reuse and ordering are each measured separately; none is adopted on another's
+  evidence.
 - A change known to break exactly one lane surfaces in stage A or B for a fixture repository.
 - Disabling the ladder produces the same final verdict as running it.
 

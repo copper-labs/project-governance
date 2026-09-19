@@ -66,6 +66,10 @@ Adapters may add named subtypes beneath a class. No adapter may remove or redefi
   history. It is never reclassified into a diagnosis nobody established.
 - Low confidence resolves to `unknown`, never to the nearest plausible class.
 - Every classification and its outcome is recorded, so accuracy is measurable rather than assumed.
+- **A remedy that works is evidence of its effect, not proof of the predicted cause.** A clean and
+  retry that passes is equally consistent with a transient service recovering. Where the cause
+  cannot be independently established it is recorded as unconfirmed, and unconfirmed never counts
+  toward classification accuracy.
 
 ## The Remedy Bound
 

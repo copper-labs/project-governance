@@ -63,8 +63,9 @@ survive unchanged, and does the substrate earn the coupling.
 
 ## Behavioral Requirements
 
-- All persistence passes through one narrow store interface: append a record, read records by
-  task, read records by question, attach an outcome to a prior record.
+- Persistence passes through one narrow store interface. It is deliberately small, but it is **not
+  fixed at four operations**: safe transition ownership needs a compare-and-set that honors an
+  expected revision, and that belongs here rather than being worked around elsewhere.
 - Every record declares its criticality. **Execution state** must be durable before the action it
   covers; a failed write means the action does not run. **Analytics** is best-effort and its loss
   never blocks work or changes a verdict.
@@ -82,8 +83,9 @@ survive unchanged, and does the substrate earn the coupling.
 
 - No component outside the store implementation touches the filesystem layout.
 - The store cannot approve, weaken, or block a check; it observes.
-- A corrupted or unreadable store is rebuilt rather than becoming a permanent blocker, and the
-  rebuild is itself recorded.
+- Analytics indexes are rebuildable and a corrupted one is rebuilt rather than becoming a permanent
+  blocker. **Execution state is not rebuildable by inference.** Losing it means the affected
+  request's outcome is unknown, which is a thing to report, not to repair by assumption.
 - Retention is bounded by count and bytes, declared, and enforced by the store. Unresolved action
   references and configuration artifacts needed for rollback are exempt from ordinary analytics
   retention.
@@ -95,7 +97,8 @@ survive unchanged, and does the substrate earn the coupling.
 | Store unwritable, analytics record | Loop continues, degraded, and says so once |
 | Store unwritable, execution state | The dependent action does not run; control returns with the reason |
 | Concurrent writer detected | Second writer waits or declines; never interleaves |
-| Corrupted record | Quarantine that record, rebuild the index, record the event |
+| Corrupted analytics record | Quarantine it, rebuild the index, record the event |
+| Corrupted execution state | Stop. It is never interpreted as "nothing happened"; the affected request becomes outcome-unknown and waits for a person |
 | Retention limit reached | Oldest bounded records drop; identities and outcomes survive longest |
 
 ## Validation Requirements

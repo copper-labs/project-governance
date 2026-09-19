@@ -31,9 +31,14 @@ scripts and hand-written plans.
 
 ## Scope
 
-- The state machine and its gates.
-- The evidence catalog that replaces per-release checkers.
-- The packet that feeds both the gate and the generated plan.
+Split by what can be proven independently, because preparation and execution have completely
+different risk.
+
+- **Read-only preparation.** Collect current release facts, preserve existing checker receipts, and
+  render a reviewable packet. This needs no gate engine, no tuned thresholds, no worker dispatch and
+  no classifier. It is separable and is the clearest measurable saving available.
+- **Gated execution.** The state machine, its gates, and real transitions. Late, and separately
+  authorized.
 
 ## Non-Goals
 
@@ -41,10 +46,18 @@ scripts and hand-written plans.
 - Reimplementing deploy tooling that already works.
 - Serving only one project shape.
 
-## Two Shapes, One Machine
+## Two Shapes, Related But Not Identical
 
-Artifact publication and environment promotion are the same machine with different states. The
-contract models gates generically; it does not hardcode environment names.
+Artifact publication and environment promotion share an action envelope. They are not the same
+subject and must not share every lifecycle rule.
+
+- An **artifact** is immutable. It stays available while environments change around it.
+- An **environment's current deployment** is mutable state, and "the same version" is not the same
+  fact twice.
+- **Publication may be permanently undoable**. Deployment compensation requires new actions and
+  cannot be assumed safe - an irreversible migration is not rolled back by redeploying.
+
+The contract models gates generically; it does not hardcode environment names.
 
 ```
 prepared -> staged -> validated -> candidate -> released -> verified
@@ -87,8 +100,8 @@ valid.
 The release evidence packet is assembled automatically, including the live facts currently left for
 an operator. It is the input to the gate, to the generated promotion plan, and to the record.
 
-Generating the promotion plan from the packet is the one place a language model clearly belongs in
-this path: prose over known content.
+The packet is rendered from a deterministic template first. A language model is used only where
+narrative synthesis demonstrably helps, measured against that template rather than assumed.
 
 ## Invariants And Constraints
 

@@ -63,6 +63,12 @@ A digest identifies bytes; it cannot reconstruct them. Configuration artifacts n
 prior state - threshold sets, selection maps, catalog versions - are retained as artifacts, not
 referenced by digest alone, or rollback is not possible.
 
+**Three facts are recorded separately and never collapsed:** whether the diagnosis was correct,
+what the remedy's observed effect was, and whether the task was finally accepted. A successful
+clean-and-retry is evidence of an effect, not proof of the predicted cause - a transient service
+recovery produces the same observation. Where cause cannot be established, it is recorded as
+**unconfirmed**, never promoted to correct.
+
 Outcomes attach later as separate records referencing the decision: what was observed, whether the
 decision proved right, its provenance - how the outcome was established - and any correction a human
 made.
@@ -78,8 +84,9 @@ are recorded distinctly and calibration uses them differently.
 - Calibration keeps differently configured cohorts distinct: a provider change, a threshold change, a
   packet-generator change and a policy change are each separable in the record.
 - An outcome is attached whenever one becomes known, including much later from a verification stage.
-- A human correction is recorded as an outcome with its reason, and is the strongest signal
-  available for calibration.
+- A human correction is recorded as an outcome with its reason. A correction that establishes a
+  classification was factually wrong is strong calibration evidence; a correction that expresses a
+  different preference is not, and the two are recorded distinctly.
 - A packet miss, where a worker asked for something the packet lacked, is an outcome against the
   narrowing decision that produced the packet.
 - Records reference artifacts by path and digest. They never inline them.
@@ -111,13 +118,19 @@ with the evidence that justified it.
 | Analytics write fails | Action proceeds; the gap is noted once |
 | Execution-state write fails | The dependent action does not run; control returns with the reason |
 | Outcome never arrives | Decision stays open; calibration excludes it rather than assuming success |
-| Conflicting outcomes | Both retained; the human correction wins for calibration |
+| Conflicting outcomes | Both retained; a factual correction wins for calibration, a preference does not |
+| Cause not establishable | Recorded as unconfirmed; never counted as correct |
 
 ## Validation Requirements
 
 - Every acted-on decision in a test run has a record, and every verification produces an outcome.
 - Calibration reads return stable values for a fixed fixture set.
-- A run with recording disabled behaves identically apart from the missing record.
+- With analytics recording disabled, ordinary checks remain available and no state-changing action
+  runs without its execution state. Behavior is not identical, and the contract no longer claims it.
+- Evaluation splits by task or failure episode, so related retries cannot leak between development
+  and held-out cases.
+- Incomplete evaluation never authorizes a weaker threshold; how much outcome data is missing is
+  reported alongside every calibration read.
 
 ## Open Questions
 

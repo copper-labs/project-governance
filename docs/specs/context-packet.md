@@ -89,7 +89,12 @@ the existing workflow.
 
 ## Invariants And Constraints
 
-- No language model participates in building a packet.
+- No language model **selects** packet contents. A previously authored, provenance-labelled handoff
+  note may be carried as content: it is deterministic input, and it is marked as a hypothesis rather
+  than a fact. The earlier blanket ban excluded precisely the handoff that stops a fresh worker
+  repeating a paid-for dead end.
+- A worker may propose the query it needs answered. Materialization of that query stays
+  deterministic; the worker never reaches around the packet to read for itself.
 - Selection reads only from the immutable subject the governance runtime resolved, never the live
   checkout, except where that runtime already declares a live exception.
 - A packet is immutable once identified. Additions create a new packet that references the prior one.

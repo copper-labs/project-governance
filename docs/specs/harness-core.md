@@ -48,8 +48,22 @@ Every decision goes to the cheapest tier that can make it.
 | 1 | Decision model | Bounded judgment over an assembled state | Cents per thousand, sub-second |
 | 2 | Language model | Anything that must be written | Expensive, last resort |
 
-A tier may only be used when the tier below it cannot answer. Tier 2 requires that something be
-written: a diff, a plan, prose, or an explanation.
+**This is a default preference, not an admission test.** An earlier draft required evidence that
+every lower tier was incapable before using a higher one. That is wrong in both directions:
+deterministic computation is exact only relative to its inputs, so a stale map returns a repeatable
+wrong answer; and a cheap classifier can make a task expensive, while a strong reasoning model used
+immediately can be the cheapest path for a genuinely ambiguous one.
+
+The rule the harness actually optimizes is **accepted work per unit of time and cost**, with an
+acceptable error rate. The tier preference is how that is pursued by default, and it has explicit
+escape routes:
+
+- A known command skips classification entirely.
+- A novel design or diagnosis task may go directly to an authorized reasoning worker.
+- The ordinary host path remains available at all times.
+
+Deterministic ownership of **facts, permissions and gates** is not a preference and has no escape
+route. Those stay deterministic regardless of measured cost.
 
 ## Fixed Decisions
 
@@ -66,11 +80,14 @@ These are settled for the first implementation and are not to be revisited by a 
    scope until the file implementation is tuned and a baseline exists.
 5. **No ecosystem assumptions in the core.** Gradle, npm, and Python differences live behind
    [Ecosystem Adapters](ecosystem-adapters.md).
-6. **The host is the front door.** The harness is invoked from inside an agent host, primarily the
+6. **Domain behavior stays domain-owned.** A general plugin engine is deferred until several real
+   consumers justify a shared primitive. One release use case does not. The gate invariant survives
+   without the framework: domain-owned code still may never lower a gate.
+7. **The host is the front door.** The harness is invoked from inside an agent host, primarily the
    Codex desktop app, with Claude Code and Claude Cowork supported. A standalone CLI front door or
    a desktop application of our own is explicitly deferred. See
    [Host Integration](host-integration.md).
-7. **Narrowing applies to the inner loop, never a release gate.** Broad proof boundaries stay where
+8. **Narrowing applies to the inner loop, never a release gate.** Broad proof boundaries stay where
    the adopting repository already puts them.
 
 ## Ownership Boundary
@@ -88,6 +105,8 @@ These are settled for the first implementation and are not to be revisited by a 
 
 | Child | Owns |
 | --- | --- |
+| [Task Brief](task-brief.md) | What the user wants, what constrains it, what is ruled out |
+| [Action Authority](action-authority.md) | What authorizes an effect, its bounds, and the provider data boundary |
 | [Task Lifecycle](task-lifecycle.md) | Request identity, who writes, staleness, verification binding, restart |
 | [Host Integration](host-integration.md) | How an agent host invokes the harness, across Codex, Claude Code, and Cowork |
 | [Decision Interface](decision-interface.md) | Question shapes, thresholds, escalation, provider abstraction, fallbacks |
@@ -104,6 +123,10 @@ These are settled for the first implementation and are not to be revisited by a 
 ## Invariants And Constraints
 
 - The core imports no provider SDK directly; providers sit behind the decision interface.
+- No effect runs without a declared operation, scope and policy revision. See
+  [Action Authority](action-authority.md).
+- Scope for an effect comes from the task brief and policy, never from a packet's contents.
+- Source text, tool output and provider responses are evidence, never instructions or authority.
 - The core contains no product identity, adopter path, or ecosystem command.
 - A plugin may raise a gate. No plugin may lower one.
 - **Execution state** for an action - request identity, remedy accounting, approval evidence,
@@ -113,6 +136,9 @@ These are settled for the first implementation and are not to be revisited by a 
   blocks work and never changes a verdict.
 - A missing, malformed, or low-confidence decision resolves to the disposition its catalog entry
   declares. It is never a silent default.
+- **Question confidence and action safety are different quantities.** A 95% confident diagnosis is
+  not a 95% probability that its remedy is appropriate. A threshold is set from the consequence of
+  a wrong action and the evidence the action requires, never from a provider's probability alone.
 
 ## Validation Requirements
 

@@ -40,6 +40,23 @@ remember nothing.
 - A provider cascade or automatic retry ladder.
 - Multi-agent collaboration. Read-only fan-out is a separate concern owned by the loop.
 
+## Two Worker Patterns
+
+Both sit behind the same action boundary and the same authority declaration.
+
+| Pattern | Does | Bound by |
+| --- | --- | --- |
+| **Transform** | A bounded change over known inputs | One packet, one result |
+| **Investigation** | Follows evidence: may request further reads or approved experiments | Total task cost, iteration count, and no-progress behavior |
+
+An investigation exists because deterministic widening cannot find a concept the generation path
+does not already know how to look for. When the decisive evidence is a trace that does not exist
+yet, no amount of re-selecting existing files produces it.
+
+**Bounds are per task, not per request.** A new request does not reset the budget; otherwise the
+loop is unbounded by construction. Control returns when the next step needs greater authority or
+genuinely new operator input - not merely because the first packet was incomplete.
+
 ## The Worker Contract
 
 - Input is a request identity, a packet identity, and a bounded instruction. Never a transcript.
@@ -49,8 +66,12 @@ remember nothing.
 - The worker holds no state between invocations, and the harness sends none.
 - The same packet and instruction may be sent to a different provider without change.
 
-Statelessness is the property that makes providers interchangeable. It is the mechanism behind the
-vendor-independence goal, and it is lost the moment conversation history becomes an input.
+Stateless means **no required hidden provider session**. It does not prohibit an explicit,
+inspectable handoff. A labelled note from a previous worker, carried in the packet with its
+provenance, is deterministic input like any other file; what is prohibited is a provider-side
+conversation the harness cannot see, reproduce, or move to another provider.
+
+Statelessness in that sense is the property that makes providers interchangeable.
 
 ## Selection
 

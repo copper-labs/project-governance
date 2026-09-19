@@ -48,7 +48,9 @@ decision model is an implementation behind this interface, never a dependency of
 ## Behavioral Requirements
 
 - Three question shapes are supported: a choice among declared options, a score against ordered
-  levels, and a boolean judgment. A provider that cannot express one of these is not usable.
+  levels, and a boolean judgment. **A provider must support the shapes its enabled consumers
+  actually use, not all three.** Required capability is negotiated at registration, and a question
+  whose shape a provider does not support is rejected explicitly rather than approximated.
 - Questions are declared as catalog data with a stable identifier and a version. Changing a
   question's meaning requires a new version; catalog entries are never edited in place.
 - Multiple questions about one state are asked in a single call where the provider supports it,
@@ -77,6 +79,11 @@ terminal disposition, which is `fallback` or `needs-input` and is never another 
 Tier 2 diagnosis is permitted only where a catalog entry names it, and is bounded by that entry.
 This is the one exception to the generation-only rule for Tier 2, and it is explicit rather than
 implied.
+
+A threshold is not a probability cutoff alone. Each entry declares the **consequence of a wrong
+  action** taken on its answer and the **evidence that action requires**. A high-confidence answer
+  whose remedy is destructive needs more than confidence to act on; a low-confidence answer whose
+  remedy is free may be acted on cheaply.
 
 Thresholds are per question, declared in the catalog, and start conservative. They may only be
 loosened against recorded outcomes, never against intuition. See [Decision Record](decision-record.md).

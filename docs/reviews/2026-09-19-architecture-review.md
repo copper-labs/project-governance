@@ -11,6 +11,10 @@ summary: A deeper review of the harness model, its missing execution and accepta
 
 # Architectural And Conceptual Review
 
+> **Phase-plan references below are historical.** The six-phase plan this review discusses
+> was replaced by the five-step sequence in [the master plan](../exec-plans/README.md);
+> the superseded files remain in git history.
+
 ## Judgment
 
 The useful core is a portable record of what the user wants, controlled execution, and evidence of
@@ -232,7 +236,7 @@ use existing host controls; it is not a request to build a new sandbox or approv
 
 **Owners:** [Build Orchestration](../specs/build-orchestration.md),
 [Ecosystem Adapters](../specs/ecosystem-adapters.md),
-[Phase 1](../exec-plans/active/phase-1-build-hygiene.md).
+Phase 1 *(superseded phase plan)*.
 
 Three different projects are bundled into build hygiene: prevent concurrent interference, reuse
 old verdicts, and improve lane order. They have different prerequisites and should earn adoption
@@ -262,8 +266,8 @@ further ranking only if the whole distribution improves under the repository's c
 ## A8 — Measure Interventions, Not Just Classifier Accuracy
 
 **Owners:** [Decision Record](../specs/decision-record.md),
-[Phase 0](../exec-plans/active/phase-0-measure.md),
-[Phase 4](../exec-plans/active/phase-4-tighten-on-evidence.md).
+Phase 0 *(superseded phase plan)*,
+Phase 4 *(superseded phase plan)*.
 
 Even the intended improved evaluation has an attribution problem: if a model calls a failure
 “stale cache,” a clean-and-retry passes, and the outcome is marked correct, the label may still be
@@ -292,7 +296,7 @@ classifier was correct.
 
 **Owners:** [Plugin Contract](../specs/plugin-contract.md),
 [Release Management](../specs/release-management.md),
-[Phase 5](../exec-plans/active/phase-5-release-plugin.md).
+Phase 5 *(superseded phase plan)*.
 
 Collecting current release facts and rendering a reviewable packet can stand alone. It does not
 need tuned triage thresholds, portable worker dispatch, or a generic plugin state machine. Delaying

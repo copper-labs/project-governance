@@ -15,8 +15,12 @@ summary: How optional capability attaches to the harness by declaring states, ga
 
 ## Purpose
 
-Let optional capability attach without growing the core and without weakening what the core
-guarantees. A plugin declares a domain. It does not orchestrate.
+Record how domain behavior stays domain-owned, and what it may never do.
+
+**A general plugin engine is deferred.** One release use case is not evidence for an extension
+framework, and building one now would be a framework in search of consumers. Domain behavior lives
+with its domain until several real consumers justify a shared primitive. What survives without the
+framework is the part that was actually load-bearing: the gate invariant.
 
 ## Current Implementation
 
@@ -49,12 +53,18 @@ guarantees. A plugin declares a domain. It does not orchestrate.
 | Commands | How a transition is executed, delegated to existing tooling |
 | Records | What the transition writes to the decision record |
 
-Nothing else. A plugin that needs to declare anything beyond these four is describing a gap in the
-core, and the core is what should change.
+These four are what a domain **must** express to be gated by the core. They are not a ceiling.
+
+An earlier draft said any need beyond them described a gap the core should fill. That is backwards:
+it would pull domain-specific behavior into a shared engine on the evidence of a single consumer.
+Domain code may do more than these four things, in its own repository, with its own tests. It comes
+to the core only when a second and third consumer want the same primitive.
 
 ## The Gate Invariant
 
-**A plugin may raise a gate. No plugin may lower one.**
+This survives the framework's deferral, and applies to any domain code, plugin or not.
+
+**A domain may raise a gate. No domain may lower one.**
 
 Specifically, a plugin cannot grant itself automatic approval for an irreversible action, reduce a
 threshold below the core's floor, remove a required approver, or mark its own transition verified.

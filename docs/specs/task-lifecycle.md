@@ -49,10 +49,14 @@ worker returned a diff that nobody applied.
 ## States
 
 ```
-planned -> dispatched -> submitted -> applied -> verified -> terminal
-                     \-> needs-input      \-> refused
+planned -> dispatched -> submitted -> prepared -> in-progress -> applied -> verified -> accepted
+                     \-> needs-input                  \-> outcome-unknown    \-> refused
                      \-> cancelled
 ```
+
+`prepared` and `in-progress` exist because a durable record does not make an effect atomic. A crash
+between two file writes leaves the ledger saying one thing and the world another, and replaying from
+the record duplicates the effect.
 
 - `needs-input` and `cancelled` are ordinary outcomes, not failures.
 - `refused` means a result could not be applied safely. It is never silently discarded.
@@ -81,10 +85,28 @@ request declares its mode at creation and cannot change it.
   naming a path outside the request's declared scope is refused.
 - **Duplicate submission.** A second submission for a request already applied is refused and
   recorded. Identity, not content comparison, decides this.
-- **Restart.** After an interruption, a request resumes from its last durable state. A request
-  interrupted between submission and application resumes as submitted, not as dispatched.
+- **Restart.** After an interruption, a request in `in-progress` is **not** resumed from the record
+  alone. Its actual effects are inspected first. If they can be established, the state is corrected
+  to match the world. If they cannot, the request becomes `outcome-unknown` and stops there; the
+  uncertainty is retained rather than resolved by assumption.
+- **Transition ownership is atomic.** A state change carries the revision it expected to find.
+  Two processes reading the same prior state cannot both act: the second one's expected revision no
+  longer matches and its transition is refused. Preventing interleaved writes is not sufficient.
+- **Effects declare their retry behavior.** Each is idempotent, or explicitly non-retryable. The
+  harness does not attempt exactly-once execution across files or remote systems.
+- **Cancellation needs evidence**, not just a flag: owned work is shown to have stopped.
 - **Verification binds the resulting subject**, never the starting subject or the packet alone. A
   verification result that names a different subject than the one produced is invalid.
+- **Verification is not acceptance.** Checks passing says the declared checks passed on that
+  subject. It does not establish that the outcome in the brief was reached. A task reaches
+  `accepted` when the brief's declared obligations are satisfied, which may be automatic where those
+  obligations are fully covered by evidence, and needs review where they are not.
+- **Guard against circularity.** A worker can change the implementation, its tests, and the policy
+  selecting which checks run. Mandatory acceptance requirements bind to the **authorized baseline**,
+  not to the subject the worker produced. A worker's proposed change to those requirements is
+  reviewable output, never authority for accepting the same work.
+- Every verification records the claim being checked, the exact subject, the evidence produced, and
+  any acceptance obligation still open.
 - Host authorization stays bound to the action it covers. An approval granted for one request does
   not carry to a regenerated one.
 
@@ -112,6 +134,10 @@ invocation is resumable from that state alone, and an invocation that cannot rea
 | Interrupted mid-application | Resume from durable state; never re-apply an applied result |
 | Verification names a different subject | Invalid; re-verify against the produced subject |
 | Execution state unreadable | Do not act; return control with the reason |
+| Crash during application | Inspect effects; correct state or become outcome-unknown |
+| Expected revision no longer matches | Transition refused; the racing caller does not act |
+| Effect succeeded, receipt lost | outcome-unknown; never replayed on an assumption |
+| Untested claims remain | Left explicitly open rather than closed by a partial run |
 
 ## Validation Requirements
 
@@ -120,6 +146,11 @@ invocation is resumable from that state alone, and an invocation that cannot rea
 - Interruption after generation and after application, in both modes, resumed without overwriting a
   concurrent edit and without applying the same result twice.
 - A result generated against a stale subject refused, then regenerated and applied cleanly.
+- A crash between two file writes, a crash after an effect but before its receipt, and two callers
+  racing to resume: each yields an observed outcome or explicit uncertainty, never a fabricated
+  clean restart.
+- A patch that deletes a failing assertion does not satisfy the obligation that assertion covered.
+- A prose-only task completes without compilation pretending to verify its content.
 - Verification demonstrably referencing the resulting subject.
 
 ## Open Questions

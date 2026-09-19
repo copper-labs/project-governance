@@ -11,6 +11,10 @@ summary: Per-finding disposition of the secondary review, what changed in the co
 
 # Reconciliation Of The Secondary Review
 
+> **Phase-plan references below are historical.** The six-phase plan this review discusses
+> was replaced by the five-step sequence in [the master plan](../exec-plans/README.md);
+> the superseded files remain in git history.
+
 Response to [the secondary review](2026-09-19-secondary-review.md). Ten findings accepted, one
 accepted with a variation, none declined. Six of the eight P1 findings were contradictions between
 contracts I wrote, not differences of opinion, and are corrected rather than argued.
@@ -28,7 +32,7 @@ added; every fix is a contract correction plus a counterexample test.
 | R4 | Build locking does not cover its promised concurrency | Accepted | [Build Orchestration](../specs/build-orchestration.md) |
 | R5 | A repeated failure is not evidence of a source defect | Accepted | [Failure Triage](../specs/failure-triage.md) |
 | R6 | One low-confidence answer has three outcomes | Accepted | [Decision Interface](../specs/decision-interface.md), consumers aligned |
-| R7 | Phase 0 cannot support an honest go/no-go | Accepted | [Phase 0](../exec-plans/active/phase-0-measure.md), [master plan](../exec-plans/README.md) |
+| R7 | Phase 0 cannot support an honest go/no-go | Accepted | Phase 0 *(superseded phase plan)*, [master plan](../exec-plans/README.md) |
 | R8 | Ledger provenance insufficient for calibration | Accepted | [Decision Record](../specs/decision-record.md) |
 | R9 | Packet depends on an unimplemented subject seam | Accepted | [Context Packet](../specs/context-packet.md) |
 | R10 | Packet misses and passing lanes are incomplete signals | Accepted | [Context Packet](../specs/context-packet.md), Phases 3 and 4 |
