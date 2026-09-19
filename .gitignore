@@ -3,3 +3,6 @@ node_modules/
 dist/
 .governance/
 *.log
+.env
+.env.*
+!.env.example

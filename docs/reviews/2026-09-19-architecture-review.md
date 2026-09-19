@@ -40,7 +40,9 @@ supersede individual observations; the manifest is the review boundary.
 Several reconciled specs were present in that snapshot, including the improved release gate,
 failure episode, and execution-state contracts. The phase plans still contained earlier wording.
 This review evaluates the intended corrections and separates remaining synchronization issues at
-the end. No provider call, build, adopter change, deployment, or host capability test was performed.
+the end. A closeout readback confirmed that the main plan corrections subsequently landed; those
+historical discrepancies are not the basis for A1–A9. No provider call, build, adopter change,
+deployment, or host capability test was performed.
 
 ## A1 — Optimize Accepted Work, Not A Mandatory Tier Cascade
 
@@ -380,5 +382,16 @@ These are carry-over edits, distinct from the architectural findings above:
 - Several moved-document links still targeted the previous directory layout. Validate links after
   the author completes the move and synchronized plan update; this review leaves those files alone.
 
-Before implementation, finish that synchronization and use a named source snapshot. The new
-architectural decisions to settle are A1–A6; A7–A9 are opportunities to prove value with less work.
+**Closeout readback:** The author updated the plans during this review. I checked the diffs: Phase 0
+now includes held-out evaluation and an inconclusive result; Phase 1 is independent of its verdict;
+the fixture adapter precedes real builds; Phase 2 preserves exhausted failure diagnoses and hands
+source work to the host; Phase 3 improves packet proof and outcome measures; Phase 4 requires
+coverage evidence; Phase 5 separates authorized staging execution. The master plan also selects
+TypeScript on Node and explicitly defers unavailable KMP environment proof. These are observed
+document changes, not runtime or environment certification. Their closeout hashes are in the
+manifest. Most moved-link edits also landed; this was not an exhaustive final reconciliation audit.
+
+Use the synchronization notes above as snapshot history, not a request to repeat completed edits.
+The new architectural decisions to settle are A1–A6; A7–A9 are opportunities to prove value with
+less work. The separate Task Lifecycle child is a sensible ownership choice; no consolidation into
+the storage spec is needed.
