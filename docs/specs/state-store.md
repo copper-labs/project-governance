@@ -24,7 +24,7 @@ model; this contract says where it lives and behind what boundary.
 - **Current boundary:** none.
 - **Evidence:** none.
 - **Known limits:** The file implementation is single-workspace and offers no cross-machine view.
-- **Ledger:** [Research index](../../README.md).
+- **Ledger:** [Research index](../research/concept.md).
 
 ## Scope
 

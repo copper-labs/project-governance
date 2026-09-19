@@ -26,7 +26,7 @@ no decision model at all, which is why it comes first.
 - **Evidence:** none.
 - **Known limits:** This contract decides which invocations to make. It does not change what a
   build tool does inside one.
-- **Ledger:** [Research index](../../README.md).
+- **Ledger:** [Research index](../research/concept.md).
 
 ## Scope
 

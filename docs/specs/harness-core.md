@@ -24,7 +24,7 @@ contract in this family. The harness owns a loop. It owns no intelligence of its
 - **Evidence:** none.
 - **Known limits:** The decision provider named in these specs launched in September 2026 and has
   no independent calibration evidence.
-- **Ledger:** [Research index](../../README.md).
+- **Ledger:** [Research index](../research/concept.md).
 
 ## Scope
 

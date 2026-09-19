@@ -26,7 +26,7 @@ decision model is an implementation behind this interface, never a dependency of
   accuracy, latency and cost. It is a measurement, not an implementation.
 - **Known limits:** The intended provider is hosted-only, released September 2026, with no
   published calibration evidence.
-- **Ledger:** [Research index](../../README.md).
+- **Ledger:** [Research index](../research/concept.md).
 
 ## Scope
 

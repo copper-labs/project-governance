@@ -28,7 +28,7 @@ discovering it at frontier prices. This is where the token cost of the loop is a
   materialization is required work, not an available property.
 - **Evidence:** none for the harness layer.
 - **Known limits:** Narrowing quality is unmeasured until packet misses are recorded.
-- **Ledger:** [Research index](../../README.md).
+- **Ledger:** [Research index](../research/concept.md).
 
 ## Scope
 

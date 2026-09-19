@@ -26,7 +26,7 @@ remember nothing.
 - **Evidence:** none.
 - **Known limits:** In the first step the host owns the model actually running the conversation;
   the harness selects only for work it dispatches.
-- **Ledger:** [Research index](../../README.md).
+- **Ledger:** [Research index](../research/concept.md).
 
 ## Scope
 

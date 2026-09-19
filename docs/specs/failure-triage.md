@@ -25,7 +25,7 @@ most classes never reach a language model.
 - **Evidence:** none.
 - **Known limits:** Classification is the first real use of the decision interface, chosen because
   a wrong answer costs one build cycle.
-- **Ledger:** [Research index](../../README.md).
+- **Ledger:** [Research index](../research/concept.md).
 
 ## Scope
 
