@@ -10,6 +10,15 @@ Working log for autonomous runs. Newest entry last. Each run appends; nothing is
 - **Store:** files, JSON for records and Markdown for prose
 - **Blocked on:** nothing for Phase 1
 
+## Autonomous Schedule
+
+An hourly scheduled task works one batch per run, commits, and appends here. Every run first checks
+`docs/reviews/` for a review newer than the reconciliation; if one exists it reconciles instead of
+implementing, and stops. It stops at the end of Phase 1 rather than starting Phase 2.
+
+Runs need this computer awake with the desktop app running. If it sleeps, runs stop and resume when
+it wakes; nothing is lost because state lives in this file and in git.
+
 ## Standing Constraints
 
 - No provider calls anywhere in Phase 1. It is deterministic by design.
