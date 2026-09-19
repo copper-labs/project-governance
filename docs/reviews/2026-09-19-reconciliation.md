@@ -11,6 +11,10 @@ summary: Per-finding disposition of the secondary review, what changed in the co
 
 # Reconciliation Of The Secondary Review
 
+> **Contract references below are historical.** The specification set was reorganized on
+> 2026-09-19 around four objects - Task, Action, Artifact, Evidence. See
+> [the specifications index](../specs/README.md); superseded files remain in git history.
+
 > **Phase-plan references below are historical.** The six-phase plan this review discusses
 > was replaced by the five-step sequence in [the master plan](../exec-plans/README.md);
 > the superseded files remain in git history.
@@ -26,22 +30,22 @@ added; every fix is a contract correction plus a counterexample test.
 
 | # | Finding | Disposition | Where the fix landed |
 | --- | --- | --- | --- |
-| R1 | Model-selected evidence can weaken a release gate | Accepted | [Release Management](../specs/release-management.md), [Plugin Contract](../specs/plugin-contract.md) |
-| R2 | Mandatory and optional recording are incompatible | Accepted | [Harness Core](../specs/harness-core.md), [Decision Record](../specs/decision-record.md), [State Store](../specs/state-store.md) |
-| R3 | Task lifecycle and apply/verify boundary have no owner | Accepted with variation | New [Task Lifecycle](../specs/task-lifecycle.md) |
-| R4 | Build locking does not cover its promised concurrency | Accepted | [Build Orchestration](../specs/build-orchestration.md) |
+| R1 | Model-selected evidence can weaken a release gate | Accepted | Release Management *(superseded contract)*, Plugin Contract *(superseded contract)* |
+| R2 | Mandatory and optional recording are incompatible | Accepted | [Harness Core](../specs/harness-core.md), Decision Record *(superseded contract)*, State Store *(superseded contract)* |
+| R3 | Task lifecycle and apply/verify boundary have no owner | Accepted with variation | New Task Lifecycle *(superseded contract)* |
+| R4 | Build locking does not cover its promised concurrency | Accepted | Build Orchestration *(superseded contract)* |
 | R5 | A repeated failure is not evidence of a source defect | Accepted | [Failure Triage](../specs/failure-triage.md) |
 | R6 | One low-confidence answer has three outcomes | Accepted | [Decision Interface](../specs/decision-interface.md), consumers aligned |
 | R7 | Phase 0 cannot support an honest go/no-go | Accepted | Phase 0 *(superseded phase plan)*, [master plan](../exec-plans/README.md) |
-| R8 | Ledger provenance insufficient for calibration | Accepted | [Decision Record](../specs/decision-record.md) |
-| R9 | Packet depends on an unimplemented subject seam | Accepted | [Context Packet](../specs/context-packet.md) |
-| R10 | Packet misses and passing lanes are incomplete signals | Accepted | [Context Packet](../specs/context-packet.md), Phases 3 and 4 |
+| R8 | Ledger provenance insufficient for calibration | Accepted | Decision Record *(superseded contract)* |
+| R9 | Packet depends on an unimplemented subject seam | Accepted | Context Packet *(superseded contract)* |
+| R10 | Packet misses and passing lanes are incomplete signals | Accepted | Context Packet *(superseded contract)*, Phases 3 and 4 |
 | R11 | Batches require work scheduled later | Accepted | All six phase plans |
 
 ## The One Variation
 
 **R3.** The review asked for a worked task protocol inside existing contracts rather than another
-spec family. The protocol is added as one new child, [Task Lifecycle](../specs/task-lifecycle.md),
+spec family. The protocol is added as one new child, Task Lifecycle *(superseded contract)*,
 rather than inside the store.
 
 The reason is the finding itself: the store was already claiming lifecycle ownership it did not

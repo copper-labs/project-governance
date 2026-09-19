@@ -6,20 +6,27 @@ status: draft
 owner: project-harness
 created: 2026-09-19
 updated: 2026-09-19
-summary: Measure where time, tokens, rework and human intervention actually go, and pick one intervention on evidence.
+summary: A small baseline for one concrete scenario, so the slice that follows has a before-number to beat.
 ---
 
 > Child of [the master plan](../README.md).
 
-# Step 1 - Find The Recurring Cost
+# Step 1 - Baseline One Scenario
 
 ## Final State
 
-A measured account of where the current loop spends time and tokens, across both failure and
-all-pass paths, and one selected intervention chosen from that evidence rather than assumed.
+A before-number for one concrete scenario, measured on the current workflow:
 
-**Non-goals:** building anything, calling a provider, or presuming that classification is the
-bottleneck.
+> Investigate one failing check, make a bounded fix, verify it, and resume correctly after an
+> interruption.
+
+**Non-goals:** a general cost survey, building anything, calling a provider, or presuming that
+classification is the bottleneck.
+
+This is deliberately smaller than a discovery phase. Two inputs disagreed - one wanted the recurring
+cost found first, the other wanted a workflow proven and measured as it went. Without a before-number
+the slice is unfalsifiable; with a full survey nothing gets built for weeks. Measuring the current
+cost of the *one scenario the slice will implement* satisfies both.
 
 ## Delivery
 
@@ -34,14 +41,14 @@ bottleneck.
   recorded task history - both needed before the account is assembled
 - Semantic contract: settled
 - Model class: diagnosis-review (gpt-5.6-sol, medium; source: default table)
-- Fixed decisions: the sample covers both failing and all-pass paths; anything unmeasurable is
-  reported as unknown rather than estimated; the sample draws from every candidate repository named
-  in the master plan, including `coaching-intelligence-sdk-parallel-development`, which the operator
-  identifies as a major source of recurring cost and which has not yet been inspected
-- Acceptance: a cost account naming repeated discovery, log reading, duplicate execution, rework
-  and human intervention, each with its share of elapsed time and tokens, and its uncertainty; the
-  account reports per repository as well as in aggregate, so one project's profile cannot be
-  mistaken for the general case
+- Fixed decisions: one scenario only; the sample covers both the failing and the all-pass path;
+  anything unmeasurable is reported as unknown rather than estimated; the sample draws from every
+  candidate repository named in the master plan, weighted toward the movement SDK because its scale
+  and its mixed ecosystems make it the case most likely to break a general claim
+- Acceptance: for that one scenario, time to an accepted result, total tokens and execution cost,
+  repeated investigation and rework, and whether a fresh session can currently continue correctly -
+  the four measures the slice will later be judged on; reported per repository as well as in
+  aggregate, so one project's profile is not mistaken for the general case
 - Development checkpoints: an interim read on a quarter of the sample, to catch a mis-specified
   measure before the whole pass is spent
 - Build and integration point: none

@@ -9,7 +9,7 @@ updated: 2026-09-19
 summary: Release and promotion modelled as one gated state machine, delivered as the first plugin instance.
 ---
 
-> Child of [Decision-First Harness Core](harness-core.md), instance of [Plugin Contract](plugin-contract.md).
+> Child of [Decision-First Harness Core](harness-core.md), instance of Plugin Contract *(contract retired)*.
 
 # Release Management Plugin
 

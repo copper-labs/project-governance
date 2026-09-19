@@ -61,7 +61,7 @@ genuinely new operator input - not merely because the first packet was incomplet
 
 - Input is a request identity, a packet identity, and a bounded instruction. Never a transcript.
 - Output is a result naming its request and the starting subject it was generated against, plus any
-  escape-hatch requests. Who applies it is decided by mode in [Task Lifecycle](task-lifecycle.md);
+  escape-hatch requests. Who applies it is decided by mode in [Task Lifecycle](action.md);
   this contract applies nothing itself.
 - The worker holds no state between invocations, and the harness sends none.
 - The same packet and instruction may be sent to a different provider without change.

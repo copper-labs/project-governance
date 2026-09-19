@@ -36,7 +36,7 @@ is the clearest measurable saving available and the baseline is already in the a
 - Execution: sequential
 - Parallel support: one bounded read-only assignment enumerating the facts currently left for an
   operator and where each is obtainable, needed at batch start
-- Semantic contract: settled by [Release Management](../../specs/release-management.md)
+- Semantic contract: settled by [Release Management](../../specs/release-preparation.md)
 - Model class: routine (gpt-5.6-luna, high; source: default table)
 - Fixed decisions: read-only throughout; existing checkers are called and their receipts preserved,
   never reimplemented; an unavailable fact is reported unavailable and never inferred; every

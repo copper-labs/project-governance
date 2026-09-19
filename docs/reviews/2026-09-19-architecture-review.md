@@ -11,6 +11,10 @@ summary: A deeper review of the harness model, its missing execution and accepta
 
 # Architectural And Conceptual Review
 
+> **Contract references below are historical.** The specification set was reorganized on
+> 2026-09-19 around four objects - Task, Action, Artifact, Evidence. See
+> [the specifications index](../specs/README.md); superseded files remain in git history.
+
 > **Phase-plan references below are historical.** The six-phase plan this review discusses
 > was replaced by the five-step sequence in [the master plan](../exec-plans/README.md);
 > the superseded files remain in git history.
@@ -80,8 +84,8 @@ it does not imply any particular framework is needed.
 
 ## A2 — Externalize The Task's Meaning, Not Only Its Execution History
 
-**Owners:** [Task Lifecycle](../specs/task-lifecycle.md),
-[State Store](../specs/state-store.md), [Worker Invocation](../specs/worker-invocation.md).
+**Owners:** Task Lifecycle *(superseded contract)*,
+State Store *(superseded contract)*, [Worker Invocation](../specs/worker-invocation.md).
 
 The lifecycle identifies requests and source subjects, but not enough of the task's meaning.
 What outcome did the user request? Which constraints remain in force? What has been ruled out?
@@ -115,7 +119,7 @@ without requiring its particular workflow or feature-list format.
 
 ## A3 — Allow Bounded Exploration Instead Of Demanding A Perfect First Packet
 
-**Owners:** [Context Packet](../specs/context-packet.md),
+**Owners:** Context Packet *(superseded contract)*,
 [Worker Invocation](../specs/worker-invocation.md), [Failure Triage](../specs/failure-triage.md).
 
 The packet contract correctly identifies candidate generation as the quality ceiling. That creates
@@ -146,8 +150,8 @@ accepted results and total context consumed, including repeated prefixes and ret
 ## A4 — Verification And Task Acceptance Need Different Meanings
 
 **Owners:** [Worker Invocation: Invariants](../specs/worker-invocation.md),
-[Task Lifecycle: States](../specs/task-lifecycle.md),
-[Decision Record](../specs/decision-record.md).
+Task Lifecycle: States *(superseded contract)*,
+Decision Record *(superseded contract)*.
 
 “Verification is separate and deterministic” describes check execution, not general correctness.
 A test suite can deterministically pass a change that solves the wrong problem. Documentation,
@@ -174,8 +178,8 @@ its content. A partial test run must leave untested claims explicitly open.
 
 ## A5 — Durable Records Do Not Make Side Effects Atomic
 
-**Owners:** [Task Lifecycle: Restart and Failure Modes](../specs/task-lifecycle.md),
-[State Store](../specs/state-store.md), [Release Management](../specs/release-management.md).
+**Owners:** Task Lifecycle: Restart and Failure Modes *(superseded contract)*,
+State Store *(superseded contract)*, Release Management *(superseded contract)*.
 
 The new lifecycle improves ownership, but “resume from the last durable state” is insufficient
 during application. Consider a crash after one of two files changes but before `applied` is written.
@@ -206,7 +210,7 @@ restart. Test a lost remote response before enabling promotion actions.
 ## A6 — Carry Authority And Data Boundaries Across The Subprocess Seam
 
 **Owners:** [Host Integration](../specs/host-integration.md),
-[Task Lifecycle](../specs/task-lifecycle.md), [Worker Invocation](../specs/worker-invocation.md),
+Task Lifecycle *(superseded contract)*, [Worker Invocation](../specs/worker-invocation.md),
 [Decision Interface](../specs/decision-interface.md).
 
 Host-owned permission is the right principle. A subprocess protocol still has to preserve it.
@@ -234,7 +238,7 @@ use existing host controls; it is not a request to build a new sandbox or approv
 
 ## A7 — Separate Execution Coordination From Evidence Reuse And Scheduling
 
-**Owners:** [Build Orchestration](../specs/build-orchestration.md),
+**Owners:** Build Orchestration *(superseded contract)*,
 [Ecosystem Adapters](../specs/ecosystem-adapters.md),
 Phase 1 *(superseded phase plan)*.
 
@@ -265,7 +269,7 @@ further ranking only if the whole distribution improves under the repository's c
 
 ## A8 — Measure Interventions, Not Just Classifier Accuracy
 
-**Owners:** [Decision Record](../specs/decision-record.md),
+**Owners:** Decision Record *(superseded contract)*,
 Phase 0 *(superseded phase plan)*,
 Phase 4 *(superseded phase plan)*.
 
@@ -294,8 +298,8 @@ classifier was correct.
 
 ## A9 — Deliver Release Preparation Without A General Plugin Engine
 
-**Owners:** [Plugin Contract](../specs/plugin-contract.md),
-[Release Management](../specs/release-management.md),
+**Owners:** Plugin Contract *(superseded contract)*,
+Release Management *(superseded contract)*,
 Phase 5 *(superseded phase plan)*.
 
 Collecting current release facts and rendering a reviewable packet can stand alone. It does not

@@ -33,9 +33,13 @@ plugin engine, and any change to what the governance runtime owns.
 
 ## What Changed, And Why
 
-The earlier plan assumed classification was the bottleneck and built an evaluation for it first.
-That presumed its own conclusion. This sequence finds where time and tokens actually go, proves a
-useful tool without a model, and only then tests whether a decision model improves **accepted work**.
+The earlier plan assumed classification was the bottleneck and built an evaluation for it first,
+which presumed its own conclusion. This sequence baselines one concrete scenario, proves that
+scenario end to end without a model, and only then tests whether a decision model improves
+**accepted work**.
+
+The scenario is chosen because it exercises everything at once: context, authority, execution,
+evidence and continuity.
 
 A negative result at step 3 removes one feature and leaves a working tool behind. Under the old
 plan it would have invalidated the premise after the build.
@@ -44,8 +48,8 @@ plan it would have invalidated the premise after the build.
 
 | Step | Plan | Question it answers |
 | --- | --- | --- |
-| 1 | [Find the recurring cost](active/step-1-find-the-cost.md) | Where do time, tokens, rework and intervention actually go? |
-| 2 | [Assistance inside the host](active/step-2-assistance-in-host.md) | Does a deterministic tool plus a task brief beat the current workflow? |
+| 1 | [Baseline one scenario](active/step-1-find-the-cost.md) | What does that scenario cost today, on the four measures the slice is judged on? |
+| 2 | [Prove one workflow](active/step-2-assistance-in-host.md) | Investigate a failing check, fix, verify, resume after interruption - does it beat the baseline? |
 | 3 | [One optional decision](active/step-3-one-decision.md) | Does adding a classifier improve accepted work, holding everything else fixed? |
 | 4 | [Bounded dispatch and recovery](active/step-4-dispatch-and-recovery.md) | Can we apply results and recover from interruption safely? |
 | 5 | [Expand from demonstrated reuse](active/step-5-expand.md) | Does a second host or ecosystem work without changing the core? |
@@ -61,10 +65,10 @@ them and may start at any time.
 
 ## Contracts With No Owning Step, Deliberately
 
-[Plugin Contract](../specs/plugin-contract.md) has no step. The general plugin engine is deferred
+Plugin Contract *(contract retired; the gate invariant lives in the umbrella)* has no step. The general plugin engine is deferred
 until several consumers justify it, so nothing in this sequence builds one. The contract is retained
 because the gate invariant it carries applies to any domain code, plugin or not, and
-[Release Management](../specs/release-management.md) depends on that invariant while
+[Release Management](../specs/release-preparation.md) depends on that invariant while
 [Track R](active/track-release-preparation.md) stays read-only.
 
 ## Settled Decisions
@@ -100,7 +104,7 @@ not an afterthought:
   per checkout.
 - **Machine-global resources are shared across those workspaces.** Metro ports, simulators and
   physical devices are owned per machine, not per workspace. A per-workspace claim does not cover
-  them, which is a real gap in [Build Orchestration](../specs/build-orchestration.md).
+  them, which is a real gap in [Build Orchestration](../specs/execution.md).
 - **A dev loop already exists** at `tools/dev-loop`, with durable state tracking device bindings,
   port ownership by process id, and deployment digests. That is prior art for exactly the
   operational state this proposal describes, and the harness should reference its receipts rather

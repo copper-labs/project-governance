@@ -86,7 +86,7 @@ A threshold is not a probability cutoff alone. Each entry declares the **consequ
   remedy is free may be acted on cheaply.
 
 Thresholds are per question, declared in the catalog, and start conservative. They may only be
-loosened against recorded outcomes, never against intuition. See [Decision Record](decision-record.md).
+loosened against recorded outcomes, never against intuition. See [Decision Record](evidence.md).
 
 ## Invariants And Constraints
 

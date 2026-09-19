@@ -11,10 +11,12 @@ summary: Conceptual proposal for a harness and governance system whose control p
 
 # Decision-First Harness
 
-> **Superseded in part.** This is the original concept note, kept for its reasoning. Where it
-> differs from the contracts, the contracts win: the store is files, not a richer substrate; the
-> front door is the agent host, not a CLI of our own; and execution state is recorded *before* the
-> action it covers, not after verification. See [the specifications](../specs/README.md).
+> **Superseded in part.** The original concept note, kept for its reasoning. Where it differs from
+> the contracts, the contracts win. In particular: the thesis is now **continuity**, not decision
+> cost, and the runtime is useful with zero model calls; operational state lives in SQLite with
+> Markdown for briefs and files for large artifacts; the front door is the agent host; and execution
+> state is durable *before* the action it covers, not after verification. See
+> [the specifications](../specs/README.md).
 
 Conceptual proposal. Nothing here is a design or a commitment. The point is to agree on the idea
 and the first experiment.
@@ -159,7 +161,7 @@ fills. The two are complementary by design rather than by coincidence.
 richer substrate is reevaluated only once the harness is tuned and running, and only against the
 baseline the file implementation produces. That keeps the comparison honest and stops two hard
 problems being coupled on day one. The store boundary in
-[State Store](../specs/state-store.md) exists so that later decision stays cheap.
+[State Store](../specs/operational-store.md) exists so that later decision stays cheap.
 
 **Three cautions that informed it.**
 

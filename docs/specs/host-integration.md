@@ -58,7 +58,7 @@ assume which step is active. The invocation contract is identical; only the call
   thresholds.
 - **A routing instruction is advisory coverage, not enforcement.** It suggests the host call the
   harness; it constrains nothing the host does outside it. Enforcement of effects lives at the
-  action boundary. See [Action Authority](action-authority.md).
+  action boundary. See [Action Authority](action.md).
 - An adapter either demonstrates the capabilities a mode requires, or that mode is reported
   unsupported. Support is never inferred from sharing instruction text.
 - Each supported host receives the same marked section, generated from one source, so the three

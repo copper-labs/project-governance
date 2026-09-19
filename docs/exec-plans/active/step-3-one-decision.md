@@ -60,7 +60,7 @@ protocol, autonomous dispatch.
 - Ownership: the evaluation; one writer
 - Execution: sequential
 - Parallel support: one bounded read-only assignment labelling outcomes for the held-out split
-- Semantic contract: settled by [Decision Record](../../specs/decision-record.md)
+- Semantic contract: settled by [Decision Record](../../specs/evidence.md)
 - Model class: diagnosis-review (gpt-5.6-sol, medium; source: default table)
 - Fixed decisions: three variants compared - current workflow, deterministic assistance, assistance
   plus this decision; labels are outcome-based; the split is held out from question design and

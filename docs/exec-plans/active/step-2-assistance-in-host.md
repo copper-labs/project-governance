@@ -32,7 +32,7 @@ lane reordering.
 - Ownership: repository scaffolding and the store; one writer
 - Execution: sequential
 - Parallel support: solo
-- Semantic contract: settled by [State Store](../../specs/state-store.md)
+- Semantic contract: settled by [State Store](../../specs/operational-store.md)
 - Model class: difficult-implementation (gpt-5.6-luna, xhigh; source: default table)
 - Fixed decisions: TypeScript on Node; charter, agent instructions and governance adoption land
   here; files only; execution state durable before an action, analytics best-effort; the store
@@ -56,8 +56,8 @@ lane reordering.
 - Ownership: brief and authority; one writer
 - Execution: sequential
 - Parallel support: solo; these two contracts are the safety boundary and belong to one author
-- Semantic contract: settled by [Task Brief](../../specs/task-brief.md) and
-  [Action Authority](../../specs/action-authority.md)
+- Semantic contract: settled by [Task Brief](../../specs/task.md) and
+  [Action Authority](../../specs/action.md)
 - Model class: deep-reasoning (gpt-5.6-sol, high; source: default table) because a gap here becomes
   an unauthorized effect everywhere downstream
 - Fixed decisions: briefs are versioned and never edited in place; operator instruction, observed
@@ -86,7 +86,7 @@ lane reordering.
 - Execution: sequential
 - Parallel support: one bounded read-only assignment establishing what good context looks like for
   a sample of past tasks, needed as the comparison baseline
-- Semantic contract: settled by [Context Packet](../../specs/context-packet.md)
+- Semantic contract: settled by [Context Packet](../../specs/artifact.md)
 - Model class: ambiguous-integration (gpt-5.6-terra, high; source: default table)
 - Fixed decisions: the subject-to-materialization bridge is built here and its absence is a
   blocker, not an assumption; mandatory items are never dropped by narrowing or budget; the existing

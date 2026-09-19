@@ -11,6 +11,10 @@ summary: Independent review of the draft harness contracts and phased plan, with
 
 # Decision-First Harness: Secondary Review
 
+> **Contract references below are historical.** The specification set was reorganized on
+> 2026-09-19 around four objects - Task, Action, Artifact, Evidence. See
+> [the specifications index](../specs/README.md); superseded files remain in git history.
+
 > **Phase-plan references below are historical.** The six-phase plan this review discusses
 > was replaced by the five-step sequence in [the master plan](../exec-plans/README.md);
 > the superseded files remain in git history.
@@ -50,9 +54,9 @@ design or delivery correction. A Phase 5 P1 need not delay a Phase 0 experiment.
 
 ### R1 — P1: Model-selected evidence can weaken a release gate
 
-**Sources:** [Release Management: Gates and Evidence Catalog](../specs/release-management.md),
+**Sources:** Release Management: Gates and Evidence Catalog *(superseded contract)*,
 [Harness Core: Fixed Decisions](../specs/harness-core.md),
-[Plugin Contract: Gate Invariant](../specs/plugin-contract.md).
+Plugin Contract: Gate Invariant *(superseded contract)*.
 
 The release contract makes “which evidence types apply” a decision-model output. Complete catalog
 coverage is then checked against that selection. A model can omit a required evidence type and
@@ -71,8 +75,8 @@ policy or rejects the stale evaluation. Static load validation alone cannot prov
 ### R2 — P1: Mandatory recording and optional recording are incompatible
 
 **Sources:** [Harness Core: Invariants](../specs/harness-core.md),
-[Decision Record: Failure Modes and Validation](../specs/decision-record.md),
-[State Store: Failure Modes and Validation](../specs/state-store.md).
+Decision Record: Failure Modes and Validation *(superseded contract)*,
+State Store: Failure Modes and Validation *(superseded contract)*.
 
 The umbrella requires every decision to be recorded before its action. The record spec says a
 failed write does not stop the action; both storage contracts require unchanged behavior with
@@ -89,7 +93,7 @@ checks remain available and that the action cannot be duplicated or lose its ret
 
 ### R3 — P1: The task lifecycle and apply/verify boundary have no owner
 
-**Sources:** [State Store: Scope and Behavioral Requirements](../specs/state-store.md),
+**Sources:** State Store: Scope and Behavioral Requirements *(superseded contract)*,
 [Host Integration: Two Steps](../specs/host-integration.md),
 [Worker Invocation: Worker Contract](../specs/worker-invocation.md),
 Phase 3 *(superseded phase plan)*.
@@ -111,7 +115,7 @@ the same patch twice. Checks must reference the resulting subject, not the origi
 
 ### R4 — P1: Build locking does not yet cover the concurrency it promises
 
-**Sources:** [Build Orchestration: Workspace Lock, Ladder, Failure Modes](../specs/build-orchestration.md),
+**Sources:** Build Orchestration: Workspace Lock, Ladder, Failure Modes *(superseded contract)*,
 Phase 1: Batches 2–3 *(superseded phase plan)*,
 [existing Test Execution: Inputs and Resources](GOVERNANCE-RUNTIME:docs/specs/test-execution.md).
 
@@ -159,7 +163,7 @@ an unsupported source edit or exceed the episode's remedy allowance.
 
 **Sources:** [Harness Core: Fixed Decisions](../specs/harness-core.md),
 [Decision Interface: Escalation Ladder](../specs/decision-interface.md),
-[Context Packet: Failure Modes](../specs/context-packet.md),
+Context Packet: Failure Modes *(superseded contract)*,
 [Failure Triage: Failure Modes](../specs/failure-triage.md).
 
 The umbrella says a below-threshold answer takes a deterministic fallback and continues. The
@@ -177,7 +181,7 @@ budget overflow, and low confidence. Assert the same disposition at interface an
 ### R7 — P1: Phase 0 cannot yet support an honest go/no-go decision
 
 **Sources:** Phase 0 *(superseded phase plan)*,
-[Decision Record: Calibration Reads](../specs/decision-record.md),
+Decision Record: Calibration Reads *(superseded contract)*,
 Phase 4: Batch 1 *(superseded phase plan)*.
 
 Agreement with the prior actor is not correctness. The plan leaves sample size, error tolerance,
@@ -197,8 +201,8 @@ stop model adoption, not automatically cancel independently justified determinis
 
 ### R8 — P2: The ledger lacks enough provenance for its calibration promise
 
-**Sources:** [Decision Record: Record Shape](../specs/decision-record.md),
-[State Store: Retention](../specs/state-store.md),
+**Sources:** Decision Record: Record Shape *(superseded contract)*,
+State Store: Retention *(superseded contract)*,
 Phase 4: Rollback *(superseded phase plan)*.
 
 Question version and a state digest are insufficient to distinguish provider changes, threshold
@@ -218,7 +222,7 @@ references, and rollback restores exact prior configuration from retained eviden
 
 ### R9 — P1: Packet correctness depends on an unimplemented subject seam
 
-**Sources:** [Context Packet: Invariants and Failure Modes](../specs/context-packet.md),
+**Sources:** Context Packet: Invariants and Failure Modes *(superseded contract)*,
 Phase 3: Batches 2–3 *(superseded phase plan)*,
 [existing context producer](GOVERNANCE-RUNTIME:src/project_governance_runtime/context.py),
 [Governance Kernel: context contract](GOVERNANCE-RUNTIME:docs/specs/governance-kernel.md).
@@ -248,7 +252,7 @@ and submit a task in a clean checkout. Validate both the bytes and their subject
 
 **Sources:** Phase 3: Final State and Batch 3 *(superseded phase plan)*,
 Phase 4: Batch 2 *(superseded phase plan)*,
-[Context Packet: Escape Hatch](../specs/context-packet.md).
+Context Packet: Escape Hatch *(superseded contract)*.
 
 A worker can miss an essential constraint without asking for it. A lower request rate therefore
 does not establish better packets. Likewise, a lane that never failed may cover a rare but important

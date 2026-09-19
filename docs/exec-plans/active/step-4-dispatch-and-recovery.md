@@ -30,7 +30,7 @@ effect or inventing a clean restart. Added only once Steps 2 and 3 show the work
 - Ownership: task lifecycle; one writer
 - Execution: sequential
 - Parallel support: solo; this is the recovery boundary and belongs to one author
-- Semantic contract: settled by [Task Lifecycle](../../specs/task-lifecycle.md)
+- Semantic contract: settled by [Task Lifecycle](../../specs/action.md)
 - Model class: deep-reasoning (gpt-5.6-sol, high; source: default table) because a wrong recovery
   rule silently corrupts the working tree
 - Fixed decisions: side-effecting actions record expected inputs, intended outputs, action identity
@@ -56,7 +56,7 @@ effect or inventing a clean restart. Added only once Steps 2 and 3 show the work
 - Ownership: application and acceptance; one writer
 - Execution: sequential
 - Parallel support: solo
-- Semantic contract: settled by [Task Lifecycle](../../specs/task-lifecycle.md) and
+- Semantic contract: settled by [Task Lifecycle](../../specs/action.md) and
   [Worker Invocation](../../specs/worker-invocation.md)
 - Model class: difficult-implementation (gpt-5.6-luna, xhigh; source: default table)
 - Fixed decisions: the writer is chosen per mode and each mode is its own acceptance claim; a stale

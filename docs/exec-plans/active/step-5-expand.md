@@ -57,7 +57,7 @@ execution.
 - Ownership: build orchestration; one writer
 - Execution: sequential
 - Parallel support: solo
-- Semantic contract: settled by [Build Orchestration](../../specs/build-orchestration.md)
+- Semantic contract: settled by [Build Orchestration](../../specs/execution.md)
 - Model class: difficult-implementation (gpt-5.6-luna, xhigh; source: default table)
 - Fixed decisions: coordination uses the existing execution owner's claims and cleanup rather than a
   second owner; in-flight deduplication is separate from reuse across completed runs; reuse is a

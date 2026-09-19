@@ -11,6 +11,10 @@ summary: Per-finding disposition of the architectural review, the two contracts 
 
 # Reconciliation Of The Architecture Review
 
+> **Contract references below are historical.** The specification set was reorganized on
+> 2026-09-19 around four objects - Task, Action, Artifact, Evidence. See
+> [the specifications index](../specs/README.md); superseded files remain in git history.
+
 Response to [the architecture review](2026-09-19-architecture-review.md). All nine findings
 accepted. Two carry a note back rather than a disagreement.
 
@@ -25,23 +29,23 @@ nothing about what was transmitted (A6).
 | # | Finding | Disposition | Where the fix landed |
 | --- | --- | --- | --- |
 | A1 | Optimize accepted work, not a mandatory tier cascade | Accepted | [Harness Core](../specs/harness-core.md), [Decision Interface](../specs/decision-interface.md) |
-| A2 | Externalize the task's meaning | Accepted | New [Task Brief](../specs/task-brief.md); [Worker Invocation](../specs/worker-invocation.md), [Context Packet](../specs/context-packet.md) |
-| A3 | Allow bounded exploration | Accepted | [Worker Invocation](../specs/worker-invocation.md), [Context Packet](../specs/context-packet.md) |
-| A4 | Verification and acceptance are different | Accepted | [Task Lifecycle](../specs/task-lifecycle.md) |
-| A5 | Durable records do not make side effects atomic | Accepted | [Task Lifecycle](../specs/task-lifecycle.md), [State Store](../specs/state-store.md) |
-| A6 | Carry authority and data boundaries across the seam | Accepted | New [Action Authority](../specs/action-authority.md); [Host Integration](../specs/host-integration.md) |
-| A7 | Separate coordination, reuse and scheduling | Accepted, with a note | [Build Orchestration](../specs/build-orchestration.md), [Step 5](../exec-plans/active/step-5-expand.md) |
-| A8 | Measure interventions, not classifier accuracy | Accepted | [Decision Record](../specs/decision-record.md), [Failure Triage](../specs/failure-triage.md), [Step 3](../exec-plans/active/step-3-one-decision.md) |
-| A9 | Release preparation without a plugin engine | Accepted, with a note | [Plugin Contract](../specs/plugin-contract.md), [Release Management](../specs/release-management.md), [Track R](../exec-plans/active/track-release-preparation.md) |
+| A2 | Externalize the task's meaning | Accepted | New Task Brief *(superseded contract)*; [Worker Invocation](../specs/worker-invocation.md), Context Packet *(superseded contract)* |
+| A3 | Allow bounded exploration | Accepted | [Worker Invocation](../specs/worker-invocation.md), Context Packet *(superseded contract)* |
+| A4 | Verification and acceptance are different | Accepted | Task Lifecycle *(superseded contract)* |
+| A5 | Durable records do not make side effects atomic | Accepted | Task Lifecycle *(superseded contract)*, State Store *(superseded contract)* |
+| A6 | Carry authority and data boundaries across the seam | Accepted | New Action Authority *(superseded contract)*; [Host Integration](../specs/host-integration.md) |
+| A7 | Separate coordination, reuse and scheduling | Accepted, with a note | Build Orchestration *(superseded contract)*, [Step 5](../exec-plans/active/step-5-expand.md) |
+| A8 | Measure interventions, not classifier accuracy | Accepted | Decision Record *(superseded contract)*, [Failure Triage](../specs/failure-triage.md), [Step 3](../exec-plans/active/step-3-one-decision.md) |
+| A9 | Release preparation without a plugin engine | Accepted, with a note | Plugin Contract *(superseded contract)*, Release Management *(superseded contract)*, [Track R](../exec-plans/active/track-release-preparation.md) |
 
 ## Two Contracts Added
 
-- **[Task Brief](../specs/task-brief.md)** holds the desired outcome, constraints in force,
+- **Task Brief *(superseded contract)*** holds the desired outcome, constraints in force,
   acceptance evidence, scope, open questions and ruled-out hypotheses. Every item records whether it
   is an operator instruction, an observed fact, or a worker hypothesis, and only the appropriate
   owner may change each. A new instruction revises the brief and invalidates affected pending
   actions; it never retroactively authorizes work already done.
-- **[Action Authority](../specs/action-authority.md)** requires every executable request to declare
+- **Action Authority *(superseded contract)*** requires every executable request to declare
   its operation, scope, destination and policy revision, enforced before effects and after path
   resolution. It also carries the data boundary: anything offered to a hosted provider must satisfy
   the project's export rules before transmission, and source text, tool output and provider

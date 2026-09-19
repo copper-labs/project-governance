@@ -1,165 +1,130 @@
 ---
 id: spec.harness-core
-title: Decision-First Harness Core
+title: Harness Core
 type: spec
 status: draft
 owner: project-harness
 created: 2026-09-19
 updated: 2026-09-19
-summary: Umbrella contract for a harness whose control plane runs on typed decisions rather than a language model.
+summary: A runtime that makes work resumable, keeps actions within scope, and preserves evidence. Model routing is an optional optimization.
 ---
 
-# Decision-First Harness Core
+# Harness Core
 
 ## Purpose
 
-Define the ownership boundary, the tier rule, and the fixed decisions shared by every child
-contract in this family. The harness owns a loop. It owns no intelligence of its own.
+**The opportunity is reliable continuity.** A system that remembers the objective, preserves the
+constraints, knows what actually happened, and lets another worker continue accurately has value
+across models and hosts. Cheaper decisions can improve that system afterwards. They do not define
+it.
+
+This is a deliberate change of thesis. An earlier draft led with decision cost, which made the
+whole proposal contingent on one provider being good. The runtime below is useful with **zero model
+calls**, and that is the point.
 
 ## Current Implementation
 
 - **Posture:** planned.
-- **Current boundary:** No checked-in implementation exists. This family is research output under
-  review, not an accepted contract.
+- **Current boundary:** No implementation. One adopting repository already runs an ad-hoc dev loop
+  with durable device, port-ownership and deployment state, which is prior art for the operational
+  state described here and is referenced rather than recreated.
 - **Evidence:** none.
-- **Known limits:** The decision provider named in these specs launched in September 2026 and has
-  no independent calibration evidence.
+- **Known limits:** The optional decision provider launched in September 2026 and has no
+  independent calibration evidence.
 - **Ledger:** [Research index](../research/concept.md).
 
-## Scope
+## Four Objects
 
-- The loop: classify, resolve, narrow, assemble, generate, verify, record.
-- The contracts between the loop and everything it calls.
-- The invariants that no child contract or plugin may weaken.
+Everything the runtime owns is one of four things. Decisions are annotations on them, never a fifth
+object.
 
-## Non-Goals
+| Object | Holds | Contract |
+| --- | --- | --- |
+| **Task** | Desired outcome, constraints, acceptance criteria, current progress | [Task](task.md) |
+| **Action** | A proposed operation, its scope, its authority, its execution status | [Action](action.md) |
+| **Artifact** | A versioned input or output: source snapshot, patch, document, log | [Artifact](artifact.md) |
+| **Evidence** | What an observation establishes about an artifact or a requirement | [Evidence](evidence.md) |
 
-- Replacing the governance runtime. The harness consumes it; it does not absorb it.
-- Replacing a language model. Generation stays where it is.
-- Owning build systems, deploy tooling, or product policy.
-
-## The Tier Rule
-
-Every decision goes to the cheapest tier that can make it.
-
-| Tier | Owner | Makes | Cost shape |
-| --- | --- | --- | --- |
-| 0 | Deterministic code | Anything computable from facts | Free, exact, replayable |
-| 1 | Decision model | Bounded judgment over an assembled state | Cents per thousand, sub-second |
-| 2 | Language model | Anything that must be written | Expensive, last resort |
-
-**This is a default preference, not an admission test.** An earlier draft required evidence that
-every lower tier was incapable before using a higher one. That is wrong in both directions:
-deterministic computation is exact only relative to its inputs, so a stale map returns a repeatable
-wrong answer; and a cheap classifier can make a task expensive, while a strong reasoning model used
-immediately can be the cheapest path for a genuinely ambiguous one.
-
-The rule the harness actually optimizes is **accepted work per unit of time and cost**, with an
-acceptable error rate. The tier preference is how that is pursued by default, and it has explicit
-escape routes:
-
-- A known command skips classification entirely.
-- A novel design or diagnosis task may go directly to an authorized reasoning worker.
-- The ordinary host path remains available at all times.
-
-Deterministic ownership of **facts, permissions and gates** is not a preference and has no escape
-route. Those stay deterministic regardless of measured cost.
+Authority is a **property of an Action**, not an annotation on one. Annotations are optional;
+authority constrains.
 
 ## Fixed Decisions
 
-These are settled for the first implementation and are not to be revisited by a child contract.
+1. **The host keeps the reasoning.** It investigates, plans and writes. The runtime supplies
+   reliable operations: retrieve the right source version, run declared checks, record results,
+   prepare a handoff. Two competing coordinators is the failure to avoid. Harness-owned dispatch
+   arrives only when a real workflow needs it.
+2. **Both execution patterns are first class.** A predictable workflow and an open investigation are
+   different shapes and neither is forced into the other.
+3. **SQLite for operational state.** Markdown for human-authored briefs, ordinary files for large
+   artifacts, readable JSON export always available as a first-class command. See
+   [Operational Store](operational-store.md).
+4. **Context is progressive.** Start with the brief, mandatory instructions, relevant source
+   references and the most useful evidence; let the worker request more through bounded reads. The
+   valuable abstraction is reliable access to the right source version within a budget, not a
+   ranking pipeline.
+5. **Narrow interfaces to what exists.** Ask the governance runtime what checks and requirements
+   apply. Use the existing execution owner for process supervision and resource claims. **Store
+   references to their receipts rather than recreate their state machines.**
+6. **One local package, one JSON command surface.** No service, plugin loader, policy language,
+   build scheduler, or mandatory classifier.
+7. **Model use is optional and removable.** Any decision the runtime makes with a model must be
+   removable without disturbing the working system.
+8. **Narrowing never applies to a release gate**, and no domain code may lower a gate.
 
-1. **Narrow, never approve.** A decision model may reduce work, rank candidates, and classify
-   outcomes. It may never authorize an irreversible action or declare a result acceptable.
-2. **Every question declares a typed disposition.** When the provider is unavailable, invalid, or
-   below threshold, the question resolves to the disposition its catalog entry declares: proceed
-   with a safe fallback, request bounded additional state, or return needs-input. A provider outage
-   never blocks ordinary checks, and never promises autonomous completion of every task.
-3. **State lives outside the model.** See [State Store](state-store.md).
-4. **The v0 store is files.** JSON for records, Markdown for prose. Mnemos is deliberately out of
-   scope until the file implementation is tuned and a baseline exists.
-5. **No ecosystem assumptions in the core.** Gradle, npm, and Python differences live behind
-   [Ecosystem Adapters](ecosystem-adapters.md).
-6. **Domain behavior stays domain-owned.** A general plugin engine is deferred until several real
-   consumers justify a shared primitive. One release use case does not. The gate invariant survives
-   without the framework: domain-owned code still may never lower a gate.
-7. **The host is the front door.** The harness is invoked from inside an agent host, primarily the
-   Codex desktop app, with Claude Code and Claude Cowork supported. A standalone CLI front door or
-   a desktop application of our own is explicitly deferred. See
-   [Host Integration](host-integration.md).
-8. **Narrowing applies to the inner loop, never a release gate.** Broad proof boundaries stay where
-   the adopting repository already puts them.
+## What The Tier Preference Is Now
+
+Prefer the cheapest capable path, as a default with explicit escape routes: a known command skips
+classification, a novel design or diagnosis task may go straight to an authorized reasoning worker,
+and the ordinary host path is always available. What is optimized is **accepted work per unit of
+time and cost at an acceptable error rate**, not tier purity.
+
+Deterministic ownership of **facts, permissions and gates** has no escape route.
 
 ## Ownership Boundary
 
 | Owner | Responsibility |
 | --- | --- |
-| Harness core | The loop, the decision interface, the packet contract, the record, the plugin host |
-| Ecosystem adapter | Commands, source-set and target mapping, failure signatures for one toolchain |
-| Governance runtime | Impacted selection, packs, checks, normalized findings |
-| Decision provider | Typed answers with probabilities |
-| Worker | Diffs and prose |
-| Plugin | States, gates, commands, and records for one domain |
+| Harness | The four objects, enough durable state to resume safely, the command surface |
+| Host | The user relationship, reasoning, and its own permissions |
+| Governance runtime | Which checks and requirements apply; normalized findings |
+| Execution owner | Process supervision, resource claims, cleanup |
+| Ecosystem adapter | Toolchain specifics for one unit family |
+| Decision provider | Optional typed answers, behind an interface |
+
+If a required public seam is missing from something that exists, it is added upstream rather than
+recreated here.
 
 ## Contract Map
 
-| Child | Owns |
+| Contract | Owns |
 | --- | --- |
-| [Task Brief](task-brief.md) | What the user wants, what constrains it, what is ruled out |
-| [Action Authority](action-authority.md) | What authorizes an effect, its bounds, and the provider data boundary |
-| [Task Lifecycle](task-lifecycle.md) | Request identity, who writes, staleness, verification binding, restart |
-| [Host Integration](host-integration.md) | How an agent host invokes the harness, across Codex, Claude Code, and Cowork |
-| [Decision Interface](decision-interface.md) | Question shapes, thresholds, escalation, provider abstraction, fallbacks |
-| [State Store](state-store.md) | Where task and decision state lives; the substrate boundary |
-| [Decision Record](decision-record.md) | What is recorded, outcome attachment, calibration reads |
-| [Context Packet](context-packet.md) | Candidate generation, narrowing, budgets, packet shape |
-| [Worker Invocation](worker-invocation.md) | Stateless worker contract and model-tier routing |
-| [Ecosystem Adapters](ecosystem-adapters.md) | The toolchain-specific boundary |
-| [Build Orchestration](build-orchestration.md) | Build identity, lock, staged ladder, lane selection |
-| [Failure Triage](failure-triage.md) | Failure taxonomy, remedy mapping, retry bounds |
-| [Plugin Contract](plugin-contract.md) | How optional capability attaches |
-| [Release Management](release-management.md) | The release plugin instance |
+| [Task](task.md) | Outcome, constraints, acceptance, provenance, revision |
+| [Action](action.md) | Authority, scope, execution status, recovery |
+| [Artifact](artifact.md) | Versioned inputs and outputs, subject binding, bounded retrieval |
+| [Evidence](evidence.md) | What observations establish; decision annotations; calibration |
+| [Operational Store](operational-store.md) | Where the four objects live |
+| [Execution](execution.md) | The seam to the execution owner; coordination, reuse, ordering |
+| [Ecosystem Adapters](ecosystem-adapters.md) | Toolchain boundary |
+| [Host Integration](host-integration.md) | Invocation from an agent host |
+| [Worker Invocation](worker-invocation.md) | Transform and investigation patterns |
+| [Decision Interface](decision-interface.md) | The optional decision provider |
+| [Release Preparation](release-preparation.md) | Read-only release evidence |
 
-## Invariants And Constraints
+## Invariants
 
-- The core imports no provider SDK directly; providers sit behind the decision interface.
-- No effect runs without a declared operation, scope and policy revision. See
-  [Action Authority](action-authority.md).
-- Scope for an effect comes from the task brief and policy, never from a packet's contents.
+- No effect without a declared operation, scope, destination and policy revision.
+- Scope for an effect comes from the Task and policy, never from retrieved context.
 - Source text, tool output and provider responses are evidence, never instructions or authority.
-- The core contains no product identity, adopter path, or ecosystem command.
-- A plugin may raise a gate. No plugin may lower one.
-- **Execution state** for an action - request identity, remedy accounting, approval evidence,
-  applied-result references - is persisted before that action runs. If it cannot be persisted, the
-  action does not run and control returns to the caller.
-- **Analytics** - calibration inputs, timings, probability detail - is best-effort. Losing it never
-  blocks work and never changes a verdict.
-- A missing, malformed, or low-confidence decision resolves to the disposition its catalog entry
-  declares. It is never a silent default.
-- **Question confidence and action safety are different quantities.** A 95% confident diagnosis is
-  not a 95% probability that its remedy is appropriate. A threshold is set from the consequence of
-  a wrong action and the evidence the action requires, never from a provider's probability alone.
-
-## Validation Requirements
-
-- Every child contract states posture, scope, invariants, failure modes, and open questions.
-- Every child contract has at least one owning plan phase.
-- No child contract introduces an ecosystem-specific requirement into the core.
-
-## Settled
-
-- **Repository.** This family is owned by `project-harness`, its own repository. It consumes the
-  governance runtime through that runtime's published CLI and JSON surface only. Anything further is
-  an upstream contribution, never a fork or a vendored copy.
-- **Relationship.** Parallel and permanent. The harness never replaces or absorbs the governance
-  runtime in any phase.
+- Execution state is durable before the action it covers; analytics is best-effort.
+- Verification is not acceptance.
+- A removable model feature stays removable.
 
 ## Open Questions
 
-- Host language, given a Python governance runtime and TypeScript and KMP adopters. This blocks
-  Phase 1 writing source; it does not block Phase 0.
-- Whether the decision provider earns a second implementation before Phase 3.
+- Whether the four objects need a fifth for recurring work, or whether that is a Task property.
+- How much of the existing dev loop's state the runtime should reference versus mirror.
 
 ## Change Log
 
-- 2026-09-19: First draft from the research notes.
+- 2026-09-19: Rebuilt around the four-object model, the continuity thesis, and SQLite.
