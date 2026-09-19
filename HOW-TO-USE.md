@@ -45,6 +45,27 @@ Without that, type the full path: `~/ORGANTA/project-harness/bin/harness help`.
 It keeps a small database in a `.harness` folder inside whatever repo you run it from. Add that to
 that repo's `.gitignore`, or point it elsewhere with `--db <path>`.
 
+## The one command that matters
+
+Run this **once in each repo you work in**:
+
+```sh
+cd ~/COPPERLABS/portal-webapp
+harness init
+```
+
+That writes a short block into that repo's `AGENTS.md` telling Codex to use the harness. From then
+on you work exactly as you do today — you talk to Codex, Codex calls the harness. You do not type
+harness commands.
+
+It only touches instruction files that already exist, it leaves everything the team wrote around
+its block alone, and running it twice changes nothing.
+
+## The commands below are for inspecting, not for driving
+
+Everything after this point is how *you* look at what the harness recorded, or how you verify it
+works. It is not the workflow. The workflow is: talk to Codex.
+
 ## A real walkthrough
 
 Every block below is actual output.

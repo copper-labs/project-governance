@@ -9,11 +9,13 @@ import { authorizeAction, proposeAction, recoverAll, type Inspection } from "./o
 import { defaultPolicy, withinScope, type AuthorityRequest } from "./ops/authority.ts";
 import { runCheck } from "./ops/execution.ts";
 import { changedPaths, resolveSubject, retrieve, routeByDeclaredTarget, type SubjectRef } from "./ops/retrieval.ts";
+import { initRepo } from "./ops/adapter.ts";
 import { existsSync } from "node:fs";
 import type { Action, TaskItem } from "./model/types.ts";
 
 const USAGE = `harness <command>
 
+  init          [--file AGENTS.md]...      write the block that makes your agent use this
   task create   --outcome <text> [--constraint <text>]... [--scope <path>]... [--acceptance <text>]...
   task show     --task <id>
   task list
@@ -63,6 +65,16 @@ function main(argv: string[]): void {
 
   const store = new Store(dbPath);
   try {
+    if (group === "init") {
+      const results = initRepo(root, flags["file"] ?? []);
+      return emit({
+        ok: true,
+        repo: root,
+        files: results,
+        next: "Start a normal session in your agent. It will record the job and call the harness itself.",
+      });
+    }
+
     if (group === "task" && verb === "create") {
       const outcome = one(flags, "outcome") ?? fail("task create requires --outcome");
       const items: Omit<TaskItem, "seq" | "revoked">[] = [
