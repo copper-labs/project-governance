@@ -261,7 +261,7 @@ rare-failure lane that appears redundant in routine history. The evaluation must
 
 ### R11 — P2: Several plan batches require work scheduled later
 
-**Sources:** [Master Plan](../exec-plans/active/README.md), [Phase 1](../exec-plans/active/phase-1-build-hygiene.md),
+**Sources:** [Master Plan](../exec-plans/README.md), [Phase 1](../exec-plans/active/phase-1-build-hygiene.md),
 [Phase 2](../exec-plans/active/phase-2-decision-interface.md), [Phase 3](../exec-plans/active/phase-3-harness-as-tool.md),
 [Phase 4](../exec-plans/active/phase-4-tighten-on-evidence.md), [Phase 5](../exec-plans/active/phase-5-release-plugin.md).
 
