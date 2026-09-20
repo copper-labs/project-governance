@@ -83,3 +83,18 @@ project hooks use their locked local wheel instead.
 - [Developer documentation](docs/developer/index.md)
 - [Charter](CHARTER.md)
 - [Execution plans](docs/exec-plans/README.md)
+
+## Continuity module
+
+Task continuity now lives in [components/harness](components/harness/README.md). It shares this
+repository and wheel release with governance. Codex is the first host target; other continuity hosts
+are deferred. Ordinary governance remains usable without Node.
+
+An installed wheel provides `project-governance harness ...` and the `harness` entry point. Both use
+the same bundled TypeScript module and installed executor. Node 22.18+ with native SQLite is required;
+set `GOVERNANCE_NODE` to an explicit executable when needed. No npm runtime installation is required.
+
+Contributors use `npm ci --prefix components/harness --ignore-scripts`, then
+`npm --prefix components/harness test` and `npm --prefix components/harness run typecheck`.
+The [continuity contracts](components/harness/docs/specs/README.md) and
+[process map](components/harness/docs/architecture/development-flow.md) explain the ownership split.

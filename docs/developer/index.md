@@ -42,3 +42,9 @@ project-governance docs route --capability change-runtime --json
 
 The catalog is a routing surface, not a second technical authority. Follow its reference before
 acting and inspect its local sources for current implementation behavior.
+
+## Continuity
+
+The [continuity module](../../components/harness/README.md) owns task history and bounded resume.
+It is part of this governance product and wheel; policy and process supervision retain their existing
+owners. See the [process map](../../components/harness/docs/architecture/development-flow.md).

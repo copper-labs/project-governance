@@ -60,3 +60,9 @@ explicit operator request. Routine product work stays narrow.
 - [Hook and check taxonomy](governance/hook-and-check-taxonomy.md)
 - [Validation strategy](governance/validation-strategy.md)
 - [Agent setup](guides/agent-setup-instructions.md)
+
+## Continuity
+
+The [continuity module](../components/harness/README.md) owns task history and bounded resume.
+It is part of this governance product and wheel; policy and process supervision retain their existing
+owners. See the [process map](../components/harness/docs/architecture/development-flow.md).

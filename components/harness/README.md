@@ -19,5 +19,6 @@ Node 22.18 or newer. Native TypeScript and SQLite. No runtime dependencies or bu
 Run `npm test` and `npm run typecheck` here. This is an early local implementation; real host
 qualification and demonstrated token savings remain pilot work.
 
-The single governance installation/release, telemetry retention and development-loop integration are
-accepted design, not delivered packaging. The existing CLI remains a local development surface.
+The governance wheel now embeds this runtime and exposes `project-governance harness` and `harness`.
+Telemetry retention, full development-loop integration and native Codex hook qualification remain
+adoption work. The module CLI is also available for source development.

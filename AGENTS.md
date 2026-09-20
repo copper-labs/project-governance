@@ -57,3 +57,10 @@ tools/run-source-governance.sh check --summary --stage pre-commit --mode impacte
   operator request.
 - The source workflow builds the wheel, runs focused runtime tests, inspects its boundary, and
   installs it into a clean temporary environment.
+
+## Continuity module
+
+`components/harness` owns the TypeScript task/evidence store and bounded resume. Read its scoped
+instructions for module work. Governance still owns policy and execution. The wheel includes the
+runtime payload; never maintain a second checked-in copy under Python assets. Run module tests and
+typecheck for its changes, and installed-wheel proof for packaging or executor-boundary changes.

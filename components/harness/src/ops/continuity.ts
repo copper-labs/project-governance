@@ -20,6 +20,9 @@ export function resume(store: Store, taskId: string, after = 0, maxBytes = 16000
     if (!fits())
         return { ok: false, blocked: "mandatory task context exceeds resume budget", taskId, requiredBytes: Buffer.byteLength(JSON.stringify(packet)) };
     const omitted: string[] = [];
+    // Reserve final metadata before filling optional context and event pages.
+    packet["omitted"] = omitted;
+    packet["changes"] = [];
     const add = (key: string, value: unknown) => {
         packet[key] = value;
         if (!fits()) {
@@ -37,12 +40,14 @@ export function resume(store: Store, taskId: string, after = 0, maxBytes = 16000
     packet["changes"] = delivered;
     for (const event of changes) {
         const summary = { seq: event.seq, eventId: event.eventId, kind: event.kind, createdAt: event.createdAt };
+        const previousCursor = packet["cursor"];
         delivered.push(summary);
+        packet["cursor"] = event.seq;
         if (!fits()) {
             delivered.pop();
+            packet["cursor"] = previousCursor;
             break;
         }
-        packet["cursor"] = event.seq;
     }
     packet["hasMore"] = Number(packet["cursor"]) < store.latestCursor(taskId);
     packet["omitted"] = omitted;

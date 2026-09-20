@@ -14,6 +14,12 @@ smallest change that earns its cost, remove what no longer helps.
 - Execution-critical state is durable before the action it covers; analytics is best-effort.
 - No provider or model call is required for any core path.
 
+## Module commands
+
+Run npm commands from this directory, or use `npm --prefix components/harness` from the repository
+root. The installed entry is `project-governance harness`; governance packages the canonical source
+into its wheel. Root governance instructions own cross-module work and release policy.
+
 ## Start Here
 
 - [Specifications](docs/specs/README.md) — the four objects and their contracts.

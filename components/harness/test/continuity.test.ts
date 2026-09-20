@@ -202,3 +202,16 @@ test('legacy unversioned evidence stays unknown even with a matching tree', asyn
     assert.ok(!JSON.stringify(r).includes('source-match'));
     f.store.close();
 });
+
+test("resume reserves final metadata before filling a tight event page", () => {
+    const f = fixture();
+    for (let n = 0; n < 40; n++)
+        f.store.appendEvent(f.task.taskId, "noise", { log: "not a context packet" });
+    for (const budget of [2200, 2400, 2600, 2800, 3000, 3200]) {
+        const packet = resume(f.store, f.task.taskId, 0, budget);
+        assert.equal(packet.ok, true, JSON.stringify(packet));
+        assert.ok(Buffer.byteLength(JSON.stringify(packet)) <= budget);
+        assert.ok(Number(packet["cursor"]) > 0);
+    }
+    f.store.close();
+});

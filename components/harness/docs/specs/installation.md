@@ -14,7 +14,7 @@ updated: 2026-09-19
 Harness is the continuity module of Project Governance. Supported adoption requires governance;
 there is no standalone harness product, separate user-selected harness version or generic executor
 fallback. Codex app on macOS is the first supported-host target. Cowork and other hosts are deferred.
-This is an accepted product contract, not a claim that bundled installation is implemented.
+Bundled installation is implemented; native host qualification remains separate.
 
 One governance release, one install/update/repair experience and one qualified deployment identity
 are the target. Governance-only installations can remain available during rollout and for existing
@@ -27,22 +27,23 @@ Keep the current TypeScript continuity module and Python governance runtime behi
 versioned contracts. This repository is a development location, not an independently supported
 product. No rewrite, second installer or dependency-injection framework is needed merely to bundle.
 
-The first integrated release packages both internally versioned artifacts under a single governance
-release manifest. Extend governance's lock schema to pin that immutable manifest and its exact
-component digests/source revisions; do not add an independently editable harness lock. The existing
-lock remains the truth until that migration ships. Record the resolved deployment digest in receipts.
-Internal component revisions are diagnostic data, not a user compatibility matrix.
+The governance wheel embeds this module as package data generated from `components/harness/src`.
+One existing wheel lock pins all bytes. There is no separate harness release, composition manifest,
+Node package installation or independently editable component lock. Node remains a prerequisite.
 
-A later repository consolidation can move the module into governance unchanged once packaging and
-qualification pass. Preserve history/tests and public seams. Migration is a separate governance-owned
-change; this specification does not move files into or modify the read-only sister repository.
-The benefit of consolidation is one change/release pipeline, not eliminating useful module boundaries.
+The Python launcher holds governance's runtime-reader lease, probes Node/SQLite, then starts the
+packaged CLI while preserving the caller's workspace. It binds default governance commands to its
+own Python environment. Both `harness` and `project-governance harness` use this one launcher.
+
+Source consolidation and wheel packaging are implemented locally. Publication and adopter rollout
+still require the existing governance release boundary. No live SQLite database was relocated or
+merged as part of the source migration.
 
 ## Installer responsibilities
 
 1. Inspect Git common directory, current worktree, installed deployment, runtime prerequisites,
    instruction ownership, active jobs and Codex integration state.
-2. Stage the exact governance release and both component artifacts. Verify hashes before execution.
+2. Stage the exact governance wheel containing both modules. Verify hashes before execution.
    Ship only required runtime files. Resolve a supported Node executable explicitly; do not install
    development dependencies or rely on an interactive shell's PATH.
 3. Validate public protocols, storage compatibility and provider-free smoke scenarios. A release is
@@ -72,7 +73,8 @@ runtime generations while referenced jobs still need them. Network-shared SQLite
 
 ## Qualification status
 
-Current `init --apply` only writes instruction blocks; the package is private/version 0.0.0. The unified
-manifest, bundled installer, compatibility enforcement at all production entry points and real Codex
-qualification are remaining work. Existing low-level non-Git/explicit-database functions remain useful
-for fixtures and diagnostics; they do not define a standalone supported deployment.
+The wheel contains the runtime and generation-bound launcher. `init --apply` still only writes
+explicitly requested instruction blocks; native Codex hook installation is not claimed. Public CLI
+and installed-wheel tests establish local packaging/owner behavior. Native hook qualification, full
+cross-worktree upgrade coordination and automatic adoption remain separate planned work. Low-level
+non-Git/explicit-database functions are fixtures/diagnostics, not a standalone supported product.

@@ -8,6 +8,10 @@ from .runtime_access import runtime_reader
 def main():
     """Route replacement operations to their exclusive guard and ordinary commands to readers."""
     try:
+        if len(sys.argv) > 1 and sys.argv[1] == "harness":
+            from .continuity import main as continuity
+
+            return continuity(sys.argv[2:])
         if len(sys.argv) > 2 and sys.argv[1] == "startup":
             from .cli import main as run
 

@@ -15,6 +15,7 @@ from pathlib import Path
 
 from verify_kmp_surface import verify_kmp_surface
 from verify_provider_agents import verify_provider_agents
+from verify_continuity import verify_continuity
 from verify_startup_updates import verify_startup_updates
 
 
@@ -600,6 +601,7 @@ def main() -> int:
         root = Path(temporary) / "target"
         root.mkdir()
         python, command = initialize_target(root, wheel)
+        verify_continuity(root, command)
         verify_provider_agents(root)
         verify_change_narratives(root, command)
         verify_launcher_refresh(root, command)

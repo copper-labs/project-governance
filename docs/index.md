@@ -63,3 +63,9 @@ This repository does not contain a customer's source paths, build commands, runt
 credentials, product vocabulary, or target-specific checks. Those remain in the adopting
 repository. Publishing a wheel requires an operator decision. An adopter may authorize compatible
 startup updates through its tracked profile; major releases and integration changes remain deliberate.
+
+## Continuity
+
+The [continuity module](../components/harness/README.md) owns task history and bounded resume.
+It is part of this governance product and wheel; policy and process supervision retain their existing
+owners. See the [process map](../components/harness/docs/architecture/development-flow.md).

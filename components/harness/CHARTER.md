@@ -14,7 +14,7 @@ qualified release are the target. Model advice stays optional and removable.
   checks. The explicit `init --apply` instruction installer is the only source-file write exception.
 - This repository consumes the governance runtime through its published CLI and JSON surface only.
   Anything further is a coordinated governance change, never a fork or duplicated policy. This
-  repository remains a development location; standalone deployment is not a supported product.
+  module is developed in governance; standalone deployment is not a supported product.
 
 ## Design Principle
 

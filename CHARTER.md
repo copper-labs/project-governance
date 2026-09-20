@@ -7,7 +7,7 @@ project instance and contains no product-specific policy or operational data.
 
 - Markdown is the active authority for governance decisions, plans, and documentation.
 - The standard wheel contains only generic runtime behavior, generic checks, schemas, and shared
-  skills.
+  skills, including the internal TypeScript continuity payload.
 - A project owns its profile, facts, extension packs, documentation, and thin integration files.
 - Projects pin an exact wheel. Adoption is deliberate unless a tracked opt-in authorizes a
   compatible update at top-level task startup; source changes never alter another project's lock.

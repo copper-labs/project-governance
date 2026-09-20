@@ -69,6 +69,8 @@ def _parser() -> argparse.ArgumentParser:
         version=f"%(prog)s {__version__}",
     )
     commands = parser.add_subparsers(dest="command", required=True)
+    continuity = commands.add_parser("harness", add_help=False, help="Resume tasks through bundled continuity")
+    continuity.add_argument("arguments", nargs=argparse.REMAINDER)
     check = commands.add_parser("check")
     _selection_arguments(check)
     check.add_argument("--timeout-seconds", type=float)
@@ -654,6 +656,10 @@ def main() -> int:
     args = _parser().parse_args()
     root = _root()
     try:
+        if args.command == "harness":
+            from .continuity import main as continuity
+
+            return continuity(args.arguments)
         if args.command == "startup":
             from .startup import dispatch
             from .startup_state import StartupError

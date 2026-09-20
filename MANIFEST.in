@@ -1,3 +1,6 @@
 graft src/project_governance_runtime/assets/skills
 include tools/release_version.py
 include tools/build_release_assets.py
+
+include tools/build_harness.py
+recursive-include components/harness/src *.ts

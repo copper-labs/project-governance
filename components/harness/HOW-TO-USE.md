@@ -1,8 +1,9 @@
 # Using Project Harness
 
-These commands describe the current development CLI. The accepted deployment is governance with its
-continuity module, targeting Codex only. Bundled installation is not implemented yet. Standalone
-adoption and Cowork support are outside the current product scope.
+These commands run through the installed governance wheel using `project-governance harness` or
+`harness`. Source developers can use this module’s `bin/harness`. Bundled operation requires Node
+22.18+; `GOVERNANCE_NODE` selects an explicit executable. Standalone adoption and Cowork support
+remain outside the product scope.
 
 Use the absolute path to `bin/harness`, or put that directory on PATH. Run it from the target
 workspace. The default SQLite store lives under the Git common directory, so linked worktrees
