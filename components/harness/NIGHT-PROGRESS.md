@@ -29,3 +29,12 @@ explicit planning assumptions, not measured savings.
 This follow-up changed documentation only. Bundled packaging, retention/reporting, benchmark runner,
 real Codex qualification and automatic proof/hook/device integration remain pending. Earlier test
 and review results above apply to the previous implementation; they do not certify these additions.
+
+## Governance source cutover
+
+The module now lives in governance under `components/harness`. Its source history and reviewed work
+were imported, with an immutable source snapshot retained. The wheel embeds the runtime and exposes
+`project-governance harness` and `harness` through one generation-bound launcher. Existing governance
+checks do not require Node. See governance's `docs/reviews/2026-09-19-continuity-migration.md` for exact
+qualification. Native Codex hooks, bounded aggregate telemetry and device-workflow expansion remain
+separate adoption steps. No release or adopter lock was changed during local integration.

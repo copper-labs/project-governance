@@ -8,7 +8,7 @@ separate owners. Read [Harness Core](harness-core.md) first.
 | Durability, migration and local state | Purpose |
 | --- | --- |
 | [Harness Core](harness-core.md) | Ownership, boundaries and provider-free workflow |
-| [Product and Installation](installation.md) | One governance product/release; required dependency; pending packaging |
+| [Product and Installation](installation.md) | One governance wheel with embedded continuity; required dependency |
 | [Development Loop](development-loop.md) | Focused proof, hooks, device workflow and duplicate coordination |
 | [Telemetry and Qualification](measurement-and-qualification.md) | Bounded analytics, lightweight lab and provisional benefit assumptions |
 | [Repository Discovery](repository-discovery.md) | Gated, disposable shallow map; no mandatory indexing |

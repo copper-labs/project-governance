@@ -1,6 +1,6 @@
 # Governance + Codex adoption
 
-Status: accepted plan; specification work complete, implementation pending. Updated 2026-09-19.
+Status: source consolidation and single-wheel packaging complete locally; host/pilot work pending. Updated 2026-09-19.
 Supersedes the independent-companion/Cowork adoption parts of the earlier proposal. It does not
 reopen or mislabel the completed architecture-reset implementation.
 
@@ -11,8 +11,8 @@ reopen or mislabel the completed architecture-reset implementation.
 - [x] Map current, first-release and destination flows; connect hook/device costs to an ordered plan.
 - [ ] Qualify the current core through the actual Codex app: session reopen, interruption, compaction,
   linked worktrees and two cooperating sessions. Start with explicit commands, then native hooks.
-- [ ] In governance's own project, add one release-manifest/lock migration and companion packaging.
-  Preserve Python/TypeScript boundaries; no rewrite or second installer. Test activation recovery.
+- [x] Consolidate in governance and embed continuity in the existing wheel. No separate manifest/lock
+  migration was needed. Installed-wheel proof includes existing startup recovery fixtures.
 - [ ] Add bounded analytics/report and lightweight regression/performance runner in this module.
 - [ ] Connect one next-proof packet and a real local check to existing governance plans/receipts.
   Make manual-then-hook duplication visible and follow the one-gate path; no new verdict cache.

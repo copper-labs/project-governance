@@ -1,0 +1,25 @@
+{
+  "source_snapshot": "1070d45ad81fdd907f4d9d6860734d9aa4d1dd9b",
+  "integration_commit": "385721c473b4136f0a372a50c41899e4866b2aae",
+  "original_governance_base": "96e6a331998d9897ad7490ae055c8ebfdd4451da",
+  "imported_files": 84,
+  "original_history_reachable": true,
+  "wheel": "project_governance_runtime-2.8.3.dev26+g385721c473b4-py3-none-any.whl",
+  "wheel_sha256": "52d16efebc8d5629c25401d2f7261a9ab77f8a2eb43f7a9d1c5fc3149acf1091",
+  "wheel_bytes": 496451,
+  "archive_and_checkout_files_equal": 263,
+  "python_tests": {
+    "run": 468,
+    "skipped": 1,
+    "status": "passed"
+  },
+  "node_tests": {
+    "version": "22.18.0",
+    "run": 72,
+    "status": "passed"
+  },
+  "typecheck": "passed",
+  "installed_wheel_proof": "passed on Node 22.18.0; source-distribution wheel",
+  "remote_publication": "not performed",
+  "native_codex_hooks": "not qualified"
+}
