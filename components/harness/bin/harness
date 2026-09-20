@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Wrapper so you can type `harness ...` instead of the node incantation.
+set -euo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if ! node -e 'const [major,minor]=process.versions.node.split(".").map(Number);process.exit(major>22||(major===22&&minor>=18)?0:1)' 2>/dev/null; then
+  echo "This needs Node 22.18 or newer." >&2
+  exit 1
+fi
+
+# The database lives with the repo you are working in, unless you say otherwise.
+exec node --experimental-strip-types --no-warnings "$HERE/src/cli.ts" "$@"

@@ -1,0 +1,257 @@
+{
+  "captured_at_utc": "2026-09-19T05:43:37.048053+00:00",
+  "source_root": "/Users/stacy/ORGANTA/project-harness",
+  "files": [
+    {
+      "path": "docs/exec-plans/README.md",
+      "sha256": "91816952b7f8466d63ead07dbaebe94f2d2a5182e7dc7629b4965b0f0495fba4"
+    },
+    {
+      "path": "docs/exec-plans/active/phase-0-measure.md",
+      "sha256": "4f14b08433cdb63919b4f421bb17de17d0667a053e4285d5be8729995e16d7ab"
+    },
+    {
+      "path": "docs/exec-plans/active/phase-1-build-hygiene.md",
+      "sha256": "34f74c7da860afb5fd113317146962c55c44b35165b751d88436146c598dabcc"
+    },
+    {
+      "path": "docs/exec-plans/active/phase-2-decision-interface.md",
+      "sha256": "be00136445c89f4f675d26fc9f76553813c4eb22f3a6989b62b62c02919b8995"
+    },
+    {
+      "path": "docs/exec-plans/active/phase-3-harness-as-tool.md",
+      "sha256": "7c8d7c6ea02788c6c5584a22443c00fe0540d333161e43401deeb233518eabba"
+    },
+    {
+      "path": "docs/exec-plans/active/phase-4-tighten-on-evidence.md",
+      "sha256": "43331c3ce11229d7c5e4967c31872705a754082736f78ffb584fd51aa167b98b"
+    },
+    {
+      "path": "docs/exec-plans/active/phase-5-release-plugin.md",
+      "sha256": "908de305c6c2d64da99db410623f73963c0ac1fe20ac4264f4239c3092398aa4"
+    },
+    {
+      "path": "docs/research/builds-and-checks.md",
+      "sha256": "f2c13b81675d8310eb0592cec416d9043b3f5ed1ffd8c189913e92b4ac1405c3"
+    },
+    {
+      "path": "docs/research/concept.md",
+      "sha256": "f93871a296f003ec690a280956ba6f1eadc6a8df5479c6c787035a0a5c254855"
+    },
+    {
+      "path": "docs/research/flow.md",
+      "sha256": "6fdda6664e3e0596012e3dbce4bec40372ee89b527c046ee7b2d7a30263476dd"
+    },
+    {
+      "path": "docs/research/portal-case-study.md",
+      "sha256": "b4b05258eabdab01fe0df8eb523c8c9fe79f2d037d195b7174079791e708f072"
+    },
+    {
+      "path": "docs/research/release-management.md",
+      "sha256": "49d588d78d02c63b814329b184752a1871f625ecefe0677f052f4f40b80b504c"
+    },
+    {
+      "path": "docs/reviews/2026-09-19-reconciliation.md",
+      "sha256": "6df99570d0bcecff7e7985c2192d1982220ad337be8b12405c3c0f1effc8c9b3"
+    },
+    {
+      "path": "docs/reviews/2026-09-19-secondary-review.md",
+      "sha256": "36a9349f979534674b0896a2e3af6409138639bf01cdf2708a6e5486b8798979"
+    },
+    {
+      "path": "docs/specs/README.md",
+      "sha256": "e25f1a30486564743f424cd684d15735297c5404e1684be9b86eff0c246d3167"
+    },
+    {
+      "path": "docs/specs/build-orchestration.md",
+      "sha256": "f9380ff23adadff1cd3de46634fd8b00ecac16322ff1a9e56dd0010b275bb110"
+    },
+    {
+      "path": "docs/specs/context-packet.md",
+      "sha256": "52ec9803ff1cb62df93f9427cee589e884d8dfff4ac842c82ca417cc9e437dca"
+    },
+    {
+      "path": "docs/specs/decision-interface.md",
+      "sha256": "6352540c77a8b6fe36d06008473492007375301dacea0d22946818633b2d459f"
+    },
+    {
+      "path": "docs/specs/decision-record.md",
+      "sha256": "e26a31fa123c8ec3d25aafe78ed728de5d0d4dbfff353cb70b88339f7615d981"
+    },
+    {
+      "path": "docs/specs/ecosystem-adapters.md",
+      "sha256": "e1fa26e1f2326827eb73b37bc6c2f36889358b4e89c03ef95cae6f8947c7ecaa"
+    },
+    {
+      "path": "docs/specs/failure-triage.md",
+      "sha256": "84c5fcf29bd2a23a5aa1706ee70e1dcd4e06189d45d3db7fda241201da0c41d0"
+    },
+    {
+      "path": "docs/specs/harness-core.md",
+      "sha256": "5a6e0efaf6588316b918217c562db338a63a3d0fe6acd0e45107816baccc6dbf"
+    },
+    {
+      "path": "docs/specs/host-integration.md",
+      "sha256": "43918a789e7344bbf5bf8ccba9c0bb4e85f64739cfc78e7fd7eb11f7d6780921"
+    },
+    {
+      "path": "docs/specs/plugin-contract.md",
+      "sha256": "1d6fe0109d22b0d91bfe425d1f5c0f628295d206389f97e4d09235690fd113b6"
+    },
+    {
+      "path": "docs/specs/release-management.md",
+      "sha256": "8dc527b9f000fd24ff44c21e323c221934ac52739c526c5b64c7b9eef0ff05ac"
+    },
+    {
+      "path": "docs/specs/state-store.md",
+      "sha256": "74cbebf3930f93638eaf989722c8747e358c43f0f883bad8d4bcf773a058d571"
+    },
+    {
+      "path": "docs/specs/task-lifecycle.md",
+      "sha256": "f176faa772731212b39f38a10803894d181d550ecd75f60e25253963040e7d95"
+    },
+    {
+      "path": "docs/specs/worker-invocation.md",
+      "sha256": "2bdc965e9d6bb2de0d1fcbd74e7d868fe576256a5a78a60463532dc8a93cbde9"
+    }
+  ],
+  "drift_during_capture": [],
+  "review_document": "docs/reviews/2026-09-19-architecture-review.md",
+  "changed_since_capture_at_review_closeout": [
+    "docs/exec-plans/README.md",
+    "docs/exec-plans/active/phase-0-measure.md",
+    "docs/exec-plans/active/phase-1-build-hygiene.md",
+    "docs/exec-plans/active/phase-2-decision-interface.md",
+    "docs/exec-plans/active/phase-3-harness-as-tool.md",
+    "docs/exec-plans/active/phase-4-tighten-on-evidence.md",
+    "docs/exec-plans/active/phase-5-release-plugin.md",
+    "docs/research/builds-and-checks.md",
+    "docs/research/concept.md",
+    "docs/research/flow.md",
+    "docs/research/portal-case-study.md",
+    "docs/research/release-management.md",
+    "docs/reviews/2026-09-19-secondary-review.md",
+    "docs/specs/build-orchestration.md",
+    "docs/specs/context-packet.md",
+    "docs/specs/decision-interface.md",
+    "docs/specs/failure-triage.md",
+    "docs/specs/harness-core.md",
+    "docs/specs/state-store.md",
+    "docs/specs/worker-invocation.md"
+  ],
+  "closeout_readback_at_utc": "2026-09-19T05:48:06.372216+00:00",
+  "closeout_files": [
+    {
+      "path": "docs/exec-plans/README.md",
+      "sha256": "76b8e4cbb15a70d835f53c1941c64a13fb38947ec32d962b250ba433f9c13e8a"
+    },
+    {
+      "path": "docs/exec-plans/active/phase-0-measure.md",
+      "sha256": "d94dd0b43d036b139ee026239868c1474789c2053c488435a4fcde3f292912ae"
+    },
+    {
+      "path": "docs/exec-plans/active/phase-1-build-hygiene.md",
+      "sha256": "4beaf7d7335c30c648785bfda643900ce584ea04910dff36d47587c1e3df948c"
+    },
+    {
+      "path": "docs/exec-plans/active/phase-2-decision-interface.md",
+      "sha256": "b1145755c7b12628cdef4f7eb213b591a7c7e73e839427c59675b6fb2b8559da"
+    },
+    {
+      "path": "docs/exec-plans/active/phase-3-harness-as-tool.md",
+      "sha256": "1e9b06feadc6428b0440bd7243584eb8b1a9a1dd5dceaf5baec2f454b7464aff"
+    },
+    {
+      "path": "docs/exec-plans/active/phase-4-tighten-on-evidence.md",
+      "sha256": "a65753210853dacc4c7ce118c44b43c6ac9b6d8e14231fa8b7655cfc0e33bcb5"
+    },
+    {
+      "path": "docs/exec-plans/active/phase-5-release-plugin.md",
+      "sha256": "ee7fe2bb370df7ce8fb7a12bbcc6e0852b2b343dede939885800b4c5f125ee84"
+    },
+    {
+      "path": "docs/research/builds-and-checks.md",
+      "sha256": "6bce20b7aba792d69b7f0720b836d75372b1127fee89d7c761f96f461891f364"
+    },
+    {
+      "path": "docs/research/concept.md",
+      "sha256": "eb79277f8736b8d8b31f2288bb14f7f126b0ccae1fe293478c84a7020b9aa42e"
+    },
+    {
+      "path": "docs/research/flow.md",
+      "sha256": "e5645f5671fa53105bc5cce8b53d058c3329d9ff8942423f479c318f8304c799"
+    },
+    {
+      "path": "docs/research/portal-case-study.md",
+      "sha256": "d5c48909568d8ab32d793ba2af7bb91a2e4b1c1ea3d98964e172ee2469779d08"
+    },
+    {
+      "path": "docs/research/release-management.md",
+      "sha256": "9078a76ec44ee9665e86f6a3b0135db462290cfbdfd4e2256f768673b6abc68a"
+    },
+    {
+      "path": "docs/reviews/2026-09-19-reconciliation.md",
+      "sha256": "6df99570d0bcecff7e7985c2192d1982220ad337be8b12405c3c0f1effc8c9b3"
+    },
+    {
+      "path": "docs/reviews/2026-09-19-secondary-review.md",
+      "sha256": "a6b87c2877abba1d17cffe1231ad44ca76a7985392c7c7d2fd6241634bdec1f5"
+    },
+    {
+      "path": "docs/specs/README.md",
+      "sha256": "e25f1a30486564743f424cd684d15735297c5404e1684be9b86eff0c246d3167"
+    },
+    {
+      "path": "docs/specs/build-orchestration.md",
+      "sha256": "3e5f1f80c0213de14d96c93020628397b62362e469679a18e82203a4520a67a4"
+    },
+    {
+      "path": "docs/specs/context-packet.md",
+      "sha256": "920ea84920bcac1a2e81e1bae8c5b2934ae9ade6c024540e733bf30b09ef66e2"
+    },
+    {
+      "path": "docs/specs/decision-interface.md",
+      "sha256": "f6c9ded33cc095e8d35607f98cd729dfe09c325ec810aeef7e2c1bd269a62d86"
+    },
+    {
+      "path": "docs/specs/decision-record.md",
+      "sha256": "e26a31fa123c8ec3d25aafe78ed728de5d0d4dbfff353cb70b88339f7615d981"
+    },
+    {
+      "path": "docs/specs/ecosystem-adapters.md",
+      "sha256": "e1fa26e1f2326827eb73b37bc6c2f36889358b4e89c03ef95cae6f8947c7ecaa"
+    },
+    {
+      "path": "docs/specs/failure-triage.md",
+      "sha256": "a6e106f708ab43c6ac53533e2a326b4688b73710065e7900d80a56a47ca46cb4"
+    },
+    {
+      "path": "docs/specs/harness-core.md",
+      "sha256": "75f31ace63a1bc0262a838ce6985055c3b0cdc98e4c5ff677ea7356ca325aa30"
+    },
+    {
+      "path": "docs/specs/host-integration.md",
+      "sha256": "43918a789e7344bbf5bf8ccba9c0bb4e85f64739cfc78e7fd7eb11f7d6780921"
+    },
+    {
+      "path": "docs/specs/plugin-contract.md",
+      "sha256": "1d6fe0109d22b0d91bfe425d1f5c0f628295d206389f97e4d09235690fd113b6"
+    },
+    {
+      "path": "docs/specs/release-management.md",
+      "sha256": "8dc527b9f000fd24ff44c21e323c221934ac52739c526c5b64c7b9eef0ff05ac"
+    },
+    {
+      "path": "docs/specs/state-store.md",
+      "sha256": "524bf76499362e91a0b9b1b4b4fb83a938d7c20a99837482a0d13899082a4429"
+    },
+    {
+      "path": "docs/specs/task-lifecycle.md",
+      "sha256": "f176faa772731212b39f38a10803894d181d550ecd75f60e25253963040e7d95"
+    },
+    {
+      "path": "docs/specs/worker-invocation.md",
+      "sha256": "50a9df72af4f928301a3946945f85ed9c967c6443c87d6aee83154e679fc5792"
+    }
+  ]
+}

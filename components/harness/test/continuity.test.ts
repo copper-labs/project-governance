@@ -1,0 +1,204 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { writeFileSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { fixture } from "./helpers.ts";
+import { resume, reconcile, exportTask, importHistory } from "../src/ops/continuity.ts";
+import { readAtSubject, resolveSubject, retrieve } from "../src/ops/retrieval.ts";
+import { treeDigest, recordPaths, report } from "../src/ops/concurrency.ts";
+import { workContext, defaultDbPath, sessionId } from "../src/store/location.ts";
+import { Store } from "../src/store/store.ts";
+test("index and symbolic branch reads stay pinned while worktree reads use live bytes", () => {
+    const f = fixture(), staged = resolveSubject(f.root, { kind: "staged" }), head = resolveSubject(f.root, { kind: "commit", rev: "HEAD" });
+    assert.ok(!("error" in staged) && !("error" in head));
+    writeFileSync(join(f.root, "a.ts"), "second\n");
+    f.git("add", "a.ts");
+    f.git("commit", "-qm", "second");
+    for (const subject of [staged, head])
+        assert.deepEqual(readAtSubject(f.root, subject, "a.ts"), { ok: true, content: "first\n" });
+    writeFileSync(join(f.root, "a.ts"), "dirty\n");
+    const live = resolveSubject(f.root, { kind: "worktree" });
+    assert.ok(!("error" in live));
+    assert.deepEqual(readAtSubject(f.root, live, "a.ts"), { ok: true, content: "dirty\n" });
+    f.store.close();
+});
+test("mandatory missing, excluded scope, and duplicate-content paths preserve their contracts", () => {
+    const f = fixture(), subject = resolveSubject(f.root, { kind: "commit", rev: "HEAD" });
+    assert.ok(!("error" in subject));
+    const r = retrieve(f.store, f.root, subject, ["a.ts", "b.ts"], { maxBytes: 100, usedBytes: 0 }, { mandatory: ["missing.ts"], taskId: f.task.taskId, scope: [f.root] });
+    assert.ok(r.blocked);
+    assert.equal(f.store.budget(f.task.taskId), undefined);
+    const ok = retrieve(f.store, f.root, subject, ["a.ts", "b.ts"], { maxBytes: 100, usedBytes: 0 }, { scope: [f.root] });
+    assert.deepEqual(ok.artifacts.map(a => a.path), ["a.ts", "b.ts"]);
+    const denied = retrieve(f.store, f.root, subject, ["b.ts"], { maxBytes: 100, usedBytes: 0 }, { scope: [join(f.root, "a.ts")] });
+    assert.equal(denied.artifacts.length, 0);
+    assert.equal(denied.unavailable.length, 1);
+    f.store.close();
+});
+test("a second database connection cannot reset or overspend a retrieval budget", () => {
+    const f = fixture(), s = new Store(join(f.root, ".harness/harness.db"));
+    assert.deepEqual(f.store.reserveBytes(f.task.taskId, 6, 10), { ceiling: 10, used: 6 });
+    assert.equal(s.reserveBytes(f.task.taskId, 6, 10000), null);
+    assert.deepEqual(s.budget(f.task.taskId), { ceiling: 10, used: 6 });
+    s.setBudget(f.task.taskId, 20, "host:expand");
+    assert.ok(f.store.reserveBytes(f.task.taskId, 6));
+    s.close();
+    f.store.close();
+});
+test("content drift detects second dirty edits and reader-writer overlap", () => {
+    const f = fixture(), where = workContext(f.root), wid = f.store.workspace(where.locator, f.root);
+    writeFileSync(join(f.root, "a.ts"), "dirty1");
+    const first = treeDigest(f.root);
+    recordPaths(f.store, { session: "reader", workspaceId: wid, taskId: f.task.taskId, cwd: f.root, paths: ["a.ts"], mode: "read" });
+    recordPaths(f.store, { session: "writer", workspaceId: wid, taskId: f.task.taskId, cwd: f.root, paths: ["a.ts"], mode: "write" });
+    writeFileSync(join(f.root, "a.ts"), "dirty2");
+    assert.notEqual(first, treeDigest(f.root));
+    const r = report(f.store, { session: "reader", workspaceId: wid, worktree: f.root, taskId: f.task.taskId, cwd: f.root });
+    assert.deepEqual(r.changedReads, ["a.ts"]);
+    assert.equal(r.overlappingPaths[0]?.risk, "reader-writer");
+    f.store.close();
+});
+test("resume is bounded, keeps constraints, and returns a cursor without replaying logs", () => {
+    const f = fixture();
+    for (let n = 0; n < 80; n++)
+        f.store.appendEvent(f.task.taskId, "noise", { log: "x".repeat(1000) });
+    f.store.checkpoint(f.task.taskId, { summary: "Found cause", next: "verify fix", evidenceIds: [], subject: null });
+    const p = resume(f.store, f.task.taskId, 0, 3000);
+    assert.equal(p.ok, true);
+    assert.ok(Buffer.byteLength(JSON.stringify(p)) <= 3000);
+    assert.equal(p["hasMore"], true);
+    assert.ok(!JSON.stringify(p).includes("xxx"));
+    const next = resume(f.store, f.task.taskId, Number(p["cursor"]), 3000);
+    assert.ok(Number(next["cursor"]) > Number(p["cursor"]));
+    f.store.close();
+});
+test("fork pins parent version and checkpoint while same-task worktree continuation gets another attempt", () => {
+    const f = fixture(), where = workContext(f.root), wid = f.store.workspace(where.locator, f.root);
+    const a = f.store.bind(f.task.taskId, "session-a", wid, f.root);
+    const c = f.store.checkpoint(f.task.taskId, { summary: "original", next: "continue", evidenceIds: [], subject: null, attemptId: a.attemptId });
+    const child = f.store.forkTask(f.task.taskId, { worktree: join(f.root, "sibling") });
+    f.store.checkpoint(f.task.taskId, { summary: "later", next: "different", evidenceIds: [], subject: null });
+    assert.equal(child.parentCheckpoint, c.checkpointId);
+    assert.equal(child.parentVersion, 1);
+    const b = f.store.bind(f.task.taskId, "session-b", "other-workspace", join(f.root, "sibling"), a.attemptId);
+    assert.equal(b.taskId, a.taskId);
+    assert.notEqual(b.attemptId, a.attemptId);
+    f.store.close();
+});
+test("merge reconciliation preserves historical proof and does not accept target", () => {
+    const f = fixture(), subject = resolveSubject(f.root, { kind: "commit", rev: "HEAD" });
+    assert.ok(!("error" in subject));
+    const a = f.store.putArtifact({ kind: "receipt", subject: subject.digest, path: null, inline: "pass", bytes: 4, provenance: "observed" });
+    f.store.recordEvidence({ taskId: f.task.taskId, actionId: f.action.actionId, artifactId: a.artifactId, claim: "old proof", observed: "pass", establishes: "old source only", confirmation: "confirmed", criticality: "execution" });
+    writeFileSync(join(f.root, "a.ts"), "new source");
+    f.git("commit", "-qam", "new");
+    const r = reconcile(f.store, f.task.taskId, f.root, "HEAD", [{ taskId: f.task.taskId, version: 1 }], ["host-reported semantic conflict"]);
+    assert.match(JSON.stringify(r.detail), /stale/);
+    assert.equal(f.store.readArtifact(a.artifactId)?.subject, subject.digest);
+    assert.equal(f.store.readTask(f.task.taskId)?.status, "open");
+    f.store.close();
+});
+test("selected bundles are coherent, integrity checked and imported without authority", () => {
+    const f = fixture(), other = fixture();
+    const b = exportTask(f.store, f.task.taskId);
+    assert.equal(importHistory(other.store, b).inserted, true);
+    assert.equal(importHistory(other.store, b).inserted, false);
+    assert.equal(other.store.readTask(f.task.taskId), null);
+    assert.throws(() => importHistory(other.store, { ...b, digest: "fake" }), /identity/);
+    f.store.close();
+    other.store.close();
+});
+test("unknown usage remains unknown and stable native samples are not counted twice", () => {
+    const f = fixture();
+    assert.equal(f.store.usageTotals(f.task.taskId).inputTokens, null);
+    const u = { taskId: f.task.taskId, actionId: null, kind: "worker" as const, inputTokens: 100, outputTokens: 30, cachedInputTokens: 80, reasoningTokens: 20, durationMs: null, costMicros: null, source: "native-fixture", measurementId: "one" };
+    assert.ok(f.store.recordUsage(u));
+    assert.equal(f.store.recordUsage(u), null);
+    const totals = f.store.usageTotals(f.task.taskId);
+    assert.equal(totals.inputTokens, 100);
+    assert.equal(totals.cachedInputTokens, 80);
+    assert.equal(totals.costMicros, null);
+    f.store.close();
+});
+test("linked Git worktrees discover one store without sharing workspace identity", () => {
+    const f = fixture(), wt = join(f.root, ".harness/wt");
+    f.git("worktree", "add", "--detach", wt, "HEAD");
+    assert.equal(defaultDbPath(f.root), defaultDbPath(wt));
+    assert.notEqual(workContext(f.root).locator, workContext(wt).locator);
+    f.store.close();
+});
+test('forked findings retain their original origin across later forks', () => {
+    const f = fixture();
+    const p = f.store.reviseTask(f.task.taskId, [{ kind: 'ruled-out', provenance: 'observed', body: 'old hypothesis failed on parent inputs' }]);
+    const child = f.store.forkTask(p.taskId), grand = f.store.forkTask(child.taskId);
+    assert.equal(grand.items.find(i => i.kind === 'ruled-out')!.origin, `${p.taskId}@${p.version}`);
+    f.store.close();
+});
+test('task mutation composes with an outer transaction and preserves rollback', () => {
+    const f = fixture();
+    let id = '';
+    assert.throws(() => f.store.atomic(() => { id = f.store.createTask('nested', []).taskId; throw new Error('rollback'); }));
+    assert.equal(f.store.readTask(id), null);
+    assert.ok(f.store.readTask(f.task.taskId));
+    f.store.close();
+});
+test('numeric ledger keys survive normal selected bundle serialization', () => {
+    const f = fixture(), other = fixture();
+    f.store.appendEvent(f.task.taskId, 'numeric', { '2': 'b', '1': 'a' });
+    const b = JSON.parse(JSON.stringify(exportTask(f.store, f.task.taskId)));
+    assert.equal(importHistory(other.store, b).inserted, true);
+    f.store.close();
+    other.store.close();
+});
+test('manifest reconciliation compares declared files without granting acceptance', async () => {
+    const { FakeExecutor } = await import('./helpers.ts');
+    const { submitCheck, collectResult, fileDigest } = await import('../src/ops/execution.ts');
+    const f = fixture(), e = new FakeExecutor();
+    const file = join(f.root, 'a.ts');
+    submitCheck(f.store, f.action, { ...f.batch, inputs: { mode: 'manifest', roots: [f.root], files: [{ path: file, sha256: fileDigest(file) }] } }, e, 'host', f.root);
+    e.finish();
+    e.reply['input_validity'] = 'manifest-verified';
+    collectResult(f.store, f.action.actionId, e);
+    const r = reconcile(f.store, f.task.taskId, f.root, 'HEAD', [{ taskId: f.task.taskId, version: 1 }]);
+    assert.match(JSON.stringify(r), /declared-inputs-match/);
+    assert.equal(f.store.readTask(f.task.taskId)!.status, 'open');
+    f.store.close();
+});
+test('concurrent processes cannot both spend the same remaining task budget', async () => {
+    const { spawn } = await import('node:child_process');
+    const { resolve } = await import('node:path');
+    const f = fixture(), db = join(f.root, '.harness/harness.db');
+    f.store.setBudget(f.task.taskId, 10, 'host');
+    f.store.close();
+    const source = `import{Store}from ${JSON.stringify(resolve('src/store/store.ts'))};const s=new Store(${JSON.stringify(db)});console.log(JSON.stringify(s.reserveBytes(${JSON.stringify(f.task.taskId)},6)));s.close();`;
+    const worker = () => new Promise<unknown>((yes, no) => { const p = spawn(process.execPath, ['--input-type=module', '-e', source]); let out = ''; let err = ''; p.stdout.on('data', d => out += d); p.stderr.on('data', d => err += d); p.on('error', no); p.on('close', code => code === 0 ? yes(JSON.parse(out)) : no(new Error(err))); });
+    const values = await Promise.all([worker(), worker()]);
+    assert.equal(values.filter(Boolean).length, 1);
+    const s = new Store(db);
+    assert.equal(s.budget(f.task.taskId)!.used, 6);
+    s.close();
+});
+test('retrieval reports the reservation total after an intervening reader', () => {
+    const f = fixture(), subject = resolveSubject(f.root, { kind: 'commit', rev: 'HEAD' });
+    assert.ok(!('error' in subject));
+    f.store.setBudget(f.task.taskId, 20, 'host');
+    const reserve = f.store.reserveBytes.bind(f.store);
+    f.store.reserveBytes = (id, n, ceiling) => { reserve(id, 6); return reserve(id, n, ceiling); };
+    const r = retrieve(f.store, f.root, subject, ['a.ts'], { maxBytes: 20, usedBytes: 0 }, { taskId: f.task.taskId, scope: [f.root] });
+    assert.equal(r.budget.usedBytes, 12);
+    f.store.close();
+});
+test('legacy unversioned evidence stays unknown even with a matching tree', async () => {
+    const { DatabaseSync } = await import('node:sqlite');
+    const f = fixture(), subject = resolveSubject(f.root, { kind: 'commit', rev: 'HEAD' });
+    assert.ok(!('error' in subject));
+    const a = f.store.putArtifact({ kind: 'receipt', subject: subject.digest, path: null, inline: 'legacy', bytes: 6, provenance: 'observed' });
+    f.store.recordEvidence({ taskId: f.task.taskId, actionId: null, artifactId: a.artifactId, claim: 'legacy', observed: 'old', establishes: 'old', confirmation: 'confirmed', criticality: 'execution' });
+    const db = new DatabaseSync(join(f.root, '.harness/harness.db'));
+    db.exec("UPDATE ledger SET detail=json_remove(detail,'$.taskVersion') WHERE kind='evidence'");
+    db.close();
+    const r = reconcile(f.store, f.task.taskId, f.root, 'HEAD', [{ taskId: f.task.taskId, version: 1 }]);
+    assert.match(JSON.stringify(r), /unknown/);
+    assert.ok(!JSON.stringify(r).includes('source-match'));
+    f.store.close();
+});

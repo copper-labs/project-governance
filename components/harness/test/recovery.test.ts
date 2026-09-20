@@ -1,0 +1,10 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { join } from "node:path";
+import { Store } from "../src/store/store.ts";
+import { submitCheck, collectResult } from "../src/ops/execution.ts";
+import { fixture, FakeExecutor } from "./helpers.ts";
+test("observing a live action leaves its state and revision unchanged", () => { const f = fixture(), e = new FakeExecutor(); const a = submitCheck(f.store, f.action, f.batch, e, "host:1", f.root); collectResult(f.store, a.actionId, e); assert.deepEqual(f.store.readAction(a.actionId), a); f.store.close(); });
+test("restart recovers through owner identity and receipt, not output existence", () => { const f = fixture(), e = new FakeExecutor(); submitCheck(f.store, f.action, f.batch, e, "host:1", f.root); f.store.close(); e.finish(); const reopened = new Store(join(f.root, ".harness/harness.db")); assert.equal(collectResult(reopened, f.action.actionId, e).passed, true); assert.equal(e.submissions, 1); reopened.close(); });
+test("wrong job or changed owner cannot reconcile a receipt", () => { const f = fixture(), e = new FakeExecutor(); submitCheck(f.store, f.action, f.batch, e, "host:1", f.root); e.finish(); e.reply["job_id"] = "wrong"; assert.throws(() => collectResult(f.store, f.action.actionId, e), /identity/); e.digest = "new"; assert.throws(() => collectResult(f.store, f.action.actionId, e), /owner/); f.store.close(); });
+test("task correction during a running job preserves historical result without granting acceptance", () => { const f = fixture(), e = new FakeExecutor(); submitCheck(f.store, f.action, f.batch, e, "host:1", f.root); f.store.reviseTask(f.task.taskId, [], { status: "cancelled" }); e.finish(); assert.equal(collectResult(f.store, f.action.actionId, e).passed, true); assert.equal(f.store.readTask(f.task.taskId)?.status, "cancelled"); assert.equal(f.store.readAction(f.action.actionId)?.taskVersion, 1); f.store.close(); });

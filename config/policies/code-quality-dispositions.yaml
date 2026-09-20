@@ -1,39 +1,64 @@
 version: 2
 owner: project-governance-maintainers
 dispositions:
-  - finding: quality.high-cyclomatic
-    path: src/project_governance_runtime/execution_commands.py
-    symbol: normalized_command
-    disposition: cohesion-accepted
-    owner: project-governance-maintainers
-    reviewer: Codex architecture review
-    approved_on: 2026-08-15
-    responsibility: Normalize one checker process result into governed command evidence.
-    rationale: The decisions form one linear normalization pipeline, and extracting them would scatter one integrity boundary across helper functions without separating responsibilities.
-  - finding: quality.high-cognitive
-    path: src/project_governance_runtime/execution_commands.py
-    symbol: normalized_command
-    disposition: cohesion-accepted
-    owner: project-governance-maintainers
-    reviewer: Codex architecture review
-    approved_on: 2026-08-15
-    responsibility: Normalize one checker process result into governed command evidence.
-    rationale: The control flow keeps process failure, envelope integrity, finding lifecycle, and final status visible together at the single command-normalization boundary.
-  - finding: quality.large-type
-    path: tests/test_runtime_package_execution.py
-    symbol: RuntimeExecutionTests
-    disposition: cohesion-accepted
-    owner: project-governance-maintainers
-    reviewer: Codex architecture review
-    approved_on: 2026-08-15
-    responsibility: Prove the runtime command execution and evidence-normalization contract.
-    rationale: The test class covers one narrow public execution boundary, and splitting it solely by file length would reduce navigability without isolating an independent fixture or responsibility.
-  - finding: quality.large-type
-    path: tests/test_runtime_dependency_checker.py
-    symbol: RuntimeDependencyCheckerTests
-    disposition: cohesion-accepted
-    owner: project-governance-maintainers
-    reviewer: Codex architecture review
-    approved_on: 2026-09-12
-    responsibility: Prove dependency admission through the public checker and its immutable change-packet fixture.
-    rationale: Scope trust, release evidence and defect ratcheting exercise one admission boundary and reuse the same isolated target fixture. Keeping the scenarios together preserves that relationship; splitting the test class solely by line count would not isolate a separate responsibility.
+- finding: quality.high-cyclomatic
+  path: src/project_governance_runtime/execution_commands.py
+  symbol: normalized_command
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex architecture review
+  approved_on: 2026-08-15
+  responsibility: Normalize one checker process result into governed command evidence.
+  rationale: The decisions form one linear normalization pipeline, and extracting them would scatter one integrity
+    boundary across helper functions without separating responsibilities.
+- finding: quality.high-cognitive
+  path: src/project_governance_runtime/execution_commands.py
+  symbol: normalized_command
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex architecture review
+  approved_on: 2026-08-15
+  responsibility: Normalize one checker process result into governed command evidence.
+  rationale: The control flow keeps process failure, envelope integrity, finding lifecycle, and final status visible
+    together at the single command-normalization boundary.
+- finding: quality.large-type
+  path: tests/test_runtime_package_execution.py
+  symbol: RuntimeExecutionTests
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex architecture review
+  approved_on: 2026-08-15
+  responsibility: Prove the runtime command execution and evidence-normalization contract.
+  rationale: The test class covers one narrow public execution boundary, and splitting it solely by file length
+    would reduce navigability without isolating an independent fixture or responsibility.
+- finding: quality.large-type
+  path: tests/test_runtime_dependency_checker.py
+  symbol: RuntimeDependencyCheckerTests
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex architecture review
+  approved_on: 2026-09-12
+  responsibility: Prove dependency admission through the public checker and its immutable change-packet fixture.
+  rationale: Scope trust, release evidence and defect ratcheting exercise one admission boundary and reuse the same
+    isolated target fixture. Keeping the scenarios together preserves that relationship; splitting the test class
+    solely by line count would not isolate a separate responsibility.
+- finding: quality.large-function
+  path: components/harness/src/cli.ts
+  symbol: main
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex migration architecture review; prior Opus implementation review retained in module docs/reviews
+  approved_on: '2026-09-19'
+  responsibility: Route continuity commands through the same task identity and scope boundary.
+  rationale: Preserve the reviewed CLI boundary during source relocation. Its handlers delegate domain behavior
+    to operations; splitting the dispatch solely for import would mix refactoring with packaging proof.
+- finding: quality.large-type
+  path: components/harness/src/store/store.ts
+  symbol: Store
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex migration architecture review; prior Opus implementation review retained in module docs/reviews
+  approved_on: '2026-09-19'
+  responsibility: Own the transactional SQLite boundary for task and execution evidence.
+  rationale: The reviewed store retains transaction ownership across linked records. Source consolidation does not
+    justify splitting persistence methods into competing connection or transaction owners.

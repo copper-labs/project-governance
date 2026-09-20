@@ -1,0 +1,22 @@
+{
+  "name": "@organta/harness",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A runtime that makes work resumable, keeps actions within scope, and preserves evidence.",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "bin": {
+    "harness": "./src/cli.ts"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --test \"test/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit",
+    "harness": "node --experimental-strip-types src/cli.ts"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.0",
+    "typescript": "5.9.3"
+  }
+}

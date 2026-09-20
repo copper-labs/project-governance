@@ -1,0 +1,331 @@
+{
+  "date": "2026-09-19",
+  "node": "v24.16.0",
+  "tests": {
+    "passed": 71,
+    "failed": 0,
+    "command": "npm test",
+    "durationMs": 3241.418208
+  },
+  "typecheck": "npm run typecheck: pass",
+  "diffCheck": "git diff --check: pass",
+  "candidateSourceDigest": "455cd012508aa83d94819935f2cb54d102454d913c2f3ea5ab5122a0388565e8",
+  "files": {
+    "src/cli.ts": "ff10e4983ee6de87c07e161b9f2f7cf4fbaa9a3248868d770b58079ad2b73b4f",
+    "src/model/types.ts": "927f131addf69d65ce6c7de1f7579f306da6653dc2358a2e154594c8d0a73745",
+    "src/ops/actions.ts": "0083f86ccbfb3b4d1e75074103e43a6379b3d16adc4bdde1a7a77915391dced7",
+    "src/ops/adapter.ts": "f4a1fa1d9ce555716859810c413ac2b7386dce4a3ddb1f0981d1bb9a977938b0",
+    "src/ops/authority.ts": "5315443f59582b28364724a453ce5b034b317bca88e20113f064958303e36d5e",
+    "src/ops/concurrency.ts": "86fe986691b1deb31c37ac11b9a90213984e3e73625b37859867dbd373a313bb",
+    "src/ops/continuity.ts": "485517fb422b4e379aaa46b512a87b46f12b10e2329f3d13fcff645b13819ade",
+    "src/ops/execution.ts": "38f85fcbe3f1ca7196ccac76b74b84841278329b7b7d9e0f84d028fcc59a3ff3",
+    "src/ops/governance.ts": "67c4a3e53d3933351ea47179ff693868bcc4e3ef3153d7b4b8905940075c4f88",
+    "src/ops/retrieval.ts": "426d2b7f72e89e2a860e806c0fff7a7c0ccd6e9fc2e4976e4b833911ba8b6c07",
+    "src/store/location.ts": "a1c71abf4d1975ffbb68427f74435b6b7b638ee1be6bd7b88e0345e4f775135d",
+    "src/store/schema.ts": "3d3bf2010cb46ff71efe091860b625d332a7fa4749018b5529c42a6dc051bb1d",
+    "src/store/store.ts": "16dac0e9a1ff063eda7478748df0e0a6da3e8d60a35167a9bd19eab032bf5b25",
+    "test/adapter.test.ts": "16445de9364f6b719346830e18577f6289eb8ff31874e80737d507cae43ec30a",
+    "test/authority.test.ts": "4952e9902b6b7e137224577adac938edb731e0840745aa4bb2cbb09f8687dc53",
+    "test/cli-execution.test.ts": "8dc7f39b7eead3919386a55eceda78a68c2401563ac53450aee801c3e2029c9c",
+    "test/cli.test.ts": "c4711910320c73bbcc9ddd90e78c028838f77b558b3b7121ea3cf16ba8b80a47",
+    "test/concurrency.test.ts": "233170b92b7b950149d5eba64ae19a15e7a0a299d7230d69c7011dd9943f200c",
+    "test/continuity.test.ts": "2701c65fea2bec83ebb0a5e67c9c3cb6a3b1f1614731734407c0fce8cd86aeca",
+    "test/execution.test.ts": "d5fb80d9b9cf33d41145aa21130cb31603de3c93cc8a1bbde766f66f9386e843",
+    "test/helpers.ts": "30d6ac7d87011f84f6fb0b9a5eeb4a19e6a7b6ba17105e411d1b41d38470adae",
+    "test/recovery.test.ts": "6739d13b2681f70e6e51d9eaf3a1dceeed513b83e7feaa59fbd6951413f82c81",
+    "test/retrieval.test.ts": "668a5e8c44dcd208e51f909a395211f5c6fa45f3a8451271a007df8884be0f57",
+    "test/store.test.ts": "dd858149ff44eb95e80723988096222bc65fd70d9320674d4f6e449f674c621d"
+  },
+  "governanceSourceRef": "96e6a331998d9897ad7490ae055c8ebfdd4451da",
+  "proofBoundary": "Public SOURCE CLI fixture, not published-runtime or host lifecycle certification",
+  "qualification": {
+    "pass": {
+      "exitCode": 0,
+      "actionId": "445ed4eb-92dc-4b09-9b96-c2ac83a7b601",
+      "jobId": "46e1e4d4-1e76-4307-9c10-14c97d695953",
+      "pending": false,
+      "established": true,
+      "passed": true,
+      "state": "succeeded",
+      "stage": null,
+      "inputFingerprint": "8c6d0e861f6ab5ad1d53c10b5eea53efd65e83e1a017dc6f40dea3e0e22cfaa0",
+      "inputValidity": "declared-scope-only",
+      "cleanupConfirmed": true,
+      "cases": [
+        {
+          "id": "check",
+          "outcome": "passed",
+          "exit_code": 0,
+          "duration_ms": 78.483,
+          "stdout": "/Users/stacy/ORGANTA/project-harness/.harness/qualification/owner-state/jobs/46e1e4d4-1e76-4307-9c10-14c97d695953/case-check/stdout.log",
+          "stderr": "/Users/stacy/ORGANTA/project-harness/.harness/qualification/owner-state/jobs/46e1e4d4-1e76-4307-9c10-14c97d695953/case-check/stderr.log"
+        }
+      ]
+    },
+    "failedAssertion": {
+      "exitCode": 1,
+      "actionId": "2160f059-ca0e-4392-8d63-2d4cc83bfbf1",
+      "jobId": "b8995a4d-da94-40e2-847d-873ce7b6d1de",
+      "pending": false,
+      "established": true,
+      "passed": false,
+      "state": "failed",
+      "stage": null,
+      "inputFingerprint": "8c6d0e861f6ab5ad1d53c10b5eea53efd65e83e1a017dc6f40dea3e0e22cfaa0",
+      "inputValidity": "declared-scope-only",
+      "cleanupConfirmed": true,
+      "cases": [
+        {
+          "id": "check",
+          "outcome": "failed",
+          "exit_code": 7,
+          "duration_ms": 80.474,
+          "stdout": "/Users/stacy/ORGANTA/project-harness/.harness/qualification/owner-state/jobs/b8995a4d-da94-40e2-847d-873ce7b6d1de/case-check/stdout.log",
+          "stderr": "/Users/stacy/ORGANTA/project-harness/.harness/qualification/owner-state/jobs/b8995a4d-da94-40e2-847d-873ce7b6d1de/case-check/stderr.log"
+        }
+      ]
+    },
+    "cleanup": {
+      "exitCode": 3,
+      "actionId": "9d38cbd3-dbbb-4a26-9242-44c483d2fb76",
+      "jobId": "6d6e2082-cc71-4d8d-b91f-26aa59f1f1a9",
+      "pending": true,
+      "established": false,
+      "passed": null,
+      "state": "running",
+      "stage": "Awaiting project resource cleanup acknowledgment",
+      "inputFingerprint": null,
+      "inputValidity": null,
+      "cleanupConfirmed": null,
+      "cases": null
+    },
+    "cleaned": {
+      "exitCode": 0,
+      "actionId": "9d38cbd3-dbbb-4a26-9242-44c483d2fb76",
+      "jobId": "6d6e2082-cc71-4d8d-b91f-26aa59f1f1a9",
+      "pending": false,
+      "established": true,
+      "passed": true,
+      "state": "succeeded",
+      "stage": null,
+      "inputFingerprint": "8c6d0e861f6ab5ad1d53c10b5eea53efd65e83e1a017dc6f40dea3e0e22cfaa0",
+      "inputValidity": "declared-scope-only",
+      "cleanupConfirmed": true,
+      "cases": [
+        {
+          "id": "fault",
+          "outcome": "passed",
+          "exit_code": 0,
+          "duration_ms": 82.199,
+          "stdout": "/Users/stacy/ORGANTA/project-harness/.harness/qualification/owner-state/jobs/6d6e2082-cc71-4d8d-b91f-26aa59f1f1a9/case-fault/stdout.log",
+          "stderr": "/Users/stacy/ORGANTA/project-harness/.harness/qualification/owner-state/jobs/6d6e2082-cc71-4d8d-b91f-26aa59f1f1a9/case-fault/stderr.log"
+        }
+      ]
+    },
+    "crash": {
+      "exitCode": 3,
+      "actionId": "3157ac0a-339d-4cfa-9ce8-1422bab7070b",
+      "jobId": "3fab3340-cdc6-48a5-af01-528f61038f68",
+      "pending": true,
+      "established": false,
+      "passed": null,
+      "state": "running",
+      "stage": "Initializing provider",
+      "inputFingerprint": null,
+      "inputValidity": null,
+      "cleanupConfirmed": null,
+      "cases": null
+    },
+    "recovered": {
+      "exitCode": 2,
+      "actionId": "3157ac0a-339d-4cfa-9ce8-1422bab7070b",
+      "jobId": "3fab3340-cdc6-48a5-af01-528f61038f68",
+      "pending": false,
+      "established": false,
+      "passed": false,
+      "state": "failed",
+      "stage": null,
+      "inputFingerprint": "8c6d0e861f6ab5ad1d53c10b5eea53efd65e83e1a017dc6f40dea3e0e22cfaa0",
+      "inputValidity": "invalid-or-unverified",
+      "cleanupConfirmed": true,
+      "cases": [
+        {
+          "id": "fault",
+          "outcome": "not-run"
+        }
+      ]
+    },
+    "manifest-unchanged": {
+      "exitCode": 0,
+      "actionId": "0c5bb874-6e5d-44c7-9c11-0acbb727c4df",
+      "jobId": "fa9f35e9-778b-47a9-b495-05c89ac41178",
+      "pending": false,
+      "established": true,
+      "passed": true,
+      "state": "succeeded",
+      "stage": null,
+      "inputFingerprint": "906fe91c9b87f17ac7fae2f19d6495c980010de891cc8de38eed681207466741",
+      "inputValidity": "manifest-verified",
+      "cleanupConfirmed": true,
+      "cases": [
+        {
+          "id": "manifest",
+          "outcome": "passed",
+          "exit_code": 0,
+          "duration_ms": 128.919,
+          "stdout": "/Users/stacy/ORGANTA/project-harness/.harness/qualification/owner-state/jobs/fa9f35e9-778b-47a9-b495-05c89ac41178/case-manifest/stdout.log",
+          "stderr": "/Users/stacy/ORGANTA/project-harness/.harness/qualification/owner-state/jobs/fa9f35e9-778b-47a9-b495-05c89ac41178/case-manifest/stderr.log"
+        }
+      ]
+    },
+    "manifest-changed": {
+      "exitCode": 2,
+      "actionId": "6b9a3625-b89d-4dd7-8c2c-ca3639840f4a",
+      "jobId": "12cd2726-ed93-4675-b6b1-9eb966acba17",
+      "pending": false,
+      "established": false,
+      "passed": false,
+      "state": "failed",
+      "stage": null,
+      "inputFingerprint": "906fe91c9b87f17ac7fae2f19d6495c980010de891cc8de38eed681207466741",
+      "inputValidity": "invalid-or-unverified",
+      "cleanupConfirmed": true,
+      "cases": [
+        {
+          "id": "manifest",
+          "outcome": "failed",
+          "exit_code": 0,
+          "duration_ms": 81.686,
+          "stdout": "/Users/stacy/ORGANTA/project-harness/.harness/qualification/owner-state/jobs/12cd2726-ed93-4675-b6b1-9eb966acba17/case-manifest/stdout.log",
+          "stderr": "/Users/stacy/ORGANTA/project-harness/.harness/qualification/owner-state/jobs/12cd2726-ed93-4675-b6b1-9eb966acba17/case-manifest/stderr.log",
+          "reason": "test input changed: manifest digest mismatch"
+        }
+      ]
+    },
+    "cancel-run": {
+      "exitCode": 3,
+      "actionId": "bbaf98f9-22c3-4a8a-8440-50d8b2454b48",
+      "jobId": "84e3c16d-e637-44d6-abcc-5efebe9e999f",
+      "pending": true,
+      "established": false,
+      "passed": null,
+      "state": "running",
+      "stage": "Initializing provider",
+      "inputFingerprint": null,
+      "inputValidity": null,
+      "cleanupConfirmed": null,
+      "cases": null
+    },
+    "cancel-cancelled": {
+      "exitCode": 3,
+      "actionId": "bbaf98f9-22c3-4a8a-8440-50d8b2454b48",
+      "jobId": "84e3c16d-e637-44d6-abcc-5efebe9e999f",
+      "pending": true,
+      "established": false,
+      "passed": null,
+      "state": "running",
+      "stage": "Cancellation requested",
+      "inputFingerprint": null,
+      "inputValidity": null,
+      "cleanupConfirmed": null,
+      "cases": null
+    },
+    "cancel-observed": {
+      "exitCode": 2,
+      "actionId": "bbaf98f9-22c3-4a8a-8440-50d8b2454b48",
+      "jobId": "84e3c16d-e637-44d6-abcc-5efebe9e999f",
+      "pending": false,
+      "established": false,
+      "passed": false,
+      "state": "cancelled",
+      "stage": null,
+      "inputFingerprint": "8c6d0e861f6ab5ad1d53c10b5eea53efd65e83e1a017dc6f40dea3e0e22cfaa0",
+      "inputValidity": "declared-scope-only",
+      "cleanupConfirmed": true,
+      "cases": [
+        {
+          "id": "check",
+          "outcome": "failed",
+          "exit_code": -15,
+          "duration_ms": 289.231,
+          "stdout": "/Users/stacy/ORGANTA/project-harness/.harness/qualification/owner-state/jobs/84e3c16d-e637-44d6-abcc-5efebe9e999f/case-check/stdout.log",
+          "stderr": "/Users/stacy/ORGANTA/project-harness/.harness/qualification/owner-state/jobs/84e3c16d-e637-44d6-abcc-5efebe9e999f/case-check/stderr.log",
+          "reason": "Cancellation requested"
+        }
+      ]
+    }
+  },
+  "baseCommit": "c84cb1973351fd7b3d000c027a0e6fa887c3cc00",
+  "delivery": "local uncommitted changes",
+  "reviewAudits": [
+    {
+      "artifact_bytes": 0,
+      "artifact_path": null,
+      "artifact_written": false,
+      "audit_json_path": "/Users/stacy/ORGANTA/project-harness/.harness/implementation/claude-review-audit.json",
+      "changed_files": [],
+      "cwd": "/Users/stacy/ORGANTA/project-harness",
+      "effort": "xhigh",
+      "ended_at": "2026-09-19T17:21:28Z",
+      "exit_status": 0,
+      "fallback_model": "none",
+      "model": "claude-opus-5",
+      "patch_apply_clean": null,
+      "permission_mode": "plan",
+      "repo_changed": false,
+      "role": "arch",
+      "started_at": "2026-09-19T17:11:18Z",
+      "timed_out": false,
+      "write_mode": "none"
+    },
+    {
+      "artifact_bytes": 0,
+      "artifact_path": null,
+      "artifact_written": false,
+      "audit_json_path": "/Users/stacy/ORGANTA/project-harness/.harness/implementation/claude-recheck-audit.json",
+      "changed_files": [],
+      "cwd": "/Users/stacy/ORGANTA/project-harness",
+      "effort": "xhigh",
+      "ended_at": "2026-09-19T17:39:19Z",
+      "exit_status": 0,
+      "fallback_model": "none",
+      "model": "claude-opus-5",
+      "patch_apply_clean": null,
+      "permission_mode": "plan",
+      "repo_changed": false,
+      "role": "qa",
+      "started_at": "2026-09-19T17:32:36Z",
+      "timed_out": false,
+      "write_mode": "none"
+    },
+    {
+      "artifact_bytes": 0,
+      "artifact_path": null,
+      "artifact_written": false,
+      "audit_json_path": "/Users/stacy/ORGANTA/project-harness/.harness/implementation/claude-final-audit.json",
+      "changed_files": [],
+      "cwd": "/Users/stacy/ORGANTA/project-harness",
+      "effort": "xhigh",
+      "ended_at": "2026-09-19T17:45:45Z",
+      "exit_status": 0,
+      "fallback_model": "none",
+      "model": "claude-opus-5",
+      "patch_apply_clean": null,
+      "permission_mode": "plan",
+      "repo_changed": false,
+      "role": "qa",
+      "started_at": "2026-09-19T17:44:12Z",
+      "timed_out": false,
+      "write_mode": "none"
+    }
+  ],
+  "governanceWorktreeStatus": [
+    "?? docs/research/"
+  ],
+  "governanceProtocolSourceHashes": {
+    "entry.py": "6382b52d5c208c1d29956a4eca4e39ed8ea8af37837884c6648b568908f14b39",
+    "cli.py": "0af91352aecc4f84060d522ada04fcaec0ec7bc3868df9ef76a0872088d834ca",
+    "jobs.py": "e16de7ee1c55a9f39936d802c34cb8bc94bf464321f2e8b239d0d3ad1c7cdadb",
+    "test_batches.py": "b0c89d6335fe5b56cb252ceb67e022c4afbcd75aa089b94a9e791edbe774f89c"
+  }
+}

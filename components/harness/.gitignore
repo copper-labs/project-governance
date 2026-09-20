@@ -1,0 +1,9 @@
+.DS_Store
+node_modules/
+dist/
+.governance/
+*.log
+.env
+.env.*
+!.env.example
+.harness/
