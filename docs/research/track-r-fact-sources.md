@@ -1,3 +1,5 @@
+> Historical research note, reviewed 2026-09-19. This survey contains eight rows. The earlier seven-field wording and 18-of-25 coverage claim are unqualified; rederive from source receipts before using them. Current implementation contracts live under docs/specs.
+
 ---
 id: research.track-r-fact-sources
 title: Track R - Release Fact Sources

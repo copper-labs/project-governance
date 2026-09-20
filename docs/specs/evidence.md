@@ -1,103 +1,59 @@
 ---
 id: spec.harness.evidence
-title: Evidence
+title: Evidence and Measurement
 type: spec
-status: draft
+status: current
 owner: project-harness
 created: 2026-09-19
 updated: 2026-09-19
-summary: What an observation establishes about an artifact or a requirement, and why that is not the same as acceptance.
+summary: Current architecture-reset contract; implementation and qualification limits are explicit.
 ---
 
-> Child of [Harness Core](harness-core.md).
+# Evidence and Measurement
 
-# Evidence
+## Claims
 
-## Purpose
+Evidence separates a claim, observation, what it establishes, confirmation and original artifact
+or action. Confirmation is confirmed, refuted or unconfirmed. Execution-critical evidence is
+transactional; analytics is best-effort. Action transitions and reconciliation are durable ledger
+records. Existing records are not rewritten when inputs or operator intent change.
 
-An observation, and what it establishes. Decisions are annotations here, not a separate object.
+A passing declared check establishes its assertion under the owner's reported input posture. It
+is not task acceptance. Interruption, invalid inputs or missing cleanup cannot establish a pass.
+A successful retry is an observed effect, not proof that a hypothesized cause was correct.
 
-## Current Implementation
+## Measurement
 
-- **Posture:** planned. **Evidence:** none.
-- **Current boundary:** The governance runtime's telemetry is deliberately content-free and is not
-  this. Existing checkers already emit receipts, which are referenced rather than copied.
-- **Known limits:** Calibration needs volume; early readings are noisy.
-- **Ledger:** [Research index](../research/concept.md).
+Record native incremental usage with stable source and measurement IDs. Duplicate observations
+are not added twice. Input/output counts, cached input, reasoning subset, duration and cost are
+nullable. Cached input is a subset of total input; reasoning is a subset of output. Never sum
+these subsets again. The source adapter must normalize provider semantics to that convention.
 
-## Shape
+Totals are known subtotals with measured/missing coverage and source names. Unknown is not zero.
+Cumulative native counters must be converted to incremental observations before submission. Byte
+budgets, command count and execution time are proxies and cannot be labelled token savings.
 
-Each Evidence record names the **claim** being checked, the exact **Artifact or requirement** it
-concerns, what was **observed**, and what that observation **establishes** — which is often less
-than it appears to.
+## Evaluation
 
-Execution-critical fields are durable before the Action they cover. Analytics fields are
-best-effort and their loss never blocks work or changes a verdict.
+Compare existing host + governance against host + governance + harness. Keep model settings,
+acceptance and task mix stable; account for cache warmth, familiarity, all child/provider usage,
+retries and rework. Track accepted tasks, later defects, operator intervention, resume time,
+time to actionable failure, total elapsed time, test compute and harness overhead.
 
-## Three Facts, Never Collapsed
+Historical repeated-source telemetry is a signal for investigation, not proof of redundant work.
+The original baseline has unresolved event/run denominator ambiguity. No realized token-saving
+percentage is currently established. Shadow decisions do not save tokens if the full host path
+still runs.
 
-- **Diagnosis correctness** — was the predicted cause right?
-- **Remedy outcome** — what did the remedy actually do?
-- **Task acceptance** — were the Task's criteria satisfied?
+## Provenance and portability
 
-A clean-and-retry that passes is evidence of an **effect**, not proof of the predicted **cause**: a
-transient service recovering produces the same observation. Where cause cannot be independently
-established it is recorded **unconfirmed**, and unconfirmed never counts toward accuracy.
+Imported history is inert and may contain untrusted text. A content hash checks integrity, not
+source trust. Exact source equality does not import authority or make an old environment current.
+Export selected records only; the host controls sharing, credentials, privacy and retention.
 
-## Verification Is Not Acceptance
+## Accepted measurement expansion
 
-Checks passing says the declared checks passed on that subject. A test suite can deterministically
-pass a change that solved the wrong problem, and documentation, architecture and nonfunctional
-requirements may need review or external evidence.
-
-**Guard against circularity.** A worker can change the implementation, its tests, and the policy
-selecting which checks run. Mandatory acceptance requirements bind to the **authorized baseline**,
-not to the subject the worker produced. A worker's proposed change to those requirements is
-reviewable output, never authority for accepting the same work. Untested claims stay explicitly
-open rather than closed by a partial run.
-
-## Decision Annotations
-
-A decision annotation records the question and its version, the catalog and policy digests, the
-effective thresholds, the producer and provider versions (`unknown` where unreported), the answer
-with its confidence and distribution, the disposition taken, and the tier that answered.
-
-**Question confidence and action safety are different quantities.** A 95% confident diagnosis is
-not a 95% probability its remedy is appropriate.
-
-A digest identifies bytes; it cannot reconstruct them. Configuration needed to restore a prior
-state is retained as an artifact, not referenced by digest alone.
-
-## Calibration
-
-Per question and version: observed accuracy against established outcomes, whether stated confidence
-matches observed frequency, disposition rates, and how much outcome data is **missing**.
-
-- Evaluation splits by task or failure episode, so related retries cannot leak between development
-  and held-out cases.
-- Selection creates missing evidence: an excluded lane or file cannot reveal its value through a
-  normal run, so a bounded sample of broader comparison inspects omissions.
-- **Incomplete evaluation never authorizes a weaker threshold.**
-- A factual correction is strong calibration evidence; a changed preference is not, and the two are
-  recorded distinctly.
-- A provider upgrade requires a replay check and a working disable path, not just a version field.
-
-## Failure Modes
-
-| Condition | Behavior |
-| --- | --- |
-| Analytics write fails | Work proceeds; the gap is noted once |
-| Execution-critical write fails | The dependent Action does not run |
-| Outcome never arrives | The decision stays open; calibration excludes rather than assumes success |
-| Cause not establishable | Recorded unconfirmed |
-
-## Validation Requirements
-
-- A retry that succeeds for a cause unrelated to the proposed remedy does not become evidence the
-  diagnosis was right.
-- An omitted lane that later finds a defect is visible in the evaluation.
-- A patch deleting a failing assertion does not satisfy that assertion's obligation.
-
-## Change Log
-
-- 2026-09-19: Replaces the decision-record contract; decisions become annotations here.
+[Bounded telemetry and qualification](measurement-and-qualification.md) defines retention, the
+lightweight laboratory, pilot design and explicitly hypothetical first-release benefit assumptions.
+These additions are planned. Governance-only versus governance with continuity is the comparison;
+there is no standalone harness arm. Device compute and model coordination cost remain separate.

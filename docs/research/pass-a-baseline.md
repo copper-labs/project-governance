@@ -1,3 +1,5 @@
+> Historical research note, reviewed 2026-09-19. The 495-run sample and 624-operation denominator have not been reconciled. Percentages are provisional and do not establish harness savings. Current implementation contracts live under docs/specs.
+
 ---
 id: research.pass-a-baseline
 title: Pass A - Baseline Findings

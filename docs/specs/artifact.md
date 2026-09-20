@@ -1,85 +1,54 @@
 ---
 id: spec.harness.artifact
-title: Artifact
+title: Artifact and Retrieval
 type: spec
-status: draft
+status: current
 owner: project-harness
 created: 2026-09-19
 updated: 2026-09-19
-summary: Versioned inputs and outputs, bound to the right source version, retrieved progressively within a budget.
+summary: Current architecture-reset contract; implementation and qualification limits are explicit.
 ---
 
-> Child of [Harness Core](harness-core.md).
+# Artifact and Retrieval
 
-# Artifact
+## Identity
 
-## Purpose
+An artifact records kind, exact subject when established, source locator, bytes, provenance and
+content-addressed identity. Identical contents at different source paths have different locators;
+content files may still share the same byte digest. Missing content is never reconstructed by
+reading a mutable source path.
 
-A versioned input or output: a source snapshot, a patch, a document, a log. The valuable
-abstraction is **reliable access to the right source version within a budget** — not predicting a
-perfect context payload before work starts.
+Committed and staged reads resolve a tree object once and read that immutable tree. Symbolic refs
+and the index are not consulted again to supply bytes. Worktree reads use actual filesystem bytes,
+reject escaping symlinks and binary/oversized content, and identify each artifact by its bytes.
+Per-file snapshots do not claim an atomic repository-wide view.
 
-## Current Implementation
+## Retrieval
 
-- **Posture:** planned. **Evidence:** none.
-- **Current boundary:** The governance runtime materializes bounded context with byte ceilings, but
-  reads through a supplied filesystem root. That is **not** the same as binding to the immutable
-  check subject: a dirty worktree can supply different bytes from the selected staged or branch
-  subject. A bridge is required work, not an available property.
-- **Known limits:** Subject binding is the hard part; ranking is not.
-- **Ledger:** [Research index](../research/concept.md).
+`context get` defaults to worktree, because implementation needs current edits. Review callers
+choose staged or a commit explicitly. Every path, including discovered and mandatory paths, is
+checked against task scope. Mandatory paths are added to the request and missing/oversized required
+content blocks the packet. Optional omissions are named.
 
-## What Changed From The Earlier Draft
+A no-path request returns a bounded scope-filtered discovery list without reading or charging
+source content. It does not pass directories to a Git file reader. Native host reads remain
+available; the host can register important read dependencies through `paths --mode read`.
 
-An earlier contract specified candidate generation, a narrowing decision, mandatory-item protection,
-budget arbitration and a miss-cause taxonomy. Most of that was a ranking pipeline built to predict
-the perfect payload. It is cut.
+Materialization returns the actual source content and an artifact ID. Large stored artifacts are
+available through `artifact read`, which requires a task link and supports bounded UTF-8 byte pages.
+Retrieval budget counts delivered source bytes, including repeat reads; JSON overhead and model
+prefixes are not tokens and are measured separately where available.
 
-What remains is the part that carries the value: every Artifact is bound to an exact version, and
-retrieval is progressive and bounded.
+## Budget
 
-## Behavioral Requirements
+The default task ceiling is 262144 bytes. Reservation is atomic across callers. `budget set`
+explicitly changes the ceiling with a host reference; no new request silently resets it. Failed
+or interrupted delivery can conservatively retain its reservation. Mandatory instructions in a
+resume packet have their own bounded-envelope check and are never silently truncated.
 
-- Every Artifact has a content-addressed identity and names the subject it came from.
-- **Subject binding is explicit.** An Artifact drawn from a staged or branch subject is not
-  satisfied by live worktree bytes, and the difference is detectable rather than assumed.
-- A Task starts with its brief, its mandatory instructions, its relevant source references and the
-  most useful existing evidence. It does not start with everything.
-- A worker requests more through bounded reads. The runtime materializes those deterministically;
-  the worker never reaches around the runtime to read for itself.
-- Budgets bind to the **Task**, not to a single request. A new request does not reset them.
-- A previously authored, provenance-labelled handoff may be carried as content. It is marked a
-  hypothesis, never a fact.
-- Large artifacts live as ordinary files and are referenced, never inlined into records.
-- A Task with no diff routes by declared target. Impacted-change selection cannot locate an edit
-  that does not exist yet.
+## Evidence limits
 
-## Invariants
-
-- No model selects what an Artifact contains. A worker may propose the query; materialization stays
-  deterministic.
-- An Artifact is immutable once identified. A revision is a new Artifact referencing the prior one.
-- Budget exhaustion returns a blocker or a bounded expansion request. It never silently drops
-  something the Task required.
-
-## Failure Modes
-
-| Condition | Behavior |
-| --- | --- |
-| Subject bridge unavailable | Blocker; the contract does not claim subject-bound bytes without it |
-| Requested read outside Task scope | Refused; scope is not widened by asking |
-| Task budget exhausted | Return control with what is established so far |
-| Retrieval cannot establish a version | No Artifact; the uncertainty is reported |
-
-## Validation Requirements
-
-- Staged and worktree bytes made to differ, proving which the Artifact carried.
-- A task whose decisive evidence is two reads away, compared against full preassembly: accepted
-  results and total context consumed, including repeated prefixes and retries.
-- A task needing a new experiment rather than a larger selection, showing that retrieval alone
-  cannot substitute.
-- A clean checkout with no diff routing by declared target.
-
-## Change Log
-
-- 2026-09-19: Replaces the context-packet contract; the ranking pipeline is removed.
+Byte identity proves content identity, not completeness, policy authority, a valid environment or
+acceptance. Original subjects remain attached after merge. Unknown subject is explicit. Complete
+upstream logs stay with their execution owner; artifact references do not promise indefinite owner
+retention.

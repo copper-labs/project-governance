@@ -1,137 +1,21 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
-import { authorize, defaultPolicy, withinScope } from "../src/ops/authority.ts";
-import type { Task } from "../src/model/types.ts";
-
-function fixture(): { root: string; inside: string; outside: string; link: string } {
-  const root = mkdtempSync(join(tmpdir(), "harness-auth-"));
-  const inside = join(root, "repo");
-  const outside = join(root, "elsewhere");
-  mkdirSync(inside, { recursive: true });
-  mkdirSync(outside, { recursive: true });
-  writeFileSync(join(inside, "a.ts"), "ok");
-  writeFileSync(join(outside, "secret.txt"), "not yours");
-  const link = join(inside, "escape");
-  symlinkSync(outside, link);
-  return { root, inside, outside, link };
-}
-
-const task = (items: Task["items"]): Task => ({
-  taskId: "t", version: 1, supersedes: null, outcome: "investigate",
-  status: "open", createdAt: "", items,
-  worktree: null, branch: null, parentTask: null, session: null, mode: "implement",
+import { authorize, defaultPolicy } from "../src/ops/authority.ts";
+import { authorizeAction, proposeAction, prepareAction, beginAction } from "../src/ops/actions.ts";
+import { fixture } from "./helpers.ts";
+test("path traversal and symlink escape are refused", () => {
+    const f = fixture(), other = fixture();
+    symlinkSync(other.root, join(f.root, "outside"));
+    for (const target of [join(f.root, "../escape"), join(f.root, "outside/a.ts")])
+        assert.equal(authorize({ ...f.req, targets: [target] }, defaultPolicy(), f.task, f.root).ok, false);
+    f.store.close();
+    other.store.close();
 });
-
-const item = (kind: Task["items"][number]["kind"], body: string) => ({
-  seq: 0, kind, provenance: "operator" as const, body, revoked: false,
-});
-
-test("a target inside declared scope is allowed", () => {
-  const f = fixture();
-  const v = authorize(
-    { operation: "read", scope: [f.inside], destination: null, policyRevision: "policy-1", targets: [join(f.inside, "a.ts")] },
-    defaultPolicy(), task([]), f.root,
-  );
-  assert.deepEqual(v, { ok: true });
-});
-
-test("an escape through .. is refused after resolution", () => {
-  const f = fixture();
-  const v = authorize(
-    { operation: "read", scope: [f.inside], destination: null, policyRevision: "policy-1", targets: [join(f.inside, "..", "elsewhere", "secret.txt")] },
-    defaultPolicy(), task([]), f.root,
-  );
-  assert.equal(v.ok, false);
-});
-
-test("an escape through a symlink is refused after resolution", () => {
-  const f = fixture();
-  assert.equal(withinScope(join(f.link, "secret.txt"), [f.inside], f.root), false);
-  const v = authorize(
-    { operation: "read", scope: [f.inside], destination: null, policyRevision: "policy-1", targets: [join(f.link, "secret.txt")] },
-    defaultPolicy(), task([]), f.root,
-  );
-  assert.equal(v.ok, false, "a symlink out of scope does not become in-scope by its path");
-});
-
-test("an action cannot claim scope the task does not hold", () => {
-  const f = fixture();
-  const v = authorize(
-    { operation: "read", scope: [f.root], destination: null, policyRevision: "policy-1", targets: [join(f.inside, "a.ts")] },
-    defaultPolicy(), task([item("scope", f.inside)]), f.root,
-  );
-  assert.equal(v.ok, false);
-});
-
-test("a stale policy revision is refused, never assumed permissive", () => {
-  const f = fixture();
-  const v = authorize(
-    { operation: "read", scope: [f.inside], destination: null, policyRevision: "policy-0", targets: [join(f.inside, "a.ts")] },
-    defaultPolicy("policy-1"), task([]), f.root,
-  );
-  assert.equal(v.ok, false);
-  assert.match((v as { reason: string }).reason, /stale/);
-});
-
-test("an investigate-only constraint refuses a transmitting action at the boundary", () => {
-  const f = fixture();
-  const v = authorize(
-    { operation: "transmit", scope: [f.inside], destination: "provider", policyRevision: "policy-1", targets: [join(f.inside, "a.ts")] },
-    { ...defaultPolicy(), allowedDestinations: ["provider"] },
-    task([item("constraint", "investigate this without changing code")]),
-    f.root,
-  );
-  assert.equal(v.ok, false, "the prohibition is enforced, not merely worded");
-});
-
-test("transmit requires a declared, permitted destination", () => {
-  const f = fixture();
-  const noDest = authorize(
-    { operation: "transmit", scope: [f.inside], destination: null, policyRevision: "policy-1", targets: [join(f.inside, "a.ts")] },
-    defaultPolicy(), task([]), f.root,
-  );
-  assert.equal(noDest.ok, false, "a destination is never inferred");
-
-  const notPermitted = authorize(
-    { operation: "transmit", scope: [f.inside], destination: "somewhere-else", policyRevision: "policy-1", targets: [join(f.inside, "a.ts")] },
-    { ...defaultPolicy(), allowedDestinations: ["provider"] },
-    task([]), f.root,
-  );
-  assert.equal(notPermitted.ok, false);
-});
-
-test("export rules block a transmission before it leaves", () => {
-  const f = fixture();
-  writeFileSync(join(f.inside, ".env.local"), "JEV_TOKEN=x");
-  const v = authorize(
-    { operation: "transmit", scope: [f.inside], destination: "provider", policyRevision: "policy-1", targets: [join(f.inside, ".env.local")] },
-    { ...defaultPolicy(), allowedDestinations: ["provider"] },
-    task([]), f.root,
-  );
-  assert.equal(v.ok, false);
-  assert.match((v as { reason: string }).reason, /export rules/);
-});
-
-test("writing to a working tree is not an operation the policy offers", () => {
-  assert.equal(defaultPolicy().allowedOperations.includes("read"), true);
-  assert.deepEqual(
-    defaultPolicy().allowedOperations.filter((o) => String(o) === "write"),
-    [],
-    "the host holds the pen",
-  );
-});
-
-test("a read-only constraint does not block running a declared check", () => {
-  const f = fixture();
-  const v = authorize(
-    { operation: "check", scope: [f.inside], destination: null, policyRevision: "policy-1", targets: [f.inside] },
-    defaultPolicy(),
-    task([item("constraint", "investigate this without changing code")]),
-    f.root,
-  );
-  assert.deepEqual(v, { ok: true },
-    "running the suite the operator declared is not a code change");
-});
+test("no scope and stale policy fail closed", () => { const f = fixture(); assert.equal(authorize({ ...f.req, policyRevision: "old" }, defaultPolicy(), f.task, f.root).ok, false); assert.equal(authorize(f.req, defaultPolicy(), { ...f.task, items: [] }, f.root).ok, false); f.store.close(); });
+test("structured denied operation is enforced; prose is retained for host interpretation", () => { const f = fixture(); const t = f.store.reviseTask(f.task.taskId, [{ kind: "constraint", provenance: "operator", body: "deny:check" }]); assert.equal(authorize(f.req, defaultPolicy(), t, f.root).ok, false); f.store.close(); });
+test("changed authorization request cannot authorize a different proposal", () => { const f = fixture(); const a = proposeAction(f.store, f.task.taskId, f.req); assert.equal(authorizeAction(f.store, a, { ...f.req, targets: [] }, defaultPolicy(), f.root).status, "refused"); f.store.close(); });
+test("cancel/revise after authorization prevents dispatch", () => { const f = fixture(); const p = prepareAction(f.store, f.action, [], "owner"); f.store.reviseTask(f.task.taskId, [], { status: "cancelled" }); assert.throws(() => beginAction(f.store, p), /not open|revised/); f.store.close(); });
+test("legal state transitions are enforced even with current revision", () => { const f = fixture(); assert.throws(() => f.store.transitionAction(f.action.actionId, f.action.revision, "completed"), /illegal/); f.store.close(); });
+test("task expected revision and host-reported acceptance reference are explicit", () => { const f = fixture(); f.store.reviseTask(f.task.taskId, [], { expectedVersion: 1 }); assert.throws(() => f.store.reviseTask(f.task.taskId, [], { expectedVersion: 1 }), /expected revision/); assert.throws(() => f.store.reviseTask(f.task.taskId, [], { status: "accepted" }), /authority reference/); f.store.close(); });

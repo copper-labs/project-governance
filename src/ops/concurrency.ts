@@ -1,99 +1,95 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import { readFileSync, lstatSync, readlinkSync } from "node:fs";
+import { resolve } from "node:path";
 import type { Store } from "../store/store.ts";
-
-/**
- * Concurrent sessions in one worktree.
- *
- * "Fork in this workspace" gives two conversations one folder and one branch. That is a
- * deliberate, cheap choice, so the answer here is detection rather than a lock: the harness
- * does not write files and cannot prevent two agents editing the same one. What it can do is
- * notice quickly and say so, instead of leaving the collision to be discovered later.
- */
-
-/** A fingerprint of the working tree: HEAD plus everything modified or staged. */
+import { canonicalPath } from "./retrieval.ts";
+import { resolveTarget, withinScope } from "./authority.ts";
+export function pathDigest(cwd: string, path: string): string | null {
+    try {
+        const p = resolve(cwd, path), st = lstatSync(p);
+        if (st.isSymbolicLink())
+            return "link:" + readlinkSync(p);
+        if (!st.isFile() || st.size > 32 * 1024 * 1024)
+            return null;
+        return "sha256:" + createHash("sha256").update(readFileSync(p)).digest("hex");
+    }
+    catch {
+        return null;
+    }
+}
+/** Content fingerprint for relevant Git files. Unknown if inspection exceeds the bound. */
 export function treeDigest(cwd: string): string | null {
-  const head = spawnSync("git", ["rev-parse", "HEAD"], { cwd, encoding: "utf8" });
-  const status = spawnSync("git", ["status", "--porcelain=v1"], { cwd, encoding: "utf8" });
-  if (head.status !== 0 || status.status !== 0) return null;
-  return (
-    "tree:" +
-    createHash("sha256").update(head.stdout.trim() + "\u0000" + status.stdout).digest("hex").slice(0, 16)
-  );
+    const git = (args: string[]) => spawnSync("git", args, { cwd, encoding: "utf8", maxBuffer: 4 * 1024 * 1024 });
+    const head = git(["rev-parse", "HEAD"]), diff = git(["diff", "--raw", "--no-abbrev", "HEAD"]), files = git(["ls-files", "-z", "--modified", "--others", "--exclude-standard"]);
+    if (head.status !== 0 || diff.status !== 0 || files.status !== 0)
+        return null;
+    const paths = [...new Set(files.stdout.split("\0").filter(Boolean))].sort();
+    if (paths.length > 2000)
+        return null;
+    const hash = createHash("sha256").update(head.stdout).update(diff.stdout);
+    let total = 0;
+    for (const p of paths) {
+        try {
+            total += lstatSync(resolve(cwd, p)).size;
+        }
+        catch {
+            return null;
+        }
+        if (total > 8 * 1024 * 1024)
+            return null;
+        const d = pathDigest(cwd, p);
+        if (d === null)
+            return null;
+        hash.update(JSON.stringify([p, d]));
+    }
+    return "tree:" + hash.digest("hex");
 }
-
-export interface OtherSession {
-  session: string;
-  taskId: string | null;
-  outcome: string | null;
-  lastSeen: string;
-  minutesAgo: number;
+export function recordPaths(store: Store, opts: {
+    session: string;
+    workspaceId: string;
+    taskId: string;
+    cwd: string;
+    paths: string[];
+    mode: "read" | "write";
+}): void {
+    const task = store.readTask(opts.taskId);
+    if (!task)
+        throw new Error("unknown task");
+    const scope = task.items.filter(i => !i.revoked && i.kind === "scope").map(i => i.body);
+    for (const raw of opts.paths) {
+        const p = canonicalPath(opts.cwd, resolveTarget(raw, opts.cwd));
+        if (!withinScope(p, scope, opts.cwd))
+            throw new Error("path intent outside task scope");
+        store.recordIntent(opts.session, opts.workspaceId, opts.taskId, p, opts.mode, pathDigest(opts.cwd, p));
+    }
 }
-
-export interface ConcurrencyReport {
-  /** Sessions other than this one, recently active in the same worktree. */
-  others: OtherSession[];
-  /** Paths this job has touched that another active session's job has also touched. */
-  overlappingPaths: { path: string; session: string; taskId: string }[];
-  /** True when the working tree changed since this session last acted here. */
-  treeChangedSinceYouLastActed: boolean;
-  warning: string | null;
+export function report(store: Store, opts: {
+    session: string | null;
+    workspaceId?: string;
+    worktree: string;
+    taskId: string | null;
+    cwd: string;
+}) {
+    if (!opts.session)
+        return { coverage: "unknown", warning: "No stable host session identity; concurrency coverage is unknown.", others: [], overlappingPaths: [], changedReads: [], treeChangedSinceYouLastActed: "unknown" as const };
+    const previous = store.readActivity(opts.session, opts.worktree), digest = treeDigest(opts.cwd);
+    const others = store.activeSessions(opts.worktree, opts.session, new Date(Date.now() - 30 * 60 * 1000).toISOString());
+    const intents = opts.workspaceId ? store.intents(opts.workspaceId) : [];
+    const mine = intents.filter(i => i.session === opts.session && (!opts.taskId || i.task_id === opts.taskId));
+    const overlappingPaths = mine.flatMap(m => intents.filter(o => o.session !== opts.session && o.path === m.path && (o.mode === "write" || m.mode === "write")).map(o => ({ path: m.path, session: o.session, taskId: o.task_id, risk: m.mode === "write" && o.mode === "write" ? "write-overlap" : "reader-writer" })));
+    const changedReads = mine.filter(i => i.mode === "read" && (i.digest === null || pathDigest(opts.cwd, i.path) !== i.digest)).map(i => i.path);
+    const treeChanged: boolean | "unknown" = previous?.treeDigest != null && digest !== null ? previous.treeDigest !== digest : "unknown";
+    store.recordActivity({ session: opts.session, worktree: opts.worktree, taskId: opts.taskId, treeDigest: digest });
+    const warning = overlappingPaths.length ? "Cooperating sessions have overlapping read/write intentions. Coordinate writes or use separate worktrees." : changedReads.length ? "Previously read files changed or cannot be verified; refresh affected conclusions." : treeChanged === "unknown" ? "Workspace drift is unknown; no comparable bounded observation." : treeChanged ? "Workspace contents changed since the last observation; the actor is unknown." : others.length ? "Other sessions are active; only declared paths are covered." : null;
+    return { coverage: "advisory; declared paths only; 30-minute activity window", warning, others, overlappingPaths, changedReads, treeChangedSinceYouLastActed: treeChanged };
 }
-
-const ACTIVE_WINDOW_MS = 30 * 60 * 1000;
-
-export function report(
-  store: Store,
-  opts: { session: string; worktree: string; taskId: string | null; cwd: string },
-): ConcurrencyReport {
-  const now = Date.now();
-  const digest = treeDigest(opts.cwd);
-  const previous = store.readActivity(opts.session, opts.worktree);
-  const treeChanged =
-    previous?.treeDigest != null && digest != null && previous.treeDigest !== digest;
-
-  const others = store
-    .activeSessions(opts.worktree, opts.session, new Date(now - ACTIVE_WINDOW_MS).toISOString())
-    .map((a) => ({
-      session: a.session,
-      taskId: a.taskId,
-      outcome: a.taskId ? (store.readTask(a.taskId)?.outcome ?? null) : null,
-      lastSeen: a.lastSeen,
-      minutesAgo: Math.max(0, Math.round((now - Date.parse(a.lastSeen)) / 60000)),
-    }));
-
-  const overlappingPaths = opts.taskId
-    ? store.overlappingPaths(opts.taskId, opts.worktree, others.map((o) => o.session))
-    : [];
-
-  let warning: string | null = null;
-  if (overlappingPaths.length) {
-    const names = [...new Set(overlappingPaths.map((p) => p.path))].slice(0, 5);
-    warning =
-      `Another active session in this worktree has touched ${names.join(", ")}. ` +
-      `You share one folder and one branch, so edits can overwrite each other. ` +
-      `Confirm with the operator before changing those files.`;
-  } else if (treeChanged) {
-    warning =
-      `The working tree changed since your last action and you did not cause it. ` +
-      `Another session is probably editing here. Re-read anything you are about to change.`;
-  } else if (others.length) {
-    warning =
-      `${others.length} other session(s) active in this worktree. No file overlap detected yet.`;
-  }
-
-  return { others, overlappingPaths, treeChangedSinceYouLastActed: treeChanged, warning };
-}
-
-/** Called after every command, so the next session's report is accurate. */
-export function touch(
-  store: Store,
-  opts: { session: string; worktree: string; taskId: string | null; cwd: string },
-): void {
-  store.recordActivity({
-    session: opts.session,
-    worktree: opts.worktree,
-    taskId: opts.taskId,
-    treeDigest: treeDigest(opts.cwd),
-  });
+export function touch(store: Store, opts: {
+    session: string | null;
+    worktree: string;
+    taskId: string | null;
+    cwd: string;
+}): void {
+    if (opts.session)
+        store.recordActivity({ session: opts.session, worktree: opts.worktree, taskId: opts.taskId, treeDigest: store.readActivity(opts.session, opts.worktree)?.treeDigest ?? null });
 }

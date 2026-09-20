@@ -1,111 +1,62 @@
 ---
 id: spec.harness.host-integration
-title: Host Integration
+title: Codex Host Integration
 type: spec
-status: draft
+status: current
 owner: project-harness
-created: 2026-09-19
 updated: 2026-09-19
-summary: How an agent host invokes the harness, and what stays host-owned across Codex, Claude Code, and Cowork.
 ---
 
-> Child of [Decision-First Harness Core](harness-core.md).
+# Codex host integration
 
-# Host Integration
+## Supported target
 
-## Purpose
+Codex app on macOS is the sole first-adoption target. Governance is required. Cowork, Claude Code,
+other hosts and a custom front end are deferred; they are not release blockers. Portable internal
+contracts are useful, but do not require a general host framework or lowest-common-denominator API.
+See [installation](installation.md) for the accepted bundled-product contract.
 
-Define the seam between an agent host and the harness. The first delivered surface is not a
-standalone tool: the operator keeps working inside the host they already use, and the harness is
-what that host calls first.
+## Existing implementation and limits
 
-## Current Implementation
+The host calls the JSON CLI from a known project root. Existing `init` previews routing and
+`init --apply` can write AGENTS.md or CLAUDE.md marked blocks while preserving surrounding content.
+That legacy CLAUDE.md capability is not supported-host qualification. The integrated installer targets
+AGENTS.md only. Malformed markers and symlinked instruction files are refused by this prototype.
 
-- **Posture:** planned.
-- **Current boundary:** The governance runtime already writes a marked routing section into host
-  entry files during `init`, and adopting repositories already keep thin per-host adapters. That
-  pattern is the intended carrier; no harness routing exists yet.
-- **Evidence:** none.
-- **Known limits:** Host tool-invocation surfaces differ and are outside our control.
-- **Ledger:** [Research index](../research/concept.md).
+Adapters work at task boundaries rather than wrapping every native read. Codex owns reasoning,
+edits, permissions, acceptance and external effects. It registers important dependencies and records
+coherent checkpoints. Native tools remain available.
 
-## Scope
+`resume --task` may bind a stable host session. Without an explicit task, only an existing session
+binding can resume; never choose an arbitrary open task. `host hook` currently accepts a bounded
+SessionStart fixture and emits additional context. It does not install or certify native hooks.
+Real Codex session/compaction/completion behavior remains unqualified.
 
-- One invocation contract, expressed once and adapted per host.
-- The marked section written into each host's entry file.
-- What the host keeps owning.
+## First qualification recipe
 
-## Non-Goals
+Prove stable session/task identity, root/worktree mapping, process access and the installed generation.
+Create/checkpoint/reopen/resume a task, repeat across linked worktrees and concurrent sessions, interrupt
+a declared harmless check, then recover its original owner result without resubmitting. Confirm bounded
+context, mandatory constraints, changed-scope handling and original full-log access.
 
-- A standalone CLI front door. Deferred, not designed out.
-- A desktop application. Deferred.
-- Replacing host-native permissions, approvals, or session handling.
+Then qualify native lifecycle hooks, compaction timing, tool-result capture and native usage semantics
+on the installed app version. Install one handler per operation, preserve host trust review and make
+handlers idempotent. A missing optional hook can use explicit task-boundary commands; missing critical
+state blocks dependent execution. `doctor` distinguishes available, qualified and unknown.
 
-## Two Steps
+Use existing completion-aware waits, or a qualified completion return, never both for one job. No model
+polling loop. Hook output carries attributed history, not new authority. No private transcript scraping.
 
-**Step one, now.** The host remains the front door. Its adapter instructs it to call the harness
-before exploring, and to work from the packet it receives. The host writes; the harness decides,
-assembles, and records.
+## Model policy
 
-**Step two, later.** The same core is driven by a front door of our own. Nothing in the core may
-assume which step is active. The invocation contract is identical; only the caller changes.
+Governance owns task-category model guidance. Precedence is operator choice, project policy, governance
+defaults, subject to actual Codex capabilities. This guidance neither switches a running parent nor
+authorizes delegation. Record requested model/effort/policy source and observed execution when available.
+Apply choices only through supported host controls at appropriate task/authorized delegation boundaries.
+No duplicate model table or compulsory semantic classifier belongs in harness.
 
-## The Adapter Is Written By The Runtime
+## Future front door
 
-`init` writes one marked block into a repository's agent instruction files. It touches only files
-already present, preserves everything authored around its markers, and is idempotent. The block is
-routing only: it names the commands and when to use them, and carries no policy, taxonomy or
-threshold.
-
-It also carries the practice guidance that belongs with the host rather than the contracts:
-sharing a workspace is fine for exploring and risky for implementing, and a branched conversation
-that is about to implement should be offered a worktree.
-
-## Behavioral Requirements
-
-- The harness exposes one invocation surface, callable as a subprocess with JSON on stdout, so any
-  host capable of running a command can use it without a bespoke integration.
-- Host adapters are thin. They contain routing instructions only, never policy, taxonomy, or
-  thresholds.
-- **A routing instruction is advisory coverage, not enforcement.** It suggests the host call the
-  harness; it constrains nothing the host does outside it. Enforcement of effects lives at the
-  action boundary. See [Action Authority](action.md).
-- An adapter either demonstrates the capabilities a mode requires, or that mode is reported
-  unsupported. Support is never inferred from sharing instruction text.
-- Each supported host receives the same marked section, generated from one source, so the three
-  hosts cannot drift apart in substance.
-- Supported hosts at v0: Codex desktop, Claude Code, Claude Cowork. An unsupported host must still
-  be able to call the invocation surface directly.
-- The harness never assumes it is being driven by a specific host, and never parses host transcripts.
-- A worker that asks for something the packet lacks is recorded as a packet miss, whichever host
-  it runs in.
-
-## Invariants And Constraints
-
-- Host adapters are generated and marked; authored content around them is never rewritten.
-- The harness holds no host session state, credentials, or transcript.
-- Approvals, permissions, and irreversible-action gating stay with the host and the adopting
-  repository, never with the harness.
-- Nothing in the core references a host by name outside its adapter.
-
-## Failure Modes
-
-| Condition | Behavior |
-| --- | --- |
-| Host cannot run subprocesses | Unsupported; report plainly rather than degrading silently |
-| Adapter section missing or stale | Report drift; do not rewrite authored content |
-| Harness unavailable | The host proceeds as it does today, with a recorded note |
-
-## Validation Requirements
-
-- The same task, run from each supported host, produces equivalent packets and records.
-- Adapter generation is idempotent and touches only its marked section.
-
-## Open Questions
-
-- Whether Cowork and Claude Code should share one adapter or keep separate files.
-- How much of the packet a host should be shown directly versus given as a path.
-
-## Change Log
-
-- 2026-09-19: First draft.
+An owned CLI/app may apply the same governance contracts with tighter lifecycle control. This remains
+a later option, not a second agent loop for the first release. Additional host adapters require an
+explicit new scope decision; they do not automatically follow the first pilot.

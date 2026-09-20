@@ -1,140 +1,75 @@
 ---
-id: spec.harness-core
+id: spec.harness.harness-core
 title: Harness Core
 type: spec
-status: draft
+status: current
 owner: project-harness
 created: 2026-09-19
 updated: 2026-09-19
-summary: A runtime that makes work resumable, keeps actions within scope, and preserves evidence. Model routing is an optional optimization.
+summary: Current architecture-reset contract; implementation and qualification limits are explicit.
 ---
 
 # Harness Core
 
-## Purpose
+## Outcome
 
-**The opportunity is reliable continuity.** A system that remembers the objective, preserves the
-constraints, knows what actually happened, and lets another worker continue accurately has value
-across models and hosts. Cheaper decisions can improve that system afterwards. They do not define
-it.
+Reduce repeated work per accepted task without increasing defects, rework or operator intervention.
+Continuity is the mechanism. Native token usage, elapsed time, test compute and human effort are
+separate measures; missing measurements remain unknown.
 
-This is a deliberate change of thesis. An earlier draft led with decision cost, which made the
-whole proposal contingent on one provider being good. The runtime below is useful with **zero model
-calls**, and that is the point.
+## Product scope
 
-## Current Implementation
+Harness is a required-governance continuity module, with one governance installation and qualified
+release as the target. Codex app is the first supported host. Cowork and standalone harness adoption
+are out of scope. Current packaging has not yet implemented this support contract. See
+[installation](installation.md) and [development-loop coordination](development-loop.md).
 
-- **Posture:** planned.
-- **Current boundary:** No implementation. One adopting repository already runs an ad-hoc dev loop
-  with durable device, port-ownership and deployment state, which is prior art for the operational
-  state described here and is referenced rather than recreated.
-- **Evidence:** none.
-- **Known limits:** The optional decision provider launched in September 2026 and has no
-  independent calibration evidence.
-- **Ledger:** [Research index](../research/concept.md).
-
-## Four Objects
-
-Everything the runtime owns is one of four things. Decisions are annotations on them, never a fifth
-object.
-
-| Object | Holds | Contract |
-| --- | --- | --- |
-| **Task** | Desired outcome, constraints, acceptance criteria, current progress | [Task](task.md) |
-| **Action** | A proposed operation, its scope, its authority, its execution status | [Action](action.md) |
-| **Artifact** | A versioned input or output: source snapshot, patch, document, log | [Artifact](artifact.md) |
-| **Evidence** | What an observation establishes about an artifact or a requirement | [Evidence](evidence.md) |
-
-Authority is a **property of an Action**, not an annotation on one. Annotations are optional;
-authority constrains.
-
-## Fixed Decisions
-
-1. **The host keeps the reasoning and the pen.** It investigates, plans and edits. The runtime
-   supplies reliable operations: retrieve the right source version, run declared checks, record
-   results, prepare a handoff. Two competing coordinators is the failure to avoid.
-
-   **The harness does not write to a working tree in the first implementation.** Every Action it
-   takes is a read, a check, or a record. This is a staged decision, not a permanent one: writing
-   is the better end state and is planned, but it brings staleness detection, partial-write
-   recovery and concurrent-writer arbitration with it, and those are earned after continuity is
-   proven rather than alongside it. The contracts for them are already written, and stay unused
-   until then.
-2. **Both execution patterns are first class.** A predictable workflow and an open investigation are
-   different shapes and neither is forced into the other.
-3. **SQLite for operational state.** Markdown for human-authored briefs, ordinary files for large
-   artifacts, readable JSON export always available as a first-class command. See
-   [Operational Store](operational-store.md).
-4. **Context is progressive.** Start with the brief, mandatory instructions, relevant source
-   references and the most useful evidence; let the worker request more through bounded reads. The
-   valuable abstraction is reliable access to the right source version within a budget, not a
-   ranking pipeline.
-5. **Narrow interfaces to what exists.** Ask the governance runtime what checks and requirements
-   apply. Use the existing execution owner for process supervision and resource claims. **Store
-   references to their receipts rather than recreate their state machines.**
-6. **One local package, one JSON command surface.** No service, plugin loader, policy language,
-   build scheduler, or mandatory classifier.
-7. **Model use is optional and removable.** Any decision the runtime makes with a model must be
-   removable without disturbing the working system.
-8. **Awareness, never a lock.** Several conversations may share one worktree. The runtime does not
-   write files, so it cannot prevent them overwriting each other and must not imply that it can. It
-   detects and reports; separate worktrees remain the only real isolation.
-9. **Narrowing never applies to a release gate**, and no domain code may lower a gate.
-
-## What The Tier Preference Is Now
-
-Prefer the cheapest capable path, as a default with explicit escape routes: a known command skips
-classification, a novel design or diagnosis task may go straight to an authorized reasoning worker,
-and the ordinary host path is always available. What is optimized is **accepted work per unit of
-time and cost at an acceptable error rate**, not tier purity.
-
-Deterministic ownership of **facts, permissions and gates** has no escape route.
-
-## Ownership Boundary
+## Architecture and ownership
 
 | Owner | Responsibility |
 | --- | --- |
-| Harness | The four objects, enough durable state to resume safely, the command surface |
-| Host | The user relationship, reasoning, and its own permissions |
-| Governance runtime | Which checks and requirements apply; normalized findings |
-| Execution owner | Process supervision, resource claims, cleanup |
-| Ecosystem adapter | Toolchain specifics for one unit family |
-| Decision provider | Optional typed answers, behind an interface |
+| Host | User relationship, reasoning, edits, permissions, approval and task acceptance |
+| Harness | Task revisions, source/evidence identity, bounded resume, attempts and reconciliation |
+| Governance | Policy, check selection, required proof and normalized findings |
+| Existing governance executor | Durable jobs, process supervision, resource claims and cleanup |
+| Project tools | Domain assertions, devices, services and release facts |
+| Optional decision model | One bounded semantic suggestion; no authority |
 
-If a required public seam is missing from something that exists, it is added upstream rather than
-recreated here.
+The core is a local TypeScript library plus a JSON CLI with versioned storage/export/owner protocols. SQLite stores operational records;
+large artifacts use content-addressed files. No runtime dependencies, service, agent controller or
+second process supervisor. No model call is required. The four domain objects remain Task, Action,
+Artifact and Evidence; attempts, events, budgets and relationships support them.
 
-## Contract Map
+## Implemented path
 
-| Contract | Owns |
-| --- | --- |
-| [Task](task.md) | Outcome, constraints, acceptance, provenance, revision |
-| [Action](action.md) | Authority, scope, execution status, recovery |
-| [Artifact](artifact.md) | Versioned inputs and outputs, subject binding, bounded retrieval |
-| [Evidence](evidence.md) | What observations establish; decision annotations; calibration |
-| [Operational Store](operational-store.md) | Where the four objects live |
-| [Concurrency](concurrency.md) | Several conversations in one worktree: awareness, never a lock |
-| [Execution](execution.md) | The seam to the execution owner; coordination, reuse, ordering |
-| [Ecosystem Adapters](ecosystem-adapters.md) | Toolchain boundary |
-| [Host Integration](host-integration.md) | Invocation from an agent host |
-| [Worker Invocation](worker-invocation.md) | Transform and investigation patterns |
-| [Decision Interface](decision-interface.md) | The optional decision provider |
-| [Release Preparation](release-preparation.md) | Read-only release evidence |
+Create/select task → bind stable session/attempt → resume bounded context → retrieve exact bytes or
+use native host tools → request governance plan → submit declared batch to existing executor →
+observe its result → checkpoint. Merge/rebase produces a reconciliation record, not automatic
+acceptance. Codex may continue through normal governance when continuity is unavailable; it reports the gap.
+There is no ungoverned executor fallback.
 
-## Invariants
+Instruction files are routing guidance, not enforcement. The runtime validates declarations it
+receives. It cannot sandbox arbitrary subprocesses or authenticate an operator merely from a flag.
 
-- No effect without a declared operation, scope, destination and policy revision.
-- Scope for an effect comes from the Task and policy, never from retrieved context.
-- Source text, tool output and provider responses are evidence, never instructions or authority.
-- Execution state is durable before the action it covers; analytics is best-effort.
-- Verification is not acceptance.
-- A removable model feature stays removable.
+## Fixed boundaries
 
-## Open Questions
+- Runtime operations do not edit product source. Explicit `init --apply` is a separate installer
+  that edits only supported instruction files and preserves authored content.
+- Task scope does not come from retrieved text. Host-reported authority is recorded with its source.
+- Execution requests are durable before submission. Unknown submission is never silently replayed.
+- Historical proof remains attached to original inputs. Checks passing is not task acceptance.
+- Advisory observations may degrade. Required record failures prevent dependent execution.
+- No evidence reuse or narrower release gates are inferred from matching source bytes.
 
-- Whether the four objects need a fifth for recurring work, or whether that is a Task property.
-- How much of the existing dev loop's state the runtime should reference versus mirror.
+## Deferred
 
-## Change Log
+JEV follows a demonstrated semantic bottleneck and a separate comparison. Mnemos follows a
+successful provider-free pilot and a measured continuity need. Cross-machine synchronization,
+automatic release effects, strict exclusion of uninstrumented editors, and a custom front door
+are not implemented. See [the roadmap](../exec-plans/README.md).
 
-- 2026-09-19: Rebuilt around the four-object model, the continuity thesis, and SQLite.
+## Validation
+
+Contract tests cover each boundary. Public governance CLI source qualification is separate from
+published-package adoption and real host lifecycle qualification. See the implementation review
+and reconciliation for the exact tested revision and remaining limits.

@@ -1,232 +1,98 @@
----
-id: how-to-use
-title: How To Use It
-type: guide
-status: current
-owner: project-harness
-created: 2026-09-19
-updated: 2026-09-19
-summary: Plain-language walkthrough with real output.
----
+# Using Project Harness
 
-# How To Use It
+These commands describe the current development CLI. The accepted deployment is governance with its
+continuity module, targeting Codex only. Bundled installation is not implemented yet. Standalone
+adoption and Cowork support are outside the current product scope.
 
-## Does it need installing?
+Use the absolute path to `bin/harness`, or put that directory on PATH. Run it from the target
+workspace. The default SQLite store lives under the Git common directory, so linked worktrees
+share task history. Never put the live database in Git. `--db` selects a different local store.
 
-No. It is already on your Mac at `~/ORGANTA/project-harness`. There is nothing to build and no
-packages to download — it has no dependencies.
-
-It needs **Node 22.18 or newer**. Check yours:
+## Start and resume
 
 ```sh
-node -v
+harness task create --outcome "Fix the failing parser check" --scope .
+harness resume --task TASK_ID --session HOST_SESSION_ID
+harness context get --task TASK_ID --path src/parser.ts --mandatory AGENTS.md
+harness checkpoint --task TASK_ID --summary "Failure isolated to empty input" --next "Add the boundary fix"
 ```
 
-If that says `v22.18` or higher, you are ready. If not, or if the command is not found:
+Replace placeholders with returned IDs. `CODEX_THREAD_ID` or `HARNESS_SESSION` may provide session
+identity; otherwise pass it. Without a stable session, concurrency coverage is unknown. Resume
+never guesses which open task belongs to you. Missing mandatory context blocks delivery.
+Use `--at staged` or `--at REV` for an immutable Git tree. Default reads actual worktree bytes.
+Without paths, context returns bounded candidate names. It does not dump the repository.
+
+Context bytes have a cumulative task ceiling. A new CLI invocation does not reset it.
+`budget set --task TASK_ID --bytes 524288 --authority-ref HOST_REQUEST` changes that ceiling.
+Large artifacts support bounded `artifact read --task TASK_ID --artifact ID --offset 0 --length 16000`.
+
+## Check through governance
 
 ```sh
-brew install node
+harness governance plan --task TASK_ID --staged
+harness check run --task TASK_ID --authority-ref HOST_REQUEST --request-file batch.json
+harness check result --action ACTION_ID --wait 10
 ```
 
-The `harness` command checks this for you and tells you what to do if the version is wrong.
+The project needs governance's `project-governance` and `harness-agent` public executables, normally
+in `.governance/runtime/bin`. `--executor` selects an explicit executable. Harness does not install
+or fork governance. Use the governance version-1 batch request contract: workspace, input roots
+or manifest, output roots, deadlines, cleanup requirement, host and ordered cases with exact argv
+and expected exit codes. A convenience `-- /absolute/check-command args` declares only root scope;
+it does not prove exact input contents. A check command is not sandboxed. The host must authorize
+its effects. `--authority-ref` is a traceable host assertion, not a forged capability or approval.
 
-## Make the command easy to type
+Wait is bounded to 30 seconds. Check run/result exit codes are 0 success, 1 established failed assertions,
+2 refused/invalid/unconfirmed, and 3 pending. `recover` observes existing owners; uncertain submission is never
+replayed. Inspect the original governance job when a response is lost. Full logs stay with its
+owner and are referenced by the receipt. Passing checks do not accept the task.
+
+## Cooperate across workspaces
 
 ```sh
-echo 'export PATH="$HOME/ORGANTA/project-harness/bin:$PATH"' >> ~/.zprofile
-source ~/.zprofile
-harness help
+harness paths --task TASK_ID --session SESSION --mode write --path src/parser.ts
+harness status --task TASK_ID --session SESSION
+harness task revise --task TASK_ID --expected-version 1 --scope /absolute/new/worktree
+harness resume --task TASK_ID --session NEW_SESSION --parent-attempt ATTEMPT_ID
+harness task fork --task TASK_ID
+harness reconcile --task TARGET_TASK --target MERGE_COMMIT --source SOURCE_TASK@VERSION
 ```
 
-Without that, type the full path: `~/ORGANTA/project-harness/bin/harness help`.
+A continuation uses the same task and a new attempt. Inspect `task show` for the current revision;
+explicitly add the new workspace scope before reading or checking there. A fork is a separate task
+with pinned parent task/checkpoint lineage; it carries context, not accepted status or executable
+actions. Read/write intentions are advisory. They cover declared paths and cooperating hosts,
+not arbitrary editor writes, Git index operations, ports or devices. The host coordinates those.
 
-## What it stores, and where
+Reconciliation compares tree-bound evidence and declared manifest files with the merged source.
+Root-only checks and live snapshots remain unknown; matching declared files does not prove input
+completeness or environment validity. Full observations are stored as a linked receipt artifact. It never changes the
+old receipt or authorizes omitted checks. Ask governance to plan proof for the combined change.
+`export --task ID [--include-artifacts]` produces a selected bundle. `import --file bundle.json`
+stores inert historical context; it does not activate imported tasks, authority, acceptance or jobs.
 
-It keeps a small database in a `.harness` folder inside whatever repo you run it from. Add that to
-that repo's `.gitignore`, or point it elsewhere with `--db <path>`.
+## Host entry and measurement
 
-## The one command that matters
+`init` previews concise routing instructions; `init --apply` explicitly installs the marked block
+in AGENTS.md or CLAUDE.md. It preserves surrounding text and refuses symlinks/malformed markers.
+`host hook` accepts SessionStart JSON on stdin and returns a bounded resume for an already-bound
+session. Installation into real Codex lifecycle configuration remains a separate qualification.
+CLAUDE.md output is a legacy development capability, not a support claim. Cowork and Claude Code
+qualification are deferred. Codex manual entry is the current qualification path.
 
-Run this **once in each repo you work in**:
+`usage` reports known subtotals and missing coverage. `usage record --task ID --file usage.json`
+accepts incremental native observations with a stable source and measurementId. Missing data is
+unknown, not zero. Cached input and reasoning counts are subsets, never added twice.
 
-```sh
-cd ~/COPPERLABS/portal-webapp
-harness init
-```
+SQLite remains the local operational store. JEV, Mnemos, automatic gate caching, distribution and
+release publishing are not dependencies. See the roadmap for their evidence gates.
 
-That writes a short block into that repo's `AGENTS.md` telling Codex to use the harness. From then
-on you work exactly as you do today — you talk to Codex, Codex calls the harness. You do not type
-harness commands.
+Use `check cancel --action ID --authority-ref HOST_REQUEST` to request owner cancellation.
+Unknown owner state stays visible; cancellation is not an invented cleanup receipt. Resume returns
+its attempt ID and workspace-scope status. Forked findings carry their original task revision.
 
-It only touches instruction files that already exist, it leaves everything the team wrote around
-its block alone, and running it twice changes nothing.
-
-## The commands below are for inspecting, not for driving
-
-Everything after this point is how *you* look at what the harness recorded, or how you verify it
-works. It is not the workflow. The workflow is: talk to Codex.
-
-## A real walkthrough
-
-Every block below is actual output.
-
-### 1. Start a job
-
-Run this from inside the repo you are working in.
-
-```sh
-harness task create \
-  --outcome "find out why the migration-prefix check is failing" \
-  --constraint "do not change any code, just investigate" \
-  --scope "$PWD"
-```
-
-It returns the job, including a `taskId`. Keep that id — every other command takes it.
-
-```json
-{ "ok": true, "task": {
-    "taskId": "cdd91634-f051-445b-a15e-2988188bd966",
-    "outcome": "find out why the migration-prefix check is failing",
-    "status": "open",
-    "items": [
-      { "kind": "constraint", "provenance": "operator", "body": "do not change any code, just investigate" },
-      { "kind": "scope", "provenance": "operator", "body": "/Users/stacy/COPPERLABS/portal-webapp" }
-    ] } }
-```
-
-`provenance: operator` means **you** said it. Nothing the AI later suggests can overwrite it.
-
-Forgotten the id? `harness task list`.
-
-### 2. Run a check and keep the receipt
-
-```sh
-harness check run --task <id> --claim "the migration prefix check passes" \
-  --subject HEAD -- npm run check:migration-prefixes
-```
-
-```json
-{ "ok": false, "exitCode": 1, "durationMs": 59,
-  "establishes": "the declared checks failed on subject HEAD",
-  "confirmation": "refuted",
-  "receipt": "sha256:6c56b838dadedf8097ed74dfc2a8b4fca80b741548f378ce750dac24b893601c" }
-```
-
-Anything after `--` is your own command; it is run unchanged. The full output is kept under that
-receipt id, so nobody has to re-run it to find out what happened.
-
-### 3. See what it recorded
-
-```sh
-harness task show --task <id>
-```
-
-```
-job     : find out why the migration-prefix check is failing
-status  : open      <- a passing check is not the job being done
-actions : [('check', 'completed')]
-evidence: refuted
-           the declared checks failed on subject HEAD
-cost    : {'calls': 1, 'durationMs': 59}
-```
-
-The job stays `open` after a check passes. Checks passing is not the same as the thing you asked
-for being done, and the harness will not conflate the two.
-
-### 4. Fetch a file at an exact version
-
-```sh
-harness context get --task <id> --at HEAD --path config/ci-impact-map.json
-```
-
-```json
-{ "ok": true,
-  "artifacts": [ { "path": "config/ci-impact-map.json", "bytes": 62885,
-                   "subject": "tree:a87de8bad6439ba02c6717dfd61b969ef78c9213" } ],
-  "budget": { "maxBytes": 262144, "usedBytes": 62885 } }
-```
-
-`--at HEAD` means the committed version. `--at staged` means what you have staged. This matters:
-if your editor has unsaved changes, those are *not* what an AI should be reasoning about unless you
-say so.
-
-The budget belongs to the job, not the request. Ask again and the second request sees what the
-first spent — so a long investigation cannot quietly consume an unbounded amount of context.
-
-### 5. It refuses work outside the job
-
-```sh
-harness context get --task <id> --at HEAD --path ../asensei-mnemos/README.md
-```
-
-```json
-{ "ok": false,
-  "refused": "outside the task's scope: ../asensei-mnemos/README.md",
-  "scope": ["/Users/stacy/COPPERLABS/portal-webapp"] }
-```
-
-This is the point of the thing. You said the job covers one repo, so it will not reach into another.
-
-### 6. After a crash
-
-```sh
-harness recover
-```
-
-If something was interrupted mid-run, this looks at what actually happened on disk. If it can tell,
-it corrects the record. If it cannot, it says `outcome-unknown` and stops, rather than guessing or
-re-running something that may already have taken effect.
-
-### 7. Costs
-
-```sh
-harness usage --task <id>
-harness export > snapshot.json
-```
-
-`export` dumps everything as readable JSON.
-
-## When two chats share one folder
-
-Forking a chat "in this workspace" gives both threads the same folder and the same branch. They can
-overwrite each other's edits, and git cannot help — it is one branch in one checkout.
-
-The harness will not stop that. It does not write files, so it never sees the write, and a lock
-would be a promise it cannot keep. What it does is tell you quickly:
-
-```
-Another active session in this worktree has touched src/export.ts.
-You share one folder and one branch, so edits can overwrite each other.
-```
-
-If the branched thread is only exploring — working out an approach, writing a spec — create its job
-with `--exploring`. A job that changes nothing cannot collide with one that does, so it is left
-alone rather than nagged about.
-
-```sh
-harness status          # who else is working in this folder right now
-```
-
-**Practice worth keeping:** share a workspace for exploring, use a new worktree for implementing.
-
-## What it does not do
-
-**It does not edit your code.** Codex still does that. The harness reads, runs checks you name, and
-records. If it is wrong, you get a wrong note — never a mangled file.
-
-## The whole command list
-
-```
-harness init
-harness task create   --outcome <text> [--constraint <text>]... [--scope <path>]... [--exploring]
-harness task show     --task <id>
-harness task list     [--all]
-harness task fork     --task <id> [--outcome <text>] [--exploring]
-harness status        [--task <id>]
-harness task revise   --task <id> [--constraint <text>]... [--note <text>]... [--revoke <seq>]...
-harness context get   --task <id> [--at staged|worktree|<rev>] [--path <p>]... [--budget <bytes>]
-harness check run     --task <id> --claim <text> [--subject <rev>] -- <command> [args...]
-harness recover
-harness usage         [--task <id>]
-harness export
-```
+`check cancel` reports the cancellation request, not a test verdict: 0 acknowledged/terminal,
+3 pending, 2 refused/unknown. Manifest reconciliation compares stored Git blob bytes with the
+original worktree hashes. EOL/clean-smudge/LFS transformations can produce a conservative stale
+classification; inspect that representation difference before concluding the source changed.

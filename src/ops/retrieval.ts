@@ -1,159 +1,155 @@
 import { spawnSync } from "node:child_process";
-import type { Store } from "../store/store.ts";
-import type { Artifact, Task } from "../model/types.ts";
-
-/**
- * Subject-bound retrieval.
- *
- * The governance runtime materializes bounded context, but reads through a supplied
- * filesystem root, which is not the same as binding to an immutable subject: a dirty
- * worktree supplies different bytes from the staged or branch subject. This is the bridge.
- * Nothing here reads the working tree unless the subject *is* the working tree.
- */
-
-export type SubjectRef =
-  | { kind: "staged" }
-  | { kind: "commit"; rev: string }
-  | { kind: "worktree" };
-
+import { readFileSync, statSync } from "node:fs";
+import { relative, resolve, isAbsolute } from "node:path";
+import { contentAddress, type Store } from "../store/store.ts";
+import type { Artifact } from "../model/types.ts";
+import { withinScope } from "./authority.ts";
+export type SubjectRef = {
+    kind: "staged";
+} | {
+    kind: "commit";
+    rev: string;
+} | {
+    kind: "worktree";
+};
 export interface Subject {
-  ref: SubjectRef;
-  /** A digest identifying the exact content this subject names. */
-  digest: string;
-  label: string;
+    ref: SubjectRef;
+    digest: string;
+    label: string;
+    tree?: string;
 }
-
-function git(cwd: string, args: string[]): { ok: boolean; out: string; err: string } {
-  const r = spawnSync("git", args, { cwd, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
-  return { ok: r.status === 0, out: r.stdout ?? "", err: r.stderr ?? "" };
+function git(cwd: string, args: string[]) {
+    const r = spawnSync("git", args, { cwd, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
+    return { ok: r.status === 0, out: r.stdout ?? "", err: r.stderr ?? String(r.error ?? "") };
 }
-
-/** Resolve a subject to an immutable digest. A subject that cannot be resolved is reported. */
-export function resolveSubject(cwd: string, ref: SubjectRef): Subject | { error: string } {
-  if (ref.kind === "worktree") {
-    return { ref, digest: "worktree:unbound", label: "live worktree (unbound)" };
-  }
-  if (ref.kind === "staged") {
-    const tree = git(cwd, ["write-tree"]);
-    if (!tree.ok) return { error: `cannot resolve the staged subject: ${tree.err.trim()}` };
-    return { ref, digest: `tree:${tree.out.trim()}`, label: "staged index" };
-  }
-  const rev = git(cwd, ["rev-parse", `${ref.rev}^{tree}`]);
-  if (!rev.ok) return { error: `cannot resolve ${ref.rev}: ${rev.err.trim()}` };
-  return { ref, digest: `tree:${rev.out.trim()}`, label: ref.rev };
+export function resolveSubject(cwd: string, ref: SubjectRef): Subject | {
+    error: string;
+} {
+    if (ref.kind === "worktree")
+        return { ref, digest: "worktree:per-file", label: "live worktree; each artifact binds its bytes" };
+    const r = ref.kind === "staged" ? git(cwd, ["write-tree"]) : git(cwd, ["rev-parse", "--verify", "--end-of-options", `${ref.rev}^{tree}`]);
+    if (!r.ok || !/^[a-f0-9]{40,64}$/.test(r.out.trim()))
+        return { error: `cannot resolve subject: ${r.err.trim()}` };
+    return { ref, tree: r.out.trim(), digest: `tree:${r.out.trim()}`, label: ref.kind === "staged" ? "staged index" : ref.rev };
 }
-
-/** Read one path *at* a subject. Never falls back to the working tree. */
-export function readAtSubject(
-  cwd: string,
-  subject: Subject,
-  path: string,
-): { ok: true; content: string } | { ok: false; error: string } {
-  if (subject.ref.kind === "worktree") {
-    const r = git(cwd, ["--no-pager", "show", `:0:${path}`]);
-    return r.ok ? { ok: true, content: r.out } : { ok: false, error: r.err.trim() };
-  }
-  const spec =
-    subject.ref.kind === "staged" ? `:0:${path}` : `${subject.ref.rev}:${path}`;
-  const r = git(cwd, ["--no-pager", "show", spec]);
-  if (!r.ok) return { ok: false, error: `not present at ${subject.label}: ${r.err.trim()}` };
-  return { ok: true, content: r.out };
+export function canonicalPath(cwd: string, path: string): string {
+    const rel = relative(cwd, resolve(cwd, path));
+    if (!rel || rel === ".." || rel.startsWith("../") || isAbsolute(rel) || rel.includes("\0"))
+        throw new Error(`path must name a file inside the workspace: ${path}`);
+    return rel.split("\\").join("/");
 }
-
+export function readAtSubject(cwd: string, subject: Subject, path: string): {
+    ok: true;
+    content: string;
+} | {
+    ok: false;
+    error: string;
+} {
+    try {
+        const p = canonicalPath(cwd, path);
+        if (subject.ref.kind === "worktree") {
+            if (!withinScope(p, [cwd], cwd))
+                throw new Error("symlink escapes workspace");
+            const target = resolve(cwd, p), before = statSync(target);
+            if (!before.isFile() || before.size > 32 * 1024 * 1024)
+                throw new Error("not a bounded regular file");
+            const bytes = readFileSync(target), after = statSync(target);
+            if (before.ino !== after.ino || before.size !== after.size || before.mtimeMs !== after.mtimeMs)
+                throw new Error("file changed during read; retry");
+            const content = bytes.toString("utf8");
+            if (!Buffer.from(content).equals(bytes) || content.includes("\0"))
+                throw new Error("binary content is not a text artifact");
+            return { ok: true, content };
+        }
+        if (!subject.tree)
+            throw new Error("immutable tree is missing");
+        const type = git(cwd, ["cat-file", "-t", `${subject.tree}:${p}`]);
+        if (!type.ok || type.out.trim() !== "blob")
+            return { ok: false, error: "not a file blob at the pinned tree" };
+        const r = spawnSync("git", ["show", `${subject.tree}:${p}`], { cwd, maxBuffer: 32 * 1024 * 1024 });
+        if (r.status !== 0 || r.error)
+            return { ok: false, error: "pinned blob unavailable or exceeds limit" };
+        const content = r.stdout.toString("utf8");
+        if (!Buffer.from(content).equals(r.stdout) || content.includes("\0"))
+            return { ok: false, error: "binary content is not a text artifact" };
+        return { ok: true, content };
+    }
+    catch (error) {
+        return { ok: false, error: (error as Error).message };
+    }
+}
 export interface RetrievalBudget {
-  /** Budgets bind to the Task, not to one request. A new request does not reset them. */
-  maxBytes: number;
-  usedBytes: number;
+    maxBytes: number;
+    usedBytes: number;
 }
-
 export interface RetrievalResult {
-  artifacts: Artifact[];
-  /** Paths that did not fit, named rather than silently dropped. */
-  deferred: string[];
-  /** Paths that could not be read at the subject. */
-  unavailable: { path: string; reason: string }[];
-  budget: RetrievalBudget;
-  blocked: string | null;
+    artifacts: Artifact[];
+    deferred: string[];
+    unavailable: {
+        path: string;
+        reason: string;
+    }[];
+    budget: RetrievalBudget;
+    blocked: string | null;
 }
-
-/**
- * Retrieve a set of paths at a subject, within the Task's remaining budget.
- *
- * Mandatory paths are never dropped: if they do not fit, the retrieval returns a blocker
- * rather than quietly omitting something the Task required. Everything else defers, and the
- * worker asks for more through a bounded read.
- */
-export function retrieve(
-  store: Store,
-  cwd: string,
-  subject: Subject,
-  paths: string[],
-  budget: RetrievalBudget,
-  opts: { mandatory?: string[] } = {},
-): RetrievalResult {
-  const mandatory = new Set(opts.mandatory ?? []);
-  const artifacts: Artifact[] = [];
-  const deferred: string[] = [];
-  const unavailable: { path: string; reason: string }[] = [];
-  let used = budget.usedBytes;
-
-  // Mandatory first, so budget pressure never silently costs a required item.
-  const ordered = [...paths].sort((a, b) => Number(mandatory.has(b)) - Number(mandatory.has(a)));
-
-  for (const path of ordered) {
-    const read = readAtSubject(cwd, subject, path);
-    if (!read.ok) {
-      unavailable.push({ path, reason: read.error });
-      continue;
+export function retrieve(store: Store, cwd: string, subject: Subject, paths: string[], budget: RetrievalBudget, opts: {
+    mandatory?: string[];
+    taskId?: string;
+    scope?: string[];
+} = {}): RetrievalResult {
+    if (!Number.isSafeInteger(budget.maxBytes) || budget.maxBytes < 0 || !Number.isSafeInteger(budget.usedBytes) || budget.usedBytes < 0)
+        throw new Error("invalid retrieval budget");
+    const mandatory = new Set((opts.mandatory ?? []).map(p => canonicalPath(cwd, p)));
+    const ordered = [...new Set([...mandatory, ...paths.map(p => canonicalPath(cwd, p))])];
+    const current = opts.taskId ? store.budget(opts.taskId) : undefined;
+    const max = current?.ceiling ?? budget.maxBytes, prior = current?.used ?? budget.usedBytes;
+    const result: RetrievalResult = { artifacts: [], deferred: [], unavailable: [], budget: { maxBytes: max, usedBytes: prior }, blocked: null };
+    const pending: {
+        path: string;
+        content: string;
+        bytes: number;
+    }[] = [];
+    let bytes = 0;
+    for (const path of ordered) {
+        const read = opts.scope && !withinScope(path, opts.scope, cwd)
+            ? { ok: false as const, error: "outside task scope" } : readAtSubject(cwd, subject, path);
+        if (!read.ok) {
+            result.unavailable.push({ path, reason: read.error });
+            if (mandatory.has(path))
+                result.blocked = `required context unavailable: ${path}`;
+            continue;
+        }
+        const n = Buffer.byteLength(read.content);
+        if (prior + bytes + n > max) {
+            if (mandatory.has(path))
+                result.blocked = `mandatory context does not fit: ${path}; expand the task budget explicitly`;
+            else
+                result.deferred.push(path);
+            continue;
+        }
+        bytes += n;
+        pending.push({ path, content: read.content, bytes: n });
     }
-    const bytes = Buffer.byteLength(read.content);
-    if (used + bytes > budget.maxBytes) {
-      if (mandatory.has(path)) {
-        return {
-          artifacts, deferred, unavailable,
-          budget: { ...budget, usedBytes: used },
-          blocked: `mandatory context does not fit the task budget: ${path} needs ${bytes} bytes, ${Math.max(0, budget.maxBytes - used)} of ${budget.maxBytes} remain`,
-        };
-      }
-      deferred.push(path);
-      continue;
+    if (result.blocked)
+        return result;
+    const reserved = opts.taskId ? store.reserveBytes(opts.taskId, bytes, max) : { ceiling: max, used: prior + bytes };
+    if (!reserved) {
+        result.blocked = "concurrent retrieval spent the remaining budget; retry or expand";
+        return result;
     }
-    used += bytes;
-    artifacts.push(
-      store.putArtifact({
-        kind: "snapshot",
-        subject: subject.digest,
-        path,
-        inline: read.content,
-        bytes,
-        provenance: "observed",
-      }),
-    );
-  }
-
-  return {
-    artifacts, deferred, unavailable,
-    budget: { ...budget, usedBytes: used },
-    blocked: null,
-  };
+    for (const p of pending) {
+        const artifact = store.putArtifact({ kind: "snapshot", subject: subject.ref.kind === "worktree" ? `worktree:${contentAddress(p.content)}` : subject.digest, path: p.path, inline: p.content, bytes: p.bytes, provenance: "observed" });
+        if (opts.taskId)
+            store.linkArtifact(opts.taskId, artifact.artifactId);
+        result.artifacts.push(artifact);
+    }
+    result.budget = { maxBytes: reserved.ceiling, usedBytes: reserved.used };
+    return result;
 }
-
-/**
- * A Task with no changed paths still needs context. Impacted-change selection cannot locate
- * an edit that does not exist yet, so a task with no diff routes by its declared scope.
- */
-export function routeByDeclaredTarget(task: Task): string[] {
-  return task.items.filter((i) => !i.revoked && i.kind === "scope").map((i) => i.body);
-}
-
-/** Paths changed between a subject and its parent, when there is a diff to work from. */
-export function changedPaths(cwd: string, subject: Subject): string[] {
-  const args =
-    subject.ref.kind === "staged"
-      ? ["diff", "--cached", "--name-only"]
-      : subject.ref.kind === "commit"
-        ? ["diff", "--name-only", `${subject.ref.rev}~1`, subject.ref.rev]
-        : ["diff", "--name-only"];
-  const r = git(cwd, args);
-  return r.ok ? r.out.split("\n").map((s) => s.trim()).filter(Boolean) : [];
+/** Clean tasks get a bounded discovery list, not a directory passed to git show. */
+export function discoverPaths(cwd: string, subject: Subject, scope: string[]): string[] {
+    const r = subject.tree ? git(cwd, ["ls-tree", "-r", "--name-only", "-z", subject.tree]) : git(cwd, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"]);
+    if (!r.ok)
+        return [];
+    return [...new Set(r.out.split("\0").filter(p => p && withinScope(p, scope, cwd)))].sort().slice(0, 40);
 }

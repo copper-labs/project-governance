@@ -1,53 +1,36 @@
----
-id: spec.harness.index
-title: Harness Specifications
-type: spec
-status: draft
-owner: project-harness
-created: 2026-09-19
-updated: 2026-09-19
-summary: Contracts for a runtime that makes work resumable, keeps actions in scope, and preserves evidence.
----
+# Harness specifications
 
-# Harness Specifications
+Current architecture-reset contracts and accepted adoption design. Governance is required; Codex
+app is the first supported-host target. Cowork is deferred. The goal is less repeated work per accepted task. The core
+works without a model; host reasoning/editing, governance policy and executor supervision retain
+separate owners. Read [Harness Core](harness-core.md) first.
 
-Draft contracts, revised against two independent reviews and one greenfield critique. Not yet
-accepted policy. See [the reconciliations](../reviews/) for what changed and why.
-
-**The thesis is continuity**, not decision cost. The runtime is useful with zero model calls;
-model routing is an optional optimization that must stay removable.
-
-Start with [the umbrella](harness-core.md). Everything the runtime owns is one of four objects.
-
-## The Four Objects
-
-| Contract | Holds |
+| Durability, migration and local state | Purpose |
 | --- | --- |
-| [Task](task.md) | Desired outcome, constraints, acceptance criteria, progress |
-| [Action](action.md) | A proposed operation, its scope, authority and execution status |
-| [Artifact](artifact.md) | A versioned input or output, bound to an exact source version |
-| [Evidence](evidence.md) | What an observation establishes, and decision annotations |
+| [Harness Core](harness-core.md) | Ownership, boundaries and provider-free workflow |
+| [Product and Installation](installation.md) | One governance product/release; required dependency; pending packaging |
+| [Development Loop](development-loop.md) | Focused proof, hooks, device workflow and duplicate coordination |
+| [Telemetry and Qualification](measurement-and-qualification.md) | Bounded analytics, lightweight lab and provisional benefit assumptions |
+| [Repository Discovery](repository-discovery.md) | Gated, disposable shallow map; no mandatory indexing |
+| [Operational Store](operational-store.md) | Durability, migration and local state |
+| [Action](action.md) | Authorization, revisions and legal transitions |
+| [Execution](execution.md) | Governance jobs, receipts, recovery and cancellation |
+| [Artifact and Retrieval](artifact.md) | Pinned bytes, artifact access and cumulative budgets |
+| [Task, Attempts and Checkpoints](task.md) | Intent, attempts, checkpoint lineage and reconciliation |
+| [Evidence and Measurement](evidence.md) | Evidence limits and truthful native usage |
+| [Concurrency and Workspaces](concurrency.md) | Cooperating sessions, path intentions and drift |
+| [Host Integration](host-integration.md) | Instruction routing, bounded resume and hook qualification |
+| [Ecosystem Adapters](ecosystem-adapters.md) | Project assertions without duplicated governance policy |
+| [Worker Invocation](worker-invocation.md) | Existing executor ownership; no worker controller |
+| [Optional Decision Interface](decision-interface.md) | Deferred semantic decision experiment |
+| [Failure Triage](failure-triage.md) | Deterministic failure handling and explicit unknowns |
+| [Release Preparation](release-preparation.md) | Deferred read-only preparation; no publication authority |
 
-## Supporting Contracts
+Current implementation includes task revisions, bounded retrieval/resume, session attempts,
+public governance CLI adapters, evidence and usage, advisory concurrency, reconciliation and
+quarantined history import. Deferred decision and release contracts state their admission rules;
+they do not claim integrations that are absent. Review history is historical, not current policy.
 
-| Contract | Purpose |
-| --- | --- |
-| [Harness Core](harness-core.md) | Thesis, fixed decisions, ownership boundary, invariants |
-| [Operational Store](operational-store.md) | SQLite for state, Markdown for briefs, files for artifacts |
-| [Concurrency](concurrency.md) | Several conversations in one worktree; modes; overlap detection |
-| [Execution](execution.md) | The seam to the existing execution owner; coordination, reuse, ordering |
-| [Ecosystem Adapters](ecosystem-adapters.md) | Toolchain boundary across Kotlin, npm and Python units |
-| [Host Integration](host-integration.md) | Invocation from an agent host |
-| [Worker Invocation](worker-invocation.md) | Transform and investigation patterns |
-| [Decision Interface](decision-interface.md) | The optional decision provider |
-| [Failure Triage](failure-triage.md) | A candidate first decision, if the evidence points there |
-| [Release Preparation](release-preparation.md) | Read-only release evidence |
-
-## Retired
-
-`task-brief`, `task-lifecycle`, `action-authority`, `decision-record`, `context-packet`,
-`state-store`, `build-orchestration` and `plugin-contract` were folded into the four objects or
-retired. Their content is in git history. The gate invariant that `plugin-contract` carried now
-lives in [the umbrella](harness-core.md), independent of any plugin mechanism.
-
-Plans live in [../exec-plans/](../exec-plans/README.md).
+`accepted-design` documents specify the next implementation; they do not claim shipped behavior.
+Existing CLI capabilities beyond the support target are development/legacy surfaces. See the
+[three-stage process map](../architecture/development-flow.md) and [adoption plan](../exec-plans/active/2026-09-19-governance-codex-adoption.md).

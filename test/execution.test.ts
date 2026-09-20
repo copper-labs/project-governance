@@ -1,95 +1,92 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { Store } from "../src/store/store.ts";
-import { authorizeAction, proposeAction } from "../src/ops/actions.ts";
-import { defaultPolicy, type AuthorityRequest } from "../src/ops/authority.ts";
-import { runCheck } from "../src/ops/execution.ts";
-
-function setup() {
-  const root = mkdtempSync(join(tmpdir(), "harness-exec-"));
-  const store = new Store(":memory:");
-  const task = store.createTask("verify the check", [
-    { kind: "scope", provenance: "operator", body: root },
-  ]);
-  const req: AuthorityRequest = {
-    operation: "check", scope: [root], destination: null,
-    policyRevision: "policy-1", targets: [root],
-  };
-  let action = proposeAction(store, task.taskId, req);
-  action = authorizeAction(store, action, req, defaultPolicy(), root);
-  return { root, store, task, action };
-}
-
-test("a passing check records what it establishes, and no more", () => {
-  const { root, store, task, action } = setup();
-  const r = runCheck(store, action, {
-    claim: "the suite passes", command: "true", args: [], cwd: root, subject: "sha256:abc",
-  });
-  assert.equal(r.exitCode, 0);
-  assert.equal(r.evidence?.confirmation, "confirmed");
-  assert.match(r.evidence?.establishes ?? "", /not acceptance of the task/,
-    "passing checks are not acceptance");
-  assert.match(r.evidence?.establishes ?? "", /sha256:abc/, "evidence is attributed to its subject");
-  assert.equal(store.readAction(action.actionId)?.status, "completed");
-  assert.equal(store.listEvidence(task.taskId).length, 1);
-  store.close();
+import { submitCheck, collectResult, validateBatch, fileDigest } from "../src/ops/execution.ts";
+import { fixture, FakeExecutor } from "./helpers.ts";
+test("a declared batch is bound durably and only the existing owner executes it", () => { const f = fixture(), e = new FakeExecutor(); submitCheck(f.store, f.action, f.batch, e, "host:1", f.root); const b = f.store.execution(f.action.actionId)!; assert.equal(e.submissions, 1); assert.equal(b.jobId, "job-1"); assert.equal(b.request.idempotency_key, f.action.actionId); assert.equal(b.authorityRef, "host:1"); assert.equal(f.store.readAction(f.action.actionId)?.status, "in-progress"); assert.equal(collectResult(f.store, f.action.actionId, e).pending, true); e.finish(); const r = collectResult(f.store, f.action.actionId, e); assert.equal(r.passed, true); assert.equal(f.store.readTask(f.task.taskId)?.status, "open"); assert.match(f.store.listEvidence(f.task.taskId)[0]!.establishes, /acceptance/); assert.equal(f.store.usageTotals(f.task.taskId).inputTokens, null); f.store.close(); });
+test("unknown response after submission is never automatically replayed", () => { const f = fixture(), e = new FakeExecutor(); e.submit = () => { e.submissions++; throw new Error("lost response"); }; const a = submitCheck(f.store, f.action, f.batch, e, "host:1", f.root); assert.equal(a.status, "outcome-unknown"); assert.equal(collectResult(f.store, a.actionId, e).pending, true); assert.equal(e.submissions, 1); f.store.close(); });
+test("failed assertions, incomplete cleanup and case identity remain distinct", () => { const f = fixture(), e = new FakeExecutor(); submitCheck(f.store, f.action, f.batch, e, "host:1", f.root); e.finish(false); e.reply["cleanup_confirmed"] = false; assert.throws(() => collectResult(f.store, f.action.actionId, e), /cleaned/); e.reply["cleanup_confirmed"] = true; e.reply["cases"] = [{ id: "unrelated", outcome: "passed" }]; assert.throws(() => collectResult(f.store, f.action.actionId, e), /case identity/); e.finish(false); assert.equal(collectResult(f.store, f.action.actionId, e).passed, false); assert.equal(f.store.listEvidence(f.task.taskId)[0]!.confirmation, "refuted"); f.store.close(); });
+test("invalid input proof and interruption cannot establish a test result", () => { const f = fixture(), e = new FakeExecutor(); submitCheck(f.store, f.action, f.batch, e, "host:1", f.root); e.finish(false); e.reply["input_validity"] = "invalid-or-unverified"; collectResult(f.store, f.action.actionId, e); assert.equal(f.store.listEvidence(f.task.taskId)[0]!.confirmation, "unconfirmed"); f.store.close(); });
+test("manifest hashes, scope and exact argv are validated before dispatch", () => { const f = fixture(), e = new FakeExecutor(); const file = join(f.root, "a.ts"); const value = { ...f.batch, inputs: { mode: "manifest", roots: [f.root], files: [{ path: file, sha256: fileDigest(file) }] } }; writeFileSync(file, "changed"); assert.throws(() => submitCheck(f.store, f.action, value, e, "host:1", f.root), /manifest bytes changed/); assert.equal(e.submissions, 0); const outside = fixture(); assert.throws(() => validateBatch({ ...f.batch, output_roots: [outside.root] }, f.action, f.root), /outside/); f.store.close(); outside.store.close(); });
+test("repeated terminal observations neither duplicate evidence nor usage", () => { const f = fixture(), e = new FakeExecutor(); submitCheck(f.store, f.action, f.batch, e, "host:1", f.root); e.finish(); collectResult(f.store, f.action.actionId, e); collectResult(f.store, f.action.actionId, e); assert.equal(f.store.listEvidence(f.task.taskId).length, 1); assert.equal(f.store.usageTotals(f.task.taskId).calls, 1); f.store.close(); });
+test('wrong input fingerprint is refused and infrastructure failure stays unconfirmed', () => {
+    const f = fixture(), e = new FakeExecutor();
+    submitCheck(f.store, f.action, f.batch, e, 'host:1', f.root);
+    e.finish();
+    e.reply['input_fingerprint'] = 'wrong';
+    assert.throws(() => collectResult(f.store, f.action.actionId, e), /input binding/);
+    e.finish(false);
+    (e.reply['cases'] as Record<string, unknown>[])[0]!['reason'] = 'spawn failed';
+    collectResult(f.store, f.action.actionId, e);
+    assert.equal(f.store.listEvidence(f.task.taskId)[0]!.confirmation, 'unconfirmed');
+    f.store.close();
 });
-
-test("a failing check is refuted, not merely unconfirmed", () => {
-  const { root, store, action } = setup();
-  const r = runCheck(store, action, {
-    claim: "the suite passes", command: "false", args: [], cwd: root, subject: "sha256:abc",
-  });
-  assert.notEqual(r.exitCode, 0);
-  assert.equal(r.evidence?.confirmation, "refuted");
-  store.close();
+test('acknowledged submission survives a failed job-link write and validates protocol', async () => {
+    const { recoverJobLink } = await import('../src/ops/execution.ts');
+    const f = fixture(), e = new FakeExecutor(), link = f.store.linkJob.bind(f.store);
+    f.store.linkJob = () => { throw new Error('transient link failure'); };
+    const a = submitCheck(f.store, f.action, f.batch, e, 'host', f.root);
+    assert.equal(a.status, 'outcome-unknown');
+    assert.match(a.refusedReason!, /job-1/);
+    f.store.linkJob = link;
+    recoverJobLink(f.store, a.actionId);
+    assert.equal(f.store.execution(a.actionId)!.jobId, 'job-1');
+    e.finish();
+    e.reply['protocol_version'] = 99;
+    assert.throws(() => collectResult(f.store, a.actionId, e), /protocol/);
+    e.reply['protocol_version'] = 1;
+    assert.equal(collectResult(f.store, a.actionId, e).passed, true);
+    f.store.close();
 });
-
-test("a check that does not finish establishes nothing", () => {
-  const { root, store, action } = setup();
-  const r = runCheck(store, action, {
-    claim: "the slow suite passes", command: "sleep", args: ["5"], cwd: root,
-    subject: "sha256:abc", timeoutMs: 150,
-  });
-  assert.equal(r.timedOut, true);
-  assert.equal(r.evidence?.confirmation, "unconfirmed", "a timeout confirms nothing either way");
-  assert.match(r.evidence?.establishes ?? "", /nothing/);
-  store.close();
+test('cancellation before dispatch prevents submission', async () => {
+    const { cancelCheck } = await import('../src/ops/execution.ts');
+    const f = fixture(), e = new FakeExecutor();
+    assert.equal(cancelCheck(f.store, f.action.actionId, 'host').action.status, 'cancelled');
+    assert.throws(() => submitCheck(f.store, f.action, f.batch, e, 'host', f.root));
+    assert.equal(e.submissions, 0);
+    f.store.close();
 });
-
-test("a receipt is kept and is content-addressed", () => {
-  const { root, store, action } = setup();
-  const r = runCheck(store, action, {
-    claim: "echo works", command: "echo", args: ["hello"], cwd: root, subject: "sha256:abc",
-  });
-  const receipt = store.readArtifact(r.receiptArtifactId);
-  assert.ok(receipt);
-  assert.equal(receipt?.kind, "receipt");
-  assert.equal(receipt?.provenance, "observed");
-  assert.match(receipt?.artifactId ?? "", /^sha256:/);
-  assert.match(receipt?.inline ?? "", /hello/);
-  store.close();
+test('dispatched cancellation repairs an acknowledged link and waits for owner cleanup', async () => {
+    const { cancelCheck } = await import('../src/ops/execution.ts');
+    const f = fixture(), e = new FakeExecutor(), link = f.store.linkJob.bind(f.store);
+    f.store.linkJob = () => { throw new Error('link unavailable'); };
+    submitCheck(f.store, f.action, f.batch, e, 'host', f.root);
+    f.store.linkJob = link;
+    let calls = 0;
+    const cancel = e.cancel.bind(e);
+    e.cancel = () => { calls++; return cancel(); };
+    const r = cancelCheck(f.store, f.action.actionId, 'host', e);
+    assert.equal(calls, 1);
+    assert.equal(r.action.status, 'cancelled');
+    assert.equal(f.store.listEvidence(f.task.taskId)[0]!.confirmation, 'unconfirmed');
+    f.store.close();
+    const pending = fixture(), owner = new FakeExecutor();
+    submitCheck(pending.store, pending.action, pending.batch, owner, 'host', pending.root);
+    owner.cancel = () => ({ job_id: 'job-1' });
+    owner.status = () => ({ job_id: 'job-1', stage: 'Awaiting project cleanup', elapsed_seconds: 1 });
+    const p = cancelCheck(pending.store, pending.action.actionId, 'host', owner);
+    assert.equal('pending' in p && p.pending, true);
+    assert.equal(p.action.status, 'in-progress');
+    pending.store.close();
 });
-
-test("execution is instrumented from the first run", () => {
-  const { root, store, task, action } = setup();
-  runCheck(store, action, { claim: "c", command: "true", args: [], cwd: root, subject: null });
-  const totals = store.usageTotals(task.taskId);
-  assert.equal(totals.calls, 1, "usage is emitted, not reconstructed later");
-  assert.ok(totals.durationMs >= 0);
-  store.close();
+test('authorized execution orphans are visible and cancellable before dispatch', async () => {
+    const { cancelCheck } = await import('../src/ops/execution.ts');
+    const f = fixture(), e = new FakeExecutor();
+    f.store.saveExecution({ actionId: f.action.actionId, request: validateBatch(f.batch, f.action, f.root), requestDigest: 'fixture', authorityRef: 'host', executor: e.executable, executorDigest: e.digest, stateRoot: e.stateRoot, jobId: null, result: null, createdAt: new Date().toISOString() });
+    assert.equal(f.store.listUnresolvedActions()[0]!.actionId, f.action.actionId);
+    assert.equal(cancelCheck(f.store, f.action.actionId, 'host').action.status, 'cancelled');
+    assert.equal(e.submissions, 0);
+    f.store.close();
 });
-
-test("the action passes through prepared and in-progress on its way to completed", () => {
-  const { root, store, action } = setup();
-  const before = store.readAction(action.actionId)!;
-  runCheck(store, action, { claim: "c", command: "true", args: [], cwd: root, subject: null });
-  const after = store.readAction(action.actionId)!;
-  assert.equal(after.status, "completed");
-  assert.equal(after.revision, before.revision + 3, "prepared, in-progress, completed");
-  assert.ok(after.reconcile, "a reconciliation method was recorded before the effect");
-  store.close();
+test('status observation failure retains pending identity without evidence', () => {
+    const f = fixture(), e = new FakeExecutor();
+    submitCheck(f.store, f.action, f.batch, e, 'host', f.root);
+    e.status = () => { throw new Error('status transient'); };
+    const r = collectResult(f.store, f.action.actionId, e);
+    assert.equal(r.pending, true);
+    assert.equal(r.action.actionId, f.action.actionId);
+    assert.match(String(r.result!['statusError']), /transient/);
+    assert.equal(f.store.listEvidence(f.task.taskId).length, 0);
+    f.store.close();
 });

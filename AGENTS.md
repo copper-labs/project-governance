@@ -8,8 +8,8 @@ smallest change that earns its cost, remove what no longer helps.
 
 ## Non-Negotiables
 
-- The harness does not write to a working tree. It reads, runs declared checks, and records.
-  The host performs every edit.
+- The harness does not write to a working tree. It reads, delegates declared checks to governance, and records.
+  The host performs every product-source edit. `init --apply` is the explicit host-instruction installer.
 - Never write outside this repository. Other repositories are read-only.
 - Execution-critical state is durable before the action it covers; analytics is best-effort.
 - No provider or model call is required for any core path.

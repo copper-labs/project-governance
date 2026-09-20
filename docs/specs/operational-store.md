@@ -2,106 +2,70 @@
 id: spec.harness.operational-store
 title: Operational Store
 type: spec
-status: draft
+status: current
 owner: project-harness
 created: 2026-09-19
 updated: 2026-09-19
-summary: SQLite for operational state, Markdown for human-authored briefs, files for large artifacts, JSON export always available.
+summary: Current architecture-reset contract; implementation and qualification limits are explicit.
 ---
-
-> Child of [Harness Core](harness-core.md).
 
 # Operational Store
 
-## Purpose
+## Contract
 
-Hold the four objects durably enough that work resumes correctly after an interruption.
+SQLite is authoritative for local task and action state. Git repositories locate it at
+`git rev-parse --git-common-dir` plus `harness/harness.db`; linked worktrees share this store.
+Non-Git folders use `.harness/harness.db`. An explicit `--db` overrides discovery.
 
-## Current Implementation
+Schema 6 migrates schemas 4 and 5 transactionally and preserves historical records. Unsupported versions
+are refused before schema changes. WAL, FULL synchronization, foreign keys and a bounded busy
+wait are enabled. Network-shared databases are unsupported. Migration failure preserves the prior
+transaction; keep a coherent backup before adopting a new runtime in an important project.
 
-- **Posture:** planned. **Evidence:** none.
-- **Known limits:** Single machine, single database file. No cross-machine view.
-- **Ledger:** [Research index](../research/concept.md).
+Task versions are append-only. Action current state uses compare-and-set with legal transitions;
+ledger events retain transitions and reconciliation. SQLite does not make external effects atomic.
 
-## Why SQLite, Having Chosen Files
+## Identity and portability
 
-The earlier decision was files only, to keep a clean baseline before considering a richer substrate.
-That reasoning held until the contracts required concurrent transition ownership with an expected
-revision, durable state before effects, remedy accounting, and recovery from partial writes.
+A persisted repository UUID identifies this local history; clones are not silently equated by URL.
+Workspace UUIDs use local filesystem identity of the Git admin directory (or non-Git directory) and
+store the current path as a locator. This survives ordinary moves and distinguishes recreated
+checkouts on the same filesystem. Cross-filesystem movement requires an explicit new binding.
 
-At that point "files only" quietly became "implement transactions, indexes, locking and corruption
-recovery ourselves." SQLite already provides transactional updates, in a single local file, with no
-service and no dependency to operate.
+Selected task exports read one transaction and carry a version, digest, history, evidence and
+optional artifact content. Export is local output, not permission to transmit private material.
+Import verifies bundle identity and retains it in quarantine. It does not activate tasks, jobs,
+permissions or acceptance. Import is idempotent by bundle digest; conflicting histories coexist.
+This is portability for inspection, not automatic synchronization or a database merge.
 
-Two things this does **not** mean:
+## Artifacts and retention
 
-- **It does not reopen the substrate question.** SQLite is a local file at the storage layer. A
-  richer product substrate remains deferred and is a separate decision at a different layer.
-- **It does not make effects atomic.** A transaction commits the *record*. A filesystem change or a
-  deployment is still not atomic, so the prepared, in-progress and outcome-unknown machinery in
-  [Action](action.md) stays exactly as it is.
+Large content uses durable content-addressed files beside the store, referenced by artifact rows.
+Keep these files with backups/exports. References to an upstream job point to that owner's logs;
+its retention must cover the evidence lifetime. No automatic pruning or cascading deletion exists.
+Preserve active tasks, unresolved actions and referenced proof. A future retention command must
+prove reachability, coherent export and recovery before it can delete anything.
 
-## The Store Belongs To The Repository
+## Cost and failure behavior
 
-A job belongs to a repository, not to a folder. Git worktrees are separate folders sharing one
-repository, and branching a conversation into a new worktree is ordinary practice — so a store kept
-beside the working files would hand every branched thread an empty history, which is precisely the
-failure this runtime exists to prevent.
+Byte budgets are stored and reserved transactionally per task. A caller cannot reset the ceiling
+by making another read. Explicit expansion has a host reference and a ledger event. These are
+retrieval guards, not native token counts. Analytics writes are best-effort; critical records fail
+closed. Artifacts left unreferenced after interruption are harmless and not automatically deleted.
 
-The store therefore lives beside the shared git directory, which every worktree of a repository
-resolves to. A repository without git falls back to the folder, which is all there is to key on.
+## Future substrate
 
-Jobs are tagged with the worktree and branch they were started from, so one shared store stays
-legible: a conversation sees its own worktree's jobs by default, and other worktrees' jobs are
-listed as available to fork rather than silently mixed in.
+Keep storage-specific code in `src/store`. Do not introduce a provider framework now. Mnemos may
+first receive an exported context projection while SQLite remains authoritative. Replacement of
+execution-critical storage needs its own durability, concurrency, migration and rollback proof.
 
-## Division Of Storage
+The retired task_path table is removed during migration; it held advisory prototype path sightings,
+not task/evidence history. Per-item fork origins are stored in task_item. The coherent library
+`exportJson` method remains a diagnostic surface; portable exchange uses selected exportTask bundles.
 
-| Content | Where | Why |
-| --- | --- | --- |
-| Operational state: Tasks, Actions, Evidence, annotations | SQLite | Transactions, indexes, concurrent transitions |
-| Human-authored briefs and prose | Markdown files | People write and review them directly |
-| Large artifacts: snapshots, patches, logs | Ordinary files, referenced | Databases are bad blob stores |
+## Bundled adoption and analytics
 
-**Readable JSON export is a first-class command, always available** — not an occasional
-convenience. Inspectability matters most while the taxonomies and thresholds are still wrong, which
-is now.
-
-## Behavioral Requirements
-
-- Every record declares its criticality. **Execution-critical** state is durable before the Action
-  it covers; if it cannot be persisted, the Action does not run. **Analytics** is best-effort.
-- The interface provides a compare-and-set honoring an expected revision. It is deliberately small
-  but is not fixed at a particular operation count: safe transition ownership is a requirement, not
-  something to work around.
-- Writes are append-oriented. Correction supersedes; nothing is rewritten in place.
-- Retention is bounded and declared. Unresolved Action references and configuration needed for
-  rollback are exempt from ordinary analytics retention.
-- No credentials, tokens or full source content are stored.
-
-## Failure Modes
-
-| Condition | Behavior |
-| --- | --- |
-| Store unwritable, analytics | Work continues, degraded, noted once |
-| Store unwritable, execution-critical | The dependent Action does not run; control returns |
-| Corrupted analytics index | Rebuilt; the event recorded |
-| Corrupted execution-critical state | **Stop.** Never read as "nothing happened"; the affected Action becomes outcome-unknown and waits for a person |
-| Database locked by another process | Wait or decline with the reason; never bypass |
-
-## Validation Requirements
-
-- With the store disabled, ordinary checks remain available and no state-changing Action runs.
-- A write failure injected immediately before an Action, then a restart, leaves it neither
-  duplicated nor stripped of its accounting.
-- Two processes racing a transition: the second one's expected revision no longer matches and it
-  does not act.
-- JSON export reproduces the operational state readably for a human.
-
-## Open Questions
-
-- Whether the export should be a snapshot or a stream for long-running tasks.
-
-## Change Log
-
-- 2026-09-19: Replaces the files-only state store. SQLite adopted for operational state.
+[Installation](installation.md) governs deployment/migration coordination across worktrees. Non-Git
+and explicit-database paths above describe current low-level mechanics, not standalone product support.
+[Telemetry](measurement-and-qualification.md) uses a separate bounded analytics store when implemented;
+operational records and referenced artifacts are not subject to analytics expiry.

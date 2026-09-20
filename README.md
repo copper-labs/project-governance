@@ -1,19 +1,23 @@
 # Project Harness
 
-A small runtime that makes work resumable, keeps actions within scope, and preserves evidence.
+The continuity module of Project Governance. It preserves task intent, resumes work with bounded
+context, and keeps evidence tied to the inputs that produced it. Governance is required; Codex app
+is the first supported-host target. Cowork is deferred.
 
-It remembers what the operator asked for, checks that work stays inside its declared scope, fetches
-the right version of the right files, runs declared checks, and records what actually happened — so
-a fresh session can continue accurately. It is useful with zero model calls; a decision model is an
-optional optimization that must stay removable.
+The host edits and reasons. Governance selects and runs checks. Harness records continuity and
+links the results. Core operation needs no model calls.
 
-The host keeps the reasoning and the pen: the harness does not write to a working tree.
+- [Development flow: now, first release and destination](docs/architecture/development-flow.md)
+- [Bundled installation contract](docs/specs/installation.md)
+- [How to use it](HOW-TO-USE.md)
+- [Implementation and review receipt](docs/reviews/2026-09-19-implementation-reconciliation.md)
+- [Architecture and specifications](docs/specs/README.md)
+- [Roadmap](docs/exec-plans/README.md)
+- [Greenfield assessment](docs/reviews/2026-09-19-greenfield-assessment.md)
 
-- **[How to use it](HOW-TO-USE.md)** — start here.
-- [Charter](CHARTER.md)
-- [Specifications](docs/specs/README.md)
-- [Plans](docs/exec-plans/README.md)
-- [Baseline findings](docs/research/pass-a-baseline.md)
+Node 22.18 or newer. Native TypeScript and SQLite. No runtime dependencies or build step.
+Run `npm test` and `npm run typecheck` here. This is an early local implementation; real host
+qualification and demonstrated token savings remain pilot work.
 
-Requires Node 22.18 or newer. No runtime dependencies.
-// scratch
+The single governance installation/release, telemetry retention and development-loop integration are
+accepted design, not delivered packaging. The existing CLI remains a local development surface.

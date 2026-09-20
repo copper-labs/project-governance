@@ -1,128 +1,87 @@
 ---
 id: spec.harness.decision-interface
-title: Decision Interface
+title: Optional Decision Interface
 type: spec
-status: draft
+status: current
 owner: project-harness
 created: 2026-09-19
 updated: 2026-09-19
-summary: One provider-agnostic contract for typed decisions, with confidence thresholds, escalation, and a deterministic fallback for every question.
+summary: Current architecture-reset contract; implementation and qualification limits are explicit.
 ---
 
-> Child of [Decision-First Harness Core](harness-core.md).
+# Optional Decision Interface
 
-# Decision Interface
+## Status
 
-## Purpose
+Deferred experiment. No provider dependency, network call, classifier or decision catalog is
+required or installed by the core. This is the current architectural boundary, not an assertion
+that a future model adapter has been implemented.
 
-Give every decision in the harness one shape: a state in, a typed answer and a confidence out. The
-decision model is an implementation behind this interface, never a dependency of the loop.
+## Admission
 
-## Current Implementation
+First establish the provider-free baseline and identify an expensive semantic judgment. Exact
+facts, arithmetic, hashes, permissions, input applicability rules and release gates remain code-owned.
+JEV is a learned decision model, not deterministic execution.
 
-- **Posture:** planned.
-- **Current boundary:** none.
-- **Evidence:** A local probe exists under ignored runtime state to measure provider routing
-  accuracy, latency and cost. It is a measurement, not an implementation.
-- **Known limits:** The intended provider is hosted-only, released September 2026, with no
-  published calibration evidence.
-- **Ledger:** [Research index](../research/concept.md).
+A future typed question names its version, bounded evidence/candidates, answer schema, provider
+identity, deadline, measurement and explicit unknown/fallback disposition. The model may suggest;
+code and the host retain authority. Provider-specific Choice, Score and Noul semantics must not be
+collapsed into one supposedly calibrated probability of safe action.
 
-## Scope
+## Evaluation
 
-- Question shapes and the question catalog.
-- Confidence thresholds and the escalation ladder.
-- Provider abstraction and fallbacks.
+Compare deterministic matching, the existing host and one optional model on held-out failure/task
+episodes. Include packet creation, provider latency/cost, fallback, repeated host context, omission
+and rework. Start in shadow mode; shadow quality is not realized savings. Pin question/provider
+versions, retain evidence and test disabling the adapter. Do not promote a confidence threshold
+without target-workload calibration.
 
-## Non-Goals
+## Removal
 
-- Deciding what the questions are for a given domain. Domains own their own catalog entries.
-- Generation of any kind.
+Disabling the model leaves every core command and authority boundary intact. No gate, migration,
+resume, recovery or evidence query may require model availability.
 
-## Definitions
+## Placement in the development flow
 
-- **Question**: a named, versioned, typed request for judgment over a state.
-- **Catalog**: the declared set of questions, owned as data, not code.
-- **Fallback**: the conservative answer used when no usable decision is available.
+A **decision adapter** answers one small semantic question. JEV is one possible implementation;
+deterministic rules remain the first choice and Codex remains the fallback for open reasoning.
+The adapter is an internal governance module interface, not a separately supported model-routing product.
 
-## Behavioral Requirements
+`structured facts → deterministic match → optional bounded semantic question → validated suggestion → owner decision`
 
-- Three question shapes are supported: a choice among declared options, a score against ordered
-  levels, and a boolean judgment. **A provider must support the shapes its enabled consumers
-  actually use, not all three.** Required capability is negotiated at registration, and a question
-  whose shape a provider does not support is rejected explicitly rather than approximated.
-- Questions are declared as catalog data with a stable identifier and a version. Changing a
-  question's meaning requires a new version; catalog entries are never edited in place.
-- Multiple questions about one state are asked in a single call where the provider supports it,
-  and the interface records that they shared a state.
-- Every catalog entry declares a typed disposition for an unusable answer. A question with no
-  declared disposition is invalid.
-- Every answer carries a confidence value and the probabilities behind it, both recorded.
-- The interface is synchronous from the loop's perspective and has a bounded timeout. A timeout is
-  a fallback, not an error that stops the loop.
+| Candidate | Example answer | Where it helps | Timing |
+| --- | --- | --- | --- |
+| Failure triage | Infrastructure / product assertion / insufficient evidence | Read a short unresolved diagnostic rather than repeatedly ingesting a full log | First candidate after measured provider-free pilot |
+| Context ranking | Ordered subset of supplied evidence IDs | Prioritize relevant history within a byte budget | Only after simple retrieval shows misses |
+| Task-category advice | One existing governance category or unknown | Help the host choose policy for a new task | Later; no live parent switching |
 
-## Dispositions
+Known error codes, hashes, changed paths and required-check selection stay deterministic. The adapter
+cannot decide to skip a pre-commit/CI/device gate, assert that a cached verdict is valid, mark cleanup
+complete, authorize a retry or accept a task. A product failure labelled infrastructure remains a
+recorded failure; classification cannot erase it.
 
-An answer is unusable when the provider fails, the schema is violated, the state exceeds budget, or
-confidence falls below the entry's act threshold. Every catalog entry declares which of three
-dispositions applies, and every consumer asserts the same one:
+## Proposed provider-neutral contract
 
-| Disposition | Meaning | Example |
-| --- | --- | --- |
-| `fallback` | Proceed on the declared conservative answer | Lane ranking: fall back to the static rule |
-| `widen` | Request bounded additional state and ask again, within a declared attempt and cost bound | Packet narrowing: widen rather than narrow |
-| `needs-input` | Return control; the task is not completed autonomously | Failure triage: hand the output to a human |
+Request: question ID/version, purpose, bounded typed state/evidence references, allowed candidates
+(including unknown), response schema, evidence digest, deadline, data-sharing policy and total cost
+budget. Response: answer or abstention, referenced evidence IDs, provider/model version, native usage,
+latency and raw provider-specific uncertainty fields. Reject malformed answers, invented candidate IDs,
+expired responses and results for changed inputs. No generated executable commands.
 
-`widen` declares its maximum attempts and its cost ceiling. Exhausting them resolves to the entry's
-terminal disposition, which is `fallback` or `needs-input` and is never another `widen`.
+Initial experiment cap: one eligible request per unresolved failure episode, at most 8 KiB evidence,
+5-second deadline and no automatic retry cascade. These are tunable experimental bounds, not JEV
+capability claims. Oversize/incomplete evidence or provider outage returns unknown and uses the existing
+Codex path. Preserve decisive late-context facts; never silently truncate to meet a provider limit.
+Credentials and permission to send project data are explicit; enabling an adapter is not blanket export
+permission. Local/no-model operation remains complete.
 
-Tier 2 diagnosis is permitted only where a catalog entry names it, and is bounded by that entry.
-This is the one exception to the generation-only rule for Tier 2, and it is explicit rather than
-implied.
+TypeSafe documents Choice, Score and Noul as different structured question primitives. The adapter
+maps only the selected question's semantics; reported confidence is not a universal probability that
+an action is safe. [TypeSafe primitives](https://docs.typesafe.ai/primitives)
 
-A threshold is not a probability cutoff alone. Each entry declares the **consequence of a wrong
-  action** taken on its answer and the **evidence that action requires**. A high-confidence answer
-  whose remedy is destructive needs more than confidence to act on; a low-confidence answer whose
-  remedy is free may be acted on cheaply.
-
-Thresholds are per question, declared in the catalog, and start conservative. They may only be
-loosened against recorded outcomes, never against intuition. See [Decision Record](evidence.md).
-
-## Invariants And Constraints
-
-- No answer from this interface may authorize an irreversible action.
-- Provider unavailability degrades the loop to its fallbacks; it never blocks work.
-- The interface never returns free text, and never asks a provider to explain itself.
-- No provider SDK is imported outside a provider implementation module.
-- A state handed to a provider is bounded and recorded by digest, never by full content.
-
-## Failure Modes
-
-| Condition | Behavior |
-| --- | --- |
-| Provider unreachable, rate limited, or timed out | The entry's declared disposition, recorded with the reason |
-| Answer outside the declared schema | Treated as provider failure; the entry's disposition |
-| Malformed or degenerate probabilities | Treated as provider failure; the entry's disposition |
-| Confidence below the act threshold | The entry's declared disposition |
-| State exceeds the provider budget | Reduce deterministically where the entry allows it, otherwise the entry's disposition; never silently truncate meaning |
-| `widen` attempts or cost exhausted | The entry's terminal disposition, recorded |
-
-## Validation Requirements
-
-- Every catalog entry has an identifier, version, shape, options or levels, thresholds, and a fallback.
-- A recorded suite of states and expected answers exists for each question, and accuracy against it
-  is reported before any threshold is loosened.
-- One table-driven fixture per disposition, covering provider outage, malformed probabilities,
-  budget overflow and low confidence, asserting the same disposition at the interface and at the
-  consumer.
-- A run with the provider disabled leaves ordinary checks available. Tasks whose entries declare
-  `needs-input` return control rather than completing.
-
-## Open Questions
-
-- Whether a second provider implementation is required before Phase 3 or can wait for evidence.
-- Whether composite questions should be expressible in the catalog or kept as loop code.
-
-## Change Log
-
-- 2026-09-19: First draft.
+Start with failure episodes split into development and held-out groups, keeping related retries
+in one group. Compare deterministic parsing, current Codex handling and the adapter including packet
+preparation, escalation, total tokens/time and erroneous routing. Shadow mode establishes quality but
+saves no calls if Codex still repeats the work. Promotion requires that a measured slice actually
+replaces unnecessary host work without hiding failures or weakening required proof. The first shipped
+harness assumes **zero benefit from JEV** and requires no JEV implementation.

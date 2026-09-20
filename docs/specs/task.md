@@ -1,115 +1,78 @@
 ---
 id: spec.harness.task
-title: Task
+title: Task, Attempts and Checkpoints
 type: spec
-status: draft
+status: current
 owner: project-harness
 created: 2026-09-19
 updated: 2026-09-19
-summary: What the operator wants, what constrains it, what would establish it is done, and how far along it is.
+summary: Current architecture-reset contract; implementation and qualification limits are explicit.
 ---
 
-> Child of [Harness Core](harness-core.md).
+# Task, Attempts and Checkpoints
 
-# Task
+## Objective and revisions
 
-## Purpose
+A task preserves the desired outcome, constraints, scope, acceptance criteria and attributed
+findings. Valid states are open, needs-input, accepted and cancelled. A blank objective is refused.
+Revisions retain unrevoked items and record their predecessor. CLI revision requires the expected
+version; conflicts require a fresh read. Revocation and acceptance require a host authority reference.
+Acceptance is a recorded host decision, not an automatically proven consequence of test success.
 
-Hold the objective. Without it the runtime knows what it did and not what it was for, and cannot
-tell "investigate this slowdown without changing code" from "apply the fix now" — which name the
-same source and must not carry the same permission to write.
+Operator provenance means host-reported operator intent. Observations should reference evidence;
+free-form CLI notes and ruled-out hypotheses are labelled hypotheses. Repeating a model conclusion
+does not turn it into a fact. Structured operation constraints are described in [Action](action.md).
 
-## Current Implementation
+## Sessions and attempts
 
-- **Posture:** planned. **Evidence:** none.
-- **Known limits:** A Task records stated intent; it does not infer unstated intent.
-- **Ledger:** [Research index](../research/concept.md).
+A host session binds to an explicit task and workspace. Stable identity comes from `--session`,
+`HARNESS_SESSION`, a native Codex task ID, or a qualified hook payload. Missing identity is unknown,
+not a generated subprocess PID. List tasks to choose one; never automatically take another open job.
 
-## Mode
+A fresh session or workspace can continue the same objective through another attempt. Attempts
+name task revision, workspace, host session and optional parent attempt. Task revisions do not
+retroactively change earlier attempt or action identity.
 
-A job declares whether it will change code. `implement` is the default; `explore` means the job
-produces understanding, a spec or a plan and changes nothing. The distinction is used by
-[Concurrency](concurrency.md): a job that changes nothing cannot collide with one that does.
+## Fork
 
-## Lineage
+Forking creates an independent task. It pins the parent task revision and the checkpoint available
+at fork time, carries unrevoked attributed understanding and rewrites descendant scope locators
+into the selected checkout. It does not copy acceptance or actions. A later parent checkpoint does
+not silently change what the child inherited. Findings keep their original applicability limits.
 
-A job may be **forked**, as when a conversation is branched into another worktree. The child
-inherits the operator's constraints, the declared scope, the acceptance criteria and the ruled-out
-findings — the expensive knowledge — and starts its own progress. Session-specific handoff notes do
-not carry.
+## Checkpoint and resume
 
-The child records its parent. Git deliberately keeps no relationship between a branch and the
-branch it came from, so lineage between jobs is the runtime's to hold or it is lost.
+A checkpoint has a bounded host-authored summary, next work, original subject when known and
+validated evidence references. It does not revise authority. Resume includes live constraints,
+scope and acceptance items, a compact checkpoint, recent findings, pending-action pointers and
+paged event summaries. The returned cursor covers delivered events; omitted history remains
+explicitly accessible. Required context that cannot fit produces a blocker.
 
-Scope is rewritten to the forking worktree. Inheriting the parent's path would refuse every action
-the child takes in its own checkout.
+## Reconciliation
 
-## Contents
+Merge, rebase and cherry-pick require an explicit resulting commit/tree and exact source task
+revisions. Preserve original receipts. Report source-match, stale or unknown applicability plus
+host-reported semantic conflicts. Source-match still requires environment and policy validation.
+Reconciliation never inherits accepted status or weakens required proof.
 
-| Part | Meaning | Who may change it |
-| --- | --- | --- |
-| Desired outcome | What should be true when this is done | Operator |
-| Constraints | What must hold, including prohibitions | Operator |
-| Acceptance criteria | What would establish the outcome was reached | Operator, or policy |
-| Scope | Paths, systems and resources this task may touch | Operator and policy |
-| Progress | Open questions, ruled-out hypotheses, a readable handoff | Worker adds; operator resolves |
+## Workspace continuation
 
-## Provenance Is Part Of The Content
+Binding a new attempt does not broaden path authority. When continuing in another worktree,
+explicitly revise the task scope to include its canonical root before reading or checking there.
+The task ID and evidence history stay intact; actions bind the new task revision. A fork maps the
+parent workspace scope to the explicitly selected new workspace and pins its parent revision.
 
-Every item is one of three kinds, never merged:
+Forked items carry an origin task/revision, preserved across further forks. A resume returns the
+current attempt ID and workspace-scope warning. Binding alone grants no additional scope.
 
-- **Operator instruction** — stated by a person. Authoritative.
-- **Observed fact** — produced by a tool or executed check, carrying its receipt.
-- **Worker hypothesis** — proposed by a model. Never becomes fact by restatement, never becomes an
-  instruction.
+Reconciliation pins the target commit before resolving its tree. Tree subjects compare directly;
+manifest receipts compare each declared workspace-relative file with the target tree and report
+`declared-inputs-match`, stale or unknown. This never establishes completeness or environment
+reuse. Unversioned legacy evidence stays unknown. Detailed observations are a linked receipt;
+event pages return bounded summaries.
 
-A worker may add hypotheses and observations. It may not edit an operator instruction, widen scope,
-or relax a constraint; a proposed change to any of those is reviewable output.
-
-## Behavioral Requirements
-
-- Tasks are versioned. A revision references its predecessor; nothing is edited in place.
-- Actions reference a Task version. Continuity uses stable task and action identities; digests
-  identify immutable revisions.
-- **A new instruction revises the Task and invalidates affected pending Actions.** It never
-  retroactively authorizes work already done.
-- Unrevoked constraints survive every revision. Dropping one is an explicit operator act, recorded.
-- Ruled-out hypotheses survive into later Actions, so a fresh worker does not repeat a paid-for dead
-  end.
-- Equal source bytes do not imply the same Task; a changed file does not imply a new one.
-- A Task records the worktree and branch it was started from. One repository's jobs share one store,
-  so a job is legible about where it belongs.
-- Forking produces a separate Task. Closing one does not close the other.
-- A Task reaches **accepted** when its acceptance criteria are satisfied — automatically where the
-  criteria are fully covered by evidence, and by review where they are not.
-
-## Invariants
-
-- A worker cannot grant itself scope, permission or acceptance through the Task.
-- A prohibition is enforced at the action boundary, not by instruction alone. See [Action](action.md).
-- No credentials and no full source content live here.
-- A Task with no stated outcome returns needs-input rather than proceeding on a guess.
-
-## Failure Modes
-
-| Condition | Behavior |
-| --- | --- |
-| Instruction contradicts a live constraint | Return needs-input naming the conflict |
-| Worker attempts to edit an operator instruction | Refused, recorded as a proposal |
-| Revision arrives mid-action | Affected pending Actions invalidated; completed effects are not rewritten |
-| Acceptance criteria unmet but checks pass | Task stays open; checks passing is not acceptance |
-
-## Validation Requirements
-
-- A fresh worker resumes after an operator correction, keeps the unrevoked constraints, honors the
-  correction, and does not repeat a recorded failed investigation.
-- An investigate-only Task refuses a write at the action boundary, not merely in its wording.
-- A prose-only Task reaches acceptance without compilation pretending to verify its content.
-
-## Open Questions
-
-- Whether acceptance criteria may default from policy per task type, or are always stated.
-
-## Change Log
-
-- 2026-09-19: Replaces the separate task brief and lifecycle-state contracts.
+Manifest comparisons are memoized across receipts and capped per reconciliation at 256 unique
+paths and 8 MiB of blob output, within a shared 5-second Git inspection deadline. Excess comparisons are unknown.
+They compare stored Git blob bytes with original worktree hashes, so EOL/clean-smudge/LFS filters
+can produce a conservative stale classification without a semantic source change. This limitation
+is in the receipt; no transformation-aware reuse is claimed.
