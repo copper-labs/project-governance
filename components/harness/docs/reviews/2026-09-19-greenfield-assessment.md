@@ -12,7 +12,7 @@ This is an assessment and proposal. It changes no implementation or accepted spe
 - Governance reference checkout: `96e6a331998d9897ad7490ae055c8ebfdd4451da`. Read its charter, shared test-execution contract, and relevant context/execution/telemetry source. No execution or edits in that repository.
 - Reviewed the harness charter, specifications, plans, research, prior review reconciliations, implementation and tests.
 - Current verification: **56 tests pass; typecheck passes**, using local Node **24.16.0**. This does not qualify the declared Node 22 minimum, real host integration, device behavior or cross-machine operation.
-- Eleven additional bounded probes reproduced the issues described below. Fixtures and outputs stayed inside this repository, under `.harness/architecture-review-2026-09-19/`. See [probe results](../../.harness/architecture-review-2026-09-19/probe-results.json) and [probe script](../../.harness/architecture-review-2026-09-19/probe.mjs). These local files are ignored; they are not a published test suite.
+- Eleven additional bounded probes reproduced the issues described below. Fixtures and outputs stayed inside this repository, under `.harness/architecture-review-2026-09-19/`. See probe results (original checkout reference: `../../.harness/architecture-review-2026-09-19/probe-results.json`) and probe script (original checkout reference: `../../.harness/architecture-review-2026-09-19/probe.mjs`). These local files are ignored; they are not a published test suite.
 - External research uses primary documentation retrieved on 19 September 2026. Publication dates are stated where available. Living documentation establishes documented behavior on the research date, not verified behavior in the installed applications.
 - The historical telemetry figures below are claims in the existing baseline report. This review did not reconstruct those datasets or validate live release endpoints.
 
@@ -271,7 +271,7 @@ The immediate next build should prove **one trustworthy resume-and-execute loop*
 
 **Operator direction, 19 September 2026:** keep Mnemos on the architectural roadmap, but do not introduce it now. SQLite remains the implementation and comparison baseline. This note creates no integration workstream or dependency.
 
-Quick orientation covered Mnemos's canonical [developer guide](/Users/stacy/ASENSEI/asensei-mnemos/docs/developer/index.md), Chapters 1–2, and relevant retrieval, planning, graph, mobility and storage references at checkout `b17561127829f6a7421dbdeb9555bd6436aa01f9`. The old `docs/developer-guide.md` is a compatibility map. This was documentation review, not source/runtime or published-package qualification.
+Quick orientation covered Mnemos's canonical developer guide (original checkout reference: `/Users/stacy/ASENSEI/asensei-mnemos/docs/developer/index.md`), Chapters 1–2, and relevant retrieval, planning, graph, mobility and storage references at checkout `b17561127829f6a7421dbdeb9555bd6436aa01f9`. The old `docs/developer-guide.md` is a compatibility map. This was documentation review, not source/runtime or published-package qualification.
 
 ### Where it could fit
 
@@ -301,8 +301,8 @@ The first experiment should replay a bounded, versioned export into a disposable
 
 ### Specific questions to revisit then
 
-The [Planning reference](/Users/stacy/ASENSEI/asensei-mnemos/docs/developer/reference/capabilities/planning-continuity.md) describes an active subject-level planning thread, not arbitrary caller-defined concurrent planning threads. The harness must establish a sound mapping for multiple tasks and worktrees rather than assuming it.
+The Planning reference (original checkout reference: `/Users/stacy/ASENSEI/asensei-mnemos/docs/developer/reference/capabilities/planning-continuity.md`) describes an active subject-level planning thread, not arbitrary caller-defined concurrent planning threads. The harness must establish a sound mapping for multiple tasks and worktrees rather than assuming it.
 
-The [State Mobility reference](/Users/stacy/ASENSEI/asensei-mnemos/docs/developer/reference/capabilities/state-mobility.md) excludes plans, goals and arbitrary graph objects from built-in portable categories. It also documents a delta-export gap and aggregate rather than per-item merge outcomes. It therefore does not already solve portable harness history or Git-merge reconciliation.
+The State Mobility reference (original checkout reference: `/Users/stacy/ASENSEI/asensei-mnemos/docs/developer/reference/capabilities/state-mobility.md`) excludes plans, goals and arbitrary graph objects from built-in portable categories. It also documents a delta-export gap and aggregate rather than per-item merge outcomes. It therefore does not already solve portable harness history or Git-merge reconciliation.
 
-Finally, [storage readiness and durability](/Users/stacy/ASENSEI/asensei-mnemos/docs/developer/reference/capabilities/storage-protection-and-recovery.md) are target-specific. TypeScript API availability alone does not establish the Node-hosted, multi-process durability needed here. Verify the exact package and runtime when the experiment is justified; keep this uncertainty out of the current delivery path.
+Finally, storage readiness and durability (original checkout reference: `/Users/stacy/ASENSEI/asensei-mnemos/docs/developer/reference/capabilities/storage-protection-and-recovery.md`) are target-specific. TypeScript API availability alone does not establish the Node-hosted, multi-process durability needed here. Verify the exact package and runtime when the experiment is justified; keep this uncertainty out of the current delivery path.

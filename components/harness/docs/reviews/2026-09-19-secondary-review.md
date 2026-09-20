@@ -117,7 +117,7 @@ the same patch twice. Checks must reference the resulting subject, not the origi
 
 **Sources:** Build Orchestration: Workspace Lock, Ladder, Failure Modes *(superseded contract)*,
 Phase 1: Batches 2–3 *(superseded phase plan)*,
-[existing Test Execution: Inputs and Resources](GOVERNANCE-RUNTIME:docs/specs/test-execution.md).
+[existing Test Execution: Inputs and Resources](../../../../docs/specs/test-execution.md).
 
 The spec allows one build per workspace, but Stage C starts remaining lanes in parallel. It does
 not distinguish one lock-owning orchestration request from its child tool invocations or declare
@@ -224,8 +224,8 @@ references, and rollback restores exact prior configuration from retained eviden
 
 **Sources:** Context Packet: Invariants and Failure Modes *(superseded contract)*,
 Phase 3: Batches 2–3 *(superseded phase plan)*,
-[existing context producer](GOVERNANCE-RUNTIME:src/project_governance_runtime/context.py),
-[Governance Kernel: context contract](GOVERNANCE-RUNTIME:docs/specs/governance-kernel.md).
+[existing context producer](../../../../src/project_governance_runtime/context.py),
+[Governance Kernel: context contract](../../../../docs/specs/governance-kernel.md).
 
 The proposed packet must read the governance runtime's immutable subject. The existing
 `resolve_context(root, task, changed_paths, ...)` reads route files and content through the supplied
