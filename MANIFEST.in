@@ -1,6 +1,11 @@
-graft src/project_governance_runtime/assets/skills
+graft src/project_governance_runtime/assets
+graft src/project_governance_runtime/checker_scripts
+graft src/project_governance_runtime/defaults
+graft src/project_governance_runtime/packs
 include tools/release_version.py
 include tools/build_release_assets.py
 
 include tools/build_harness.py
 recursive-include components/harness/src *.ts
+global-exclude *.py[cod]
+global-exclude .DS_Store
