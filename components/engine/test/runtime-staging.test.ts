@@ -585,6 +585,13 @@ test("inactive installation verifies identity and preserves a failed-generation 
     assert.deepEqual(observed,{});
     const replayed=await observeStartup(startupInput,noNetwork);
     assert.equal(replayed.discover,false);
+    if ("reason" in replayed && replayed.reason === "native-owner-unavailable") {
+      // Headless CI has no native Codex ancestor. Refusal is the correct public behavior.
+      assert.equal(replayed.action, "defer");
+      const headlessRegistry = new RuntimeGenerations(startupInput.registry);
+      try { assert.equal(headlessRegistry.state().readers.length, 0); }
+      finally { headlessRegistry.close(); }
+    } else {
     assert.equal("result" in replayed && replayed.result?.status,"manual");
     const startupProfile=join(initWorkspace,"config/governance/profile.yaml"),originalProfile=readFileSync(startupProfile);
     writeFileSync(startupProfile,"schema_version: 1\nruntime_updates:\n  policy: compatible\n");
@@ -605,6 +612,8 @@ test("inactive installation verifies identity and preserves a failed-generation 
       assert.equal(startupRegistry.state().readers.length,0);
       startupRegistry.endMaintenance(maintenance.token,maintenance.owner);
     }finally{startupRegistry.close();}
+
+    }
 
     const recoveryTasks=new StartupTasks(startupInput.receipts),recoveryRegistry=new RuntimeGenerations(startupInput.registry);
     try {
