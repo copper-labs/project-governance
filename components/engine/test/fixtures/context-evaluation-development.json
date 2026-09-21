@@ -1,0 +1,118 @@
+[
+  {
+    "id": "metro-owner",
+    "request": {
+      "taskRevision": "development-fixture-1",
+      "purpose": "Find where a Metro server serving a different workspace is detected.",
+      "required": [],
+      "optional": [
+        {
+          "id": "a",
+          "sourceDigest": "sha256:45b19a440ded9fe770d5d32158b7d7a9cc77d316beccd68dd87e5bb379d597e9",
+          "excerpt": "The status endpoint returns whether a server is listening."
+        },
+        {
+          "id": "b",
+          "sourceDigest": "sha256:3e6382e3f2de2d62611ae03042dbfb62f878544ca3a331ab26424a3e7c233df3",
+          "excerpt": "Compare the Metro process cwd and configured project root before accepting the server."
+        },
+        {
+          "id": "c",
+          "sourceDigest": "sha256:16ba32b7cc776bf67ae6c5cbc7f5b878a28761ec76b8a98bc901ca35eb51c7b6",
+          "excerpt": "The bundle compiler prints syntax diagnostics."
+        }
+      ],
+      "maximumBytes": 300
+    },
+    "usefulOptionalIds": [
+      "b"
+    ]
+  },
+  {
+    "id": "worker-reconnect",
+    "request": {
+      "taskRevision": "development-fixture-1",
+      "purpose": "Find how to avoid starting the same build twice after the caller exits.",
+      "required": [],
+      "optional": [
+        {
+          "id": "a",
+          "sourceDigest": "sha256:9c24a8de2a479f36b13cb70cd7b6d33126a56396d9a1f628a760e0631d142c07",
+          "excerpt": "The CLI formats build status for the terminal."
+        },
+        {
+          "id": "b",
+          "sourceDigest": "sha256:14dc121b8f47318a3cd78a351c0283a67ec206f4d563f6d988ddf8b14b5719fa",
+          "excerpt": "A retry increments a counter after an ordinary assertion failure."
+        },
+        {
+          "id": "c",
+          "sourceDigest": "sha256:a5c82b4b60f1f36dc3b467a901de8d1890684173d9e4695740278a01dd9840e0",
+          "excerpt": "Reconnect reads the persisted run identity and existing process receipt; it does not dispatch a new worker."
+        }
+      ],
+      "maximumBytes": 300
+    },
+    "usefulOptionalIds": [
+      "c"
+    ]
+  },
+  {
+    "id": "cleanup-unknown",
+    "request": {
+      "taskRevision": "development-fixture-1",
+      "purpose": "Find why a device cannot be reassigned after uncertain cleanup.",
+      "required": [],
+      "optional": [
+        {
+          "id": "a",
+          "sourceDigest": "sha256:38b04ea36cd9611508595b01f76027024bb76457c9ac5e72519a5d74a266b9ef",
+          "excerpt": "A resource lease remains held until cleanup acknowledgment or explicit reconciliation."
+        },
+        {
+          "id": "b",
+          "sourceDigest": "sha256:26421b30c8e772c8d8c5f8a041da96a3527c62f578d41907027e4c7c5bc4c24c",
+          "excerpt": "The device list sorts simulators by display name."
+        },
+        {
+          "id": "c",
+          "sourceDigest": "sha256:3336576a59cde8c69a1bababc70da1c136157538a192978d51eb97c9ffec6790",
+          "excerpt": "The test report counts passing assertions."
+        }
+      ],
+      "maximumBytes": 300
+    },
+    "usefulOptionalIds": [
+      "a"
+    ]
+  },
+  {
+    "id": "source-stale",
+    "request": {
+      "taskRevision": "development-fixture-1",
+      "purpose": "Find where changed source invalidates a validation result.",
+      "required": [],
+      "optional": [
+        {
+          "id": "a",
+          "sourceDigest": "sha256:94dae2eac2285210923eb2d98e2b72e7d6760161d8fcf2a7fb31bf853226409c",
+          "excerpt": "The report renders duration in seconds."
+        },
+        {
+          "id": "b",
+          "sourceDigest": "sha256:0e0589551fac3d33761f5fbe2b79f109f75b43c27db643698661cfa0756e82e5",
+          "excerpt": "The completion receipt compares captured source hashes with the current candidate before accepting proof."
+        },
+        {
+          "id": "c",
+          "sourceDigest": "sha256:94b51b781e0830c6c26f6d82b3d46b9988acc230ffb905912157a5c6136c061c",
+          "excerpt": "The command discovers an executable from PATH."
+        }
+      ],
+      "maximumBytes": 300
+    },
+    "usefulOptionalIds": [
+      "b"
+    ]
+  }
+]

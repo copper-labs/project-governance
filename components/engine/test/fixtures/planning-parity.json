@@ -1,0 +1,475 @@
+{
+  "source": "Existing Python planner, 2026-09-20; output fixtures only",
+  "cases": [
+    {
+      "options": {
+        "stage": "pre-commit",
+        "mode": "impacted",
+        "changedPaths": [
+          "README.md"
+        ],
+        "explicitPackIds": []
+      },
+      "expected": {
+        "status": "ready",
+        "stage": "pre-commit",
+        "mode": "impacted",
+        "changed_paths": [
+          "README.md"
+        ],
+        "selected_packs": [
+          "documentation",
+          "format",
+          "prose",
+          "secrets"
+        ],
+        "execution_order": [
+          "documentation",
+          "format",
+          "prose",
+          "secrets"
+        ],
+        "selection_reasons": {
+          "documentation": [
+            "path:README.md"
+          ],
+          "format": [
+            "path:README.md"
+          ],
+          "prose": [
+            "path:README.md"
+          ],
+          "secrets": [
+            "path:README.md"
+          ]
+        },
+        "omitted_packs": {
+          "apple-dependencies": "not selected by the requested scope",
+          "comments": "not selected by the requested scope",
+          "context-router": "not selected by the requested scope",
+          "dependencies": "not selected by the requested scope",
+          "maintainability": "not selected by the requested scope",
+          "naming": "not selected by the requested scope",
+          "test-quality": "not selected by the requested scope"
+        },
+        "path_matches": {
+          "README.md": [
+            "documentation",
+            "format",
+            "prose",
+            "secrets"
+          ]
+        },
+        "blockers": [],
+        "replaced_packs": []
+      }
+    },
+    {
+      "options": {
+        "stage": "pre-push",
+        "mode": "impacted",
+        "changedPaths": [
+          "src/a.py",
+          "src/a.ts"
+        ],
+        "explicitPackIds": []
+      },
+      "expected": {
+        "status": "ready",
+        "stage": "pre-push",
+        "mode": "impacted",
+        "changed_paths": [
+          "src/a.py",
+          "src/a.ts"
+        ],
+        "selected_packs": [
+          "comments",
+          "format",
+          "maintainability",
+          "naming",
+          "secrets"
+        ],
+        "execution_order": [
+          "comments",
+          "format",
+          "maintainability",
+          "naming",
+          "secrets"
+        ],
+        "selection_reasons": {
+          "comments": [
+            "path:src/a.py",
+            "path:src/a.ts"
+          ],
+          "format": [
+            "path:src/a.py"
+          ],
+          "maintainability": [
+            "path:src/a.py",
+            "path:src/a.ts"
+          ],
+          "naming": [
+            "path:src/a.py",
+            "path:src/a.ts"
+          ],
+          "secrets": [
+            "path:src/a.py",
+            "path:src/a.ts"
+          ]
+        },
+        "omitted_packs": {
+          "apple-dependencies": "not selected by the requested scope",
+          "context-router": "not selected by the requested scope",
+          "dependencies": "not selected by the requested scope",
+          "documentation": "not selected by the requested scope",
+          "prose": "not selected by the requested scope",
+          "test-quality": "not selected by the requested scope"
+        },
+        "path_matches": {
+          "src/a.py": [
+            "comments",
+            "format",
+            "maintainability",
+            "naming",
+            "secrets"
+          ],
+          "src/a.ts": [
+            "comments",
+            "maintainability",
+            "naming",
+            "secrets"
+          ]
+        },
+        "blockers": [],
+        "replaced_packs": []
+      }
+    },
+    {
+      "options": {
+        "stage": "ci-pr",
+        "mode": "all",
+        "changedPaths": [],
+        "explicitPackIds": []
+      },
+      "expected": {
+        "status": "ready",
+        "stage": "ci-pr",
+        "mode": "all",
+        "changed_paths": [],
+        "selected_packs": [
+          "apple-dependencies",
+          "comments",
+          "context-router",
+          "dependencies",
+          "documentation",
+          "format",
+          "maintainability",
+          "naming",
+          "pr-description",
+          "prose",
+          "secrets",
+          "test-quality"
+        ],
+        "execution_order": [
+          "apple-dependencies",
+          "comments",
+          "context-router",
+          "dependencies",
+          "documentation",
+          "format",
+          "maintainability",
+          "naming",
+          "pr-description",
+          "prose",
+          "secrets",
+          "test-quality"
+        ],
+        "selection_reasons": {
+          "apple-dependencies": [
+            "mode:all"
+          ],
+          "comments": [
+            "mode:all"
+          ],
+          "context-router": [
+            "mode:all"
+          ],
+          "dependencies": [
+            "mode:all"
+          ],
+          "documentation": [
+            "mode:all"
+          ],
+          "format": [
+            "mode:all"
+          ],
+          "maintainability": [
+            "mode:all"
+          ],
+          "naming": [
+            "mode:all"
+          ],
+          "pr-description": [
+            "mode:all"
+          ],
+          "prose": [
+            "mode:all"
+          ],
+          "secrets": [
+            "mode:all"
+          ],
+          "test-quality": [
+            "mode:all"
+          ]
+        },
+        "omitted_packs": {},
+        "path_matches": {},
+        "blockers": [],
+        "replaced_packs": []
+      }
+    },
+    {
+      "options": {
+        "stage": null,
+        "mode": "all",
+        "changedPaths": [],
+        "explicitPackIds": []
+      },
+      "expected": {
+        "status": "blocked",
+        "stage": null,
+        "mode": "all",
+        "changed_paths": [],
+        "selected_packs": [],
+        "execution_order": [],
+        "selection_reasons": {},
+        "omitted_packs": {},
+        "path_matches": {},
+        "blockers": [
+          {
+            "code": "stage-required",
+            "message": "All mode requires a stage."
+          }
+        ],
+        "replaced_packs": []
+      }
+    },
+    {
+      "options": {
+        "stage": null,
+        "mode": "impacted",
+        "changedPaths": [],
+        "explicitPackIds": [
+          "format"
+        ]
+      },
+      "expected": {
+        "status": "ready",
+        "stage": null,
+        "mode": "impacted",
+        "changed_paths": [],
+        "selected_packs": [
+          "format"
+        ],
+        "execution_order": [
+          "format"
+        ],
+        "selection_reasons": {
+          "format": [
+            "explicit"
+          ]
+        },
+        "omitted_packs": {
+          "apple-dependencies": "not selected by the requested scope",
+          "comments": "not selected by the requested scope",
+          "commit-message": "not selected by the requested scope",
+          "context-router": "not selected by the requested scope",
+          "dependencies": "not selected by the requested scope",
+          "documentation": "not selected by the requested scope",
+          "maintainability": "not selected by the requested scope",
+          "naming": "not selected by the requested scope",
+          "pr-description": "not selected by the requested scope",
+          "prose": "not selected by the requested scope",
+          "secrets": "not selected by the requested scope",
+          "test-quality": "not selected by the requested scope"
+        },
+        "path_matches": {},
+        "blockers": [],
+        "replaced_packs": []
+      }
+    },
+    {
+      "options": {
+        "stage": "commit-msg",
+        "mode": "impacted",
+        "changedPaths": [],
+        "explicitPackIds": [
+          "format"
+        ]
+      },
+      "expected": {
+        "status": "blocked",
+        "stage": "commit-msg",
+        "mode": "impacted",
+        "changed_paths": [],
+        "selected_packs": [],
+        "execution_order": [],
+        "selection_reasons": {},
+        "omitted_packs": {
+          "commit-message": "not selected by the requested scope"
+        },
+        "path_matches": {},
+        "blockers": [
+          {
+            "code": "explicit-pack-unavailable",
+            "pack_ids": [
+              "format"
+            ],
+            "message": "Pack(s) unavailable at stage commit-msg: format"
+          }
+        ],
+        "replaced_packs": []
+      }
+    },
+    {
+      "options": {
+        "stage": "pre-commit",
+        "mode": "impacted",
+        "changedPaths": [
+          "opaque.weird"
+        ],
+        "explicitPackIds": []
+      },
+      "expected": {
+        "status": "blocked",
+        "stage": "pre-commit",
+        "mode": "impacted",
+        "changed_paths": [
+          "opaque.weird"
+        ],
+        "selected_packs": [
+          "secrets"
+        ],
+        "execution_order": [],
+        "selection_reasons": {
+          "secrets": [
+            "path:opaque.weird"
+          ]
+        },
+        "omitted_packs": {
+          "apple-dependencies": "not selected by the requested scope",
+          "comments": "not selected by the requested scope",
+          "context-router": "not selected by the requested scope",
+          "dependencies": "not selected by the requested scope",
+          "documentation": "not selected by the requested scope",
+          "format": "not selected by the requested scope",
+          "maintainability": "not selected by the requested scope",
+          "naming": "not selected by the requested scope",
+          "prose": "not selected by the requested scope",
+          "test-quality": "not selected by the requested scope"
+        },
+        "path_matches": {
+          "opaque.weird": [
+            "secrets"
+          ]
+        },
+        "blockers": [
+          {
+            "code": "unknown-impact",
+            "message": "Changed paths have no validation owner.",
+            "paths": [
+              "opaque.weird"
+            ]
+          }
+        ],
+        "replaced_packs": []
+      }
+    },
+    {
+      "options": {
+        "stage": "pre-commit",
+        "mode": "impacted",
+        "changedPaths": [],
+        "explicitPackIds": [
+          "missing"
+        ]
+      },
+      "expected": {
+        "status": "blocked",
+        "stage": "pre-commit",
+        "mode": "impacted",
+        "changed_paths": [],
+        "selected_packs": [],
+        "execution_order": [],
+        "selection_reasons": {},
+        "omitted_packs": {
+          "apple-dependencies": "not selected by the requested scope",
+          "comments": "not selected by the requested scope",
+          "context-router": "not selected by the requested scope",
+          "dependencies": "not selected by the requested scope",
+          "documentation": "not selected by the requested scope",
+          "format": "not selected by the requested scope",
+          "maintainability": "not selected by the requested scope",
+          "naming": "not selected by the requested scope",
+          "prose": "not selected by the requested scope",
+          "secrets": "not selected by the requested scope",
+          "test-quality": "not selected by the requested scope"
+        },
+        "path_matches": {},
+        "blockers": [
+          {
+            "code": "unknown-explicit-pack",
+            "message": "Unknown pack(s): missing"
+          }
+        ],
+        "replaced_packs": []
+      }
+    },
+    {
+      "options": {
+        "stage": "release",
+        "mode": "impacted",
+        "changedPaths": [
+          "README.md"
+        ],
+        "explicitPackIds": []
+      },
+      "expected": {
+        "status": "blocked",
+        "stage": "release",
+        "mode": "impacted",
+        "changed_paths": [
+          "README.md"
+        ],
+        "selected_packs": [
+          "secrets"
+        ],
+        "execution_order": [],
+        "selection_reasons": {
+          "secrets": [
+            "path:README.md"
+          ]
+        },
+        "omitted_packs": {
+          "apple-dependencies": "not selected by the requested scope",
+          "dependencies": "not selected by the requested scope"
+        },
+        "path_matches": {
+          "README.md": [
+            "secrets"
+          ]
+        },
+        "blockers": [
+          {
+            "code": "unknown-impact",
+            "message": "Changed paths have no validation owner.",
+            "paths": [
+              "README.md"
+            ]
+          }
+        ],
+        "replaced_packs": []
+      }
+    }
+  ]
+}

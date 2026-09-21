@@ -1,0 +1,194 @@
+[
+  {
+    "kind": "overview",
+    "comment": "",
+    "policy": {
+      "boundary_globs": [
+        "src/*"
+      ]
+    },
+    "blocking": true,
+    "findings": [
+      {
+        "rule_id": "SC002",
+        "path": "src/example.py",
+        "line": 1,
+        "severity": "blocking",
+        "message": "Add a file overview that states this file's responsibility.",
+        "adapter_id": "python",
+        "declaration": "<file>"
+      },
+      {
+        "rule_id": "SC003",
+        "path": "src/example.py",
+        "line": 1,
+        "severity": "blocking",
+        "message": "Add the workflow or relationship context a new reader needs.",
+        "adapter_id": "python",
+        "declaration": "<file>"
+      },
+      {
+        "rule_id": "SC004",
+        "path": "src/example.py",
+        "line": 1,
+        "severity": "blocking",
+        "message": "Add the boundary, invariant, or tradeoff this file must preserve.",
+        "adapter_id": "python",
+        "declaration": "<file>"
+      }
+    ]
+  },
+  {
+    "kind": "overview",
+    "comment": "Responsibility: Read bounded source images.\n\nContext: The checker uses captured content to keep findings tied to the reviewed change.",
+    "policy": {},
+    "blocking": true,
+    "findings": []
+  },
+  {
+    "kind": "overview",
+    "comment": "This module manages state.\nBoundary: none",
+    "policy": {
+      "boundary_globs": [
+        "src/*"
+      ]
+    },
+    "blocking": false,
+    "findings": [
+      {
+        "rule_id": "SC002",
+        "path": "src/example.py",
+        "line": 1,
+        "severity": "advisory",
+        "message": "The file overview must include a plain-language 'Responsibility:' statement.",
+        "adapter_id": "python",
+        "declaration": "<file>"
+      },
+      {
+        "rule_id": "SC003",
+        "path": "src/example.py",
+        "line": 1,
+        "severity": "advisory",
+        "message": "The file overview must include 'Context:' with the insight a new reader needs.",
+        "adapter_id": "python",
+        "declaration": "<file>"
+      },
+      {
+        "rule_id": "SC004",
+        "path": "src/example.py",
+        "line": 1,
+        "severity": "advisory",
+        "message": "State the boundary, invariant, or tradeoff instead of using a placeholder.",
+        "adapter_id": "python",
+        "declaration": "<file>"
+      },
+      {
+        "rule_id": "SC011",
+        "path": "src/example.py",
+        "line": 1,
+        "severity": "advisory",
+        "message": "The file overview may be too brief to explain responsibility and context.",
+        "adapter_id": "python",
+        "declaration": "<file>"
+      },
+      {
+        "rule_id": "SC011",
+        "path": "src/example.py",
+        "line": 1,
+        "severity": "advisory",
+        "message": "Use direct, concrete language and explain the owned decision or outcome.",
+        "adapter_id": "python",
+        "declaration": "<file>"
+      }
+    ]
+  },
+  {
+    "kind": "declaration",
+    "comment": "",
+    "name": "Parser",
+    "detail": true,
+    "blocking": true,
+    "findings": [
+      {
+        "rule_id": "SC005",
+        "path": "src/example.py",
+        "line": 7,
+        "severity": "blocking",
+        "message": "Document public type 'Parser' in simple language.",
+        "adapter_id": "python",
+        "declaration": "Parser"
+      }
+    ]
+  },
+  {
+    "kind": "declaration",
+    "comment": "Parse value.",
+    "name": "parseValue",
+    "detail": false,
+    "blocking": true,
+    "findings": [
+      {
+        "rule_id": "SC011",
+        "path": "src/example.py",
+        "line": 7,
+        "severity": "advisory",
+        "message": "The comment for 'parseValue' may be too brief to explain its responsibility.",
+        "adapter_id": "python",
+        "declaration": "parseValue"
+      },
+      {
+        "rule_id": "SC007",
+        "path": "src/example.py",
+        "line": 7,
+        "severity": "blocking",
+        "message": "The comment for 'parseValue' mainly restates its name.",
+        "adapter_id": "python",
+        "declaration": "parseValue"
+      }
+    ]
+  },
+  {
+    "kind": "declaration",
+    "comment": "Read validated source bytes from the captured change.",
+    "name": "readSource",
+    "detail": false,
+    "blocking": false,
+    "findings": []
+  },
+  {
+    "kind": "declaration",
+    "comment": "This class manages parsers.",
+    "name": "Parser",
+    "detail": true,
+    "blocking": true,
+    "findings": [
+      {
+        "rule_id": "SC011",
+        "path": "src/example.py",
+        "line": 7,
+        "severity": "advisory",
+        "message": "The comment for 'Parser' may be too brief to explain its responsibility.",
+        "adapter_id": "python",
+        "declaration": "Parser"
+      },
+      {
+        "rule_id": "SC006",
+        "path": "src/example.py",
+        "line": 7,
+        "severity": "blocking",
+        "message": "Give 'Parser' a summary paragraph and a context/relationship paragraph.",
+        "adapter_id": "python",
+        "declaration": "Parser"
+      },
+      {
+        "rule_id": "SC011",
+        "path": "src/example.py",
+        "line": 7,
+        "severity": "advisory",
+        "message": "Use direct, concrete language and explain the owned decision or outcome.",
+        "adapter_id": "python",
+        "declaration": "Parser"
+      }
+    ]
+  }
+]

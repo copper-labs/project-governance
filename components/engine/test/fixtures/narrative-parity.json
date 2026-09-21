@@ -1,0 +1,224 @@
+{
+  "source": "Existing Python narrative checkers, 2026-09-20; output fixtures only",
+  "cases": [
+    {
+      "kind": "commit",
+      "text": "Fix Metro shutdown ordering\n\nWait for port closure before starting the replacement.\n",
+      "expected": {
+        "check": "commit-message",
+        "finding_count": 0,
+        "findings": [],
+        "status": "passed",
+        "version": 1
+      }
+    },
+    {
+      "kind": "commit",
+      "text": "Fix Metro shutdown ordering\n\nSigned-off-by: Fixture <test@example.invalid>\n",
+      "expected": {
+        "check": "commit-message",
+        "finding_count": 1,
+        "findings": [
+          {
+            "line": 1,
+            "message": "commit body needs a short authored explanation beyond Git trailers",
+            "path": "message.txt",
+            "rule_id": "commit-message.body-missing",
+            "severity": "blocking"
+          }
+        ],
+        "status": "failed",
+        "version": 1
+      }
+    },
+    {
+      "kind": "commit",
+      "text": "Merge branch 'feature' into main\n",
+      "expected": {
+        "check": "commit-message",
+        "finding_count": 0,
+        "findings": [],
+        "status": "passed",
+        "version": 1
+      }
+    },
+    {
+      "kind": "commit",
+      "text": "Fix Metro shutdown ordering\n\nTODO\n",
+      "expected": {
+        "check": "commit-message",
+        "finding_count": 1,
+        "findings": [
+          {
+            "line": 3,
+            "message": "replace the placeholder commit body with an authored explanation",
+            "path": "message.txt",
+            "rule_id": "commit-message.body-placeholder",
+            "severity": "blocking"
+          }
+        ],
+        "status": "failed",
+        "version": 1
+      }
+    },
+    {
+      "kind": "commit",
+      "text": "# comment\nFix Metro shutdown ordering\n\nAuthored explanation.\n# ------------------------ >8 ------------------------\ndiscarded  \n",
+      "expected": {
+        "check": "commit-message",
+        "finding_count": 0,
+        "findings": [],
+        "status": "passed",
+        "version": 1
+      }
+    },
+    {
+      "kind": "commit",
+      "text": "PROJ-123456\n\nAuthored body.\n",
+      "expected": {
+        "check": "commit-message",
+        "finding_count": 1,
+        "findings": [
+          {
+            "line": 1,
+            "message": "commit subject must state a useful outcome, not a placeholder, generic label, or ticket alone",
+            "path": "message.txt",
+            "rule_id": "commit-message.unhelpful-subject",
+            "severity": "blocking"
+          }
+        ],
+        "status": "failed",
+        "version": 1
+      }
+    },
+    {
+      "kind": "commit",
+      "text": "fixup! Repair Metro shutdown\n",
+      "expected": {
+        "check": "commit-message",
+        "finding_count": 0,
+        "findings": [],
+        "status": "passed",
+        "version": 1
+      }
+    },
+    {
+      "kind": "pr",
+      "title": "Repair Metro shutdown waiting",
+      "text": "## Product impact\n\n- Build tooling: Metro restarts after its previous listener closes.\n\n## Nature of the change\n\nCorrect the shutdown predicate.\n\n## Code areas impacted\n\n- Metro process lifecycle.\n\n## Why\n\nThe old predicate waited for the opposite state.\n",
+      "expected": {
+        "check": "pr-description",
+        "finding_count": 0,
+        "findings": [],
+        "status": "passed",
+        "version": 1
+      }
+    },
+    {
+      "kind": "pr",
+      "title": "Various",
+      "text": "## Product impact\n\n- Build tooling: Metro restarts after its previous listener closes.\n\n## Nature of the change\n\nCorrect the shutdown predicate.\n\n## Code areas impacted\n\n- Metro process lifecycle.\n\n## Why\n\nThe old predicate waited for the opposite state.\n",
+      "expected": {
+        "check": "pr-description",
+        "finding_count": 1,
+        "findings": [
+          {
+            "line": 1,
+            "message": "pull request title must contain at least eight characters",
+            "path": "pull-request-title",
+            "rule_id": "pr-description.title-short",
+            "severity": "blocking"
+          }
+        ],
+        "status": "failed",
+        "version": 1
+      }
+    },
+    {
+      "kind": "pr",
+      "title": "Repair Metro shutdown waiting",
+      "text": "## Product impact\n\n- Build tooling: Metro restarts after its previous listener closes.\n\n## Nature of the change\n\nCorrect the shutdown predicate.\n\n## Code areas impacted\n\n- Metro process lifecycle.\n\n## Why\n\nThe old predicate waited for the opposite state.\n\n### Validation\nPassed\n",
+      "expected": {
+        "check": "pr-description",
+        "finding_count": 1,
+        "findings": [
+          {
+            "line": 17,
+            "message": "remove the Validation body section; use checks or Product impact as appropriate",
+            "path": "body.md",
+            "rule_id": "pr-description.section-not-allowed",
+            "severity": "blocking"
+          }
+        ],
+        "status": "failed",
+        "version": 1
+      }
+    },
+    {
+      "kind": "pr",
+      "title": "Repair Metro shutdown waiting",
+      "text": "## Product impact\n\n- TODO\n\n## Nature of the change\n\nCorrect the shutdown predicate.\n\n## Code areas impacted\n\n- Metro process lifecycle.\n\n## Why\n\nThe old predicate waited for the opposite state.\n",
+      "expected": {
+        "check": "pr-description",
+        "finding_count": 3,
+        "findings": [
+          {
+            "line": 1,
+            "message": "pull request section needs authored content: ## Product impact",
+            "path": "body.md",
+            "rule_id": "pr-description.field-placeholder",
+            "severity": "blocking"
+          },
+          {
+            "line": 3,
+            "message": "pull request bullet needs authored content: ## Product impact",
+            "path": "body.md",
+            "rule_id": "pr-description.field-placeholder",
+            "severity": "blocking"
+          },
+          {
+            "line": 3,
+            "message": "each Product impact bullet must use '<top-level area>: <how the change surfaces>'",
+            "path": "body.md",
+            "rule_id": "pr-description.product-impact-shape",
+            "severity": "blocking"
+          }
+        ],
+        "status": "failed",
+        "version": 1
+      }
+    },
+    {
+      "kind": "pr",
+      "title": "Repair Metro shutdown waiting",
+      "text": "<!-- template only -->",
+      "expected": {
+        "check": "pr-description",
+        "finding_count": 1,
+        "findings": [
+          {
+            "line": 1,
+            "message": "pull request body needs the required change-narrative sections",
+            "path": "body.md",
+            "rule_id": "pr-description.empty-body",
+            "severity": "blocking"
+          }
+        ],
+        "status": "failed",
+        "version": 1
+      }
+    },
+    {
+      "kind": "pr",
+      "title": "Repair Metro shutdown waiting",
+      "text": "## Product impact\n\n- Build tooling: Metro restarts after its previous listener closes.\n\n## Nature of the change\n\nCorrect the shutdown predicate.\n\n## Code areas impacted\n\n- Metro process lifecycle.\n\n```\n## Why\n```\n## Why\n\nThe old predicate waited for the opposite state.\n",
+      "expected": {
+        "check": "pr-description",
+        "finding_count": 0,
+        "findings": [],
+        "status": "passed",
+        "version": 1
+      }
+    }
+  ]
+}

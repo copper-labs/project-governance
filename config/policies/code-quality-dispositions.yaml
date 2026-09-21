@@ -19,8 +19,8 @@ dispositions:
   reviewer: Codex architecture review
   approved_on: 2026-08-15
   responsibility: Normalize one checker process result into governed command evidence.
-  rationale: The control flow keeps process failure, envelope integrity, finding lifecycle, and final status visible
-    together at the single command-normalization boundary.
+  rationale: The control flow keeps process failure, envelope integrity, finding lifecycle, and final status
+    visible together at the single command-normalization boundary.
 - finding: quality.large-type
   path: tests/test_runtime_package_execution.py
   symbol: RuntimeExecutionTests
@@ -39,9 +39,9 @@ dispositions:
   reviewer: Codex architecture review
   approved_on: 2026-09-12
   responsibility: Prove dependency admission through the public checker and its immutable change-packet fixture.
-  rationale: Scope trust, release evidence and defect ratcheting exercise one admission boundary and reuse the same
-    isolated target fixture. Keeping the scenarios together preserves that relationship; splitting the test class
-    solely by line count would not isolate a separate responsibility.
+  rationale: Scope trust, release evidence and defect ratcheting exercise one admission boundary and reuse
+    the same isolated target fixture. Keeping the scenarios together preserves that relationship; splitting
+    the test class solely by line count would not isolate a separate responsibility.
 - finding: quality.large-function
   path: components/harness/src/cli.ts
   symbol: main
@@ -60,5 +60,63 @@ dispositions:
   reviewer: Codex migration architecture review; prior Opus implementation review retained in module docs/reviews
   approved_on: '2026-09-19'
   responsibility: Own the transactional SQLite boundary for task and execution evidence.
-  rationale: The reviewed store retains transaction ownership across linked records. Source consolidation does not
-    justify splitting persistence methods into competing connection or transaction owners.
+  rationale: The reviewed store retains transaction ownership across linked records. Source consolidation does
+    not justify splitting persistence methods into competing connection or transaction owners.
+- finding: quality.large-function
+  path: components/engine/src/cli.ts
+  symbol: main
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex focused cohesion review; final Opus review remains pending
+  approved_on: '2026-09-20'
+  responsibility: Route public commands and translate their governed outcomes into stable process exit statuses.
+  rationale: The explicit dispatcher delegates domain behavior to named command owners. Its size reflects the
+    supported command surface and help text; splitting solely by length would scatter public exit-code and
+    error handling without separating a domain responsibility.
+- finding: quality.large-function
+  path: components/engine/src/context-route-command.ts
+  symbol: contextRouteCommand
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex focused cohesion review; final Opus review remains pending
+  approved_on: '2026-09-20'
+  responsibility: Assemble one routed context packet from a captured subject and retain its source-bound receipt.
+  rationale: Required routing, optional advice and the final stale-source check share one captured subject.
+    The function delegates routing, materialization and ranking, then revalidates every captured input before
+    delivery; keeping that sequence visible preserves the mandatory-context boundary.
+- finding: quality.large-function
+  path: components/engine/src/decisions.ts
+  symbol: JevDecisionAdapter.decide
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex focused cohesion review; final Opus review remains pending
+  approved_on: '2026-09-20'
+  responsibility: Return bounded optional advice or the deterministic baseline under one provider-call lifetime.
+  rationale: No-token and policy refusals precede networking. A single try/finally owns the cross-process advisory
+    lock, cancellation listener and deadline; response identity, usage and confidence checks precede delivery.
+    Splitting this lifetime solely for length would obscure cleanup and fallback paths.
+- finding: quality.large-function
+  path: components/engine/src/process-owner.ts
+  symbol: execute
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex focused cohesion review; final Opus review remains pending
+  approved_on: '2026-09-20'
+  responsibility: Own one durable command from admission through process-group cleanup and terminal evidence.
+  rationale: The function shares launch identity, cancellation, stream limits and cleanup state across asynchronous
+    callbacks. Existing modules own provider framing, resource storage, guardian behavior and delivery. Keeping
+    the remaining lifecycle together avoids competing shutdown owners; source and interruption tests cover
+    its boundaries.
+- finding: quality.large-file
+  path: components/engine/test/runtime-staging.test.ts
+  symbol: <file>
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex focused cohesion review; final Opus review remains pending
+  approved_on: '2026-09-20'
+  responsibility: Exercise installation, interrupted activation and forward repair against a continuous generation
+    history.
+  rationale: The integration scenario deliberately carries generation revisions, retained readers, backups
+    and post-write evidence through subsequent transitions. Its assertions prove replay and preservation using
+    that history. Splitting by file length would duplicate expensive setup or conceal cross-transition state;
+    narrow owner tests remain separate.

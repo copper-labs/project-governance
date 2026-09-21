@@ -1,0 +1,210 @@
+{
+  "source": "Existing Python naming analyzer, 2026-09-20; output fixtures only",
+  "policy": {
+    "naming": {
+      "forbidden_terms": [
+        "legacy",
+        "utils"
+      ],
+      "vague_terms": [
+        "manager",
+        "helper"
+      ],
+      "package_roots": [
+        "packages",
+        "services"
+      ],
+      "preferred_file_name_length": 24,
+      "blocking_file_name_length": 40,
+      "ignore_paths": [
+        "generated/*"
+      ]
+    }
+  },
+  "cases": [
+    {
+      "path": "packages/voice/VoiceVoiceManager.ts",
+      "isNew": true,
+      "expected": [
+        {
+          "rule_id": "naming.adjacent-duplicate",
+          "path": "packages/voice/VoiceVoiceManager.ts",
+          "name": "VoiceVoiceManager",
+          "severity": "blocking",
+          "classification": "new-or-renamed",
+          "message": "contains adjacent duplicate words"
+        },
+        {
+          "rule_id": "naming.vague-role",
+          "path": "packages/voice/VoiceVoiceManager.ts",
+          "name": "VoiceVoiceManager",
+          "severity": "blocking",
+          "classification": "new-or-renamed",
+          "message": "ends in vague role term 'manager'"
+        },
+        {
+          "rule_id": "naming.package-repetition",
+          "path": "packages/voice/VoiceVoiceManager.ts",
+          "name": "VoiceVoiceManager",
+          "severity": "blocking",
+          "classification": "new-or-renamed",
+          "message": "repeats the containing package name"
+        }
+      ]
+    },
+    {
+      "path": "packages/voice/VoiceVoiceManager.ts",
+      "isNew": false,
+      "expected": [
+        {
+          "rule_id": "naming.adjacent-duplicate",
+          "path": "packages/voice/VoiceVoiceManager.ts",
+          "name": "VoiceVoiceManager",
+          "severity": "advisory",
+          "classification": "existing-debt",
+          "message": "contains adjacent duplicate words"
+        },
+        {
+          "rule_id": "naming.vague-role",
+          "path": "packages/voice/VoiceVoiceManager.ts",
+          "name": "VoiceVoiceManager",
+          "severity": "advisory",
+          "classification": "existing-debt",
+          "message": "ends in vague role term 'manager'"
+        },
+        {
+          "rule_id": "naming.package-repetition",
+          "path": "packages/voice/VoiceVoiceManager.ts",
+          "name": "VoiceVoiceManager",
+          "severity": "advisory",
+          "classification": "existing-debt",
+          "message": "repeats the containing package name"
+        }
+      ]
+    },
+    {
+      "path": "services/auth/AuthLegacyHelper.py",
+      "isNew": true,
+      "expected": [
+        {
+          "rule_id": "naming.forbidden-term",
+          "path": "services/auth/AuthLegacyHelper.py",
+          "name": "AuthLegacyHelper",
+          "severity": "blocking",
+          "classification": "new-or-renamed",
+          "message": "contains forbidden term(s): legacy"
+        },
+        {
+          "rule_id": "naming.vague-role",
+          "path": "services/auth/AuthLegacyHelper.py",
+          "name": "AuthLegacyHelper",
+          "severity": "blocking",
+          "classification": "new-or-renamed",
+          "message": "ends in vague role term 'helper'"
+        },
+        {
+          "rule_id": "naming.package-repetition",
+          "path": "services/auth/AuthLegacyHelper.py",
+          "name": "AuthLegacyHelper",
+          "severity": "blocking",
+          "classification": "new-or-renamed",
+          "message": "repeats the containing package name"
+        }
+      ]
+    },
+    {
+      "path": "services/auth/AuthLegacyHelper.py",
+      "isNew": false,
+      "expected": [
+        {
+          "rule_id": "naming.forbidden-term",
+          "path": "services/auth/AuthLegacyHelper.py",
+          "name": "AuthLegacyHelper",
+          "severity": "advisory",
+          "classification": "existing-debt",
+          "message": "contains forbidden term(s): legacy"
+        },
+        {
+          "rule_id": "naming.vague-role",
+          "path": "services/auth/AuthLegacyHelper.py",
+          "name": "AuthLegacyHelper",
+          "severity": "advisory",
+          "classification": "existing-debt",
+          "message": "ends in vague role term 'helper'"
+        },
+        {
+          "rule_id": "naming.package-repetition",
+          "path": "services/auth/AuthLegacyHelper.py",
+          "name": "AuthLegacyHelper",
+          "severity": "advisory",
+          "classification": "existing-debt",
+          "message": "repeats the containing package name"
+        }
+      ]
+    },
+    {
+      "path": "src/Short.ts",
+      "isNew": true,
+      "expected": []
+    },
+    {
+      "path": "src/Short.ts",
+      "isNew": false,
+      "expected": []
+    },
+    {
+      "path": "src/LongLongLongLongLongLongLongLongLongLongLongLong.kt",
+      "isNew": true,
+      "expected": [
+        {
+          "rule_id": "naming.adjacent-duplicate",
+          "path": "src/LongLongLongLongLongLongLongLongLongLongLongLong.kt",
+          "name": "LongLongLongLongLongLongLongLongLongLongLongLong",
+          "severity": "blocking",
+          "classification": "new-or-renamed",
+          "message": "contains adjacent duplicate words"
+        },
+        {
+          "rule_id": "naming.file-name-blocking-length",
+          "path": "src/LongLongLongLongLongLongLongLongLongLongLongLong.kt",
+          "name": "LongLongLongLongLongLongLongLongLongLongLongLong",
+          "severity": "blocking",
+          "classification": "new-or-renamed",
+          "message": "file stem length 48 exceeds blocking limit 40"
+        }
+      ]
+    },
+    {
+      "path": "src/LongLongLongLongLongLongLongLongLongLongLongLong.kt",
+      "isNew": false,
+      "expected": [
+        {
+          "rule_id": "naming.adjacent-duplicate",
+          "path": "src/LongLongLongLongLongLongLongLongLongLongLongLong.kt",
+          "name": "LongLongLongLongLongLongLongLongLongLongLongLong",
+          "severity": "advisory",
+          "classification": "existing-debt",
+          "message": "contains adjacent duplicate words"
+        },
+        {
+          "rule_id": "naming.file-name-blocking-length",
+          "path": "src/LongLongLongLongLongLongLongLongLongLongLongLong.kt",
+          "name": "LongLongLongLongLongLongLongLongLongLongLongLong",
+          "severity": "advisory",
+          "classification": "existing-debt",
+          "message": "file stem length 48 exceeds blocking limit 40"
+        }
+      ]
+    },
+    {
+      "path": "generated/LegacyUtils.ts",
+      "isNew": true,
+      "expected": []
+    },
+    {
+      "path": "generated/LegacyUtils.ts",
+      "isNew": false,
+      "expected": []
+    }
+  ]
+}

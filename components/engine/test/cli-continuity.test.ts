@@ -1,0 +1,57 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { spawnSync, execFileSync } from "node:child_process";
+import { mkdtempSync, rmSync, existsSync, writeFileSync, chmodSync, mkdirSync, copyFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+test("unified CLI creates, resumes and exports canonical continuity without legacy execution", () => {
+  const root = mkdtempSync(join(tmpdir(), "unified-continuity-"));
+  try {
+    execFileSync("git", ["init", "-q"], {cwd:root});
+    execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-qm", "Initial"], {cwd:root});
+    const cli=fileURLToPath(new URL("../src/cli.ts",import.meta.url)), database=join(root,"history.sqlite");
+    const call=(args:string[])=>spawnSync(process.execPath,[cli,"harness",...args,"--db",database],{cwd:root,encoding:"utf8",timeout:10000});
+    const rejected=call(["check","run"]);
+    assert.equal(rejected.status,2);assert.equal(existsSync(database),false);
+    const help=call(["task","--help"]);
+    assert.equal(help.status,0);assert.ok(help.stdout.includes("task create --outcome"));
+    assert.equal(help.stdout.includes("check run --task"),false);
+    assert.equal(existsSync(database),false);
+    const leading=call(["--session","qualification","task","list"]);
+    assert.equal(leading.status,0,leading.stderr);
+    const created=call(["task","create","--outcome","Preserve task history","--scope",root]);
+    assert.equal(created.status,0,created.stderr);
+    const value=JSON.parse(created.stdout), task=value.task?.taskId ?? value.taskId;
+    assert.equal(typeof task,"string",created.stdout);
+    const planner=join(root,"planner");
+    const plannerModule=join(root,"planner.mjs");
+    writeFileSync(plannerModule, `import { planCommand } from ${JSON.stringify(new URL("../src/cli.ts",import.meta.url).href)};\nconsole.log(JSON.stringify(planCommand(process.argv.slice(2),process.cwd(),${JSON.stringify(fileURLToPath(new URL("../../../src/project_governance_runtime/packs/",import.meta.url)))})));\n`);
+    writeFileSync(planner, `#!/bin/sh\nshift\nexec '${process.execPath.replaceAll("'", "'\\''")}' '${plannerModule.replaceAll("'", "'\\''")}' "$@"\n`);
+    chmodSync(planner,0o700);
+    const probe=spawnSync(planner,["plan","--stage","pre-commit","--mode","impacted","--json"],{cwd:root,encoding:"utf8"});
+    assert.equal(probe.status,0,probe.stdout+probe.stderr);
+    const planned=call(["governance","plan","--task",task,"--executor",planner,"--stage","pre-commit"]);
+    assert.equal(planned.status,0,planned.stderr || planned.stdout);
+    assert.equal(typeof JSON.parse(planned.stdout).artifactId,"string");
+    const defaultDirectory=join(root,".governance","runtime","bin");
+    mkdirSync(defaultDirectory,{recursive:true});
+    const defaultPlanner=join(defaultDirectory,"project-governance");
+    copyFileSync(planner,defaultPlanner);chmodSync(defaultPlanner,0o700);
+    const defaultPlan=call(["governance","plan","--task",task,"--stage","pre-commit"]);
+    assert.equal(defaultPlan.status,0,defaultPlan.stderr || defaultPlan.stdout);
+    assert.equal(typeof JSON.parse(defaultPlan.stdout).artifactId,"string");
+    assert.ok(JSON.parse(planned.stdout).note.includes("neither test execution nor task acceptance"));
+    const shown=call(["task","show","--task",task]);
+    assert.equal(shown.status,0,shown.stderr);assert.ok(shown.stdout.includes("Preserve task history"));
+    const resumed=call(["resume","--task",task,"--session","qualification"]);
+    assert.equal(resumed.status,0,resumed.stderr);
+    const checkpoint=call(["checkpoint","--task",task,"--session","qualification","--summary","Bounded proof complete","--next","Inspect export"]);
+    assert.equal(checkpoint.status,0,checkpoint.stderr);
+    const exported=call(["export","--task",task]);
+    assert.equal(exported.status,0,exported.stderr);assert.ok(exported.stdout.includes("Bounded proof complete"));
+    const missing=call(["task","show","--task","missing"]);
+    assert.equal(missing.status,2);assert.equal(JSON.parse(missing.stdout).ok,false);
+  } finally {rmSync(root,{recursive:true,force:true});}
+});

@@ -1,0 +1,307 @@
+[
+  {
+    "file": "kotlin-annotated-multiline.kt",
+    "declarations": [
+      {
+        "kind": "type",
+        "name": "AnnotatedVocabulary",
+        "line": 11,
+        "offset": 407,
+        "public": true,
+        "signature": "AnnotatedVocabulary",
+        "headerEndLine": 11,
+        "endLine": 15
+      },
+      {
+        "kind": "function",
+        "name": "terms",
+        "line": 13,
+        "offset": 532,
+        "public": true,
+        "signature": "terms ( )",
+        "headerEndLine": 14,
+        "endLine": 14
+      }
+    ]
+  },
+  {
+    "file": "kotlin-enclosing-visibility.kt",
+    "declarations": [
+      {
+        "kind": "type",
+        "name": "InternalStore",
+        "line": 5,
+        "offset": 226,
+        "public": false,
+        "signature": "InternalStore",
+        "headerEndLine": 5,
+        "endLine": 13
+      },
+      {
+        "kind": "function",
+        "name": "save",
+        "line": 6,
+        "offset": 252,
+        "public": true,
+        "signature": "save ( )",
+        "headerEndLine": 6,
+        "endLine": 6
+      },
+      {
+        "kind": "function",
+        "name": "replace",
+        "line": 8,
+        "offset": 282,
+        "public": true,
+        "signature": "replace ( )",
+        "headerEndLine": 8,
+        "endLine": 8
+      },
+      {
+        "kind": "type",
+        "name": "Cache",
+        "line": 10,
+        "offset": 317,
+        "public": false,
+        "signature": "Cache",
+        "headerEndLine": 10,
+        "endLine": 12
+      },
+      {
+        "kind": "function",
+        "name": "clear",
+        "line": 11,
+        "offset": 340,
+        "public": true,
+        "signature": "clear ( )",
+        "headerEndLine": 11,
+        "endLine": 11
+      },
+      {
+        "kind": "type",
+        "name": "PrivateRegistry",
+        "line": 15,
+        "offset": 376,
+        "public": false,
+        "signature": "PrivateRegistry",
+        "headerEndLine": 15,
+        "endLine": 17
+      },
+      {
+        "kind": "function",
+        "name": "register",
+        "line": 16,
+        "offset": 405,
+        "public": true,
+        "signature": "register ( )",
+        "headerEndLine": 16,
+        "endLine": 16
+      }
+    ]
+  },
+  {
+    "file": "kotlin-good.kt",
+    "declarations": [
+      {
+        "kind": "type",
+        "name": "Vocabulary",
+        "line": 10,
+        "offset": 356,
+        "public": true,
+        "signature": "Vocabulary",
+        "headerEndLine": 10,
+        "endLine": 13
+      },
+      {
+        "kind": "function",
+        "name": "terms",
+        "line": 12,
+        "offset": 460,
+        "public": true,
+        "signature": "terms ( )",
+        "headerEndLine": 12,
+        "endLine": 12
+      }
+    ]
+  },
+  {
+    "file": "kotlin-missing-boundary.kt",
+    "declarations": [
+      {
+        "kind": "type",
+        "name": "VocabularyBoundary",
+        "line": 10,
+        "offset": 387,
+        "public": true,
+        "signature": "VocabularyBoundary",
+        "headerEndLine": 10,
+        "endLine": 10
+      }
+    ]
+  },
+  {
+    "file": "kotlin-missing-overview.kt",
+    "declarations": [
+      {
+        "kind": "type",
+        "name": "MissingOverview",
+        "line": 8,
+        "offset": 185,
+        "public": true,
+        "signature": "MissingOverview",
+        "headerEndLine": 8,
+        "endLine": 8
+      }
+    ]
+  },
+  {
+    "file": "kotlin-missing-public-doc.kt",
+    "declarations": [
+      {
+        "kind": "type",
+        "name": "MissingPublicDocumentation",
+        "line": 5,
+        "offset": 193,
+        "public": true,
+        "signature": "MissingPublicDocumentation",
+        "headerEndLine": 5,
+        "endLine": 5
+      }
+    ]
+  },
+  {
+    "file": "kotlin-missing-type-detail.kt",
+    "declarations": [
+      {
+        "kind": "type",
+        "name": "VocabularyCatalog",
+        "line": 6,
+        "offset": 330,
+        "public": true,
+        "signature": "VocabularyCatalog",
+        "headerEndLine": 6,
+        "endLine": 6
+      }
+    ]
+  },
+  {
+    "file": "kotlin-modified-and-anonymous-types.kt",
+    "declarations": [
+      {
+        "kind": "type",
+        "name": "Container",
+        "line": 10,
+        "offset": 375,
+        "public": true,
+        "signature": "Container",
+        "headerEndLine": 10,
+        "endLine": 17
+      },
+      {
+        "kind": "type",
+        "name": "View",
+        "line": 16,
+        "offset": 568,
+        "public": true,
+        "signature": "View",
+        "headerEndLine": 16,
+        "endLine": 16
+      },
+      {
+        "kind": "type",
+        "name": "Widget",
+        "line": 24,
+        "offset": 757,
+        "public": true,
+        "signature": "Widget",
+        "headerEndLine": 24,
+        "endLine": 38
+      },
+      {
+        "kind": "function",
+        "name": "token",
+        "line": 30,
+        "offset": 962,
+        "public": true,
+        "signature": "token ( )",
+        "headerEndLine": 30,
+        "endLine": 30
+      },
+      {
+        "kind": "type",
+        "name": "Factory",
+        "line": 37,
+        "offset": 1181,
+        "public": true,
+        "signature": "Factory",
+        "headerEndLine": 37,
+        "endLine": 37
+      },
+      {
+        "kind": "type",
+        "name": "AnonymousCompanionHost",
+        "line": 45,
+        "offset": 1346,
+        "public": true,
+        "signature": "AnonymousCompanionHost",
+        "headerEndLine": 45,
+        "endLine": 47
+      }
+    ]
+  },
+  {
+    "file": "kotlin-protected-member.kt",
+    "declarations": [
+      {
+        "kind": "type",
+        "name": "ProtectedSurface",
+        "line": 10,
+        "offset": 449,
+        "public": true,
+        "signature": "ProtectedSurface",
+        "headerEndLine": 10,
+        "endLine": 12
+      },
+      {
+        "kind": "function",
+        "name": "implementationHook",
+        "line": 11,
+        "offset": 488,
+        "public": false,
+        "signature": "implementationHook ( )",
+        "headerEndLine": 11,
+        "endLine": 11
+      }
+    ]
+  },
+  {
+    "file": "kotlin-restates-signature.kt",
+    "declarations": [
+      {
+        "kind": "function",
+        "name": "refreshCache",
+        "line": 6,
+        "offset": 242,
+        "public": true,
+        "signature": "refreshCache ( )",
+        "headerEndLine": 6,
+        "endLine": 6
+      }
+    ]
+  },
+  {
+    "file": "kotlin-wrong-attachment.kt",
+    "declarations": [
+      {
+        "kind": "type",
+        "name": "WrongAttachment",
+        "line": 12,
+        "offset": 402,
+        "public": true,
+        "signature": "WrongAttachment",
+        "headerEndLine": 12,
+        "endLine": 12
+      }
+    ]
+  }
+]

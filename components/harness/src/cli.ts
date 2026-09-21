@@ -1,5 +1,7 @@
 #!/usr/bin/env -S node --experimental-strip-types
 import { resolve, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { realpathSync } from "node:fs";
 import { readFileSync, statSync, existsSync } from "node:fs";
 import { governancePlan } from "./ops/governance.ts";
 import { Store } from "./store/store.ts";
@@ -73,7 +75,19 @@ function jsonFile(path: string): unknown {
     return JSON.parse(readFileSync(path, "utf8"));
 }
 function emit(value: unknown, code = 0): void { process.stdout.write(JSON.stringify(value, null, 2) + "\n"); process.exitCode = code; }
-function main(argv: string[]): void {
+interface ContinuityCommandOptions { groups?: readonly string[]; }
+function commandHelp(groups?: readonly string[]): string {
+    if (!groups) return HELP;
+    let include = false;
+    return HELP.split("\n").filter((line, index) => {
+        if (index === 0 || line.startsWith("Global:")) return true;
+        const command = /^  (\S+)/u.exec(line);
+        if (command) include = groups.includes(command[1]!);
+        else if (!/^\s/u.test(line)) include = false;
+        return include;
+    }).join("\n") + "\nUse unified workflow/check commands for execution and host-instructions/startup for host integration.\n";
+}
+function main(argv: string[], options: ContinuityCommandOptions = {}): void {
     const { flags, words, command } = parse(argv), [group, verb] = words;
     const one = (key: string) => flags[key]?.[0];
     const require = (key: string) => {
@@ -89,9 +103,11 @@ function main(argv: string[]): void {
         return n;
     };
     if (!group || group === "help" || flags["help"]) {
-        process.stdout.write(HELP);
+        process.stdout.write(commandHelp(options.groups));
         return;
     }
+    if (options.groups && !options.groups.includes(group))
+        throw new Error("This continuity command requires the unified workflow/check or host-instructions/startup surface");
     const where = workContext(process.cwd()), root = where.worktree;
     let who = sessionId(one("session")), taskId = one("task") ?? null;
     const store = new Store(one("db") ? resolve(one("db")!) : defaultDbPath(root));
@@ -340,9 +356,19 @@ function main(argv: string[]): void {
         store.close();
     }
 }
-try {
-    main(process.argv.slice(2));
+/** Shared CLI boundary; importing the module never opens a store or consumes host arguments. */
+export function continuityCommand(argv: string[], options: ContinuityCommandOptions = {}): number {
+    const previous = process.exitCode;
+    process.exitCode = 0;
+    try {
+        main(argv, options);
+        return Number(process.exitCode ?? 0);
+    }
+    catch (error) {
+        emit({ ok: false, error: (error as Error).message }, 2);
+        return 2;
+    }
+    finally { process.exitCode = previous; }
 }
-catch (error) {
-    emit({ ok: false, error: (error as Error).message }, 2);
-}
+if (process.argv[1] && existsSync(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url)))
+    process.exitCode = continuityCommand(process.argv.slice(2));
