@@ -392,3 +392,20 @@ No prior evidence is deleted or promoted to a broader claim by this change.
 Local-CI publisher/merge and unavailable VM infrastructure remain separately scoped pilot work;
 retain the core contracts and report unavailable proof without making fleet activation an implicit
 first-release requirement. E6 and all-platform rollout remain later scope.
+
+## Implementation closeout
+
+Implementation through E5 is complete for the operator-approved explicit preview execution scope.
+The final Opus 5 extra-high review and substantive rechecks are reconciled. Source, installed
+checker/context, installed workflow recovery and actual RN simulator/wired-device evidence are
+recorded externally with their exact input and artifact identities. Final component comparisons
+preserve unchanged checker/context proof; changed workflow paths have fresh installed proof.
+Historical device results remain bound to their original archives, not a claimed final-archive rerun.
+
+SDK runner corrections and focused target-refusal/recovery-limit assertions are committed in the
+existing authorized worktree. Optional JEV benefit remains inconclusive; no token savings are claimed.
+The earlier pending entries above record checkpoints superseded by this closeout.
+
+Shared automatic startup, instruction cutover and activation soak remain explicitly deferred.
+Publication, other platforms, device removal/reconnect, Mnemos adoption and live CI/release-provider
+adoption are separate work. Simplification candidates were delivered for review; none was removed.
