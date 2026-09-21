@@ -35,9 +35,9 @@ correctness where establishable, coverage, fallback, total cost and time to acti
 Include delayed defects and omitted evidence. Keep the classifier absent if deterministic parsing
 and compact receipts remove the cost.
 
-## Planned first semantic experiment
+## Conditional semantic experiment
 
-The [decision interface](decision-interface.md#placement-in-the-development-flow) defines a bounded,
-provider-neutral failure-triage request. JEV is one candidate after deterministic result normalization
-and the Codex pilot show a remaining cost. It cannot alter the original check verdict or authorize
-remediation. No semantic adapter is part of the first qualified release.
+The [decision interface](decision-interface.md) starts with optional-context ranking after the
+deterministic packet baseline. Failure triage follows only if normalized results leave an expensive
+semantic bottleneck. JEV cannot alter the original check verdict or authorize remediation.
+The initial provider-free milestone has no live semantic adapter requirement.

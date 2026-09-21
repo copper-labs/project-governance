@@ -2,86 +2,127 @@
 id: spec.harness.decision-interface
 title: Optional Decision Interface
 type: spec
-status: current
+status: accepted-design
 owner: project-harness
 created: 2026-09-19
 updated: 2026-09-19
-summary: Current architecture-reset contract; implementation and qualification limits are explicit.
+summary: Internal semantic decisions with immediate provider-free fallback and measured adoption.
 ---
 
-# Optional Decision Interface
+# Optional decision interface
 
-## Status
+Target evolution: [unified engine](../../../../docs/specs/unified-development-engine.md) and
+[migration categories C17](../../../../docs/reference/2026-09-20-engine-migration-inventory.md) own
+early optional JEV with deterministic fallback. Current behavior below remains effective until qualified cutover;
+prior S1–S9 references are acceptance inventory, mapped by the new transition plan.
 
-Deferred experiment. No provider dependency, network call, classifier or decision catalog is
-required or installed by the core. This is the current architectural boundary, not an assertion
-that a future model adapter has been implemented.
+## Status and ownership
 
-## Admission
-
-First establish the provider-free baseline and identify an expensive semantic judgment. Exact
-facts, arithmetic, hashes, permissions, input applicability rules and release gates remain code-owned.
-JEV is a learned decision model, not deterministic execution.
-
-A future typed question names its version, bounded evidence/candidates, answer schema, provider
-identity, deadline, measurement and explicit unknown/fallback disposition. The model may suggest;
-code and the host retain authority. Provider-specific Choice, Score and Noul semantics must not be
-collapsed into one supposedly calibrated probability of safe action.
-
-## Evaluation
-
-Compare deterministic matching, the existing host and one optional model on held-out failure/task
-episodes. Include packet creation, provider latency/cost, fallback, repeated host context, omission
-and rework. Start in shadow mode; shadow quality is not realized savings. Pin question/provider
-versions, retain evidence and test disabling the adapter. Do not promote a confidence threshold
-without target-workload calibration.
-
-## Removal
-
-Disabling the model leaves every core command and authority boundary intact. No gate, migration,
-resume, recovery or evidence query may require model availability.
+Accepted design; the interface and JEV adapter are not implemented. They belong inside the single
+governance product: the current wheel until the deliberate compiled-Node cutover, never a separate
+product or independently editable lock. Core operation requires no provider or account.
+Code owns facts, arithmetic, identity, permissions, required proof, execution and cleanup. The host
+owns reasoning, source edits and acceptance. Model output is a bounded suggestion, never authority.
 
 ## Placement in the development flow
 
-A **decision adapter** answers one small semantic question. JEV is one possible implementation;
-deterministic rules remain the first choice and Codex remains the fallback for open reasoning.
-The adapter is an internal governance module interface, not a separately supported model-routing product.
+`current facts → deterministic result → optional semantic suggestion → validation → working packet`
 
-`structured facts → deterministic match → optional bounded semantic question → validated suggestion → owner decision`
+Start with `rank_optional_context`: ordered IDs from a supplied candidate set for implementation,
+investigation, review or resume. Required instructions and mandatory evidence bypass ranking.
+JEV is the first adapter to compare against deterministic retrieval and current host discovery.
+Failure interpretation, ambiguous intent/skill advice and worker advice are later consumers selected
+by measured cost. No live parent switching, permission decisions or automatic tool calls.
 
-| Candidate | Example answer | Where it helps | Timing |
-| --- | --- | --- | --- |
-| Failure triage | Infrastructure / product assertion / insufficient evidence | Read a short unresolved diagnostic rather than repeatedly ingesting a full log | First candidate after measured provider-free pilot |
-| Context ranking | Ordered subset of supplied evidence IDs | Prioritize relevant history within a byte budget | Only after simple retrieval shows misses |
-| Task-category advice | One existing governance category or unknown | Help the host choose policy for a new task | Later; no live parent switching |
+Candidate generation and ranking are separate: a model cannot recover a file absent from its inputs.
+Preserve source digests, quoted-data boundaries, coverage limits, conflicting evidence and explicit
+unknown/abstention. Re-read or refuse changed source before delivering a packet. The host retains
+bounded expansion and native discovery. No generated prose summary is required for ranking.
 
-Known error codes, hashes, changed paths and required-check selection stay deterministic. The adapter
-cannot decide to skip a pre-commit/CI/device gate, assert that a cached verdict is valid, mark cleanup
-complete, authorize a retry or accept a task. A product failure labelled infrastructure remains a
-recorded failure; classification cannot erase it.
+## Request and response
 
-## Proposed provider-neutral contract
+A versioned request contains question/purpose, task revision, bounded candidates/evidence references,
+answer schema, evidence digest, permitted data scope, deadline and total cost budget. A response
+contains answer or abstention, candidate/evidence IDs, input digest, provider/model/question version,
+latency, native usage when available and native uncertainty fields. Missing usage remains unknown.
+E3 implementation follows E1a evidence identities; comparisons require a frozen retrieval baseline,
+independent of RN E1b/device completion.
 
-Request: question ID/version, purpose, bounded typed state/evidence references, allowed candidates
-(including unknown), response schema, evidence digest, deadline, data-sharing policy and total cost
-budget. Response: answer or abstention, referenced evidence IDs, provider/model version, native usage,
-latency and raw provider-specific uncertainty fields. Reject malformed answers, invented candidate IDs,
-expired responses and results for changed inputs. No generated executable commands.
+Reject malformed answers, invented IDs, stale input bindings and expired responses. Confidence from
+one provider/question is not a calibrated probability of correctness and cannot inherit another
+question's threshold. No generated executable commands. Add question types only with real consumers.
 
-Initial experiment cap: one eligible request per unresolved failure episode, at most 8 KiB evidence,
-5-second deadline and no automatic retry cascade. These are tunable experimental bounds, not JEV
-capability claims. Oversize/incomplete evidence or provider outage returns unknown and uses the existing
-Codex path. Preserve decisive late-context facts; never silently truncate to meet a provider limit.
-Credentials and permission to send project data are explicit; enabling an adapter is not blanket export
-permission. Local/no-model operation remains complete.
+## Modes and fallback
 
-TypeSafe documents Choice, Score and Noul as different structured question primitives. The adapter
-maps only the selected question's semantics; reported confidence is not a universal probability that
-an action is safe. [TypeSafe primitives](https://docs.typesafe.ai/primitives)
+- `off` (default): ordinary retrieval and host reasoning; zero provider calls.
+- `auto`: explicitly enabled eligible questions use the configured adapter; all others use the baseline.
+- `shadow`: explicitly enabled comparison records advice but delivers the deterministic result.
 
-Start with failure episodes split into development and held-out groups, keeping related retries
-in one group. Compare deterministic parsing, current Codex handling and the adapter including packet
-preparation, escalation, total tokens/time and erroneous routing. Shadow mode establishes quality but
-saves no calls if Codex still repeats the work. Promotion requires that a measured slice actually
-replaces unnecessary host work without hiding failures or weakening required proof. The first shipped
-harness assumes **zero benefit from JEV** and requires no JEV implementation.
+Prepare the deterministic result first. Missing `JEV_TOKEN`, disabled data sharing, unsupported input
+or disabled mode bypasses the provider immediately, without a network probe or account prompt. Token
+presence is not authorization to export project data. One configuration switch disables all optional
+calls without reinstalling or changing task state. Never log token contents or credential digests.
+
+Use a configurable one-second interactive request deadline initially; this is a tuning setting, not
+a performance guarantee. Bound the complete request and abort transport on expiry. Do not retry on
+the critical path. Timeout, invalid response or provider error returns the prepared baseline.
+Late responses cannot replace a delivered packet. Accounting must still avoid losing or double-counting
+known billable usage; unobservable usage is unknown.
+
+Authentication rejection disables attempts until explicit reset or a nonsecret configuration revision
+changes. Transient transport/rate-limit failures use a bounded cooldown (initially 60 seconds), shared
+across CLI invocations by repository/provider configuration identity. Do not put secrets in that key.
+Cooldown state is advisory: unreadable state returns the baseline, not a provider retry storm.
+Normal fallbacks appear in health/telemetry, not repetitive chat warnings.
+
+Bound candidate/evidence bytes and native request size before dispatch. Initial evidence cap is 8 KiB
+per question, at most 16 candidates and one call per packet request for the initial ranker. These
+are initial question-specific settings, not a universal one-question product ceiling. Later approved
+questions may compare bounded shared-snapshot batching with explicit quality, latency and cost proof.
+A candidate header includes ID,
+source digest and selection reason. After measuring headers, split remaining bytes equally between
+candidates and select whole UTF-8 lines around deterministic lexical matches, with ties by source
+position. Record excerpt ranges, source sizes, omitted-byte counts and excluded candidates. If headers
+alone exceed the cap, or no useful excerpt fits, return the baseline. Candidate caps, excerpt omission
+and misleading match position are evaluation strata, not guarantees that decisive evidence survived.
+Full selected artifacts use their separate delivery budget. Pin request/model versions.
+Provider-native formatting and limits must be verified when implementing the adapter.
+
+## Evaluation and promotion
+
+Compare current host discovery, deterministic packets and JEV ranking on fresh matched tasks.
+Keep related retries/variants together, tune on development cases and evaluate fresh families.
+Score decisive-evidence retention and final accepted outcomes as well as packet size, expansions,
+latency and all-agent/provider tokens. Measure candidate omissions separately from ranking mistakes.
+Include ambiguity, late decisive facts, misleading/quoted instructions, outage and stale-source cases.
+
+Shadow scores do not establish saved calls. Enable a question only when it replaces reading/reasoning
+at acceptable quality after fallback and rework. Never infer authority, a passed test, cache validity
+or acceptance from a semantic classification. Disabling the adapter leaves every core path complete.
+
+## Configuration and state ownership
+
+This specification owns a planned `continuity.decisions` section in the tracked governance profile:
+`mode` defaults to off, `provider` selects jev initially, `allowed_questions` enumerates enabled types,
+`allowed_data_classes` defaults to empty and currently permits only explicitly approved source or
+diagnostic excerpts. A caller label cannot expand allowed classes or source scope. `config_revision`
+is nonsecret and explicit. Timing/cap overrides are validated here. E3 adds schema/doctor validation
+and configuration-migration proof; these keys do not work in the current runtime. Environment supplies
+`JEV_TOKEN` only; no credential is copied into the profile or logs. The adapter maps its own variable.
+
+Provider access requires both an enabled question/mode and permitted data class/scope. This is the
+concrete data-sharing gate, not inferred consent from a token. A single mode=off disables everything.
+[Operational storage](operational-store.md#optional-provider-health--accepted-design) owns the bounded
+advisory cooldown state. E3 selects its storage mechanism outside critical ledger transactions while preserving failure isolation.
+
+Keep shadow capability for comparisons on real workloads. E3 chooses evaluator-owned execution,
+runtime integration, or both from coverage and coordination cost; offline replay is not presumed
+equivalent to observing live inputs and conditions. Runtime shadow requires a named lifecycle owner,
+bounded calls/concurrency, cancellation and durable outcome/usage accounting. No unowned detached
+calls or late mutation of delivered packets. If asynchronous ownership cannot be established, use an
+explicit evaluator run; if shadow delays delivery, measure that overhead rather than claim it is free.
+
+Evaluations declare their deadline (initially five seconds); auto retains the one-second interactive
+default. Report fallback/timeout rates over all requests alongside completed-request quality. Record
+both deadlines and execution placement. Shadow measures agreement, quality and added cost, not avoided
+host work. An enabled comparison must establish actual workflow benefit before promotion.

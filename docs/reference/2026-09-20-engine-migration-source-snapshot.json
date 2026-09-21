@@ -1,0 +1,1792 @@
+{
+  "schema_version": 1,
+  "kind": "migration-source-snapshot",
+  "captured": "2026-09-20",
+  "source_head": "3088570fd4feff022a2847c7d9e32a3e1974a946",
+  "identity_note": "Hashes describe current working bytes, including dirty files; HEAD alone does not identify this snapshot.",
+  "scope": "Tracked runtime source and payload, TS core, source/installed Git hooks, host entry controls, source configuration, build/release tools and fixtures/tests. External adopter installations and generated/ignored artifacts are not inventoried.",
+  "category_owner": "2026-09-20-engine-migration-inventory.md",
+  "file_count": 352,
+  "category_counts": {
+    "C01": 8,
+    "C02": 7,
+    "C03": 6,
+    "C04": 18,
+    "C05": 8,
+    "C06": 7,
+    "C07": 13,
+    "C08": 15,
+    "C09": 9,
+    "C10": 5,
+    "C11": 104,
+    "C12": 15,
+    "C13": 2,
+    "C14": 54,
+    "C15": 76,
+    "C16": 4,
+    "C17": 1
+  },
+  "unassigned": [],
+  "files": [
+    {
+      "path": ".claude/CLAUDE.md",
+      "category": "C14",
+      "sha256": "4c4462cfeab2d338de571aaad096cde2eefa773ed1b4308f6155921eb35e09d6"
+    },
+    {
+      "path": ".claude/agents/architecture-review.md",
+      "category": "C14",
+      "sha256": "b8c55c26eb6c6c5c7b903209d36075ad0e8338c28e8f7cae5843b1cc0a158803"
+    },
+    {
+      "path": ".claude/agents/docs-governance-review.md",
+      "category": "C14",
+      "sha256": "b192cc4d8f5e461ccaf847d3807578109cae0b5b55faf7813d86ca7131caf054"
+    },
+    {
+      "path": ".claude/agents/qa-review.md",
+      "category": "C14",
+      "sha256": "ed7060266e39c163a0a6e6239e41a5ff29ab5b97634c5d25f47e86d7f3b79b85"
+    },
+    {
+      "path": ".claude/agents/release-readiness-review.md",
+      "category": "C14",
+      "sha256": "50247a90273fe046b402939fcb80551c9e227c6b4c579826db7cfb460faa5f6b"
+    },
+    {
+      "path": ".claude/agents/security-trust-review.md",
+      "category": "C14",
+      "sha256": "47d5f1a149a4b01d6c4604e9a48a7db4a3c06cbae9d4e922afd6a2d7622bb567"
+    },
+    {
+      "path": ".claude/agents/technical-authoring.md",
+      "category": "C14",
+      "sha256": "7e4273b7e1da761b26f0580128e15bd878e225e4e5cfdf8fe8c26692889200f2"
+    },
+    {
+      "path": ".codex/config.toml",
+      "category": "C14",
+      "sha256": "f0dd4763885ad078d1ec25d1838b9d87f5e7d9545a8ae9948f0c50a9473c1386"
+    },
+    {
+      "path": ".githooks/commit-msg",
+      "category": "C05",
+      "sha256": "b624214b15b1afe03c29573879b6c5464bd67bc051b58254f912cc35e936f48b"
+    },
+    {
+      "path": ".githooks/pre-commit",
+      "category": "C05",
+      "sha256": "d3538f120335ea9a9c9cc5587c7c1bb974da95719c3b6ae6ee2b4974e85926b6"
+    },
+    {
+      "path": ".githooks/pre-pr",
+      "category": "C05",
+      "sha256": "d4654adb2414d250df4bfb06a716aaa98bd6c5af139db000c69000119e918690"
+    },
+    {
+      "path": ".githooks/pre-push",
+      "category": "C05",
+      "sha256": "568f59af2ca00a3b723da11402c303941e090876589bf35b57936f0b99415b7c"
+    },
+    {
+      "path": ".github/workflows/pr-description.yml",
+      "category": "C15",
+      "sha256": "b933cef933d33b1d1a8d3b38366e7a86f93d5715077f847090fabaee665f7acb"
+    },
+    {
+      "path": ".github/workflows/release.yml",
+      "category": "C15",
+      "sha256": "ee8c0a3e23171c414abb214fc4bc2028aab7462a2f41e1f9407c6ca8db75cb5f"
+    },
+    {
+      "path": ".github/workflows/source-readiness.yml",
+      "category": "C15",
+      "sha256": "c3b3f6f2e19a0f760cf84ebf461563adc02267f2ed6b5aca40e7b9d35a1490ef"
+    },
+    {
+      "path": "AGENTS.md",
+      "category": "C14",
+      "sha256": "2aa8c8b421ea13c54668099ce94f12953ea28e0cc52f76dfcfdddadc618a69b2"
+    },
+    {
+      "path": "CHARTER.md",
+      "category": "C14",
+      "sha256": "8a4a92b417400ddd16862d2197852df8c449c71dc695afa17b869bb6b7d4cea8"
+    },
+    {
+      "path": "CLAUDE.md",
+      "category": "C14",
+      "sha256": "cbf3cddf6ad5827219a33e6e8cbbf835153e1acc7a376f0eb72aa820a8f4def0"
+    },
+    {
+      "path": "CODEX.md",
+      "category": "C14",
+      "sha256": "30bc9631b43e315b7dbdb092ee38a34cc6d7087d13d8930506e79eff167bc993"
+    },
+    {
+      "path": "GEMINI.md",
+      "category": "C14",
+      "sha256": "23adbbeddbdc58c28a394dbfdc7e5d9ebd74e347dab7d0827fb621bafb07f7f8"
+    },
+    {
+      "path": "MANIFEST.in",
+      "category": "C15",
+      "sha256": "cb696d7d1d4bc0bf0ac563d6faf3351cc4dea1512d561785abb4317a1d46010f"
+    },
+    {
+      "path": "components/harness/.env.example",
+      "category": "C17",
+      "sha256": "9060000a4d51f2b54ba5db94bfb0781be16297b303c03dcbff22e769b5d6e535"
+    },
+    {
+      "path": "components/harness/package-lock.json",
+      "category": "C15",
+      "sha256": "a875d3501203bd22ee6dbaa629b08eb048e3e25f1e9a99b171e2e9098088d85b"
+    },
+    {
+      "path": "components/harness/package.json",
+      "category": "C15",
+      "sha256": "f2dec34611cc1217d7469e0bb039a971595d2e078497195b0fabb4aa59021441"
+    },
+    {
+      "path": "components/harness/src/cli.ts",
+      "category": "C16",
+      "sha256": "61e8b32705f924bf56a4423c2921eee41158cabf1b9d19936cc90baad8a4122f"
+    },
+    {
+      "path": "components/harness/src/model/types.ts",
+      "category": "C01",
+      "sha256": "927f131addf69d65ce6c7de1f7579f306da6653dc2358a2e154594c8d0a73745"
+    },
+    {
+      "path": "components/harness/src/ops/actions.ts",
+      "category": "C01",
+      "sha256": "0083f86ccbfb3b4d1e75074103e43a6379b3d16adc4bdde1a7a77915391dced7"
+    },
+    {
+      "path": "components/harness/src/ops/adapter.ts",
+      "category": "C04",
+      "sha256": "f4a1fa1d9ce555716859810c413ac2b7386dce4a3ddb1f0981d1bb9a977938b0"
+    },
+    {
+      "path": "components/harness/src/ops/authority.ts",
+      "category": "C01",
+      "sha256": "5315443f59582b28364724a453ce5b034b317bca88e20113f064958303e36d5e"
+    },
+    {
+      "path": "components/harness/src/ops/concurrency.ts",
+      "category": "C01",
+      "sha256": "86fe986691b1deb31c37ac11b9a90213984e3e73625b37859867dbd373a313bb"
+    },
+    {
+      "path": "components/harness/src/ops/continuity.ts",
+      "category": "C01",
+      "sha256": "c32b3642a9dcad88b3d4ef5400e3a55cdda73acb734c45d0a8b1df71b60e9cdf"
+    },
+    {
+      "path": "components/harness/src/ops/execution.ts",
+      "category": "C03",
+      "sha256": "38f85fcbe3f1ca7196ccac76b74b84841278329b7b7d9e0f84d028fcc59a3ff3"
+    },
+    {
+      "path": "components/harness/src/ops/governance.ts",
+      "category": "C02",
+      "sha256": "67c4a3e53d3933351ea47179ff693868bcc4e3ef3153d7b4b8905940075c4f88"
+    },
+    {
+      "path": "components/harness/src/ops/retrieval.ts",
+      "category": "C11",
+      "sha256": "426d2b7f72e89e2a860e806c0fff7a7c0ccd6e9fc2e4976e4b833911ba8b6c07"
+    },
+    {
+      "path": "components/harness/src/store/location.ts",
+      "category": "C01",
+      "sha256": "a1c71abf4d1975ffbb68427f74435b6b7b638ee1be6bd7b88e0345e4f775135d"
+    },
+    {
+      "path": "components/harness/src/store/schema.ts",
+      "category": "C01",
+      "sha256": "3d3bf2010cb46ff71efe091860b625d332a7fa4749018b5529c42a6dc051bb1d"
+    },
+    {
+      "path": "components/harness/src/store/store.ts",
+      "category": "C01",
+      "sha256": "16dac0e9a1ff063eda7478748df0e0a6da3e8d60a35167a9bd19eab032bf5b25"
+    },
+    {
+      "path": "components/harness/test/adapter.test.ts",
+      "category": "C15",
+      "sha256": "16445de9364f6b719346830e18577f6289eb8ff31874e80737d507cae43ec30a"
+    },
+    {
+      "path": "components/harness/test/authority.test.ts",
+      "category": "C15",
+      "sha256": "4952e9902b6b7e137224577adac938edb731e0840745aa4bb2cbb09f8687dc53"
+    },
+    {
+      "path": "components/harness/test/cli-execution.test.ts",
+      "category": "C15",
+      "sha256": "8dc7f39b7eead3919386a55eceda78a68c2401563ac53450aee801c3e2029c9c"
+    },
+    {
+      "path": "components/harness/test/cli.test.ts",
+      "category": "C15",
+      "sha256": "c4711910320c73bbcc9ddd90e78c028838f77b558b3b7121ea3cf16ba8b80a47"
+    },
+    {
+      "path": "components/harness/test/concurrency.test.ts",
+      "category": "C15",
+      "sha256": "233170b92b7b950149d5eba64ae19a15e7a0a299d7230d69c7011dd9943f200c"
+    },
+    {
+      "path": "components/harness/test/continuity.test.ts",
+      "category": "C15",
+      "sha256": "b6970cc7184b1ecb062afed3d9543bc783976db074f631909e54c47e27012f5b"
+    },
+    {
+      "path": "components/harness/test/execution.test.ts",
+      "category": "C15",
+      "sha256": "d5fb80d9b9cf33d41145aa21130cb31603de3c93cc8a1bbde766f66f9386e843"
+    },
+    {
+      "path": "components/harness/test/helpers.ts",
+      "category": "C15",
+      "sha256": "30d6ac7d87011f84f6fb0b9a5eeb4a19e6a7b6ba17105e411d1b41d38470adae"
+    },
+    {
+      "path": "components/harness/test/recovery.test.ts",
+      "category": "C15",
+      "sha256": "6739d13b2681f70e6e51d9eaf3a1dceeed513b83e7feaa59fbd6951413f82c81"
+    },
+    {
+      "path": "components/harness/test/retrieval.test.ts",
+      "category": "C15",
+      "sha256": "668a5e8c44dcd208e51f909a395211f5c6fa45f3a8451271a007df8884be0f57"
+    },
+    {
+      "path": "components/harness/test/store.test.ts",
+      "category": "C15",
+      "sha256": "dd858149ff44eb95e80723988096222bc65fd70d9320674d4f6e449f674c621d"
+    },
+    {
+      "path": "components/harness/tsconfig.json",
+      "category": "C15",
+      "sha256": "a6fb19e6ac524df83225e8392ccf0d918b7199dfcafc63ae045c34cf6db54a62"
+    },
+    {
+      "path": "config/governance/profile.yaml",
+      "category": "C14",
+      "sha256": "ea370b6e79cb766d365525080bdd94c3dc16d1dc247849e1ab204b7f2140a35e"
+    },
+    {
+      "path": "config/policies/code-quality-dispositions.yaml",
+      "category": "C14",
+      "sha256": "6ddacd78e078e8c9f2936e0dc9af87bb7c77a2a9dbc69d611c208591cd28e67a"
+    },
+    {
+      "path": "config/policies/dependency-freshness-evidence.yaml",
+      "category": "C14",
+      "sha256": "b0bcb73546f2c75f65dd7b47a2406caadedc82cd8ebc21e975083bdaa399471b"
+    },
+    {
+      "path": "pyproject.toml",
+      "category": "C15",
+      "sha256": "d79a32641551b55add53f926d85b32960b462e8bb59f7b42b215db614f7f031f"
+    },
+    {
+      "path": "requirements-dev.txt",
+      "category": "C15",
+      "sha256": "b9013ce6584dc2ef65c07aaac3efeb56fd441633632b2eed28dc015d2d95251d"
+    },
+    {
+      "path": "setup.cfg",
+      "category": "C15",
+      "sha256": "5e287f63f47e175322723b09f532d8a03494e75ca222b942c0f301e373d5b2a4"
+    },
+    {
+      "path": "setup.py",
+      "category": "C15",
+      "sha256": "471a52f8b3fbd6f72b897b320e9af8764f46cdebd512dac78f1da46ebb639131"
+    },
+    {
+      "path": "src/project_governance_runtime/__init__.py",
+      "category": "C16",
+      "sha256": "1ad4fc4723692bcc3b8f1900195ecb2a08454ec834bdd0284ccde4bac828a01a"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/.githooks/commit-msg",
+      "category": "C05",
+      "sha256": "c0487e891bf12ed39937a1425b40303a9b257e9e11dafbd90da1b6804520f6f3"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/.githooks/pre-commit",
+      "category": "C05",
+      "sha256": "206d8c1e35f6b9460679a064567bba71d6f096c7200da0f204b1fba60b8e58e9"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/.githooks/pre-pr",
+      "category": "C05",
+      "sha256": "d92efc635e61802e905c9ea583372512c3efc99fe09253e9bd11a31dc51cb979"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/.githooks/pre-push",
+      "category": "C05",
+      "sha256": "cba8410fa11dc155812630fe6593f2fd7890410b48c4497f33ade776fe20bfca"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/runtime-requirements.txt",
+      "category": "C12",
+      "sha256": "c4dbeb0302e4ad5b396c87330df6fb759b4df11e7c7d1f70f73c20d29a7fa618"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/architecture-design/SKILL.md",
+      "category": "C11",
+      "sha256": "ddcd36e0895053deb070eb504114d5572f442bb260cf043a6156488950d87f7d"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/architecture-review/SKILL.md",
+      "category": "C11",
+      "sha256": "474d54a8d19a749bb65de2ad0cacca66ea51a91ba7322f6bf14145481fad9b50"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/capture/SKILL.md",
+      "category": "C11",
+      "sha256": "704610ecea893100da5a1e47ecb1304ca6b615b1da37b31ca7726ff3d1b64e42"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/catalog.yaml",
+      "category": "C11",
+      "sha256": "3c55fa1dd3a39a4cb8387398677af76fddbda117b4335ec74b2f58ce0b7f63e5"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/context-router/SKILL.md",
+      "category": "C11",
+      "sha256": "79bb50b52b260918232ee5e0dcd66f807a75664fe1376369b4fbbb3a96b63d18"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/delegated-execution/SKILL.md",
+      "category": "C11",
+      "sha256": "61aa02ebcc8efacdbec7461476f702d74323a1e4458e39d65a33ec15cd5dd55e"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/docs-governance-review/SKILL.md",
+      "category": "C11",
+      "sha256": "a66e2c550a73cd5dfc718ff95182d2e30fff41342e0883a7472dd64f64bfb1f9"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/environment-investigation/SKILL.md",
+      "category": "C11",
+      "sha256": "e8e68249529ee43d4c39a18d53490115e3a964fe799151ee84d33a6b46692c7e"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/frame/SKILL.md",
+      "category": "C11",
+      "sha256": "648eac779bc01ddd517958462639cd1e868cd315ab07eabe06e441280009c616"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/harness-claude-agent/SKILL.md",
+      "category": "C11",
+      "sha256": "3142c9131833d954f8279ea1714cc0fa75e48bb3fab0ddd09cb7009ae94be9e9"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/harness-codex-agent/SKILL.md",
+      "category": "C11",
+      "sha256": "549cd07d6669208e13f40688523b5036bfe677d26865b2aed2326ee532c71a4b"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/harness-gemini-agent/SKILL.md",
+      "category": "C11",
+      "sha256": "8e7afcbfbb7fcb0b9ec638b5be6b50ae4845d105e4e3daf4bde8396bc9ea30c2"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/hook-check-operation/SKILL.md",
+      "category": "C11",
+      "sha256": "66df9d3900df8ceebf5b1af7a7e96e0e6e13a4f550bd6d59abd5b09df6ba7afc"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/impact-planning/SKILL.md",
+      "category": "C11",
+      "sha256": "13db0f390b266fa31ce43ecffe135db2810b9a5206ffe4cbe69b5240ecb1cfb8"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/install/SKILL.md",
+      "category": "C11",
+      "sha256": "b4375e5ae54dcfb5489d9568d1a79ba0b4acf76a23024e5c43d360945c1618b6"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/kmp-implementation/SKILL.md",
+      "category": "C11",
+      "sha256": "babc90ff00b1c8909505ef144b8c8b9d645d8eaba42aff69fe395ff962b0a142"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/maintain/SKILL.md",
+      "category": "C11",
+      "sha256": "9e775c529457878f06a1d898b4f9fc84983550c6879d804e4ffc93916ae3eb71"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/module-authoring/SKILL.md",
+      "category": "C11",
+      "sha256": "b9ea55b1105e805b9548c15291a0293e20d2487887237a4a24e49c6fb6059c42"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/pattern-packs/delivery-quality/architecture-cleanliness-review/SKILL.md",
+      "category": "C11",
+      "sha256": "c267eac7b2ec43b28610696bc78478eb895b67bc15b3fc7ffea88267db81d64b"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/pattern-packs/delivery-quality/async-ci-stability/SKILL.md",
+      "category": "C11",
+      "sha256": "e8ce8c33256bc67b62d2e90b58c19555fe636796ceed8568b96b2ff35dc272fe"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/pattern-packs/delivery-quality/build-engineering/SKILL.md",
+      "category": "C11",
+      "sha256": "ec960ca312091b6b2590e74ae94e8f10c05f97c41c44a9d8813c1953444c8010"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/pattern-packs/delivery-quality/code-review/SKILL.md",
+      "category": "C11",
+      "sha256": "d0f4264e8d7e66b4fbeb6a8cb110cc3edd26ca66f059a14e93cb918192fdf4f3"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/pattern-packs/delivery-quality/code-simplification-review/SKILL.md",
+      "category": "C11",
+      "sha256": "39c402af53f7855fca434176cb01af305c770685bee7490ad474a02b63fa69fd"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/pattern-packs/delivery-quality/commit-message-workflow/SKILL.md",
+      "category": "C11",
+      "sha256": "df3b284500ddc18658deaf3d32244239f406418b33701adc2b4f5aacc7161a07"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/pattern-packs/delivery-quality/docs-structure-migration/SKILL.md",
+      "category": "C11",
+      "sha256": "72d0e98913bb151baeb53ace14cdec5b277c69f08b6af65a72245f8c0d24e6a9"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/pattern-packs/delivery-quality/external-docs-authoring/SKILL.md",
+      "category": "C11",
+      "sha256": "09f64b1ee06b8b11971657f4fe029657a14b394ed48685967017aa1de838282b"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/pattern-packs/delivery-quality/external-docs-style-guide/SKILL.md",
+      "category": "C11",
+      "sha256": "46c58e9019c31d452413d7e72c2e454e5f01192297787b1abcc214b369d86dd6"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/pattern-packs/delivery-quality/governed-spec-workflow/SKILL.md",
+      "category": "C11",
+      "sha256": "86cc6f1abca8b06a2a4c286db13a2bcf9444c81737f2563cb4bb307d673248f4"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/pattern-packs/delivery-quality/implementation-plan-workflow/SKILL.md",
+      "category": "C11",
+      "sha256": "7fc98d0d368540f228c2cccd41702db134e3cb7e7502ab0e62e96d584e00c902"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/pattern-packs/delivery-quality/implementation-quality-gate/SKILL.md",
+      "category": "C11",
+      "sha256": "bd876c011096ffe649ef961700b13d1fb156db613b7c48c7183d906600c75445"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/pattern-packs/delivery-quality/manifest.yaml",
+      "category": "C11",
+      "sha256": "0a2886c9a1928483e8020fc442c7873740212508f7aeb2167463a52d2ef47943"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/pattern-packs/delivery-quality/mermaid-diagramming/SKILL.md",
+      "category": "C11",
+      "sha256": "f151a143b8f1a9557688b2a366be41708dbbc878cb0dcc2f7cd5a995bba444f3"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/pattern-packs/delivery-quality/pr-description-workflow/SKILL.md",
+      "category": "C11",
+      "sha256": "9abad5d4553db081ed58315cf2cb31b89dbebaf3f8672220fb7488a63b852ce7"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/pattern-packs/delivery-quality/risk-assessment/SKILL.md",
+      "category": "C11",
+      "sha256": "8ccc372b71192c04fb15cfcce565c9dfc679c093716d0b6db20a21086e38ec7b"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/pattern-packs/delivery-quality/scope-check-review/SKILL.md",
+      "category": "C11",
+      "sha256": "75435a528e1009a3cb506a217bf25190adc47549a76b9d5e24dbfdb3ffef1f25"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/pattern-packs/delivery-quality/spec-compliance-review/SKILL.md",
+      "category": "C11",
+      "sha256": "7a74c4f1d59e5914dfd5644c21ffacbe449b1992a397bf05863ed2f63172620b"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/pattern-packs/delivery-quality/structured-discovery-interview/SKILL.md",
+      "category": "C11",
+      "sha256": "d63a6399eebd18107315ea24cd792ce11985dfe9a806a00d2520709631b73b97"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/pattern-packs/delivery-quality/test-driven-development/SKILL.md",
+      "category": "C11",
+      "sha256": "62785841cdf57478a017e7acc1c5e6183da0757f85d09d359f670c26c671ad96"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/plan/SKILL.md",
+      "category": "C11",
+      "sha256": "bf1533ef7e9f882360c461efe73c6b4d502e2222960bb2a48d5cef94d9dba65b"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/python-implementation/SKILL.md",
+      "category": "C11",
+      "sha256": "d77d99a8f7b52a943611a0480bbb60b49c72363bfce46b0e53cb3530458d8165"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/qa-review/SKILL.md",
+      "category": "C11",
+      "sha256": "d5665fa2156eae6991930c2fc653b648caa605b5094093f74ce561925ee660ac"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/release-readiness-review/SKILL.md",
+      "category": "C11",
+      "sha256": "eb579b47d0884bdca5c5226ef081a43d8acd2d5215e1f0004edfd3a2e0d601af"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/resources/change-narrative.md",
+      "category": "C11",
+      "sha256": "c315a634602d5169cbb43fddfa31675e22c67513c0f04da4d021cb423116c412"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/resources/efficient-execution.md",
+      "category": "C11",
+      "sha256": "00562b30b3708852ff228cdfed0f24f026385508ebb6fed8e0deffcf187721ee"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/resources/harness-agent-operation.md",
+      "category": "C11",
+      "sha256": "451f413b97f55cbeaf8f4d9a6496c3dd02024815fbae57c017dc5d3290e8caf4"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/resources/harness-delegation.md",
+      "category": "C11",
+      "sha256": "a6c07efb9137e9aa0a72acadd7e75499b4a4c5e1871b8062106b54700dc81f97"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/resources/implementation-plan-template.md",
+      "category": "C11",
+      "sha256": "6bc30d29685b8c65cca688e8656ba9c5553f1c8b97335b367cdf1af2263f6df5"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/resources/loop-cycle.yaml",
+      "category": "C11",
+      "sha256": "4c854e0928e405f8f8569c18c526ca8cf578b511c84812b72818f67680a7acc6"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/resources/model-selection.md",
+      "category": "C11",
+      "sha256": "9382d36d7f9e4edd471dd5f65f5b4ffe6f9710d688def2eecf83b9b913f2070a"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/resources/reader-first-authoring.md",
+      "category": "C11",
+      "sha256": "b9224d855fa076039fcf694dfd311aae9a626ba5fde1a2ec82dfbca715c54896"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/resources/startup-runtime-updates.md",
+      "category": "C11",
+      "sha256": "1d63ed7447c255e431e792fc3bc107b96a85a55e039d739f930ee44b383e6bda"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/resources/test-batch-contract.md",
+      "category": "C11",
+      "sha256": "fc444636b38ce27fa87c1fbf615a181b404b627a8472b58e3923b6b56dbc1281"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/review-finding.schema.yaml",
+      "category": "C11",
+      "sha256": "bf914ad9e4cd13390206748ea9b287d0b9066619e0bb86f0686ba1bfbe6d4994"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/review/SKILL.md",
+      "category": "C11",
+      "sha256": "a0389e2e92c27f0cdd0e581e35e86cd5655fd3eac81b57133020aa372979185e"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/security-trust-review/SKILL.md",
+      "category": "C11",
+      "sha256": "068841fac430272307c38063475d5dad93cca1e0704f0bf78ab79533efaccd60"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/kmp/LICENSE",
+      "category": "C11",
+      "sha256": "a3ba48806296fefd37066dca33b79ee6d0de37385909552250a24775cf8ffd01"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/kmp/NOTICE.md",
+      "category": "C11",
+      "sha256": "9ac68e6c997a868fd08a4abf1a4331ec035d63304955a0dd42b04b869e89458e"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/kmp/core/kmp-api-and-artifact-boundaries/SKILL.md",
+      "category": "C11",
+      "sha256": "944503166111ec1e69c0b751ca4d262f71d7a386057d98ba3a58ab70bc5dcfa2"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/kmp/core/kmp-api-and-artifact-boundaries/references/decision-guide.md",
+      "category": "C11",
+      "sha256": "9577fd11d78f9427f21645650ea582643fe379d5a90453f35d3aeef3127f43d7"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/kmp/core/kmp-build-and-compatibility/SKILL.md",
+      "category": "C11",
+      "sha256": "5bb073b056eb7d31de2c2278db1996dc578e0c84b1e07772314e224fe06849d8"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/kmp/core/kmp-build-and-compatibility/references/decision-guide.md",
+      "category": "C11",
+      "sha256": "9c35d84a588d1843b7df79a9e7de2c1deccf9e6b7210d42670cd0ec4aab18365"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/kmp/core/kmp-coroutines-and-concurrency/SKILL.md",
+      "category": "C11",
+      "sha256": "019a223f2e6a916c916725c4539640f35cf899eecee84acb1f042d2aa71e25b2"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/kmp/core/kmp-coroutines-and-concurrency/references/decision-guide.md",
+      "category": "C11",
+      "sha256": "153acfb24de771eae318d7d12542e18bdd2434a9a9f7de0886db0de1756c2f90"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/kmp/core/kmp-sharing-and-architecture/SKILL.md",
+      "category": "C11",
+      "sha256": "05e5bd1a9f94b6538f6b2c58ffce81fc9537313a8d9ad3ea469822655b575527"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/kmp/core/kmp-sharing-and-architecture/references/decision-guide.md",
+      "category": "C11",
+      "sha256": "18741a23732aacda651e0b80391dd368e08d0adcf92e3ea6a454d0d4ba8a4358"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/kmp/core/kmp-source-sets-and-platform-boundaries/SKILL.md",
+      "category": "C11",
+      "sha256": "4ae220a2ee63add4cb97153ccdbeb3a17109e1cf939fab5631ec2691754cd453"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/kmp/core/kmp-source-sets-and-platform-boundaries/references/decision-guide.md",
+      "category": "C11",
+      "sha256": "e31be69e13351a439495a72cf543765ecbd8c908d77f758fd681ae03f282ed9c"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/kmp/core/kmp-test-and-evidence/SKILL.md",
+      "category": "C11",
+      "sha256": "2b921790752eb853536af40b1b6b6a1c7c2226c266f2d84370e41d62fc467118"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/kmp/core/kmp-test-and-evidence/references/decision-guide.md",
+      "category": "C11",
+      "sha256": "64b731f6e242f87c2bc122b1175f378cd675786c25c91ce35a32f3a1d2e047d2"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/kmp/manifest.yaml",
+      "category": "C11",
+      "sha256": "04a0019d8a49561e36bc8025b06879954100e2fa5780003ab96196f8c9e3cea6"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/web-cloud-control-plane/manifest.yaml",
+      "category": "C11",
+      "sha256": "8719a3b48ad5dd26b31b78fc90bc2eb3ff8d8fb6cec3cab9342c5c712d331613"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/web-cloud-control-plane/svelte-5-component-authoring/SKILL.md",
+      "category": "C11",
+      "sha256": "33884a9a431e398a12fca0828f2a6e8e09d9433ab0071b9424aafdf9750750db"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/web-cloud-control-plane/svelte-5-runes-reactivity/SKILL.md",
+      "category": "C11",
+      "sha256": "8e796f71d76f68b82c8e1c0f4fcbca3b6617f8d827128dd1c2c242afb78af5ff"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/web-cloud-control-plane/sveltekit-auth-session-boundaries/SKILL.md",
+      "category": "C11",
+      "sha256": "dd80b8957b48175b56f1996ae9e78d240c9cc6fbabd39effc695c96c4529de05"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/web-cloud-control-plane/sveltekit-cloud-worker-boundary/SKILL.md",
+      "category": "C11",
+      "sha256": "760c80121f72f393150311b78c94423a73480b8a61b659411d470b3279b8a02e"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/web-cloud-control-plane/sveltekit-data-loading/SKILL.md",
+      "category": "C11",
+      "sha256": "2403620a7d1402a1eadf51f5ee20859a7622df8fa996a6967c34855d13016acc"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/web-cloud-control-plane/sveltekit-db-migration-safety/SKILL.md",
+      "category": "C11",
+      "sha256": "74e510a0deb62ac66e7994594997ccf6a68f775246d5e1cf9db19493cae104e9"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/web-cloud-control-plane/sveltekit-deployment-adapters/SKILL.md",
+      "category": "C11",
+      "sha256": "72b75c274533019d7a1b1588f2aec713a12b9df3bed381233015050500b74af5"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/web-cloud-control-plane/sveltekit-drizzle-postgres/SKILL.md",
+      "category": "C11",
+      "sha256": "88423129db63310cf84337abda212534ea9e4611a6852a6d4c6773f8e73738ae"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/web-cloud-control-plane/sveltekit-form-actions-zod/SKILL.md",
+      "category": "C11",
+      "sha256": "909fba3afd36b9da5f2ab78f2aff27be8a575eecead7c7b49b9fea3aef5da6c5"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/web-cloud-control-plane/sveltekit-performance-observability/SKILL.md",
+      "category": "C11",
+      "sha256": "893b1043efb1473a827c78d19292e751b8b8553a7c68503693a18705228c4c58"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/web-cloud-control-plane/sveltekit-prisma-postgres-alternative/SKILL.md",
+      "category": "C11",
+      "sha256": "ea836c2169d4fb0240a0efbc5354dde2a19f2026c21233f41d063978f018cb26"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/web-cloud-control-plane/sveltekit-remote-functions/SKILL.md",
+      "category": "C11",
+      "sha256": "bd5cdbf458e45eff83fdecbd9329bba4f6192af792a8a9ef89271a6cae9766d5"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/web-cloud-control-plane/sveltekit-routing-structure/SKILL.md",
+      "category": "C11",
+      "sha256": "449645f824449ccaacffd17e7fe09ae38c393f8a9b858a9ce9579a63f556b322"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/web-cloud-control-plane/sveltekit-server-boundaries-security/SKILL.md",
+      "category": "C11",
+      "sha256": "390c8ea7d93d49d8f589df36872a6ece13e20bbc1c71e8a2f77ce4b5e27b6bc4"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/web-cloud-control-plane/sveltekit-stack-router/SKILL.md",
+      "category": "C11",
+      "sha256": "45e1e8c89dc0df02f9500e772aab30846068272933d4ac82ffc78b3621c279e6"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/web-cloud-control-plane/sveltekit-superforms/SKILL.md",
+      "category": "C11",
+      "sha256": "eec51e75fee9f972d54472aabb6e6b9dc406ee988f0964c8b4bbf5c3d9aef0c9"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/web-cloud-control-plane/sveltekit-svelte5-migration-audit/SKILL.md",
+      "category": "C11",
+      "sha256": "42ae3be478ccf1f81b29b4905602c490b966c7e99576b20cb9c1da9621b74f2f"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/web-cloud-control-plane/sveltekit-tailwind-design-system/SKILL.md",
+      "category": "C11",
+      "sha256": "4054d08f26cc7972d13b5034d72de781239757481607cc10d8f39a39cb4798f9"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/web-cloud-control-plane/sveltekit-testing-playwright-vitest/SKILL.md",
+      "category": "C11",
+      "sha256": "8be7c96785c3dae7028db9dc5ce42ba17efa3bf020f3e690065656c80748d3bf"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/stack-packs/web-cloud-control-plane/sveltekit-ui-library-integration/SKILL.md",
+      "category": "C11",
+      "sha256": "d72d3b80e1e94d39bf8e2d513642489c279d5011f34072d1497be4671f8896ee"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/technical-authoring/SKILL.md",
+      "category": "C11",
+      "sha256": "b2ad7bca9366acb3a2159f72cb076b07d08f7aabfe260470218aed33ea3b86a6"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/test-execution/SKILL.md",
+      "category": "C11",
+      "sha256": "259090c7c8518c1c505b02e1fe3b67806d593b53dde04f88218cb626c0b1dfbb"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/typescript-implementation/SKILL.md",
+      "category": "C11",
+      "sha256": "f327b6b59a516d65b56cb7936c531d17b2ca3732d771425d3d8fee90fccd87a1"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/work-item-lifecycle/SKILL.md",
+      "category": "C11",
+      "sha256": "4f0c679f033ab2f3dc29c21a18a8743f08b6421eff5046ecc198f9e4e3b1b900"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/skills/work/SKILL.md",
+      "category": "C11",
+      "sha256": "959cdabca4d55b3cd5b6faeb933e95273d03f73eff506bc8236f33e84e0a0c36"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/tools/governance-bootstrap.py",
+      "category": "C12",
+      "sha256": "63c4b02c91c8cbe72b562440df493b264fbbd2c789a6d82b2d58cdbef42339ee"
+    },
+    {
+      "path": "src/project_governance_runtime/assets/tools/governance-startup.py",
+      "category": "C12",
+      "sha256": "48308b51ca0da54560f2b78d205f2222dcc536d4a7eb52f2cbe7ef83f4eecacd"
+    },
+    {
+      "path": "src/project_governance_runtime/changed_paths.py",
+      "category": "C02",
+      "sha256": "0389daf6fcb4ae5b8c22273648cd3ef0b37b18daae8cc2079cc679495e4c09b4"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/apple_dependency_discovery.py",
+      "category": "C08",
+      "sha256": "ac1fc91933fcdb1d13eda886201fbc8c833e05764d8d0587fcf247defede158e"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/apple_dependency_evaluation.py",
+      "category": "C08",
+      "sha256": "51d35edec7fc42e43027cacade3bb2fe798293775349f2fe3fa0c7868b411c78"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/apple_dependency_exceptions.py",
+      "category": "C08",
+      "sha256": "6ad3b2c915ebf73215a56012430397a6fa9dc80c14a7f03d7157436d28537e90"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/change_narrative.py",
+      "category": "C09",
+      "sha256": "a0bb9c34174403062ea50ed67cc5372cf9171f8c21a44ce9cd89fd1a25f93da0"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/check-apple-dependencies.py",
+      "category": "C08",
+      "sha256": "f6e7b341c48855e251ae721037e89bddd50178756c82da0c11b00d3a4fbba0dd"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/check-code-smells.py",
+      "category": "C07",
+      "sha256": "3cf143cc23690a7b8ac5096551b60638f7ed4611f9165f390e081633eff5f11c"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/check-comments.py",
+      "category": "C07",
+      "sha256": "91911d6b21f71a5bc8493c23ef12693941c2e669ea52b5c97a9034646fb90a14"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/check-commit-message.py",
+      "category": "C09",
+      "sha256": "6ad932b2b9ba8f0b719cdf448dd86d4d5cec195ace7583561c58eb8a0a68876b"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/check-context-router.py",
+      "category": "C11",
+      "sha256": "6baa38f288fbd33849bd8d30c60d288c5f4de879d3c8dc9f7c09859f38693f5a"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/check-dependency-freshness.py",
+      "category": "C08",
+      "sha256": "2e156f4c9d21f8bf53dac936a5be35af5828317eed7fcdd7202d496c521c8761"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/check-doc-governance.py",
+      "category": "C09",
+      "sha256": "50e4a0faf3948621326cc4c7ee7b20fc6899e3aedcba001261944f881c12c1e3"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/check-format.py",
+      "category": "C06",
+      "sha256": "1e92ea7077d77e98426172c7866fd45d25faad9035edb36197d796c4b415cf1c"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/check-kmp-surface-validation.py",
+      "category": "C10",
+      "sha256": "7db154456283b29d26bdcfefda07003bc04fee017d1cdaefd7eda2ac35b14472"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/check-naming.py",
+      "category": "C06",
+      "sha256": "ed98c9e7b864bfca646fd796b1af5a345ca5db779ee9f215ea0d6f3c6591ef91"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/check-pr-description.py",
+      "category": "C09",
+      "sha256": "2637ec454cd7c7ac1c53f883876cbe2f5053dda8ba485102e8901b9a33dc2983"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/check-prose-style.py",
+      "category": "C06",
+      "sha256": "86f9465f33db8477f18965f60724b359d8766efe2f715934c5fa74a45b550a45"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/check-security-policy.py",
+      "category": "C08",
+      "sha256": "734d1ed7ee83d7c530e8fc8b205f63d824094cd44db2d4290b609b9869703b6e"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/check-test-quality.py",
+      "category": "C09",
+      "sha256": "657a0a1786ced1b955262229076288657949ec561805a71b60c7ebd39335129e"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/comment_checker_registry.py",
+      "category": "C07",
+      "sha256": "2a453c0c7615dafc058e44cbf3f1362c59900522c6dbcba3e3fa41d0415ee385"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/comment_checker_selection.py",
+      "category": "C07",
+      "sha256": "69180133d6c1150fa4a33476c062fec752ff16aafc864b4b1ecd19a434733861"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/context_check_profile.py",
+      "category": "C11",
+      "sha256": "ad7ba201869435e8418a364dcc1f1b171bce593a386b72b1e12349d134e0e8a0"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/dependency_evidence.py",
+      "category": "C08",
+      "sha256": "47fc52f8c4c5e6bb1bd9699c5236df8d73c04af517668c5e2e1fb720a599623d"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/dependency_extractors.py",
+      "category": "C08",
+      "sha256": "e9b6d26cb8e79451d48f174ae9a1fc8b1e12bb27fccd633692218f30f72b91a4"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/dependency_primitives.py",
+      "category": "C08",
+      "sha256": "a809a1dff0e1e23bb5fa19db9beab5cbbfd13057b96cdf683ae69f93456724e5"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/dependency_registry.py",
+      "category": "C08",
+      "sha256": "1b43a5bc8b4817a8357b5ceb680fd2f58116d13dc6f906316bd8f40f3a97f42c"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/dependency_runner.py",
+      "category": "C08",
+      "sha256": "0c3462735fdeaad719acce1609cf35c32e033bc288cc1ee70b98d29b66c0cdaa"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/dependency_workspaces.py",
+      "category": "C08",
+      "sha256": "9fa2f2a202d1f83d173f55bb1cf9d389b38374051015410f25bc67bd96b94cc2"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/finding_lifecycle.py",
+      "category": "C14",
+      "sha256": "5e01c75f5967b18b454244db02d286e60f4787346357d97abbc0fc46bf8cc847"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/governance_changed_paths.py",
+      "category": "C02",
+      "sha256": "60e3cbc377e26ece28053004400c59d24776f71b25ac943d55b42dce93786453"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/governance_schema.py",
+      "category": "C14",
+      "sha256": "fae715fd741b3232c218a4239b908b899f9ba01941bb322db4a9c99066a6fb62"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/kotlin_comment_analysis.py",
+      "category": "C07",
+      "sha256": "0f87737bd00159c7622a5edefbf34faae5ba07f0d4bdd51f31b5ed3c6a0609fe"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/kotlin_source_parser.py",
+      "category": "C07",
+      "sha256": "3d23b4db2c2e34ea514a659362d700ff64010ef4610e8d096e5194b2f2896531"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/maintainability_analysis.py",
+      "category": "C07",
+      "sha256": "41f5e8931033dc5a8d3ae7d594de2c79884bbed4bc07afb5c0fee3f1444dd27d"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/maintainability_dispositions.py",
+      "category": "C07",
+      "sha256": "71008edc5f4973d4fb6cbc0c8a97220c01c725cc4d1e1d3071482e4ddc614192"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/maintainability_source_units.py",
+      "category": "C07",
+      "sha256": "3c571ada95aaa2c07453b90e7822fc842a95511c59b067fb704a5d72a5e291f5"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/source_comment_analysis.py",
+      "category": "C07",
+      "sha256": "703c9fdefbaff9208f3f4434d8d786e3fde5c99ff7a926162b01af4fe6fddd96"
+    },
+    {
+      "path": "src/project_governance_runtime/checker_scripts/typescript-maintainability.cjs",
+      "category": "C07",
+      "sha256": "d6ad2c15c24149b6f3b9e7da47968795fb8fce76ddf83e3882b8c4469a514a66"
+    },
+    {
+      "path": "src/project_governance_runtime/checkers.py",
+      "category": "C14",
+      "sha256": "1264e57b1a11ddc7e4b53e85505307465c0c110ba517f19041854c95be7cb8d8"
+    },
+    {
+      "path": "src/project_governance_runtime/cli.py",
+      "category": "C16",
+      "sha256": "029c59da7ffc2681ea7cca1ce15bc3130e9836660b79c2f3f84e971ce358425d"
+    },
+    {
+      "path": "src/project_governance_runtime/configuration.py",
+      "category": "C14",
+      "sha256": "709ae2090729b46dcc8ea296561386488432578977bbd35f504f8acbd583f512"
+    },
+    {
+      "path": "src/project_governance_runtime/context.py",
+      "category": "C11",
+      "sha256": "58ca9d88eaeb1b090ccbbc8554b279325a17af65f25bf9b6978b8fbe913f67e4"
+    },
+    {
+      "path": "src/project_governance_runtime/continuity.py",
+      "category": "C12",
+      "sha256": "5ac90174c70624aa3bbf7d7d2bbaf0446280322487f9207df7b8e611f145ce24"
+    },
+    {
+      "path": "src/project_governance_runtime/defaults/fixtures/comment-quality/kotlin-annotated-multiline.kt",
+      "category": "C14",
+      "sha256": "f3859b8409d52bb03d87d56a1bf893ac691aca070f6ad22b6d94875910f5eb60"
+    },
+    {
+      "path": "src/project_governance_runtime/defaults/fixtures/comment-quality/kotlin-enclosing-visibility.kt",
+      "category": "C14",
+      "sha256": "7c22aba769abc238955b676a7a0b097de5dc7305dcb07347c646ff4b68a06e5d"
+    },
+    {
+      "path": "src/project_governance_runtime/defaults/fixtures/comment-quality/kotlin-good.kt",
+      "category": "C14",
+      "sha256": "90329e7d7726f6789cc8142a87e902df834e0a89a19b9c50c08ae0e541200e8e"
+    },
+    {
+      "path": "src/project_governance_runtime/defaults/fixtures/comment-quality/kotlin-missing-boundary.kt",
+      "category": "C14",
+      "sha256": "e17a54912398b279fbf93d06e09e42c7a94a04b6d5b5160ae2b6fff59f3e7d3e"
+    },
+    {
+      "path": "src/project_governance_runtime/defaults/fixtures/comment-quality/kotlin-missing-overview.kt",
+      "category": "C14",
+      "sha256": "56fcb22a8afafeae9e547e4da55e12327f1cda0084f666f744c0257829d14c57"
+    },
+    {
+      "path": "src/project_governance_runtime/defaults/fixtures/comment-quality/kotlin-missing-public-doc.kt",
+      "category": "C14",
+      "sha256": "7399fc1c91d2a2cf715725cd8bc6835a987cd0303076cc4c2ae955490c16cf2a"
+    },
+    {
+      "path": "src/project_governance_runtime/defaults/fixtures/comment-quality/kotlin-missing-type-detail.kt",
+      "category": "C14",
+      "sha256": "f4ee2db8da90312a873e9ffab8192d24630bd3db94db4c8d9abbf19bce420876"
+    },
+    {
+      "path": "src/project_governance_runtime/defaults/fixtures/comment-quality/kotlin-modified-and-anonymous-types.kt",
+      "category": "C14",
+      "sha256": "c9017066475d1d49a10ecb91b2d671496cdc19d477d4d1d74ce23fb1e1e472cc"
+    },
+    {
+      "path": "src/project_governance_runtime/defaults/fixtures/comment-quality/kotlin-protected-member.kt",
+      "category": "C14",
+      "sha256": "07ea78913282072b5a18eeaa507308028b724e08aaf36022b884edc955e183e9"
+    },
+    {
+      "path": "src/project_governance_runtime/defaults/fixtures/comment-quality/kotlin-restates-signature.kt",
+      "category": "C14",
+      "sha256": "54ebdfb5d28b6a6a7f3f7d10580172666656faddd9014cab37476c36c45aeade"
+    },
+    {
+      "path": "src/project_governance_runtime/defaults/fixtures/comment-quality/kotlin-wrong-attachment.kt",
+      "category": "C14",
+      "sha256": "2ef49c9b9a229fcaaef86a60cce356966025512bff4096bf74a63206a2df935f"
+    },
+    {
+      "path": "src/project_governance_runtime/defaults/fixtures/comment-quality/python-good.py",
+      "category": "C14",
+      "sha256": "01bd0332c62e452a406d28470628f8da5cc6979031cca613f0ead5e809b37685"
+    },
+    {
+      "path": "src/project_governance_runtime/defaults/fixtures/comment-quality/python-missing-boundary.py",
+      "category": "C14",
+      "sha256": "fa929f6df38bb7aab47064200fdad5fee46c37917e00a946378091e02eda9e8b"
+    },
+    {
+      "path": "src/project_governance_runtime/defaults/fixtures/comment-quality/python-missing-overview.py",
+      "category": "C14",
+      "sha256": "f086225b3662b80dd6b6b92cdc67e08d52b159595bb76f83c8f72f26861e671e"
+    },
+    {
+      "path": "src/project_governance_runtime/defaults/fixtures/comment-quality/python-missing-public-doc.py",
+      "category": "C14",
+      "sha256": "c9967f0e0d2a6fcd3db56a039b90e58ecd141f02e48355d0c423c4b217d3d67f"
+    },
+    {
+      "path": "src/project_governance_runtime/defaults/fixtures/comment-quality/python-restates-signature.py",
+      "category": "C14",
+      "sha256": "aed5fc4d4879e6ca5b0825b27823dec2cb9eeb26486dc7b0204391d960910a91"
+    },
+    {
+      "path": "src/project_governance_runtime/defaults/policies/apple-dependencies.yaml",
+      "category": "C14",
+      "sha256": "1417d14353fa104367cf3afb4c09eeaf131aff14edb62dc97edb1c74cc32f515"
+    },
+    {
+      "path": "src/project_governance_runtime/defaults/policies/apple-dependency-exceptions.yaml",
+      "category": "C14",
+      "sha256": "9bb4df0ab4bd6bb63b061c4f60e395c43e996d12ad00a9d402a0129829da8654"
+    },
+    {
+      "path": "src/project_governance_runtime/defaults/policies/code-quality-dispositions.yaml",
+      "category": "C14",
+      "sha256": "07f89188d6b40735b67dc3faa0561d91d8b09df6cc5078c74cebb15e97063003"
+    },
+    {
+      "path": "src/project_governance_runtime/defaults/policies/code-quality-waivers.yaml",
+      "category": "C14",
+      "sha256": "d806d89200c269413d037a7fa84ea74e1c6f01a24fe4fe77afc3d62acec6d638"
+    },
+    {
+      "path": "src/project_governance_runtime/defaults/policies/code-quality.yaml",
+      "category": "C14",
+      "sha256": "433dbb87a9025a79dc12b3027c791c936642d2e9cd123014a69a23480cedf4c5"
+    },
+    {
+      "path": "src/project_governance_runtime/defaults/policies/dependency-freshness.yaml",
+      "category": "C14",
+      "sha256": "bc3ee31ef0ad18eb68314ac02a55ca7981ba537d09707335989737cd5c5e57ce"
+    },
+    {
+      "path": "src/project_governance_runtime/defaults/policies/secret-waivers.yaml",
+      "category": "C14",
+      "sha256": "d806d89200c269413d037a7fa84ea74e1c6f01a24fe4fe77afc3d62acec6d638"
+    },
+    {
+      "path": "src/project_governance_runtime/defaults/policies/source-comment-adapters.yaml",
+      "category": "C14",
+      "sha256": "18b29fb347460305cc30289f500ecc4fca6bce54a729b164c20e55b4a8b7d755"
+    },
+    {
+      "path": "src/project_governance_runtime/defaults/policies/source-comment-waivers.yaml",
+      "category": "C14",
+      "sha256": "d806d89200c269413d037a7fa84ea74e1c6f01a24fe4fe77afc3d62acec6d638"
+    },
+    {
+      "path": "src/project_governance_runtime/defaults/policies/source-comments.yaml",
+      "category": "C14",
+      "sha256": "72c6775dc62ee48987b28200fd04c5d9f3eefcc7c3962533035716f3e94a459a"
+    },
+    {
+      "path": "src/project_governance_runtime/defaults/schemas/apple-dependency-exception.schema.json",
+      "category": "C14",
+      "sha256": "ed4c51fb038eb3705984081f5454c5e9013d19bf008f742ab77c6e737682339c"
+    },
+    {
+      "path": "src/project_governance_runtime/defaults/schemas/evidence-manifest.schema.json",
+      "category": "C14",
+      "sha256": "99ecd934ee9066256b4b45a6dae5736fe453796dfdb1406469a6780cfc60cad9"
+    },
+    {
+      "path": "src/project_governance_runtime/defaults/schemas/quality-disposition.schema.json",
+      "category": "C14",
+      "sha256": "7071e49c820c93f7a46cce225356f0547806fe4f3e1a90a6ca30da31b48abda2"
+    },
+    {
+      "path": "src/project_governance_runtime/defaults/schemas/secret-waivers.schema.json",
+      "category": "C14",
+      "sha256": "be4c8747ecd48797273cebcb26facdcc2b136557d2f550fdc906bc791b51478c"
+    },
+    {
+      "path": "src/project_governance_runtime/defaults/schemas/source-comment-adapters.schema.json",
+      "category": "C14",
+      "sha256": "9ef7e5ecd4816b247cee00692d499b88d9c344b87a5832202d79e54a293fcda2"
+    },
+    {
+      "path": "src/project_governance_runtime/defaults/schemas/source-comment-waivers.schema.json",
+      "category": "C14",
+      "sha256": "fd989e6dc7c61d763e827fe71301d860e47108fc5ce1f7bae8d6b48bc6663ee0"
+    },
+    {
+      "path": "src/project_governance_runtime/defaults/schemas/source-comments.schema.json",
+      "category": "C14",
+      "sha256": "c8e55d1537e7081681681dbd39006e3a165ea9adf4f194d8ed9a23e3329ca528"
+    },
+    {
+      "path": "src/project_governance_runtime/documentation.py",
+      "category": "C11",
+      "sha256": "a58b3f41b8409e04c84e2780dc5e83a1341b5a4b87a0e5f38303335c400bc382"
+    },
+    {
+      "path": "src/project_governance_runtime/evidence_manifest.py",
+      "category": "C02",
+      "sha256": "9c9857ede9a090a372cea0f519515a49c42bf89e7f88fecc2a79b7fd778e1be3"
+    },
+    {
+      "path": "src/project_governance_runtime/execution_commands.py",
+      "category": "C03",
+      "sha256": "70282cb880c2bf046e4b316d3067dd0747d714addd107a6b936601946391f5cc"
+    },
+    {
+      "path": "src/project_governance_runtime/execution_flow.py",
+      "category": "C03",
+      "sha256": "24a4415a3fcb53801348f60c784b6c38db0f65f4bdb333ad475d926c6c5fa31c"
+    },
+    {
+      "path": "src/project_governance_runtime/format_preservation.py",
+      "category": "C06",
+      "sha256": "5e183ea2b9d16035189230c34654bedaa3b93d01cf36254e70091ff583b3a6a9"
+    },
+    {
+      "path": "src/project_governance_runtime/harness_integration.py",
+      "category": "C12",
+      "sha256": "4fdaed448ba1f9660efaa655614ea7d46b4e6ca2c53a92c0f68ff86cecda509e"
+    },
+    {
+      "path": "src/project_governance_runtime/installation.py",
+      "category": "C12",
+      "sha256": "ac6c80f53cbb1e91fbc29ef889b7bb60064e6487e4f46ed32e375303f4668e51"
+    },
+    {
+      "path": "src/project_governance_runtime/kmp_surface_authorities.py",
+      "category": "C10",
+      "sha256": "bbd606c99a8c5679ce785e32e4c94424cbed712f328d3adcfa4e770a255b70a1"
+    },
+    {
+      "path": "src/project_governance_runtime/kmp_surface_composition.py",
+      "category": "C10",
+      "sha256": "54066e496943557d322dc83478fddbcf749b105233633d5a8678151d8836a218"
+    },
+    {
+      "path": "src/project_governance_runtime/kmp_surface_doctor.py",
+      "category": "C10",
+      "sha256": "a5f9c02d3bfc3847dadd6f9d2ff8dc5f8f49139c70d48695526cfaf5edb72b3d"
+    },
+    {
+      "path": "src/project_governance_runtime/kmp_surface_validation.py",
+      "category": "C10",
+      "sha256": "1848c2f17ab4b44a69c2534cd6fb7b60b334e8b688b4f71343ffca7dc51fc63b"
+    },
+    {
+      "path": "src/project_governance_runtime/packs/apple-dependencies.yaml",
+      "category": "C08",
+      "sha256": "80604c1dedd0a1cd2e795809a82b833825ad0136ba7126a0e009dbfcf51bdf35"
+    },
+    {
+      "path": "src/project_governance_runtime/packs/comments.yaml",
+      "category": "C07",
+      "sha256": "419a9b69a58b9df2f281d08d915dd26a0b77abb5f961a0c66f626b4b20b01fa1"
+    },
+    {
+      "path": "src/project_governance_runtime/packs/commit-message.yaml",
+      "category": "C09",
+      "sha256": "eed22b895cdc077a0cc8a1001ecfeef423355dcee2fea81263ac7c8f3522317f"
+    },
+    {
+      "path": "src/project_governance_runtime/packs/context-router.yaml",
+      "category": "C11",
+      "sha256": "989b9f41c7360cac6bb87e4b7e768a4d504da9912f9c2dcc28609efcc0c726fb"
+    },
+    {
+      "path": "src/project_governance_runtime/packs/dependencies.yaml",
+      "category": "C08",
+      "sha256": "3a36b69877f6433cbc0e0c80a1841510e73d7b350e2030417937b191d818cd03"
+    },
+    {
+      "path": "src/project_governance_runtime/packs/documentation.yaml",
+      "category": "C09",
+      "sha256": "3ea555652a5a0cd642ad44c0eedc4b0a32cb24c2c432dff19626668c99029048"
+    },
+    {
+      "path": "src/project_governance_runtime/packs/format.yaml",
+      "category": "C06",
+      "sha256": "d6af57fd392bd580ac0e58176d6e7c9d20c88e0c89bdaf1b03e2104598233a78"
+    },
+    {
+      "path": "src/project_governance_runtime/packs/maintainability.yaml",
+      "category": "C07",
+      "sha256": "39f2aa8f3e39b219afc77069aaf310691506e659b804e384bad5f28edba81706"
+    },
+    {
+      "path": "src/project_governance_runtime/packs/naming.yaml",
+      "category": "C06",
+      "sha256": "bb68a1005b0ec057acaba8e34129f6d35c3f1fbc0fcc801860fe95a3dc752d6d"
+    },
+    {
+      "path": "src/project_governance_runtime/packs/pr-description.yaml",
+      "category": "C09",
+      "sha256": "c7b6da5484fc4d33d18ae221ff3b63a2c2af55b1c38d06c3f781cdaa66201352"
+    },
+    {
+      "path": "src/project_governance_runtime/packs/prose.yaml",
+      "category": "C06",
+      "sha256": "3f5ea0f5396e357c18934052b50ce211734c7f05e7228bc1a7175b0ffb53fb37"
+    },
+    {
+      "path": "src/project_governance_runtime/packs/secrets.yaml",
+      "category": "C08",
+      "sha256": "26052fc809bef22560e3a60a9d5d1f4aaa1e6facd1c9898332ec56b95ffea473"
+    },
+    {
+      "path": "src/project_governance_runtime/packs/test-quality.yaml",
+      "category": "C09",
+      "sha256": "1e683a569273fba6555674e08ade466b8b4e5c8db5aa193cad8fb2fa0408427d"
+    },
+    {
+      "path": "src/project_governance_runtime/planning.py",
+      "category": "C02",
+      "sha256": "c6bb22de4521b27c1eaab87c9813ccff5134b2b37a8f0b1e96a79382c2dfb4eb"
+    },
+    {
+      "path": "src/project_governance_runtime/process_identity.py",
+      "category": "C12",
+      "sha256": "151143b196bda9501f08841d3be456b8b7cffcac2c5acb4a3d48ded01b470b7c"
+    },
+    {
+      "path": "src/project_governance_runtime/processes.py",
+      "category": "C03",
+      "sha256": "532bbf96f04eeb8f2bc454973792748b8fd9bb03662284a4d0699790d5c91e17"
+    },
+    {
+      "path": "src/project_governance_runtime/provider_agents/__init__.py",
+      "category": "C04",
+      "sha256": "2a7d165a923be083cd30324a94801cd08f2a0dbf2b23705ba38e1e9748952761"
+    },
+    {
+      "path": "src/project_governance_runtime/provider_agents/claude.py",
+      "category": "C04",
+      "sha256": "eaf01aaefc8fe2569e9ea6cc280a9e3b3887a7795ae1e8fdfaa8a0797e76ba3d"
+    },
+    {
+      "path": "src/project_governance_runtime/provider_agents/cli.py",
+      "category": "C04",
+      "sha256": "0af91352aecc4f84060d522ada04fcaec0ec7bc3868df9ef76a0872088d834ca"
+    },
+    {
+      "path": "src/project_governance_runtime/provider_agents/codex.py",
+      "category": "C04",
+      "sha256": "20093ae0d03a1de1e0571c043f3274cd3feb7f80bfece8ad9473b51de4bc5f04"
+    },
+    {
+      "path": "src/project_governance_runtime/provider_agents/completion.py",
+      "category": "C04",
+      "sha256": "df08249653d2a1ae2fb29be831b6ae9c48059a6779291b4f32452ffa27f60356"
+    },
+    {
+      "path": "src/project_governance_runtime/provider_agents/config.py",
+      "category": "C04",
+      "sha256": "921ec32768708aa9d9c29c656a3aa3645fd79ae4846c47229dcc43d652877265"
+    },
+    {
+      "path": "src/project_governance_runtime/provider_agents/entry.py",
+      "category": "C04",
+      "sha256": "6382b52d5c208c1d29956a4eca4e39ed8ea8af37837884c6648b568908f14b39"
+    },
+    {
+      "path": "src/project_governance_runtime/provider_agents/gemini.py",
+      "category": "C04",
+      "sha256": "8c9ff0944b7be5b36744a8349983612398e2c57f31f104e3142a1bf939ec6409"
+    },
+    {
+      "path": "src/project_governance_runtime/provider_agents/guardian.py",
+      "category": "C04",
+      "sha256": "7e62c1da7052701883dbaf24ceeac2509e18430826163132135928902b9cf28e"
+    },
+    {
+      "path": "src/project_governance_runtime/provider_agents/jobs.py",
+      "category": "C04",
+      "sha256": "e16de7ee1c55a9f39936d802c34cb8bc94bf464321f2e8b239d0d3ad1c7cdadb"
+    },
+    {
+      "path": "src/project_governance_runtime/provider_agents/launcher.py",
+      "category": "C04",
+      "sha256": "aa94a078d34d8e031f63bf63bce8b09eccad340965334010322302ae007a57f5"
+    },
+    {
+      "path": "src/project_governance_runtime/provider_agents/processes.py",
+      "category": "C04",
+      "sha256": "0d94666324d42737b1fde31ac80bab7336f0b96726b3fdbb694ee814f77a47d5"
+    },
+    {
+      "path": "src/project_governance_runtime/provider_agents/protocol.py",
+      "category": "C04",
+      "sha256": "ac4aa05b468349d6b67ffbe56e84aad798aa78dd26d37a48d1cfa8f77c261c40"
+    },
+    {
+      "path": "src/project_governance_runtime/provider_agents/runtime.py",
+      "category": "C04",
+      "sha256": "1702f3b63dd34cd215a17b399ec536e7a6eab718d4cb68de4463491d1b4c5a1a"
+    },
+    {
+      "path": "src/project_governance_runtime/provider_agents/storage.py",
+      "category": "C04",
+      "sha256": "12a0b9f45d486d6ef7c88562ae56b66e709cd9c6ede49e433dbacd7847ef0213"
+    },
+    {
+      "path": "src/project_governance_runtime/provider_agents/stream.py",
+      "category": "C04",
+      "sha256": "a744ce392fb460ee6682e385da5243e12797319d8aa87a9f2b43cb5d08d052c8"
+    },
+    {
+      "path": "src/project_governance_runtime/provider_agents/test_batches.py",
+      "category": "C03",
+      "sha256": "b0c89d6335fe5b56cb252ceb67e022c4afbcd75aa089b94a9e791edbe774f89c"
+    },
+    {
+      "path": "src/project_governance_runtime/provider_agents/worker.py",
+      "category": "C04",
+      "sha256": "1bee7227b48d9e6d28c3a7de58d5e8574da165e2266332a892adeed68841a342"
+    },
+    {
+      "path": "src/project_governance_runtime/runner.py",
+      "category": "C03",
+      "sha256": "e309e707c3f40c5a325a48521c388c9d56f12cef8badb652b3e9017c794aa1ae"
+    },
+    {
+      "path": "src/project_governance_runtime/runtime_access.py",
+      "category": "C12",
+      "sha256": "f527c38d4384b4d2169263b409e21639a20b2ed8c3edc8bf560895e90e7473b3"
+    },
+    {
+      "path": "src/project_governance_runtime/runtime_entry.py",
+      "category": "C16",
+      "sha256": "cf411bf6d4f2d3cf8396b7c10a4d0c4085f0c0991d5fcad4b870e149dfb4fcbd"
+    },
+    {
+      "path": "src/project_governance_runtime/skill_catalog.py",
+      "category": "C11",
+      "sha256": "49b05ed62376aa66d2c3868fb9139c579f7d36922fe9016bdebff2d90b072848"
+    },
+    {
+      "path": "src/project_governance_runtime/skill_selection.py",
+      "category": "C11",
+      "sha256": "424337b7006fa46f3f8144e3e1f67471bd0f66ec49c30612ef4ac47a4925c267"
+    },
+    {
+      "path": "src/project_governance_runtime/skill_telemetry.py",
+      "category": "C13",
+      "sha256": "73adef40b0d811efa2c3dd3b027e73854fc707d2c166cc52ac8dbc2220556840"
+    },
+    {
+      "path": "src/project_governance_runtime/startup.py",
+      "category": "C12",
+      "sha256": "d2e5bdcb5ad224c302d133aebe768f3412ebf570155652f407ccdc9df6fbfa31"
+    },
+    {
+      "path": "src/project_governance_runtime/startup_git.py",
+      "category": "C12",
+      "sha256": "58dab9bd07ee775cfe617eb11365e7d3c87bad2f24e8516a7938e7b7872b8e96"
+    },
+    {
+      "path": "src/project_governance_runtime/startup_installation.py",
+      "category": "C12",
+      "sha256": "c4f01bfcae875578161aca85ca569d308ce6299a99b7d2fcc936e67d0d789a05"
+    },
+    {
+      "path": "src/project_governance_runtime/startup_integration.py",
+      "category": "C12",
+      "sha256": "8d16823a276e60c7225fe473c8c2bbd8c2369fa967b7dce9cc24654753560fa1"
+    },
+    {
+      "path": "src/project_governance_runtime/startup_releases.py",
+      "category": "C12",
+      "sha256": "3d98c763774ddf111c95670f735db86b5cda7fefca6b34557410678681f5e9c2"
+    },
+    {
+      "path": "src/project_governance_runtime/startup_state.py",
+      "category": "C12",
+      "sha256": "18619301823fd07262e078920cacc6e2320d444cec271a0f417bfa866d2ec6ed"
+    },
+    {
+      "path": "src/project_governance_runtime/startup_transaction.py",
+      "category": "C12",
+      "sha256": "441ea4e4c2cac13d4c7549dba7284f580a3449a9fdeecf86f02bd756a6894697"
+    },
+    {
+      "path": "src/project_governance_runtime/state_io.py",
+      "category": "C14",
+      "sha256": "08402101ef69d878c238d526839d972d6ebf4ae18d12b2e9a1dd4d9cf51246c0"
+    },
+    {
+      "path": "src/project_governance_runtime/structured_documents.py",
+      "category": "C02",
+      "sha256": "63a6fc58e185cf0b192419f65cc95fff85623ff4a02c892ab5d2ba6da7d3b3ed"
+    },
+    {
+      "path": "src/project_governance_runtime/telemetry.py",
+      "category": "C13",
+      "sha256": "b7c84597dcf670cd69166a2c68d7e6ef686561ed20f827c99e92d720280dfb0f"
+    },
+    {
+      "path": "src/project_governance_runtime/validation_subject.py",
+      "category": "C02",
+      "sha256": "f5f095f99c25d52b2014be916e2b6e222327cd515ab79f869dd8a465fa8fad18"
+    },
+    {
+      "path": "tests/__init__.py",
+      "category": "C15",
+      "sha256": "e387c40eac579277181120450658a67504d7362aa9204d70b078b9bfbaab08bb"
+    },
+    {
+      "path": "tests/fixtures/kmp-skills/legacy-2026-08-24.yaml",
+      "category": "C15",
+      "sha256": "2751f9af90c36336a2b064d2c78e722961c28b8fe91aeca18e956659b33737a4"
+    },
+    {
+      "path": "tests/fixtures/kmp-skills/selection-scenarios.yaml",
+      "category": "C15",
+      "sha256": "d5a19ccd49542793b67d95b6e4a4a2a05d2f94414f431c1b14124fed787ea436"
+    },
+    {
+      "path": "tests/fixtures/provider_agent.py",
+      "category": "C15",
+      "sha256": "aae5bc8fa6109489593552855aaf390670b5f6e4bf3dfff1cb564fa821694d88"
+    },
+    {
+      "path": "tests/fixtures/runtime-behavior-baseline.yaml",
+      "category": "C15",
+      "sha256": "5254b4827bbd985434f1f5f3991ed843b109fa1ae27a96ffb7b3ef0a644f6704"
+    },
+    {
+      "path": "tests/test_runtime_apple_dependency_checker.py",
+      "category": "C15",
+      "sha256": "827dac2ce65b2ea9762c5d4900de00c9b8eea00d7a6d2652803e9c7861f86f0e"
+    },
+    {
+      "path": "tests/test_runtime_batch_completion.py",
+      "category": "C15",
+      "sha256": "e7bbee358a4098f6497618ffdb218c5ec8ed70a2040030470a0fe3e2c982120e"
+    },
+    {
+      "path": "tests/test_runtime_change_narrative.py",
+      "category": "C15",
+      "sha256": "ba02b795a17a23a0aec53cbd0ef99dd1fbbbb087d15d884fd70fc8439f6e0580"
+    },
+    {
+      "path": "tests/test_runtime_changed_paths.py",
+      "category": "C15",
+      "sha256": "16577d0ffa353a9db5d9a26a28128f5e8b7e8e736fe44f2d8e8ce015f96c8c5d"
+    },
+    {
+      "path": "tests/test_runtime_comment_checker.py",
+      "category": "C15",
+      "sha256": "fe4607c3d1958657f11c861bbb79a88d477333f16e839f20b5da61d298d3ecc2"
+    },
+    {
+      "path": "tests/test_runtime_context.py",
+      "category": "C15",
+      "sha256": "6b6ec963b7b26c907775d0f22ac81e48a9c4dbe2d76427f176403f3f585939b4"
+    },
+    {
+      "path": "tests/test_runtime_context_checker.py",
+      "category": "C15",
+      "sha256": "64be00f5d410247491c10360d6e069a902d8ab1f9b50f8e2e6cd8f90ec676b94"
+    },
+    {
+      "path": "tests/test_runtime_continuity.py",
+      "category": "C15",
+      "sha256": "779f2e872464ad77f296edadfbc0f669126d65b9073a202cf55d45122443cb4f"
+    },
+    {
+      "path": "tests/test_runtime_dependency_checker.py",
+      "category": "C15",
+      "sha256": "2438042cb281f3797f8256f44fa1fe9f4db7c5080f61227ede41737275034141"
+    },
+    {
+      "path": "tests/test_runtime_dependency_lock.py",
+      "category": "C15",
+      "sha256": "bb3a17a70424d2d9258dd4b0e6a4fc70b50f1a8829683cf05c992607878a4149"
+    },
+    {
+      "path": "tests/test_runtime_dependency_workspaces.py",
+      "category": "C15",
+      "sha256": "e037cd8138b6615c31855b8a21899edec09173ded89ce0f62f787c306da1de76"
+    },
+    {
+      "path": "tests/test_runtime_diagnostic_collection.py",
+      "category": "C15",
+      "sha256": "47be5eeb71060ecedeeac6445412f1c182831cac95683635f1b3913d15c4dc6b"
+    },
+    {
+      "path": "tests/test_runtime_documentation_checker.py",
+      "category": "C15",
+      "sha256": "ef21fdd90b0f58d91da8f81fa1319a3fe5648a00984c84f713298194bc926102"
+    },
+    {
+      "path": "tests/test_runtime_documentation_system.py",
+      "category": "C15",
+      "sha256": "b903bff1e25a02cf6baeb25ba3106ba4dd5d8c7f13863a9015d6c72c438e14fe"
+    },
+    {
+      "path": "tests/test_runtime_evidence_manifest.py",
+      "category": "C15",
+      "sha256": "cfad52e50f720d50643c0cce08b86da1bf34f26c973e58912e5abe38c7c115ff"
+    },
+    {
+      "path": "tests/test_runtime_finding_lifecycle.py",
+      "category": "C15",
+      "sha256": "8b86c4b29f8c2ab37eb8bb8c7fb7e592de772b973a192a47c4cf94cff2083874"
+    },
+    {
+      "path": "tests/test_runtime_format_preservation.py",
+      "category": "C15",
+      "sha256": "47f4b14524a57f9e9ace0e6b8442c77d2af1ac45d502134ab36c719337df88d6"
+    },
+    {
+      "path": "tests/test_runtime_harness_integration.py",
+      "category": "C15",
+      "sha256": "7291673ac9ce3364d2b78399df6ddabc0c3b9260390d550549468f7584a1a8fb"
+    },
+    {
+      "path": "tests/test_runtime_kmp_skill_fixtures.py",
+      "category": "C15",
+      "sha256": "0184cf7de60e58fa7b647dc75015c434657de667ea5e3e4e77f2a4bf5fbefa1b"
+    },
+    {
+      "path": "tests/test_runtime_kmp_skill_selection.py",
+      "category": "C15",
+      "sha256": "1fc16eeaaaec120da86dfe7e460cbab84abf525b768191c30e42ff2c89079d78"
+    },
+    {
+      "path": "tests/test_runtime_kmp_surface_validation.py",
+      "category": "C15",
+      "sha256": "24a113e9e367f532678027a9ae031474977dc43483c96cc4e2da73ac398411b6"
+    },
+    {
+      "path": "tests/test_runtime_maintainability_adapters.py",
+      "category": "C15",
+      "sha256": "438cef9a11b4a085e12bfaaf0f342df7847026150cd8e18364742042c24671df"
+    },
+    {
+      "path": "tests/test_runtime_maintainability_scope.py",
+      "category": "C15",
+      "sha256": "8e994d7c5f7f2534b9c1ef334805dc2f0a8587344b768de556f63acc570ffc6b"
+    },
+    {
+      "path": "tests/test_runtime_package_execution.py",
+      "category": "C15",
+      "sha256": "4325dc258dfa9a354be4d517519da05907ed3e8127f1f78cd9bec8c23b8832c2"
+    },
+    {
+      "path": "tests/test_runtime_package_installation.py",
+      "category": "C15",
+      "sha256": "18e3100e9a5021600c4a99bf732b7f30beecbe1ceb32a27efd3648863d1ef9c8"
+    },
+    {
+      "path": "tests/test_runtime_package_planning.py",
+      "category": "C15",
+      "sha256": "7721f9734e6bd4225fc1e32ee1423aa3d08aa33bd97a169f517a8137c41fe311"
+    },
+    {
+      "path": "tests/test_runtime_private_registry_boundaries.py",
+      "category": "C15",
+      "sha256": "61e29f39be50b5f3fd7691d70c9d55ea4d02ad58877c3b8402271fce313d276d"
+    },
+    {
+      "path": "tests/test_runtime_prose_checker.py",
+      "category": "C15",
+      "sha256": "f3199eb68050e77b143b5ff678df0232b606b4219809734d7d1fa6a16bbdbc2f"
+    },
+    {
+      "path": "tests/test_runtime_provider_agents.py",
+      "category": "C15",
+      "sha256": "98a979f4cb837ef3b1a37b738d07feeed0a513f263daac95d17570b0ed580d26"
+    },
+    {
+      "path": "tests/test_runtime_provider_coordination.py",
+      "category": "C15",
+      "sha256": "8929112fce6a841f7b2070a2d222ea68289ad7c836280bb1fd6bdb432c2898cd"
+    },
+    {
+      "path": "tests/test_runtime_release_versioning.py",
+      "category": "C15",
+      "sha256": "6738fc50e11a49e96df8f0a66dbf02d90b9e420d43c9813edcf47669b0ad1d95"
+    },
+    {
+      "path": "tests/test_runtime_secret_scan.py",
+      "category": "C15",
+      "sha256": "fe0dfc2b567e0b74b475fd21e5024472e01471ce21131ae96be6bf4b31f45c80"
+    },
+    {
+      "path": "tests/test_runtime_skill_catalog.py",
+      "category": "C15",
+      "sha256": "540ac7079e6f6b01149268af3c7f20d22eadda764a27328b816b348f7639363d"
+    },
+    {
+      "path": "tests/test_runtime_skill_payload.py",
+      "category": "C15",
+      "sha256": "0f25dc45a72fc1e441a331db61b72585ed2867fa1e48235abc327417b1ce0c91"
+    },
+    {
+      "path": "tests/test_runtime_skill_selection.py",
+      "category": "C15",
+      "sha256": "7df67f6d07c42c495a36051940f971078e50705b962a0715bbec01db72723874"
+    },
+    {
+      "path": "tests/test_runtime_startup_updates.py",
+      "category": "C15",
+      "sha256": "2eb18b97fa1dac4eea9bf3646bfebbeae87fce8d252993117ae546781e18eae2"
+    },
+    {
+      "path": "tests/test_runtime_telemetry.py",
+      "category": "C15",
+      "sha256": "12575c27a412142a4225b65139bbcdd358acba1d8cc4f440e2af52f5e37175d6"
+    },
+    {
+      "path": "tests/test_runtime_test_batches.py",
+      "category": "C15",
+      "sha256": "e13202ac19a6b2ca3f62ae2e02aed72eb81adad6abaa3db1ef54dbc655e4567e"
+    },
+    {
+      "path": "tests/test_runtime_test_quality.py",
+      "category": "C15",
+      "sha256": "d087d95bde9b28cc3c2c782ee4a502491c7633e983522644342c28cee4cfe09d"
+    },
+    {
+      "path": "tests/test_runtime_wheel_boundary.py",
+      "category": "C15",
+      "sha256": "64d888f0a84e6a3357eab87049bdbec9d1110d9508de5376bbc48bf9684fb31f"
+    },
+    {
+      "path": "tools/build_harness.py",
+      "category": "C15",
+      "sha256": "136a857b9d494ad2f30dde480949c0ffc58d6c6720ff952437502650ee72f70b"
+    },
+    {
+      "path": "tools/build_release_assets.py",
+      "category": "C15",
+      "sha256": "d67a8220282fd8275935dfff461e4f0f1350a4aba275e76f73bf3406517db156"
+    },
+    {
+      "path": "tools/release_version.py",
+      "category": "C15",
+      "sha256": "6e5c520caf9c887735f4a897672d8e4dc7ade580bd34626a81d04ff30111f2be"
+    },
+    {
+      "path": "tools/run-source-governance.sh",
+      "category": "C15",
+      "sha256": "d0040fb750cfa5c025544bd60d8b87ec0283d91dc4250cba95b6f1f88b64ef19"
+    },
+    {
+      "path": "tools/verify-runtime-wheel.py",
+      "category": "C15",
+      "sha256": "22c8349e106acec00d2782636f8ab404602022d3cd87d6259f02e2516eb749e6"
+    },
+    {
+      "path": "tools/verify_continuity.py",
+      "category": "C15",
+      "sha256": "a01d47dd47f0cb3ddad229e1ec6d9dbbda3a16514d7047e4b61c5369df7e47e6"
+    },
+    {
+      "path": "tools/verify_kmp_surface.py",
+      "category": "C15",
+      "sha256": "6d90c39ade1b5cce6b92b0f7982576ad0ece39acfe3f18a3a4d0e0550f2b5863"
+    },
+    {
+      "path": "tools/verify_provider_agents.py",
+      "category": "C15",
+      "sha256": "37fb4bdd65638e601a5a232bd040ad3345bde5b6aea40be24e941f7b43ce1b88"
+    },
+    {
+      "path": "tools/verify_startup_updates.py",
+      "category": "C15",
+      "sha256": "fddcaa2bc2f26e41e1334c2aba9d22fc8b5c78bf1c4dd56e15aa69d8e3407600"
+    }
+  ]
+}

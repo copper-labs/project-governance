@@ -35,7 +35,10 @@ undeclared paths remain outside coverage.
 ## Shared resources
 
 Separate worktrees isolate checkout files, not ports, devices, global caches, shared services or
-deployment targets. Resource claims and cleanup remain with their existing owners. Shared-workspace
+deployment targets. Resource claims and cleanup remain with their existing owners today. The target
+[host resource authority](../../../../docs/specs/engine-workflow-and-device-contract.md#host-resource-authority)
+defines cross-repository/version acquisition for participating host processes; repository histories
+hold references rather than their own competing leases. Shared-workspace
 Git index, checkout and commit operations need host coordination even for disjoint file edits.
 
 ## History

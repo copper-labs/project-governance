@@ -64,6 +64,22 @@ credentials, product vocabulary, or target-specific checks. Those remain in the 
 repository. Publishing a wheel requires an operator decision. An adopter may authorize compatible
 startup updates through its tracked profile; major releases and integration changes remain deliberate.
 
+## Unified development direction
+
+The [architecture decision register](specs/unified-development-engine.md) and
+[transition plan](exec-plans/active/2026-09-20-unified-development-engine.md) describe the accepted
+move to a unified engine. The [migration inventory](reference/2026-09-20-engine-migration-inventory.md)
+records established intent, category treatments and the next decisions. Mnemos integration needs are
+designed now, adoption later; RN iOS simulator qualification is followed by RN real devices.
+The [local-CI contract](specs/engine-local-ci-and-merge-contract.md) makes execution placement independent
+of proof requirements and integrates both remote and already authorized local CI paths.
+The [capability pressure test](specs/engine-capability-boundaries.md) keeps future release support
+optional; additional adopter stacks inform core design without expanding first-iteration delivery. The runtime
+and distribution described above remain the current implementation until accepted cutover.
+
+The [Opus 5 extra-high review reconciliation](reviews/2026-09-20-unified-engine-reconciliation.md)
+records the latest design corrections, remaining decisions and limits of the review evidence.
+
 ## Continuity
 
 The [continuity module](../components/harness/README.md) owns task history and bounded resume.

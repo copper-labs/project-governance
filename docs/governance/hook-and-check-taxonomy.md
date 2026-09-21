@@ -58,3 +58,23 @@ Native task lifecycle hooks are a separate opt-in boundary under the
 which assesses the task before asking the runtime to apply it. The native adapter contains no
 release-selection policy. Commit hooks invoked by an updater can join its validation transaction;
 they never initiate another update.
+
+## Unified engine transition
+
+The [migration inventory](../reference/2026-09-20-engine-migration-inventory.md) carries this contract's
+intent into the proposed TS engine and accounts for every hook/check category. Current behavior remains
+in force until the relevant category change and cutover are accepted. The workflow engine must remove
+routine coordination without reintroducing duplicate gates or per-tool compliance paperwork.
+
+### Compiled preview hook installation
+
+The compiled preview exposes `project-governance hooks` to inspect the four managed launchers.
+`hooks --apply` creates missing launchers or repairs their executable mode; `--configure` additionally
+selects `.githooks` in Git configuration. Existing custom launchers, a different configured hook
+directory, and authored hooks in Git's default directory require reconciliation before any changes.
+A linked worktree needs `extensions.worktreeConfig` enabled before this command can configure its
+hooks without changing sibling worktrees. The command does not enable that extension itself.
+
+Migration code may supply exact prior templates from a verified installation to replace known old
+launchers. The public command does not guess ownership from comments or overwrite arbitrary hooks.
+This is preview behavior; the current wheel installation remains authoritative until qualified cutover.

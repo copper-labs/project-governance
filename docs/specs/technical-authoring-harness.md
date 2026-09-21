@@ -23,6 +23,13 @@ to installed documentation structures, exact catalog routes, and agent entry poi
 [completed implementation plan](../exec-plans/completed/2026-08-21-on-demand-developer-documentation.md)
 records both contracts and this repository's documentation pilot.
 
+## Unified engine migration boundary
+
+This remains the current runtime contract. The [migration inventory](../reference/2026-09-20-engine-migration-inventory.md)
+assigns C09/C11 to preserve authored reader intent and scoped documentation workflows. The
+[transition plan](../exec-plans/active/2026-09-20-unified-development-engine.md) replaces implementation
+only after category proof and accepted changes. It does not silently remove this contract's obligations.
+
 ## Implementation State
 
 The reader contract, content intents, story spine, research boundary, and review questions below are

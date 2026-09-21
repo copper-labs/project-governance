@@ -1,8 +1,8 @@
 # The development process: now, first release and destination
 
-Accepted direction: 2026-09-19. Codex only for first adoption. Governance owns policy throughout.
+Updated direction: 2026-09-20. Codex only for first adoption. Governance owns policy throughout.
 “Now” describes governance's intended current workflow, not proof that every adopter follows it.
-“First release” is the qualified target; current local code implements only part of it.
+The target is proposed implementation behavior, not a claim that the existing runtime delivers it.
 
 ## 1. Today: governance with Codex coordination
 
@@ -40,89 +40,56 @@ Existing policy says: no manual gate immediately before its hook; no broad shipp
 one expensive build point per coherent batch unless risk requires earlier feedback; reuse only valid
 proof; independent CI remains. See [Development Loop](../specs/development-loop.md).
 
-## 2. First qualified release: governance with continuity
+## 2. Target: shared engine, approved workflow, bounded model advice
 
 ```mermaid
 flowchart TD
-    A[Operator starts or resumes in Codex] --> B[One governance installation with continuity module]
-    B --> C[Bind task and workspace; load bounded context and open jobs]
-    C --> D[Codex plans and edits a coherent batch]
-    D --> E[Governance plan plus current receipts]
-    E --> F{Existing job already owns this action?}
-    F -->|Yes| G[Observe original job]
-    F -->|No| H[Declare and dispatch needed check through governance]
-    H --> G
-    G --> I[Bounded findings plus references to full evidence]
-    I -->|Repair needed| D
-    I -->|Ready| J[Freeze and review candidate]
-    J --> K[Prepare narratives; commit hooks once]
-    K --> L[Pre-PR narrative check; pre-push sign-off once]
-    L --> M[Independent CI and review]
-    M -->|Findings| D
-    M --> N[Authorized merge; reconcile evidence for resulting tree]
-    N --> O[Required release or acceptance proof]
-    O --> P[Operator acceptance and checkpoint]
-    C -. Session interrupted .-> R[Durable task, source identity, job handles and receipts]
-    G -. Record .-> R
-    P -. Record .-> R
-    R -. Next session .-> C
-    P -. Best-effort numbers .-> S[Small local telemetry report]
+    A[Developer starts or resumes a change] --> B[Shared task, source, policy and required-proof view]
+    B --> C[Bounded context from structural map and direct search]
+    C --> D{Optional JEV enabled and available?}
+    D -->|No or failed| E[Deterministic working context]
+    D -->|Yes| F[Bounded semantic suggestion]
+    F --> E
+    E --> G[Host investigates and edits]
+    G --> H[Approved recipe and applicable proof]
+    H --> I[One workflow owner advances known stages]
+    I --> J[RN iOS simulator: build, bundle, install, launch, assertions]
+    J --> K[Confirmed cleanup and exact evidence]
+    K -->|Repair| G
+    K --> L[RN iOS real-device qualification]
+    L --> M[Review, actual Git hooks and exact integration candidate]
+    M --> R[Required CI on qualified local, VM or hosted capacity]
+    R --> S[Trusted result publication and authorized protected merge]
+    S --> N[Accepted change and measured outcome]
+    I -. Interruption .-> O[Durable owner, resource and stage state]
+    O -. Reconcile same job .-> I
+    B -. Design interface now .-> P[Memory projection contract]
+    P -. Adopt later .-> Q[Optional Mnemos retrieval]
+    Q -. Scoped and freshness-checked .-> C
 ```
 
-The continuity module reduces repeated decisions and reconstruction. It does not replace Codex,
-Git hooks, CI, device runners or governance's executor. It does not certify an old result for new
-inputs. A prototype's known-job recovery is not yet automatic integration across all hook paths.
+The diagram shows platform qualification order; it does not require every bug fix to run both targets.
+The project's proof plan determines each task's required lanes. Native iOS and broader platforms
+follow the initial RN simulator and RN physical-device qualification. Transport claims are separate.
+The [local-CI contract](../../../../docs/specs/engine-local-ci-and-merge-contract.md) defines qualified
+execution and merge evidence. Independent CI need not run on GitHub infrastructure; local development
+logs alone do not satisfy it. Actual proof planning avoids rerunning already applicable claims.
 
-The first release qualifies one real local-check workflow. The next slice adds one existing device
-runner: build, install and scenario receipts with proper resource ownership. No generic device
-scheduler or blanket result cache is required.
+The worker advances only permitted declared operations. The host receives meaningful change,
+completion or intervention; it retains reasoning, edits and acceptance. Existing gates and project
+assertions keep their intent until a category-specific change is accepted. JEV and memory are advisory.
 
-## 3. Destination: intent to accepted change with routine coordination in code
+## 3. Construction and cutover
 
-```mermaid
-flowchart TD
-    A[Operator defines outcome and acceptance] --> B[Governance workflow through Codex or later owned front end]
-    B --> C[Durable task and current proof obligations]
-    C --> D[Exact source and environment identities; bounded context]
-    D --> E[Codex reasons and edits]
-    E --> F[Deterministic change impact and evidence applicability]
-    F --> G[Existing owners execute only required work]
-    G --> H[Build artifact to install to device scenario or CI]
-    H --> I[Receipts with claims, identities and freshness]
-    I --> J{Outcome understood?}
-    J -->|Known failure| E
-    J -->|Ambiguous| K[Optional typed decision adapter]
-    K -->|JEV or another implementation suggests| L[Validate suggestion; Codex investigates when needed]
-    L --> E
-    J -->|Proof sufficient| M[Review plus required commit, push and CI gates]
-    M --> N[Authorized merge and release; destination readback]
-    N --> O[Operator accepts supported claims]
-    O --> P[Measure accepted-work cost, defects and rework]
-    P -. Deliberate tuning .-> C
-    I -. Durable history .-> C
-```
+Follow the [single transition plan](../../../../docs/exec-plans/active/2026-09-20-unified-development-engine.md):
+E0 decisions before dependent work; E1a source seam/preview proof and E1b authorized runner/baseline
+assessment; E2 RN simulator; E4 RN physical. E3 implementation follows E1a and compares against its
+own retrieval baseline, independently of the RN lane. E5 builds and qualifies selected replacement categories
+for the proposed coordinated major cutover. E6 adopts Mnemos later; its interface is designed in E0/E1.
 
-The destination is fewer LLM turns spent acting as a scheduler, log relay and memory manager.
-Reasoning remains available where it adds value. “Only required work” means governance and project
-owners establish applicability; a model never guesses away a gate. External effects retain their
-authorization, and release readiness includes actual destination proof.
+The [migration inventory](../../../../docs/reference/2026-09-20-engine-migration-inventory.md) records
+all hook/check/process categories, why they exist and the proposed treatment. The old installed owner
+remains intact during construction. No duplicate side-effect execution or permanent compatibility layer.
 
-A later owned CLI/app can start deterministic preparation before an LLM sees the task. The same
-internal modules can support that without changing policy ownership. JEV is optional semantic advice.
-A shallow repository map and later Mnemos projection earn their place through measured retrieval
-benefit; neither is necessary to run this process.
-
-## Where the savings come from
-
-| Cost | First qualified slice | Next measured slice | Longer-term possibility |
-| --- | --- | --- | --- |
-| Rebuild context | Bounded resume and checkpoints | Tune retrieval on real misses | Optional repository map or Mnemos projection |
-| Repeat a running check | Recover and observe existing owner | Link hook and device receipts | Unified proof-progress view |
-| Manual check then identical hook | Follow one planned hook path | Diagnose adopter deviations from telemetry | Deterministic next-operation assistance |
-| Read huge logs | Structured result and linked detail | Canonical runner-specific parsers | Optional JEV advice on unresolved cases |
-| Rebuild/reinstall devices | Measure and preserve job identity | Existing runner validates artifact/install reuse | Owner-controlled end-to-end artifact lineage |
-| Broad reruns at every small edit | Coherent batch and focused proof | One expensive checkpoint per measured workflow | Better impact facts where projects can prove them |
-| Release bookkeeping | Preserve existing exact receipts | One read-only fact packet | Authorized workflow with live destination readback |
-
-No savings percentage here is measured. [Measurement and qualification](../specs/measurement-and-qualification.md)
-contains the low-confidence planning envelope, examples and pilot acceptance criteria.
+Savings must be measured in accepted work, native usage coverage, recovery, elapsed time and rework.
+See [measurement](../specs/measurement-and-qualification.md); there is no speculative percentage forecast.

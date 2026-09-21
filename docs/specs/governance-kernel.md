@@ -11,6 +11,13 @@ summary: Contract for the package runtime, its configuration boundary, focused e
 
 # Governance Runtime Specification
 
+## Unified engine migration boundary
+
+This remains the current runtime contract. The [migration inventory](../reference/2026-09-20-engine-migration-inventory.md)
+assigns C02/C06–C10/C14 to preserve selection, checks, immutable subjects and finding/exception semantics. The
+[transition plan](../exec-plans/active/2026-09-20-unified-development-engine.md) replaces implementation
+only after category proof and accepted changes. It does not silently remove this contract's obligations.
+
 ## Purpose
 
 `project-governance-runtime` is a Python package exposing the `project-governance` CLI. It runs

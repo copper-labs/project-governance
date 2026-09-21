@@ -9,8 +9,14 @@ updated: 2026-09-19
 
 # Repository discovery
 
-Targeted Git/`rg` discovery is the initial baseline. No semantic index or watcher is required for
-first adoption. A shallow map is admitted only after repeated navigation costs appear in real tasks.
+Target evolution: [unified engine](../../../../docs/specs/unified-development-engine.md) and
+[migration categories C11/C17](../../../../docs/reference/2026-09-20-engine-migration-inventory.md) own
+a shared structural map and later optional memory retrieval. Current behavior below remains effective until qualified cutover;
+prior S1–S9 references are acceptance inventory, mapped by the new transition plan.
+
+Current discovery is not a shipped relevance search engine. The unified E1/E2 design adds a modest
+structural map from existing metadata for both context and proof planning, with bounded Git/lexical
+search as fallback. No semantic index, watcher or Mnemos dependency is required for first adoption.
 Compare correct-file retrieval, stale hits, latency, output volume and refresh cost with direct search.
 
 A map contains paths, package roots, manifests, explicitly declared relationships, test/config
@@ -28,5 +34,29 @@ The map cannot waive checks, grant access, establish dependency completeness or 
 source without validation. Add symbols only when paths/manifests are insufficient. Add embeddings
 only after demonstrated lexical/symbol misses outweigh construction and invalidation cost.
 
-Mnemos may later receive a rebuildable context/index projection. It remains deferred, with SQLite
-owning critical history until a separate durability/migration evaluation proves otherwise.
+The [memory boundary](../../../../docs/specs/engine-memory-boundary.md) specifies Mnemos projection,
+scope, provenance, freshness, withdrawal and cancellation needs now. Dependency adoption remains later;
+SQLite owns critical history until a separate durability/migration evaluation proves otherwise.
+
+## Working-packet interface
+
+The first packet slice supplies a bounded discovery interface over Git, targeted lexical search and
+existing routes. Record candidate reasons, search bounds and omitted/unavailable sources. Candidate
+excerpts carry source digests; selected artifacts must match them. Measure candidate-generation misses
+separately from ranking errors. Optional JEV ranking and a local index are independent capabilities.
+A missing or stale map falls back to direct search; selected source is revalidated before delivery.
+
+Build the minimal shared map with the first workflow; expand its scope only for measured navigation
+cost or useful-file misses. Symbols/imports and embeddings each need a subsequent comparison. No
+model-generated repository summary, daemon or full-map prompt injection is required for the first slice.
+
+## Concrete E1/E2 baseline and prerequisites
+
+Current `discoverPaths` is an alphabetical, scope-filtered inventory capped at 40 entries. It is not
+relevance retrieval. E1/E2 implement basic candidate search/ranking, keeping known required paths separate. E3/E4
+compare optional semantic ranking and measured retrieval extensions.
+Use bounded Git inventory and in-process lexical matching as the dependency-free baseline. Ripgrep
+may accelerate the same semantics if detected; it is optional. Doctor reports availability, and its
+absence uses bounded in-process search without failing installation. Exclude unsupported/binary or
+out-of-scope files and expose search caps and incomplete coverage. Test with relevant paths beyond
+the first 40 alphabetic entries and with dirty/untracked changes.

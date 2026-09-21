@@ -9,6 +9,11 @@ updated: 2026-09-19
 
 # Codex host integration
 
+Target evolution: [unified engine](../../../../docs/specs/unified-development-engine.md) and
+[migration categories C04/C05/C12](../../../../docs/reference/2026-09-20-engine-migration-inventory.md) own
+host lifecycle, task hooks and completion ownership. Current behavior below remains effective until qualified cutover;
+prior S1–S9 references are acceptance inventory, mapped by the new transition plan.
+
 ## Supported target
 
 Codex app on macOS is the sole first-adoption target. Governance is required. Cowork, Claude Code,
@@ -45,7 +50,9 @@ handlers idempotent. A missing optional hook can use explicit task-boundary comm
 state blocks dependent execution. `doctor` distinguishes available, qualified and unknown.
 
 Use existing completion-aware waits, or a qualified completion return, never both for one job. No model
-polling loop. Hook output carries attributed history, not new authority. No private transcript scraping.
+polling loop. E1a exercises both with fixtures; E1b records the real host capability. E2 accepts a
+qualified wake path or bounded explicit wait/inspect without per-transition model decisions. Measure
+coordination and observation latency for that actual mode; explicit waits do not prove unattended wake. Hook output carries attributed history, not new authority. No private transcript scraping.
 
 ## Model policy
 

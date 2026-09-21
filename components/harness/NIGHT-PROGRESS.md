@@ -1,3 +1,6 @@
+
+> Historical implementation snapshot. Current work order is the [S1–S9 adoption plan](docs/exec-plans/active/2026-09-19-governance-codex-adoption.md); test counts below apply only to their original source.
+
 # Current progress — 2026-09-19
 
 The architecture reset replaces the initial prototype and stale implementation plans. Current

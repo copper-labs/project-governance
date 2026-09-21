@@ -1,3 +1,6 @@
+
+> Historical migration proposal; source migration is complete. The [adoption plan](2026-09-19-governance-codex-adoption.md) alone owns current order and exits. This file is retained in place to preserve references, not to start another sequence.
+
 > Accepted and executed for local source consolidation and wheel integration. See the governance migration receipt. Remaining host/pilot items retain their separate qualification gates.
 
 # Consolidate into Project Governance

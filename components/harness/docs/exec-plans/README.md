@@ -1,26 +1,20 @@
 # Harness roadmap
 
-The [Codex/governance adoption plan](active/2026-09-19-governance-codex-adoption.md) is the active
-forward sequence. Governance is required; one product/install/release is the target. Cowork is
-deferred. The [process map](../architecture/development-flow.md) shows now, first release and destination.
+The [unified engine transition](../../../../docs/exec-plans/active/2026-09-20-unified-development-engine.md)
+owns forward planning. The direction is accepted; review the
+[architecture recommendations](../../../../docs/specs/unified-development-engine.md) before dependent
+implementation. E0 settles decisions, E1 proves risky boundaries, E2 completes a provider-free workflow,
+E3 evaluates JEV early, E4 qualifies RN iOS real devices before broader platforms, E5 coordinates
+category replacement/release, and E6 adopts Mnemos for a concrete consumer. Memory integration needs
+are designed now at E0/E1, not deferred until E6. The plan owns dependencies and exits, not this routing summary.
 
-The [architecture reset](active/2026-09-19-architecture-reset.md) replaces the old decision-first
-sequence. The [current specifications](../specs/README.md) define behavior. Prior reviews and
-research remain dated evidence, not current implementation instructions.
+The [earlier S1–S9 plan](active/2026-09-19-governance-codex-adoption.md) remains an acceptance inventory.
+The completed [architecture reset](active/2026-09-19-architecture-reset.md), prior reviews and research
+remain historical evidence. The [decision map](../../../../docs/exec-plans/active/2026-09-19-decision-first-development-loop.md)
+remains useful; no earlier sequence overrides the new review. Existing contracts govern the installed
+runtime until qualified cutover. No provider account or Mnemos dependency is required for the core.
 
-| Order | Work | Exit evidence |
-| --- | --- | --- |
-| 1 | Codex qualification + bundled governance installation | Actual app lifecycle and exact published-artifact receipts |
-| 2 | Bounded measurement + one coordinated local-check pilot | Repaired baseline; fewer duplicate requests/context at equal proof |
-| 3 | One expensive device workflow + second project on Codex | Runner-owned reuse, correct resource/claim identity, accepted-work benefit |
-| 4 | Optional discovery, semantic decision or release packet | Each targets a demonstrated bottleneck and earns its cost |
-| Later, explicit scope | Owned front end, Mnemos or additional hosts | Separate benefit, durability and integration evidence |
-
-The smaller existing step files are supporting work packages. They do not supersede this sequence.
-[Benefit assumptions and pilot targets](../specs/measurement-and-qualification.md) are unmeasured;
-[development-loop rules](../specs/development-loop.md) preserve existing governance gates.
-
-## Fixed boundaries
+## Current boundaries and preserved requirements
 
 SQLite is authoritative local state, in the Git common directory for linked worktrees. The host
 keeps source-edit ownership. Governance keeps check selection, process supervision and resource
@@ -35,7 +29,9 @@ the earlier seven-row and 18-of-25 claims are not qualified results.
 
 ## Future Mnemos seam
 
-After the provider-free pilot, evaluate Mnemos only if richer cross-task retrieval earns its cost.
+Design the [memory boundary](../../../../docs/specs/engine-memory-boundary.md) now, including scope,
+identity, provenance, freshness, withdrawals, cancellation and degradation. Adopt Mnemos later, after
+the provider-free pilot, if richer cross-task retrieval earns its cost.
 Start with a disposable projection of versioned task/checkpoint/evidence events; compare it with
 bounded SQLite queries. Imported or retrieved memory never grants authority or acceptance. Keep
 SQLite execution-critical state until a separate migration evaluation proves durability,
@@ -44,9 +40,12 @@ transactions, idempotence, portability and recovery. No Mnemos adapter is requir
 Cowork and other hosts are deferred. Kotlin/mixed ecosystems, machine-wide resources and
 distributed clones each need separate proof. Do not infer device readiness from local protocol fixtures.
 
-## Repository consolidation recommendation
+## Repository consolidation completed locally
 
-The [monorepo action proposal](active/2026-09-19-governance-monorepo-proposal.md) recommends a one-time
-import into the existing governance repository before integrated packaging, then a single-wheel
-packaging proof. This is a pending refinement of the accepted installation plan, not a completed
-migration or a change to supported-host scope.
+The harness now lives in this governance repository under `components/harness`, and the governance
+wheel embeds its runtime. The [migration receipt](../../../../docs/reviews/2026-09-19-continuity-migration.md)
+records exact source and installed-artifact proof. The original monorepo proposal is historical;
+do not repeat its migration or build a second artifact/lock system.
+
+Continue with the [agent handoff](../../../../docs/exec-plans/active/2026-09-19-continuity-agent-handoff.md).
+Publication and native Codex qualification remain separate from local integration.

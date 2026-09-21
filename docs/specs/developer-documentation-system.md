@@ -23,6 +23,13 @@ reader job. The [Reader-First Technical Authoring](technical-authoring-harness.m
 owns prose, progression, current public research, and editorial review. This specification owns
 installation, the catalog, exact routing, deterministic validation, and bounded telemetry.
 
+## Unified engine migration boundary
+
+This remains the current runtime contract. The [migration inventory](../reference/2026-09-20-engine-migration-inventory.md)
+assigns C09/C11 to preserve authored documentation, catalogs and bounded routing. The
+[transition plan](../exec-plans/active/2026-09-20-unified-development-engine.md) replaces implementation
+only after category proof and accepted changes. It does not silently remove this contract's obligations.
+
 ## Implementation State
 
 The source runtime implements this contract. It installs the minimal structure, resolves exact

@@ -9,6 +9,11 @@ updated: 2026-09-19
 
 # Governance product and installation
 
+Target evolution: [unified engine](../../../../docs/specs/unified-development-engine.md) and
+[migration categories C12/C15/C16](../../../../docs/reference/2026-09-20-engine-migration-inventory.md) own
+one release/lock and qualified runtime/package cutover. Current behavior below remains effective until qualified cutover;
+prior S1–S9 references are acceptance inventory, mapped by the new transition plan.
+
 ## Decision
 
 Harness is the continuity module of Project Governance. Supported adoption requires governance;
@@ -23,9 +28,11 @@ normal governance/Codex work with an explicit coverage gap, never to ungoverned 
 
 ## Code organization versus product boundary
 
-Keep the current TypeScript continuity module and Python governance runtime behind their public
-versioned contracts. This repository is a development location, not an independently supported
-product. No rewrite, second installer or dependency-injection framework is needed merely to bundle.
+The current TypeScript module and Python runtime use public versioned contracts. The unified target
+standardizes the core on TS, with category-led replacement and a proposed coordinated major cutover.
+The [migration inventory](../../../../docs/reference/2026-09-20-engine-migration-inventory.md) records
+what must carry forward. One product and lock remain; the current wheel below describes delivered
+packaging, not a permanent requirement to retain Python/Node wrappers.
 
 The governance wheel embeds this module as package data generated from `components/harness/src`.
 One existing wheel lock pins all bytes. There is no separate harness release, composition manifest,
@@ -78,3 +85,17 @@ explicitly requested instruction blocks; native Codex hook installation is not c
 and installed-wheel tests establish local packaging/owner behavior. Native hook qualification, full
 cross-worktree upgrade coordination and automatic adoption remain separate planned work. Low-level
 non-Git/explicit-database functions are fixtures/diagnostics, not a standalone supported product.
+
+## Optional decision-provider setup — accepted design
+
+The selected unified release will contain the internal decision interface and optional adapter. Install, update,
+repair, doctor, task resume and ordinary execution require no JEV account or token. Core tests need
+no provider/network access. Node remains the continuity prerequisite, separate from provider access.
+
+The [decision interface](decision-interface.md) owns off/auto/shadow modes, credential handling and
+fallback. Doctor reports configured/disabled/unavailable and qualification status without exposing
+credentials or making a network request by default. A missing token is a provider-availability
+notice, not an installation failure. One switch disables all optional decisions without reinstalling.
+
+The target doctor also reports optional ripgrep availability under the [discovery contract](repository-discovery.md);
+its absence uses in-process lexical search and never fails installation.

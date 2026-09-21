@@ -11,6 +11,11 @@ summary: Current architecture-reset contract; implementation and qualification l
 
 # Worker Invocation
 
+Target evolution: [unified engine](../../../../docs/specs/unified-development-engine.md) and
+[migration categories C03/C04](../../../../docs/reference/2026-09-20-engine-migration-inventory.md) own
+deterministic execution workers versus native reasoning agents. Current behavior below remains effective until qualified cutover;
+prior S1–S9 references are acceptance inventory, mapped by the new transition plan.
+
 ## Current owner
 
 Codex is the first supported host and owns reasoning workers, model/effort choice, permissions and delegation. This
@@ -39,8 +44,11 @@ explicitly coordinate paths and shared resources.
 
 ## Deferred
 
-Automated provider dispatch, autonomous plan execution, model routing and a second agent runtime
-are outside the delivered core. Future adapters must preserve the host's explicit provider choice
+Approved deterministic workflow advancement is now a target responsibility of the unified engine,
+under the [workflow contract](../../../../docs/specs/engine-workflow-and-device-contract.md). This is
+distinct from reasoning-agent delegation, which retains actual host authorization and native tools.
+It does not authorize an automatic model router or an owned replacement agent loop.
+Future adapters must preserve the host's explicit provider choice
 and expose unavailable capabilities rather than silently falling back.
 
 Governance remains the single model-selection policy owner. Harness records the policy reference and

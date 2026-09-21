@@ -11,6 +11,11 @@ summary: Current architecture-reset contract; implementation and qualification l
 
 # Execution
 
+Target evolution: [unified engine](../../../../docs/specs/unified-development-engine.md) and
+[migration categories C03/C04/C18](../../../../docs/reference/2026-09-20-engine-migration-inventory.md) own
+workflow ownership, same-job recovery and RN simulator-to-device proof. Current behavior below remains effective until qualified cutover;
+prior S1–S9 references are acceptance inventory, mapped by the new transition plan.
+
 ## Public seam
 
 `GovernanceExecutor` invokes the existing `harness-agent batch --request-file` and `result`/`wait`
@@ -58,7 +63,9 @@ JSON and shell exit status must agree. An uncertain submission never exits as su
 ## Resources
 
 Use governance's existing claims and project-owned device/service locks. Worktrees do not isolate
-ports or devices. No second claim manager, build cache, test scheduler or cleanup daemon is added.
+ports or devices. No second claim manager, build cache, test scheduler or cleanup daemon is added to this current
+batch adapter. The target [host resource authority](../../../../docs/specs/engine-workflow-and-device-contract.md#host-resource-authority)
+is an explicit later owner cutover, not a second supervisor or independent lease record.
 
 ## Owner protocol and recovery details
 
@@ -86,3 +93,16 @@ retain known action/job identity; a failed progress lookup does not change pendi
 explicit executor override above is a development/qualified governance seam, not support for another
 executor product. First adoption uses the bundled pinned governance executor. Automatic hook receipt
 linking, proof-plan refresh and device adapters are not yet delivered by this batch adapter.
+
+## Planned workflow target binding
+
+The [development loop](development-loop.md#simulator-and-connected-device-workflows--accepted-design)
+defines simulator/emulator and wired/wireless physical-device qualification. Target selection,
+readiness and resource ownership stay with project runners. The existing batch protocol is not
+claimed to implement every workflow field; expose missing facts through the owner public contract.
+Persist stage/target/job bindings before dependent execution. Observe the original owner on reconnect;
+never resubmit because a target or observation channel disappeared.
+
+E1a/E1b of the [transition plan](../../../../docs/exec-plans/active/2026-09-20-unified-development-engine.md)
+own the public protocol-gap assessment; E2 qualifies required executor/adapter extensions. Current
+wheel changes require installed-wheel proof; the target preview/final Node artifact follows E1a/E5. Missing top-level fields alone do not justify a new protocol version.

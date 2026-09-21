@@ -19,6 +19,13 @@ repository one small map from selected shared capabilities to every surface that
 This specification is the canonical Version 1 contract. The runtime schema, validator, pack command,
 doctor checks, and installed agent guidance implement it without enabling the feature for adopters.
 
+## Unified engine migration boundary
+
+This remains the current runtime contract. The [migration inventory](../reference/2026-09-20-engine-migration-inventory.md)
+assigns C10 to preserve the optional KMP coverage contract. The
+[transition plan](../exec-plans/active/2026-09-20-unified-development-engine.md) replaces implementation
+only after category proof and accepted changes. It does not silently remove this contract's obligations.
+
 ## Objective
 
 Provide a deterministic, read-only validator for an adopter-owned KMP surface graph. Adding a target

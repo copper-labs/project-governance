@@ -20,6 +20,13 @@ it has no duplicate operator reference.
 
 ## References
 
+- [E3 evaluation disposition](2026-09-20-e3-evaluation-disposition.md) records optional JEV ranking
+  outcomes, evidence limits and integration-clause readback.
+
+- [Engine migration inventory](2026-09-20-engine-migration-inventory.md) maps current hooks, processes,
+  rules, checks and release surfaces to intent, category decisions and cutover proof. Its linked
+  source snapshot records the inspected file scope and hashes; N1–N7 are the next operator decisions.
+
 - [KMP skill inventory](kmp-skill-inventory.md) records the current Kotlin Multiplatform router,
   leaf skills, source provenance, downloaded reference bundle, and known gaps.
 - [KMP skill quality audit](kmp-skill-quality-audit.md) evaluates whether each existing KMP skill

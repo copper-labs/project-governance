@@ -21,6 +21,13 @@ does not select a separate provider lifecycle.
 The [completion-return plan](../exec-plans/active/2026-09-10-test-completion-return.md)
 records the replacement workflow and its acceptance boundaries.
 
+## Unified engine migration boundary
+
+This remains the current runtime contract. The [migration inventory](../reference/2026-09-20-engine-migration-inventory.md)
+assigns C03/C04 to preserve deterministic batches, native completion and cleanup. The
+[transition plan](../exec-plans/active/2026-09-20-unified-development-engine.md) replaces implementation
+only after category proof and accepted changes. It does not silently remove this contract's obligations.
+
 ## Commands
 
 `harness-agent batch --request-file FILE` submits a version-1 JSON request. Existing status, result,

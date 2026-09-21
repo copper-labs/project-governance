@@ -1,3 +1,6 @@
+
+> Completed architecture work; retained as historical evidence. The [adoption plan](2026-09-19-governance-codex-adoption.md) alone owns current order and exits. This file is retained in place to preserve references, not to start another sequence.
+
 # Architecture reset and implementation
 
 Status: complete. Authorized by the operator on 19 September 2026.

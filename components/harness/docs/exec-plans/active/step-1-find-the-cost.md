@@ -1,3 +1,6 @@
+
+> Historical supporting detail for S2. The [adoption plan](2026-09-19-governance-codex-adoption.md) alone owns current order and exits. This file is retained in place to preserve references, not to start another sequence.
+
 # Repair the baseline
 
 Status: planned qualification/experiment after the architecture reset. Updated 2026-09-19.

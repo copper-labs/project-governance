@@ -9,7 +9,9 @@ do not turn it into another checklist or approval layer.
 
 ## Non-Negotiables
 
-- Markdown is the active governance authority. Git history preserves removed implementation.
+- Markdown owns rationale, judgment and rule-change authority. Explicit unified-engine execution
+  uses one accepted declaration/code owner per machine rule; see the charter. Existing installed
+  owners remain active until deliberate cutover. Git history preserves removed implementation.
 - Keep product identities, paths, adopters, and runtime evidence outside this checkout.
 - Keep model-specific files thin. Shared process belongs in Markdown and the wheel.
 - Do not write into another repository unless the operator explicitly asks.

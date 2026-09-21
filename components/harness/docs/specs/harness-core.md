@@ -11,17 +11,22 @@ summary: Current architecture-reset contract; implementation and qualification l
 
 # Harness Core
 
+Target evolution: [unified engine](../../../../docs/specs/unified-development-engine.md) and
+[migration categories C01–C04/C16](../../../../docs/reference/2026-09-20-engine-migration-inventory.md) own
+task/proof state and approved workflow transitions. Current behavior below remains effective until qualified cutover;
+prior S1–S9 references are acceptance inventory, mapped by the new transition plan.
+
 ## Outcome
 
 Reduce repeated work per accepted task without increasing defects, rework or operator intervention.
-Continuity is the mechanism. Native token usage, elapsed time, test compute and human effort are
+Continuity, compact working packets and measured decision assistance are the mechanisms. Native token usage, elapsed time, test compute and human effort are
 separate measures; missing measurements remain unknown.
 
 ## Product scope
 
 Harness is a required-governance continuity module, with one governance installation and qualified
 release as the target. Codex app is the first supported host. Cowork and standalone harness adoption
-are out of scope. Current packaging has not yet implemented this support contract. See
+are out of scope. Single-wheel packaging is implemented locally; full installation and host qualification remain pending. See
 [installation](installation.md) and [development-loop coordination](development-loop.md).
 
 ## Architecture and ownership
@@ -63,7 +68,8 @@ receives. It cannot sandbox arbitrary subprocesses or authenticate an operator m
 
 ## Deferred
 
-JEV follows a demonstrated semantic bottleneck and a separate comparison. Mnemos follows a
+The internal decision interface is accepted design. JEV is the first optional adapter to evaluate for
+context ranking after the deterministic working-packet baseline; it is not implemented or required. Mnemos follows a
 successful provider-free pilot and a measured continuity need. Cross-machine synchronization,
 automatic release effects, strict exclusion of uninstrumented editors, and a custom front door
 are not implemented. See [the roadmap](../exec-plans/README.md).

@@ -11,6 +11,11 @@ summary: Current architecture-reset contract; implementation and qualification l
 
 # Operational Store
 
+Target evolution: [unified engine](../../../../docs/specs/unified-development-engine.md) and
+[migration categories C01/C13/C17](../../../../docs/reference/2026-09-20-engine-migration-inventory.md) own
+critical state, analytics isolation and future memory projection. Current behavior below remains effective until qualified cutover;
+prior S1–S9 references are acceptance inventory, mapped by the new transition plan.
+
 ## Contract
 
 SQLite is authoritative for local task and action state. Git repositories locate it at
@@ -55,9 +60,14 @@ closed. Artifacts left unreferenced after interruption are harmless and not auto
 
 ## Future substrate
 
-Keep storage-specific code in `src/store`. Do not introduce a provider framework now. Mnemos may
-first receive an exported context projection while SQLite remains authoritative. Replacement of
+Keep storage-specific code behind one owner. Define the [memory boundary](../../../../docs/specs/engine-memory-boundary.md)
+now, including durable identity, projection intent, freshness, scope and withdrawal. Adopt Mnemos later
+as a rebuildable context projection while SQLite remains authoritative. Replacement of
 execution-critical storage needs its own durability, concurrency, migration and rollback proof.
+The target host resource registry has a distinct admission responsibility outside repository history;
+see the [host resource contract](../../../../docs/specs/engine-workflow-and-device-contract.md#host-resource-authority).
+N12 in the migration inventory settles post-write recovery before activation. Existing exports are
+inspectable/quarantined records, not proof of downgrade compatibility or live-job recovery.
 
 The retired task_path table is removed during migration; it held advisory prototype path sightings,
 not task/evidence history. Per-item fork origins are stored in task_item. The coherent library
@@ -67,5 +77,21 @@ not task/evidence history. Per-item fork origins are stored in task_item. The co
 
 [Installation](installation.md) governs deployment/migration coordination across worktrees. Non-Git
 and explicit-database paths above describe current low-level mechanics, not standalone product support.
-[Telemetry](measurement-and-qualification.md) uses a separate bounded analytics store when implemented;
+[Telemetry](measurement-and-qualification.md) owns the E1 choice of reused or separate bounded storage;
 operational records and referenced artifacts are not subject to analytics expiry.
+
+## Optional provider health — accepted design
+
+E3 selects bounded advisory storage scoped by repository, provider and nonsecret config revision,
+outside critical ledger transactions. Its failure cannot prevent task recording or workflow progress.
+Compare a suitable existing mechanism with a small local health file; do not introduce a subsystem
+merely for cooldowns. Preserve authentication suppression until reset/configuration change and
+transient cooldown across CLI invocations. In-process state alone does not meet this requirement.
+
+Store only failure category, cooldown expiry and reset/configuration markers, within 16 KiB. Updates
+must be concurrency-safe and bounded; contention or invalid state returns the deterministic result.
+For a file, use atomic replacement and a short exclusive update; qualify equivalent guarantees for
+reused storage. State grants no authority and cannot block core operation. Losing it may lose
+suppression history; mode and export policy still gate requests. Explicit reset clears only advisory
+state, never task history. Do not hash credentials into keys or store provider text. Test repeated
+CLI invocations, contention, expiry, auth reset and unavailable storage before enabling the adapter.

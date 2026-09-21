@@ -6,10 +6,41 @@ status: current
 owner: project-governance
 created: 2026-08-15
 updated: 2026-09-06
-summary: Defines semantic release identity and the automated immutable wheel publication boundary.
+summary: Defines compiled major-release proof and deliberate publication, with retained legacy wheel guidance.
 ---
 
 # Release Process
+
+## Compiled runtime (3.x)
+
+The coordinated major release uses `@organta/project-governance`, one bundled `.tgz` archive,
+Node `>=24.16.0 <25`, and the schema-2 runtime lock. Package and canonical dependency-lock
+versions must match the exact stable tag. Preview versions are local qualification artifacts;
+the release metadata builder refuses to publish them as stable releases.
+
+The source-readiness workflow runs source tests, type checking, release-metadata tests, package
+construction and offline installed-command proof on each non-draft pull request update, including
+new commits. This does not replace the required device, semantic or migration evidence for a release.
+A changed integration candidate requires current proof.
+
+The release workflow repeats that source/package boundary, then creates `runtime.lock.yaml` and
+`runtime-update.json` from the archive identity and full source commit. Metadata defaults to
+deliberate adoption (`automatic: false`, `integration_change: true`); no major upgrade is inferred.
+Before an authorized tag, confirm repository release immutability, reconcile exact candidate proof,
+and prepare migration notes. The workflow uploads the archive and metadata to a draft before
+publishing. Pushing, tagging and publication require explicit operator authorization. Before tagging, compare the exact release archive with the device-qualified archive; enumerate
+unchanged executed paths and rerun any affected scenario. Passing CI or matching source names alone
+does not establish this binding. After
+publication, verify the release assets and immutable status before claiming released adoption.
+
+The source checkout can retain its current governance hook owner while the preview is qualified.
+Shared automatic startup and related instruction replacement remain a separate deliberate cutover;
+release packaging does not grant authority to change another checkout.
+
+## Legacy wheel process (2.x)
+
+The following process is retained for existing wheel installations and historical release work.
+It is not the 3.x CI or publication path.
 
 Stable releases use exact `MAJOR.MINOR.PATCH` tags and matching Python package versions. Examples
 are `1.0.0`, `1.1.0`, and `1.1.1`. GitHub release titles use `Project Governance <version>`.

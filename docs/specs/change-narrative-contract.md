@@ -19,6 +19,13 @@ This specification keeps commit history lightweight while giving pull requests e
 review. The runtime enforces only deterministic minimums. Authors and reviewers remain responsible
 for whether the words are accurate, coherent, and useful.
 
+## Unified engine migration boundary
+
+This remains the current runtime contract. The [migration inventory](../reference/2026-09-20-engine-migration-inventory.md)
+assigns C05/C09 to preserve commit and PR narrative boundaries. The
+[transition plan](../exec-plans/active/2026-09-20-unified-development-engine.md) replaces implementation
+only after category proof and accepted changes. It does not silently remove this contract's obligations.
+
 ## Implementation State
 
 This approved contract is current. The source runtime installs the portable guidance, validates

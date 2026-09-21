@@ -327,3 +327,14 @@ receives verified candidate installation and ordinary commit-hook validation for
 lock update. It does not repeat independent agent review or application-wide proof for that lock
 change. Source releases retain independent QA and broad wheel proof. The updater joins its own
 validation children to the held runtime lock; Git hooks never initiate update discovery.
+
+## Unified engine transition
+
+The [migration inventory](../reference/2026-09-20-engine-migration-inventory.md) carries this contract's
+intent into the proposed TS engine and accounts for every hook/check category. Current behavior remains
+in force until the relevant category change and cutover are accepted. The workflow engine must remove
+routine coordination without reintroducing duplicate gates or per-tool compliance paperwork.
+For the proposed [local-CI path](../specs/engine-local-ci-and-merge-contract.md), independent CI means
+trusted validation of the required candidate, environment and claims; it does not mandate hosted
+compute. Local evidence may replace a hosted run only after explicit provider/check adoption and
+applicability proof. Current adopter gates remain unchanged until that cutover.

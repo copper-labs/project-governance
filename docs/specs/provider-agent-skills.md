@@ -11,6 +11,51 @@ summary: Defines optional Gemini, Claude, and Codex delegation with full native 
 
 # Optional Provider Agent Skills
 
+## Unified engine migration boundary
+
+This remains the current runtime contract. The [migration inventory](../reference/2026-09-20-engine-migration-inventory.md)
+assigns C04 to preserve native provider capabilities, model policy and one shared lifecycle. The
+[transition plan](../exec-plans/active/2026-09-20-unified-development-engine.md) replaces implementation
+only after category proof and accepted changes. It does not silently remove this contract's obligations.
+
+The compiled preview exposes explicit `provider-submit`, `provider-status`, `provider-events`,
+`provider-wait`, `provider-cancel`, `provider-follow-up`, and `provider-reconcile` commands. Submission takes `--directory`
+and `--request` (a private JSON file containing the invocation options and structured assignment).
+Observation takes `--directory` and the returned `--digest`. Event paging accepts `--after` and
+`--limit`; waiting accepts `--milliseconds` within 0–30000. Cancellation requires `--authority`.
+Follow-up takes the parent directory/digest and `--request` naming a JSON file with the new `id`,
+`prompt`, and `directory`. Assignment text is never passed on the command line.
+
+Provider request `deadlineMs` and optional `idleTimeoutMs` accept 0 to disable the respective timer,
+or up to seven days in milliseconds. Native stdout/stderr activity resets only the idle timer.
+Follow-up preserves both limits. Explicit cancellation remains available when both are disabled.
+Ordinary non-provider workflow commands retain their separate finite deadline contract.
+
+Submission exit 0 confirms durable dispatch acceptance, not successful work. Status/wait return 0
+only for successful terminal results, 1 for other terminal results, and 2 for pending/unknown states
+or invalid invocation. Observation never launches a replacement job. These preview commands do not
+yet replace the wheel's public `harness-agent` surface or establish completed migration qualification.
+
+`provider-reconcile --directory <job> --digest <request-digest>` releases retained resource claims
+and the exact runtime reader only after the original owner published confirmed cleanup. Missing or
+unknown cleanup remains unresolved. Replaying reconciliation cannot release another job's ownership.
+
+`provider-doctor --provider <provider>` accepts explicit `--model`, `--effort`, `--executable`, and
+`--config` binding options. It reports configuration and executable availability without launching a
+provider. A passed diagnostic does not establish authentication, native capabilities or model access.
+
+The compiled `provider-help` command reads its packaged command guide. After installation,
+`host-instructions --dry-run` plans thin pointers to that command; `host-instructions --plan-digest
+<digest>` applies the exact plan. The command verifies the pinned runtime and stable project launcher,
+preserves authored text/modes and safe local symlinks, and leaves empty overrides inactive. Hard-linked
+targets require reconciliation. This explicit preview path is not yet the full init/update transition.
+
+`telemetry providers --manifest <file>` reads an explicit JSON array of `{directory, requestDigest}`
+job handles. It reports verified outcomes, duration and selected native usage fields without reading
+raw logs or returning assignments/answers. Codex cumulative and per-turn values remain separate;
+missing values remain unknown. Gemini usage mapping is currently unqualified. The bounded selected
+sample does not establish accepted-work benefit or avoided-token savings.
+
 ## Purpose And Release Boundary
 
 A parent agent can delegate an authorized assignment to Gemini, Claude, or Codex, keep working,

@@ -16,6 +16,18 @@ Git remains the implementation history and recovery mechanism.
 
 ## Active
 
+- [Unified development engine transition](active/2026-09-20-unified-development-engine.md) owns the
+  new forward planning sequence. Review the [architecture decisions](../specs/unified-development-engine.md)
+  and [migration category decisions](../reference/2026-09-20-engine-migration-inventory.md) before
+  dependent runtime work. The direction is accepted; N1–N13 settle dependent cutover, authority, recovery and CI scope details. Source-only E1a and
+  authorized-adopter E1b have separate exits.
+
+- [Continuity agent handoff](active/2026-09-19-continuity-agent-handoff.md) records scope, evidence and the next authorized work boundary.
+
+- [Decision-first development loop](active/2026-09-19-decision-first-development-loop.md) records
+  the retained decision map and rationale. The [earlier adoption plan](../../components/harness/docs/exec-plans/active/2026-09-19-governance-codex-adoption.md)
+  supplies requirements carried into the unified transition; existing contracts govern current behavior.
+
 - [Return test completion to the initiating agent](active/2026-09-10-test-completion-return.md)
 
 - [Optional provider agent skills](active/2026-09-06-provider-agent-skills.md) builds and releases
@@ -61,4 +73,3 @@ Git remains the implementation history and recovery mechanism.
   telemetry, and clean-wheel proof.
 - [Governance streamlining](completed/2026-08-14-governance-streamlining.md) completed its source
   implementation and proof. Any shadow adoption is target-owned work outside this checkout.
-

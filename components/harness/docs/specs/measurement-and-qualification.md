@@ -9,6 +9,11 @@ updated: 2026-09-19
 
 # Bounded telemetry and qualification
 
+Target evolution: [unified engine](../../../../docs/specs/unified-development-engine.md) and
+[migration categories C13](../../../../docs/reference/2026-09-20-engine-migration-inventory.md) own
+shared events, bounded analytics and controlled evaluation. Current behavior below remains effective until qualified cutover;
+prior S1–S9 references are acceptance inventory, mapped by the new transition plan.
+
 ## Ownership and implementation status
 
 Use governance's public telemetry for check selection, equivalent-scope repeats and check durations.
@@ -24,10 +29,18 @@ reconciliation, execution transition and task outcome. No prompts, code, arbitra
 command bodies, full tool arguments or absolute paths. IDs are pseudonymous, not anonymous. Export
 is explicit. A report is on demand; no chat notifications, daemon or model analysis on each event.
 
-Use a separate local analytics database. Retain newest raw records within all three limits: 7 days,
+E1a compares extending governance telemetry with a separate local analytics store before choosing
+storage. Evaluate observation/join coverage, retention, frozen comparisons, failure isolation, write
+cost and migration/maintenance effort. Reuse earns preference only when it satisfies these needs;
+a separate store is justified when it materially improves them. Record the choice and rejected
+alternative in the E1a receipt; E1b measures actual adopter overhead. Either option must satisfy the following bounds and must not couple
+analytics failures or retention to the critical ledger.
+
+Retain newest raw records within all three limits: 7 days,
 1,000 records and 1 MiB payload. Retain daily aggregates for 90 days within 1 MiB, with at most 64
 combinations of dimensions per day and an `other` bucket. Target total physical storage, including
-journals, below 8 MiB; bound SQLite pages/journals and suspend recording on storage exhaustion.
+journals, below 8 MiB for the analytics allocation; bound pages/journals where SQLite is used and
+suspend recording on storage exhaustion. Account for shared-store overhead explicitly.
 Logical payload limits alone do not establish the disk bound.
 
 Use zero analytics lock wait and bounded retention work. Deduplicate observation and aggregate
@@ -70,35 +83,77 @@ below 5 ms. Flag median regression exceeding both 25% and 25 ms and reproduce on
 Calibrate before making timing goals hard gates. Correct identity, mandatory constraints, bounded
 output, durable pre-action state and no duplicate dispatch are hard gates immediately.
 
-## First-release benefits: planning assumptions, not measurements
+## Benefit targets from measured baselines
 
-The first supported release includes Codex qualification, bundled install, bounded continuity and
-reporting, plus one real check workflow. It does not include a new build cache, universal verdict
-reuse, JEV routing, a device scheduler or an owned agent loop.
+Before each intervention, measure the current workflow's accepted-work cost, usage coverage and
+variability. Declare the targeted outcome, minimum useful improvement and uncertainty/sample-size
+assumptions before candidate evaluation. Do not set a forecast from unmeasured percentage envelopes.
 
-For budgeting, use **0–15% net total-token reduction** and **0–10% elapsed-time reduction** across a
-mixed task sample as a low-confidence planning envelope. These are scenario assumptions, not empirical
-estimates or a promised nonnegative outcome: setup costs or poor adoption can cause a regression.
-Resumed tasks with substantial repeated context may show larger local gains; fresh tasks can show none.
+Target elimination of observed manual-then-hook duplicates and duplicate submission of known jobs.
+For context and coordination, derive explicit experiment thresholds from the measured baseline and
+the intervention's total overhead. Include retries, operator time and rework. A required build still
+costs its measured duration; savings require an unnecessary run to be safely avoided. Do not add
+overlapping savings categories or equate context bytes with total-token savings.
 
-Derive expectations separately for tokens and time:
-
-`net fraction saved = addressable overhead share × fraction removed − added overhead share`
-
-Illustration only: tokens with 40% addressable overhead, 30% removed and 2% added yield 10% net savings.
-For elapsed time, 20% addressable overhead, 30% removed and 1% added yield 5%. These examples do not
-estimate the actual repositories. A 15-minute required build remains a 15-minute build. Avoiding one
-unnecessary such run saves 15 minutes only when that duplicate actually existed and was safely avoided.
-
-Pilot targets, separate from the forecast: eliminate observed manual-then-hook duplicates in the
-qualified flow; eliminate duplicate submission when an existing job is known; aim for 25% less
-repeated context on resumed tasks and at least 10% lower median coordination cost on matched tasks.
-Report native-token coverage before interpreting a token result. Do not add overlapping category
-savings or assume proxy improvements equal total-token savings.
-
-Use an initial 10–20 accepted tasks per condition, with and without the continuity module under the
+Use an initial 10–20 accepted tasks per condition as a directional feasibility screen, not proof of
+a percentage improvement. An underpowered result is inconclusive, not qualified.
+Correctness, mandatory-context retention and proof coverage remain hard gates. Run the comparison with and without the continuity module under the
 same governance policy and comparable Codex/model settings, task mix, cache state and proof requirements.
 Avoid replaying identical tasks as if familiarity had no effect. Include retries, reopened work,
 operator time and all child/model usage; report spread and limitations. Repair the historical 495/624
 denominator before quoting historical comparisons. No defect/required-proof regression is acceptable.
 If benefit is unclear, improve or remove the intervention before widening scope.
+
+## Decision and workflow tuning — accepted design
+
+Join task/attempt/packet/decision/job observations through existing IDs. Record question/configuration/
+model versions, mode, fallback reason, opaque input identity, candidate/selected counts, preparation
+and provider latency, delivered bytes, expansions and attributed corrections. Record target kind and
+transport separately from queue/build/install/launch/scenario/cleanup timing where owners supply it.
+Track retry/reuse reasons, operator intervention, accepted/reopened outcomes and usage coverage.
+
+Deduplicate terminal and native-usage observations. Starts and terminals are two events for one run.
+Missing usage is unknown. Summed concurrent job time is not wall time; same-source repetition is not
+proof of waste. Distinguish observed facts from host/reviewer labels and record their provenance.
+Report by task type, decision method and configuration with the existing bounded dimensions/storage.
+Compare current host handling, deterministic packets and JEV-ranked packets, counting all attempts,
+model calls, fallbacks, expansions and rework. Shadow mode establishes no avoided host work.
+
+Routine analytics retain no source/prompts/log bodies. An explicitly enabled evaluation capture can
+keep sanitized packets, predictions, corrections and outcomes in the adopter's private evaluation
+area, with declared retention/data scope and no automatic export. Freeze useful cases separately
+from rolling analytics. Aggregate telemetry alone cannot replay or train semantic decisions. Tune
+retrieval/rules/questions first; model-weight training needs its own evidence and capability decision.
+
+Add focused fixtures for no-token/off operation with zero network calls, deadline/cooldown fallback,
+stale candidates, required-context retention and telemetry failure. Workflow fixtures cover target
+ambiguity, simulator readiness, device disconnect, contention, same-job resume and cleanup. Actual
+simulator and physical-device qualification remains separate from these fixtures.
+
+## Durable evaluation manifest and bounded dimensions
+
+This specification owns the E1a evaluation-manifest schema. Arm comparisons must use a frozen,
+explicitly enabled evaluation record set, not rolling analytics. Its manifest declares version,
+question/config/source identities, arms, task-family IDs, capture scope, author/reviewer labels,
+metric definitions, missing-usage policy, deadlines, thresholds and retention/budget. Keep inputs,
+observations and adjudication separate. E1a adds schema validation before the first comparison.
+E1b records RN baseline coverage and freezes thresholds afterward, before evaluating the candidate;
+E3 and the CI pilot may establish their own independent baselines. D10 applies this ordering to the
+engine migration itself as well as optional interventions. Missing instrumentation stays explicit.
+
+Default evaluation bounds: 500 task episodes or 100 MiB, whichever is reached first; 90-day retention
+from capture unless the operator sets another explicit expiry before the run. Stop capture at its
+cap, record incompleteness and do not silently evict a comparison. Export/extend retention explicitly
+before expiry if needed; deletion requires the declared retention policy and preserves operational
+proof. The owning adopter's private evaluation area holds this capture. No automatic cloud export.
+
+Numeric observations (bytes, counts, durations) are measures, not aggregation dimensions. Use fixed
+report projections rather than a cross-product: method/mode/task class; question/model/config revision;
+or stage/target kind/transport. Each projection obeys the existing cardinality bound and reports other
+and dropped coverage. The frozen evaluation retains the joins needed for paired analyses independently
+of the seven-day raw window and routine aggregate buckets. Do not widen routine telemetry by default.
+
+Record runner coordination burden separately: host status reads/turns where observable, unchanged
+progress reads, operator interventions, recovery attempts and time to actionable failure. Do not
+label fewer chat messages as token savings without native usage. Attribute cold/warm/stale-state
+conditions to the evaluation capture; avoid unbounded routine telemetry dimensions.

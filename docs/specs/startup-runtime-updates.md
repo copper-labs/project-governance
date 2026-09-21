@@ -11,6 +11,13 @@ summary: Define once-authorized compatible runtime adoption early in top-level t
 
 # Top-Level Startup Runtime Updates
 
+## Unified engine migration boundary
+
+This remains the current runtime contract. The [migration inventory](../reference/2026-09-20-engine-migration-inventory.md)
+assigns C05/C12 to preserve task hooks, reader ownership and update recovery. The
+[transition plan](../exec-plans/active/2026-09-20-unified-development-engine.md) replaces implementation
+only after category proof and accepted changes. It does not silently remove this contract's obligations.
+
 ## Authority
 
 An adopting repository may authorize compatible automatic updates in its tracked profile. The
@@ -64,6 +71,18 @@ owns explicit discovery and installation budgets. Discovery failure leaves the c
 usable. Children and continuations perform no network discovery. No retry loop, scheduler, or
 additional model call belongs in this operation.
 
+Compiled preparation persists one installation deadline. Download, staging, activation, commit and
+readback consume the remaining allowance; reopening preparation does not renew it. Check the deadline
+at phase boundaries and bound subprocess timeouts by the remaining time. Expiry does not establish
+process cleanup. Retain any mutation journal and maintenance obligation for explicit recovery; that
+separately invoked recovery may use its own bounded allowance.
+
+Compiled `startup prepare` stages a candidate without activation. `startup apply` composes that
+preparation with maintenance handoff, backup, activation, lock-only commit and verified completion.
+Both require the task identity, receipt store, external operation directory, work state and assessment
+reason. Application revalidates the recorded native parent and tracked opt-in; a delegated worker
+cannot supply the parent's authority. Native observation hooks do not invoke application themselves.
+
 ## Worktree And Runtime Ownership
 
 Resolve the worktree through Git and canonicalize its filesystem identity. The lock, profile,
@@ -106,6 +125,30 @@ ambiguous mutation preserves evidence and requires recovery rather than claiming
 automatic rollback may discard user changes. Retain the previous environment until it is no
 longer needed or in use.
 
+A task closing during an update does not cancel the update's ownership obligation. Keep its saved
+binding while maintenance owns the transferred reservation. Committed recovery may finish for a
+closed task, but must retire the successor reservation without reopening that task. Owner recovery
+must not erase this binding while update recovery is pending.
+
+Compiled `startup cancel-update` is limited to an updater proven stopped before activation and before
+commit dispatch. It requires the original Git snapshot, installed generation and launcher, then
+restores the transferred reservation without rewriting project files. A closed task's reservation
+is retired instead. Cancellation is durable and replayable; it does not authorize another automatic
+attempt. Activated or command-bearing journals require their corresponding recovery path.
+
+Compiled `startup restore-update` handles activation before runtime writes. It requires the stopped
+coordinator and confirmed cleanup for any dispatched commit, checks the original Git snapshot with
+only the journaled lock transition allowed, and reuses the installation's pre-write restoration.
+Independent edits and post-write generations refuse restoration. Readback of the original installed
+runtime precedes restored task ownership; the closed-task rule and durable replay apply here too.
+
+Compiled `startup retry-update` is an explicit forward commit recovery for an unchanged, valid active
+candidate after runtime writes. It preserves all evidence and records one separate retry after the
+original updater and command have stopped. Hooks and signing remain enabled. Repeating the command
+observes that retry rather than dispatching another one; another failed retry retains maintenance.
+Recovery checks both attempts' cleanup before completing. A changed or broken candidate requires
+deliberate runtime repair, not a bypass of failed checks or restoration of pre-write evidence.
+
 ## Results And Proof
 
 Normal outcomes are current, updated, deferred, and approval-required. Inconsistent installation
@@ -117,3 +160,79 @@ compatible lock update uses deterministic installation proof and its ordinary co
 does not add another independent agent review or application-wide test run. Development and
 acceptance cadence follow the approved
 [implementation plan](../exec-plans/completed/2026-09-06-top-level-startup-updates.md).
+
+## Compiled candidate compatibility
+
+The compiled engine uses startup contract version 2; wheel contract version 1 does not authorize a
+compiled update. Compatibility metadata retains schema version 1 and the existing exact field set,
+including `lock_sha256` over the candidate lock's literal JSON bytes. The lock itself uses compiled
+schema version 2. Automatic candidates must be stable, strictly newer, in the current major, and
+explicitly cover the current version through the inclusive `from_version` and exclusive
+`before_version` bounds. Configuration schema and Node contract remain unchanged.
+
+Both artifact URLs must identify the same GitHub owner/repository and their respective exact version
+tags. Local archives and other distribution locations remain deliberate adoption. Compatibility
+validation alone does not prove immutable publication, artifact integrity, native host identity,
+repository opt-in, safe worktree state or activation authority. Those checks remain mandatory before
+an automatic update. The initial compatibility component performs no network access or mutations.
+
+### Compiled preview observer installation
+
+The compiled preview exposes `startup hooks` for a read-only configuration proposal and
+`startup install-hooks` for explicit project-local installation, using the launcher's workspace and
+registry scope plus `--receipts <absolute-path>`. Installation preserves authored handlers and file
+permissions, refuses conflicting or legacy startup handlers, and leaves an already-current file
+unchanged. Installation does not enable compatible updates or edit user-level host configuration.
+
+Codex host enablement (`features.hooks`), project trust and managed restrictions remain separate
+requirements. The installer reports them without claiming they have been satisfied. See the
+[Codex configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference).
+Native event delivery must be qualified separately from writing the configuration file.
+
+Short observation readers record the hook process identity in the registry at acquisition, including
+local host, canonical workspace, PID, process fingerprint and nonce. Explicit `recover-observation`
+may release the exact reader only after a successful process inventory proves that PID absent.
+PID reuse refuses recovery. Recovery never signals processes, repeats discovery or releases the
+parent task reservation. An absent reader reports no inferred observation outcome. This mechanism
+does not recover legacy readers or a parent reservation lacking its separate native owner binding.
+New parent reservations persist that native binding and the intended exact reader token before
+registry acquisition. Acquisition verifies the planned generation and reuses only that token.
+An interruption before acquisition therefore leaves recoverable intent, not an unowned reader.
+If the native process cannot be identified, observation defers without reserving a parent task.
+
+Native stdin observations return Codex's `hookSpecificOutput` context envelope only for actionable
+initial discovery. Internal evidence stays in the receipt store; routine child/continuation/close
+observations return an empty object. SessionEnd uses the host-supported three-second timeout.
+Exact hook definitions must also be reviewed and trusted using Codex `/hooks`; project trust alone
+is insufficient. These constraints follow the [Codex Hooks contract](https://learn.chatgpt.com/docs/hooks).
+
+Compiled discovery caches a complete successful metadata-response snapshot beside the external task
+receipt store, keyed by current lock, startup settings and authentication mode. It honors
+`cache_seconds`, rejects future timestamps, and never combines a cached partial inventory with new
+network pages. Cached responses traverse the same inventory, metadata and digest validation as fresh
+responses. Oversized snapshots are not persisted; failures never publish a partial cache. The cache
+contains neither credentials nor archive bytes nor worktree/activation judgments. Preparation still
+verifies candidate identity and package bytes independently.
+
+During compiled host-instruction migration, only the exact shipped wheel startup block is replaced
+with the packaged `startup-help` route. Customized or malformed startup sections require deliberate
+reconciliation. The migration backup preserves the original and verifies original or fully intended
+content during recovery; surrounding authored guidance remains unchanged. This instruction transition
+does not migrate legacy executable hooks, enable updates or establish native host trust.
+
+### Backed legacy hook transition
+
+A compiled `update` request may declare `startupReceipts` when migrating the shipped Codex startup
+handlers. The coordinated host transition requires the original hook file in its verified backup,
+recognizes only the exact complete legacy handler set, and binds the new receipt-store path and intended
+hook bytes into host completion identity. Replacement requires drained pre-write activation; authored
+handlers and file permissions survive. A partial write or changed input leaves maintenance held for
+reconciliation. Lock-only finalization refuses legacy startup commands in project Codex hooks, Claude settings
+(including local settings), and Gemini settings. The automatic backed replacement remains Codex-specific;
+other provider handlers require their own deliberate migration. Descriptions mentioning retired files
+do not count as executable handlers.
+
+The lower-level `runtime-complete --host-plan` surface accepts `--startup-receipts` for the same bound
+transition. Neither path changes host trust or compatible-update policy. New definitions still require
+native review. The unreferenced legacy script and old installation are retired only after the remaining
+migration/readback obligations are qualified; replacing hook configuration alone does not prove delivery.

@@ -43,6 +43,18 @@ project-governance docs route --capability change-runtime --json
 The catalog is a routing surface, not a second technical authority. Follow its reference before
 acting and inspect its local sources for current implementation behavior.
 
+## Unified engine design and migration
+
+Before new engine implementation, follow the [target specification](../specs/unified-development-engine.md),
+[category inventory](../reference/2026-09-20-engine-migration-inventory.md) and
+[transition plan](../exec-plans/active/2026-09-20-unified-development-engine.md). These distinguish current
+behavior from proposed replacements, preserving hook/check intent while changing runtime mechanisms.
+The [local-CI and merge contract](../specs/engine-local-ci-and-merge-contract.md) owns local/VM/hosted
+profiles, result publication and candidate freshness for the future engine adapter.
+Both remote and local CI are required; the operator reports existing GitHub local-CI authorization.
+The [capability boundary](../specs/engine-capability-boundaries.md) uses release work to test the core
+while deferring full release implementation and host-specific adapters.
+
 ## Continuity
 
 The [continuity module](../../components/harness/README.md) owns task history and bounded resume.

@@ -1,8 +1,13 @@
 # Optional semantic decision
 
-Status: planned qualification/experiment after the architecture reset. Updated 2026-09-19.
+Supporting work package for S7 of the [adoption plan](2026-09-19-governance-codex-adoption.md).
+Updated 2026-09-19. The adoption plan owns ordering; this filename is historical.
 
-Only after the provider-free pilot, select one residual semantic decision that deterministic rules cannot handle economically. Use the provider-neutral decision adapter with JEV as one candidate, initially for residual failure triage. Evaluate it in shadow mode with abstention, calibrated confidence, deterministic fallback and adversarial/late-context cases. Measure total accepted-work cost and rework. No model owns scope, authorization, check completeness or acceptance. Remove the experiment if it does not pay for itself.
+Start with optional-context ranking through the internal decision interface after the deterministic
+working-packet baseline. JEV is the first candidate, with immediate off/no-token fallback and bounded
+provider latency. Compare total accepted-work cost and decisive-evidence retention. Failure triage
+is a later use case if observed cost justifies it, not the assumed first experiment.
 
-Follow the [current contracts](../../specs/README.md) and [roadmap](../README.md).
-Completion requires recorded evidence, not source presence.
+Follow the [decision contract](../../specs/decision-interface.md). No model owns scope, authorization,
+required proof or acceptance. Shadow scores are not saved tokens. Retain the deterministic path if
+model assistance does not earn its cost. Completion requires actual evidence, not source presence.

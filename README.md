@@ -1,5 +1,35 @@
 # Project Governance Runtime
 
+The 3.0 preview unifies governance checks, task history, deterministic workflows, device/resource
+ownership and optional JEV context assistance in `@organta/project-governance`. It ships as one
+compiled npm archive with bundled dependencies and requires Node `>=24.16.0 <25`. No JEV account
+is required: off or missing credentials use deterministic context selection.
+
+This is a deliberate major-version migration. Existing installations and shared startup hooks do
+not switch automatically. The preview is qualified through explicit invocation; shared automatic
+startup cutover is a separate adoption step. Publication requires operator authorization.
+
+For source development and an offline-installable package:
+
+```sh
+npm ci --ignore-scripts
+npm ci --prefix components/harness --ignore-scripts
+npm test
+npm run typecheck
+mkdir -p release-assets
+npm run pack:engine -- release-assets
+node components/engine/scripts/verify-package.mjs release-assets/*.tgz
+```
+
+Use the packaged `skills/install/SKILL.md` for the versioned installation request and migration
+inventory. Do not apply the legacy update flags below to the compiled runtime.
+See the [transition plan](docs/exec-plans/active/2026-09-20-unified-development-engine.md) for
+qualification boundaries and the [release process](docs/governance/release-process.md) for publishing.
+
+## Legacy installed runtime (2.x)
+
+The following commands describe installations that have not yet migrated.
+
 `project-governance` is a small, project-neutral runtime for selecting and running the checks
 affected by a repository change. Markdown remains the active authority for governance decisions,
 plans, and documentation. Git history is the recovery record for removed implementation.
