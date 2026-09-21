@@ -14,12 +14,19 @@ import { buildContextPacket } from "./context-packet.ts";
 import { JevDecisionAdapter, type DecisionProvider, type DecisionOptions, type Candidate } from "./decisions.ts";
 import { profileDecisionConfig } from "./decision-configuration.ts";
 import { discoverContext } from "./context-discovery.ts";
+import { profileDecisionSettings } from "./decision-settings.ts";
+import { DecisionRuntime } from "./decision-runtime.ts";
+import { contextAdvice, type ContextAdvice } from "./decision-context-advice.ts";
+import { resolveDecisionScope } from "./decision-scope.ts";
+import { resolveWorkflowCandidates, workflowAdvice } from "./decision-workflow-advice.ts";
 
 /** Mandatory routing runs without a provider. Only captured project configuration selects requirements. */
 export async function contextRouteCommand(args: string[], root: string,
   assetRoot = fileURLToPath(new URL("../assets/skills/", import.meta.url)), suppliedProvider?: DecisionProvider, options: DecisionOptions = {}) {
   const { values } = parseArgs({ args, strict: true, allowPositionals: false, options: {
     task: { type: "string" }, revision: { type: "string" }, staged: { type: "boolean" },
+    "decision-task": { type: "string" },
+    "workflow-candidates": { type: "string" },
     "base-ref": { type: "string" }, "include-expansion": { type: "boolean" }, "include-evaluation-skills": { type: "boolean" },
     "optional-excerpt-bytes": { type: "string" },
     "changed-path": {type:"string",multiple:true},
@@ -85,11 +92,42 @@ export async function contextRouteCommand(args: string[], root: string,
       sourceDigest: `sha256:${createHash("sha256").update(bytes).digest("hex")}` };
   });
   const optionalBudget = Math.max(0, Math.min(packet.limits.expansion - packet.used.expansion, packet.limits.total - packet.used.total));
+  const settings = profileDecisionSettings(profile);
+  const decisionScope = resolveDecisionScope(root, { ...(values["decision-task"] === undefined ? {} : { taskId: values["decision-task"] }), revision });
+  let relevanceAdvice: ContextAdvice | null = null;
+  const expandedContext = settings.questionIds.DL03.includes("context.relevance/1");
+  const provider: DecisionProvider = suppliedProvider ?? (expandedContext ? {
+    async decide(request) {
+      relevanceAdvice = await contextAdvice(new DecisionRuntime(settings, contextStateRoot(root), options), request.candidates, decisionScope, {
+        purpose: task, eventId: digest({ revision, purpose: task, source: scope.subject_digest, candidates: request.candidates }),
+        policyDigest: digest(configDigests), environment: scope.mode, revision, subjectDigest: scope.subject_digest ?? digest(configDigests),
+        excerptBytes: settings.legacy.evidenceBytes,
+      });
+      const decision = relevanceAdvice.decision;
+      return { version: 1, kind: request.kind, inputDigest: digest(request), delivered: relevanceAdvice.order,
+        suggested: relevanceAdvice.delivered ? relevanceAdvice.order : null, method: relevanceAdvice.delivered ? "jev" : "baseline",
+        reason: relevanceAdvice.reason, model: decision?.model ?? null, questionVersion: "context.relevance/1",
+        confidence: null, latencyMs: decision?.latencyMs ?? 0, usage: decision?.usage ?? { inputTokens: null, outputTokens: null } };
+    },
+  } : new JevDecisionAdapter(profileDecisionConfig(profile), join(contextStateRoot(root), "provider-health.json"), { scope: decisionScope, settings }));
   // Invalid mandatory context prevents any optional provider call or source transmission.
   const optional = packet.ready && candidates.length && optionalBudget >= 2 ? await buildContextPacket({
     taskRevision: revision, purpose: task, required: [], optional: candidates, maximumBytes: optionalBudget,
     ...(values["optional-excerpt-bytes"] !== undefined ? { optionalExcerptBytes: Number(values["optional-excerpt-bytes"]) } : {}),
-  }, suppliedProvider ?? new JevDecisionAdapter(profileDecisionConfig(profile), join(contextStateRoot(root), "provider-health.json")), options) : null;
+  }, provider, options) : null;
+  let workflowRecommendation = null;
+  if (packet.ready) {
+    const manifestPath = values["workflow-candidates"] === undefined ? null : safeSubjectPath(values["workflow-candidates"]);
+    const supplied = manifestPath ? resolveWorkflowCandidates(load(manifestPath), root, subject) : null;
+    const workflowPaths = [...new Set([...(manifestPath ? [manifestPath] : []), ...(supplied?.sourcePaths ?? [])])];
+    for (const path of workflowPaths) if (subject.source(path)?.file_type === "regular") {
+      configDigests[path] = digest(subject.read(path, 1024 * 1024).toString("base64"));
+    }
+    workflowRecommendation = await workflowAdvice(new DecisionRuntime(settings, contextStateRoot(root), options), supplied, decisionScope, {
+      task, eventId: digest({ task, revision, supplied, source: scope.subject_digest }), policyDigest: digest(configDigests),
+      environment: scope.mode, revision, subjectDigest: scope.subject_digest ?? digest(configDigests), sourcePaths: workflowPaths,
+    });
+  }
   const staleSources: string[] = [];
   // Re-read every captured candidate, including omitted sources, after optional advice returns.
   for (const path of [...Object.keys(configDigests), ...packet.entries.map(entry => entry.path), ...optionalPaths, ...targetSkillPaths]) {
@@ -113,9 +151,10 @@ export async function contextRouteCommand(args: string[], root: string,
     omissions: packet.omissions, skillOmissions: packet.skills?.omissions ?? [],
     optional: optional ? { selected: optional.entries.map(entry => entry.id), omitted: optional.omitted,
       decision: optional.decision, measurement: optional.measurement, reason: optional.reason } : null,
-    discovery, staleSources, outcome: staleSources.length ? "refused-stale-source" : packet.ready ? "delivered" : "blocked" };
+    relevanceAdvice, workflowAdvice: workflowRecommendation, discovery, staleSources, outcome: staleSources.length ? "refused-stale-source" : packet.ready ? "delivered" : "blocked" };
   durableJson(join(contextStateRoot(root), "routes", `${receiptId}.json`), receipt);
   if (staleSources.length) throw new Error("Context sources changed while preparing the routed packet");
   return { ...packet, route, routingPaths, receiptId, inputDigest: receipt.inputDigest, revision, source: identity.source,
-    optional, optionalBudget, optionalOmitted: optional?.omitted ?? optionalPaths, discovery };
+    optional, relevanceAdvice: relevanceAdvice as ContextAdvice | null, workflowAdvice: workflowRecommendation,
+    optionalBudget, optionalOmitted: optional?.omitted ?? optionalPaths, discovery };
 }

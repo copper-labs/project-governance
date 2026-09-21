@@ -1,6 +1,6 @@
 {
   "name": "@organta/project-governance",
-  "version": "3.0.0-preview.1",
+  "version": "3.0.0-rc.1",
   "description": "Unified governance, durable development workflows and evidence",
   "license": "Apache-2.0",
   "type": "module",
@@ -18,8 +18,10 @@
     "typecheck": "tsc --noEmit",
     "test:engine": "node --test 'components/engine/test/**/*.test.ts'",
     "test:continuity": "npm --prefix components/harness test",
+    "test:decision-pilot": "node --test 'components/engine/test/decision*.test.ts' components/engine/test/context-route-command.test.ts components/engine/test/context-packet.test.ts",
     "test": "npm run test:engine && npm run test:continuity && node --test 'components/engine/scripts/*.test.mjs'",
-    "pack:engine": "npm run build && node components/engine/scripts/pack-engine.mjs"
+    "pack:engine": "npm run build && node components/engine/scripts/pack-engine.mjs",
+    "verify:decision-pilot": "npm run build && node components/engine/scripts/verify-decision-pilot.mjs ."
   },
   "dependencies": {
     "ajv": "8.20.0",

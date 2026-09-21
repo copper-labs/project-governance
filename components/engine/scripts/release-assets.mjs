@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
 
 /** Bind a deliberate major release to its archive bytes; never opt existing users into migration. */
 export function releaseAssets({ manifest, tag, sourceCommit, repository, archiveName, bytes }) {
-  if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(tag) || Number(tag.split('.')[0]) < 3 ||
+  if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-rc\.[1-9]\d*)?$/.test(tag) || Number(tag.split('.')[0]) < 3 ||
       manifest.name !== '@organta/project-governance' || manifest.version !== tag ||
       manifest.engines?.node !== '>=24.16.0 <25') throw new Error('Release tag and compiled package identity must agree');
   if (!/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/.test(sourceCommit) ||
@@ -19,7 +19,7 @@ export function releaseAssets({ manifest, tag, sourceCommit, repository, archive
   const lockText = JSON.stringify(lock, null, 2) + '\n';
   const metadata = { schema_version: 1, version: tag,
     lock_sha256: createHash('sha256').update(lockText).digest('hex'), startup_contract: 2,
-    automatic: false, from_version: `${tag.split('.')[0]}.0.0`,
+    automatic: false, from_version: tag.includes('-rc.') ? tag : `${tag.split('.')[0]}.0.0`,
     before_version: `${Number(tag.split('.')[0]) + 1}.0.0`, configuration_schema: 1, integration_change: true };
   return { lockText, metadata };
 }

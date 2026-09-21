@@ -5,7 +5,7 @@ type: exec-plan
 status: active
 owner: project-governance
 created: 2026-09-20
-updated: 2026-09-20
+updated: 2026-09-21
 summary: Decision-first transition to a shared development engine, proving a real workflow before broad migration.
 ---
 
@@ -394,6 +394,11 @@ retain the core contracts and report unavailable proof without making fleet acti
 first-release requirement. E6 and all-platform rollout remain later scope.
 
 ## Implementation closeout
+
+Next delivery is owned by the
+[decision-layer delivery, release and pilot measurement plan](2026-09-21-major-adoption-and-measurement.md).
+It proposes useful JEV batches followed by RC publication and real adopter comparisons, using the
+completed implementation below as their foundation.
 
 Implementation through E5 is complete for the operator-approved explicit preview execution scope.
 The final Opus 5 extra-high review and substantive rechecks are reconciled. Source, installed

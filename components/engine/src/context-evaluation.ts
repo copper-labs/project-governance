@@ -87,8 +87,19 @@ export async function evaluateContext(cases: ContextEvaluationCase[], provider: 
     results.push({ id: entry.id, inputDigest: reference.inputDigest, omittedCandidates, oversizedUsefulCandidates, baseline: score(reference),
       candidate: score(candidate), lexical: score(lexical), shadow, decision: candidate.decision, fallbackReason: candidate.reason });
   }
+  return summarizeEvaluation(cases, results);
+}
+
+/** Aggregate observed selection and native usage without treating repeated receipts as new calls. */
+function summarizeEvaluation(cases: ContextEvaluationCase[], results: CaseResult[]) {
   const sum = (side: "baseline" | "candidate", field: "usefulSelected" | "deliveredBytes") => results.reduce((total, item) => total + item[side][field], 0);
-  const usages = results.map(item => item.decision?.usage);
+  const seenUsage = new Set<string>();
+  const usages = results.filter(item => {
+    const id = item.decision?.receiptId;
+    if (!id) return true;
+    if (seenUsage.has(id)) return false;
+    seenUsage.add(id); return true;
+  }).map(item => item.decision?.usage);
   const tokens = (field: "inputTokens" | "outputTokens") => usages.every(value => typeof value?.[field] === "number")
     ? usages.reduce((total, value) => total + value![field]!, 0) : null;
   const paired = (side: "candidate" | "shadow", reference: "baseline" | "lexical") => {

@@ -23,7 +23,7 @@ test("CLI interruption aborts active optional advice and returns cancellation ev
     } }]));
     writeFileSync(join(root, "config.json"), JSON.stringify({ ...DEFAULT_DECISIONS, mode: "auto", allowedQuestions: ["rank_optional_context"], allowedDataClasses: ["source"], allowedSourcePaths: ["a"] }));
     writeFileSync(join(root, "transport.mjs"), `globalThis.fetch=async(_url,init)=>new Promise((_resolve,reject)=>{init.signal.addEventListener('abort',()=>reject(new Error('fixture abort')),{once:true});setTimeout(()=>process.kill(process.pid,'SIGTERM'),20)});`);
-    const result = spawnSync(process.execPath, ["--import", join(root,"transport.mjs"), fileURLToPath(new URL("../src/cli.ts", import.meta.url)), "context-evaluate", "--dataset", "cases.json", "--decision-config", "config.json"], {
+    const result = spawnSync(process.execPath, ["--import", join(root,"transport.mjs"), fileURLToPath(new URL("../src/cli.ts", import.meta.url)), "context-evaluate", "--dataset", "cases.json", "--decision-task", "fixture", "--decision-revision", "evaluation-1", "--decision-config", "config.json"], {
       cwd: root, env: {...process.env, JEV_TOKEN:"synthetic-fixture", XDG_STATE_HOME:join(root,"state")}, encoding:"utf8",timeout:5000,
     });
     assert.equal(result.status, 143, result.stderr);

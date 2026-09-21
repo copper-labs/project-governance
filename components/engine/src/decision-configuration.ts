@@ -16,7 +16,8 @@ export function profileDecisionConfig(profile: unknown): DecisionConfig {
     allowed_data_classes: "allowedDataClasses", deadline_ms: "deadlineMs", evidence_bytes: "evidenceBytes",
     max_candidates: "maxCandidates", minimum_confidence: "minimumConfidence", allowed_source_paths: "allowedSourcePaths" } as const;
   if (settings["provider"] !== undefined && settings["provider"] !== "jev") throw new Error("Unsupported decision provider");
-  for (const key of Object.keys(settings)) if (key !== "provider" && !Object.hasOwn(mapping, key)) throw new Error("Unknown decision configuration key");
+  // `consumers` and `budget` belong to the first-RC owner in decision-settings.ts; this E3 view ignores them.
+  for (const key of Object.keys(settings)) if (!["provider", "consumers", "budget"].includes(key) && !Object.hasOwn(mapping, key)) throw new Error("Unknown decision configuration key");
   const result = structuredClone(DEFAULT_DECISIONS);
   for (const [external, internal] of Object.entries(mapping)) if (Object.hasOwn(settings, external)) {
     (result as unknown as Record<string, unknown>)[internal] = settings[external];

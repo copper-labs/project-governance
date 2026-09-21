@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-07-05
-updated: 2026-09-06
+updated: 2026-09-21
 summary: Entry point for the reusable, package-based project governance runtime.
 ---
 
@@ -65,6 +65,13 @@ repository. Publishing a wheel requires an operator decision. An adopter may aut
 startup updates through its tracked profile; major releases and integration changes remain deliberate.
 
 ## Unified development direction
+
+For the next delivery sequence, start with the
+[decision-layer delivery, release and pilot measurement plan](exec-plans/active/2026-09-21-major-adoption-and-measurement.md).
+The explicit-preview implementation has a recorded closeout; routine reading should not treat older
+pending checkpoints as new work. The next proposed RC includes useful decision consumers; deliberate
+adoption compares ordinary automation with JEV-enabled work. Successive consumer batches repeat this
+release/update/measurement cycle before the selected stable-major launch.
 
 The [architecture decision register](specs/unified-development-engine.md) and
 [transition plan](exec-plans/active/2026-09-20-unified-development-engine.md) describe the accepted

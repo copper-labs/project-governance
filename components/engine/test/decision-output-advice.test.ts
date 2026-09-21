@@ -1,0 +1,36 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { outputSelection, segmentCommandOutput } from "../src/decision-output-advice.ts";
+import { DecisionRuntime } from "../src/decision-runtime.ts";
+import { profileDecisionSettings } from "../src/decision-settings.ts";
+import { digest } from "../src/core.ts";
+import type { CommandReceipt } from "../src/process-owner.ts";
+
+test("output advice preserves ambiguous failures, multi-block stacks, incomplete archives and protected overflow", async t => {
+  const root = mkdtempSync(join(tmpdir(), "output-advice-")); t.after(() => rmSync(root, { recursive: true, force: true }));
+  let calls = 0;
+  const settings = profileDecisionSettings({ continuity: { decisions: { mode: "auto", allowed_data_classes: ["diagnostic"], consumers: { DL13: { mode: "auto" } } } } });
+  const runtime = new DecisionRuntime(settings, root, { token: "fixture", fetch: async () => { calls++; throw new Error("provider unavailable"); } });
+  const receipt: CommandReceipt = { version: 1, requestDigest: digest("request"), state: "failed", exitCode: 1, signal: null, cleanup: "confirmed", startedAt: "start", endedAt: "end", durationMs: 1, reason: "failed", log: join(root, "absent.log"), logBytes: 0 };
+  const scope = { workspace: root, taskId: "task", taskRevision: "1" };
+  const options = { task: "Inspect result", eventId: "fixture", policyDigest: digest("policy"), environment: "test", revision: "1" };
+  const absent = await outputSelection(runtime, receipt, scope, options);
+  assert.equal(absent.reason, "archive-unavailable"); assert.equal(absent.selection, null);
+  const present = (content: string, truncated = false) => ({ ...options, presentation: { text: content, originalPath: "result.json", originalDigest: digest(content), truncated } });
+  const unknown = "Header\n\nunfamiliar stopped operation\n\nEnd";
+  const unidentified = await outputSelection(runtime, receipt, scope, present(unknown));
+  assert.equal(unidentified.selection!.text, unknown); assert.equal(unidentified.omitted.length, 0);
+  const stack = "Header\n\nError: bad state\n\n  at first()\n\n  at second()\n\nEnd";
+  const blocks = segmentCommandOutput(stack, { failed: true, cleanupUnknown: false }).blocks;
+  assert.ok(blocks.filter(block => block.text.includes("at ")).every(block => block.protected && block.protectedReason === "stack-continuation"));
+  const incomplete = await outputSelection(runtime, receipt, scope, present(stack, true));
+  assert.equal(incomplete.reason, "incomplete-output"); assert.equal(incomplete.selection, null);
+  const overflow = await outputSelection(runtime, receipt, scope, { ...present(stack), limitBytes: 10 });
+  assert.equal(overflow.reason, "protected-overflow"); assert.equal(overflow.selection!.text, stack); assert.equal(calls, 0);
+  const routine = "Header\n\nRoutine chatter\n\nWarning: native uncertainty\n\nEnd";
+  const failedProvider = await outputSelection(runtime, { ...receipt, state: "succeeded", exitCode: 0 }, scope, present(routine));
+  assert.equal(failedProvider.delivered, false); assert.equal(failedProvider.selection!.text, routine); assert.equal(calls, 1);
+});

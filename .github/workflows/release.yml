@@ -53,6 +53,9 @@ jobs:
           if [ -f "$notes_file" ]; then
             set -- --notes-file "$notes_file"
           fi
+          case "$GITHUB_REF_NAME" in
+            *-rc.*) set -- "$@" --prerelease --latest=false ;;
+          esac
           gh release create "$GITHUB_REF_NAME" \
             --draft \
             --verify-tag \
@@ -62,7 +65,10 @@ jobs:
             release-assets/*.tgz \
             release-assets/runtime.lock.yaml \
             release-assets/runtime-update.json
-          gh release edit "$GITHUB_REF_NAME" --draft=false
+          case "$GITHUB_REF_NAME" in
+            *-rc.*) gh release edit "$GITHUB_REF_NAME" --draft=false --prerelease --latest=false ;;
+            *) gh release edit "$GITHUB_REF_NAME" --draft=false ;;
+          esac
 
   legacy-release:
     if: startsWith(github.ref_name, '2.')

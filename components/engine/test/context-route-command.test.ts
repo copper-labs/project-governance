@@ -64,6 +64,41 @@ test("routed command captures staged policy, delivers mandatory content and writ
       assert.deepEqual(noToken.skills?.entries.map(skill => skill.id), ["test-execution"]);
       assert.equal(noToken.optional?.entries[0]?.excerpt, "private optional source");
       assert.equal(networkCalls, 0);
+      process.env.JEV_TOKEN = "fixture-only";
+      const legacyUnbound = await contextRouteCommand(["--task", "fix", "--revision", "legacy", "--optional-path", "optional.ts"], root, assets);
+      assert.equal(legacyUnbound.optional?.reason, "scope-unavailable");
+      assert.equal(networkCalls, 0);
+      globalThis.fetch = async (_url, init) => {
+        networkCalls++;
+        const payload = JSON.parse(String(init?.body));
+        return Response.json({ model: "jev-1.13.0", answers: Object.fromEntries(Object.entries(payload.questions).map(([name, question]) => {
+          const keys = Object.keys((question as any).criteria), choice = keys.find(key => key !== "unknown")!;
+          return [name, { type: "choice", choice, confidence: 0.9, probabilities: Object.fromEntries(keys.map(key => [key, key === choice ? 1 : 0])) }];
+        })), usage: { input_tokens: 10, output_tokens: 2 } });
+      };
+      const legacyArgs = ["--task", "fix", "--revision", "legacy", "--decision-task", "legacy-task", "--optional-path", "optional.ts"];
+      const legacy = await contextRouteCommand(legacyArgs, root, assets);
+      assert.equal(legacy.optional?.decision?.questionVersion, "legacy.context-rank/1");
+      assert.equal(legacy.optional?.decision?.method, "jev");
+      await contextRouteCommand(legacyArgs, root, assets);
+      assert.equal(networkCalls, 1, "Repeated migrated caller reuses its decision");
+      networkCalls = 0;
+      writeFileSync(join(root, "config/governance/profile.yaml"), JSON.stringify({ ...profile, continuity: { decisions: {
+        mode: "auto", allowed_data_classes: ["source"], allowed_source_paths: ["optional.ts"], consumers: { DL03: { mode: "auto" } },
+      } } }));
+      process.env.JEV_TOKEN = "fixture-only";
+      globalThis.fetch = async () => {
+        networkCalls++;
+        return Response.json({ model: "jev-1.13.0", answers: { q1: { type: "noul", noul: 0.9 } }, usage: { input_tokens: 10, output_tokens: 2 } });
+      };
+      const unbound = await contextRouteCommand(["--task", "fix", "--revision", "expanded", "--optional-path", "optional.ts"], root, assets);
+      assert.equal(unbound.relevanceAdvice?.reason, "scope-unavailable");
+      assert.equal(networkCalls, 0);
+      const expanded = await contextRouteCommand(["--task", "fix", "--decision-task", "fixture-task", "--revision", "expanded", "--optional-path", "optional.ts"], root, assets);
+      assert.equal(expanded.relevanceAdvice?.delivered, true);
+      assert.equal(expanded.optional?.decision?.questionVersion, "context.relevance/1");
+      assert.equal(expanded.entries[0]?.content, "unstaged replacement");
+      assert.equal(networkCalls, 1);
     } finally {
       if (tokenBefore === undefined) delete process.env.JEV_TOKEN; else process.env.JEV_TOKEN = tokenBefore;
       globalThis.fetch = fetchBefore;

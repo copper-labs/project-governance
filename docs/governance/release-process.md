@@ -15,8 +15,15 @@ summary: Defines compiled major-release proof and deliberate publication, with r
 
 The coordinated major release uses `@organta/project-governance`, one bundled `.tgz` archive,
 Node `>=24.16.0 <25`, and the schema-2 runtime lock. Package and canonical dependency-lock
-versions must match the exact stable tag. Preview versions are local qualification artifacts;
+versions must match the exact stable or `MAJOR.MINOR.PATCH-rc.N` tag (positive N). Preview versions are local qualification artifacts;
 the release metadata builder refuses to publish them as stable releases.
+
+Release candidates publish with GitHub prerelease status and `latest: false`. Their update metadata
+is deliberate-only and pins `from_version` to the exact RC. Ordinary stable discovery excludes them.
+An operator-authorized RC may tag its qualified implementation branch before stable integration;
+this does not merge that branch or activate any adopter. Release notes must identify deferred native
+host/device qualification and experimental provider behavior. The tagged release workflow repeats
+source and installed-package proof before publishing the immutable assets.
 
 The source-readiness workflow runs source tests, type checking, release-metadata tests, package
 construction and offline installed-command proof on each non-draft pull request update, including

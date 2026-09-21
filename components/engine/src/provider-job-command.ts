@@ -12,6 +12,8 @@ import { reconcileCommand } from "./command-recovery.ts";
 import { providerDoctor } from "./provider-doctor.ts";
 import type { NativeProvider } from "./provider-binding.ts";
 import { providerResultSummary } from "./provider-result-summary.ts";
+import { providerDecisionAdvice } from "./decision-provider-advice.ts";
+import { withDecisionCancellation } from "./decision-cancellation.ts";
 
 export const COMMAND_RECOVERY_COMMANDS = ["command-resume-cleanup", "command-recover", "command-reconcile"];
 
@@ -41,6 +43,7 @@ export async function providerJobCommand(command: string, args: string[]) {
   const names = command === "provider-submit" ? ["directory", "request", "completion-executable"]
     : ["directory", "digest", ...(command === "provider-follow-up" ? ["request"] : []),
       ...(command === "provider-events" ? ["after", "limit"] : []), ...(command === "provider-wait" ? ["milliseconds"] : []),
+      ...(["provider-status", "provider-wait"].includes(command) ? ["decision-task", "decision-revision", "claim-evidence"] : []),
       ...(["provider-cancel", "provider-recover", "provider-resume-cleanup"].includes(command) ? ["authority"] : [])];
   const { values } = parseArgs({ args, strict: true, allowPositionals: false,
     options: Object.fromEntries(names.map(name => [name, { type: "string" as const }])) });
@@ -79,5 +82,14 @@ export async function providerJobCommand(command: string, args: string[]) {
   const milliseconds = Number(values.milliseconds ?? 30000);
   if (!Number.isSafeInteger(milliseconds) || milliseconds < 0 || milliseconds > 30000) throw new Error("Provider wait must be within 0..30000 ms");
   const result = command === "provider-wait" ? await waitCommand(directory, hash, milliseconds) : observeCommand(directory, hash);
-  return { result: { ...result, provider: providerResultSummary(result.receipt) }, exitCode: result.state !== "terminal" ? 2 : result.receipt?.state === "succeeded" ? 0 : 1 };
+  const summary = providerResultSummary(result.receipt);
+  const advice = ["provider-status", "provider-wait"].includes(command)
+    ? await withDecisionCancellation(options => providerDecisionAdvice(request, result.receipt, summary, {
+      ...(values["claim-evidence"] === undefined ? {} : { claimEvidence: values["claim-evidence"] }),
+      ...(values["decision-task"] === undefined ? {} : { taskId: values["decision-task"] }),
+      ...(values["decision-revision"] === undefined ? {} : { revision: values["decision-revision"] }),
+    }, options)) : null;
+  return { result: { ...result, provider: advice?.value.provider ?? summary,
+    ...(advice?.value.decisionAdvice ? { decisionAdvice: advice.value.decisionAdvice } : {}) },
+    exitCode: advice?.exitCode ?? (result.state !== "terminal" ? 2 : result.receipt?.state === "succeeded" ? 0 : 1) };
 }

@@ -1,15 +1,24 @@
+import { decisionProviderHealthPath } from "../src/decision-transport.ts";
+import { digest } from "../src/core.ts";
 import { test } from "node:test";
 import { spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { JevDecisionAdapter, DEFAULT_DECISIONS, type DecisionConfig, type DecisionRequest } from "../src/decisions.ts";
+import { join, dirname } from "node:path";
+import { JevDecisionAdapter as SharedAdapter, DEFAULT_DECISIONS, type LegacyDecisionOptions, type DecisionConfig, type DecisionRequest } from "../src/decisions.ts";
 
+let fixtureTask = 0;
+// These transport regressions represent distinct tasks; repeated-event reuse has its own test below.
+class JevDecisionAdapter extends SharedAdapter {
+  constructor(config: DecisionConfig, path: string, options: LegacyDecisionOptions = {}) {
+    super(config, path, { scope: { workspace: dirname(path), taskId: `fixture-${++fixtureTask}`, taskRevision: "task@1" }, ...options });
+  }
+}
 const request: DecisionRequest = { version: 1, kind: "rank_optional_context", taskRevision: "task@1", purpose: "find the state machine", dataClass: "synthetic",
   candidates: [{ id: "a", sourceDigest: "fixture-a", excerpt: "Styles" }, { id: "b", sourceDigest: "fixture-b", excerpt: "State transitions" }] };
 const config: DecisionConfig = { ...DEFAULT_DECISIONS, mode: "auto", allowedQuestions: ["rank_optional_context"], allowedDataClasses: ["synthetic"] };
-function response() { return new Response(JSON.stringify({ model: "jev-1.13.0", answers: { suggestion: { type: "choice", choice: "b", confidence: 0.9, probabilities: { a: 0.05, b: 0.9, abstain: 0.05 } } }, usage: { input_tokens: 200, output_tokens: 20 } })); }
+function response() { return new Response(JSON.stringify({ model: "jev-1.13.0", answers: { suggestion: { type: "choice", choice: "b", confidence: 0.9, probabilities: { a: 0.05, b: 0.9, unknown: 0.05 } } }, usage: { input_tokens: 200, output_tokens: 20 } })); }
 function temporary() { const dir = mkdtempSync(join(tmpdir(), "engine-decision-")); return { path: join(dir, "health.json"), close() { rmSync(dir, { recursive: true }); } }; }
 
 test("off, absent token and unapproved data make zero network calls", async () => {
@@ -31,7 +40,7 @@ test("live-shaped advice ranks supplied IDs and records native usage; shadow pre
     calls++; assert.equal(url, "https://api.typesafe.ai/v1/systemone"); assert.equal(init?.redirect, "error");
     const wire = JSON.parse(String(init?.body)); assert.equal(wire.model, "jev-1.13.0");
     return new Response(JSON.stringify({ model: config.model, answers: { suggestion: {
-      type: "choice", choice: "a", confidence: 0.9, probabilities: { a: 0.9, b: 0.05, abstain: 0.05 }
+      type: "choice", choice: "a", confidence: 0.9, probabilities: { a: 0.9, b: 0.05, unknown: 0.05 }
     } }, usage: { input_tokens: 200, output_tokens: 20 } }));
   };
   try {
@@ -45,15 +54,15 @@ test("live-shaped advice ranks supplied IDs and records native usage; shadow pre
 });
 
 test("abstention and low confidence preserve baseline and usage without suppressing the next decision", async () => {
-  for (const choice of ["abstain", "a"]) {
+  for (const choice of ["unknown", "a"]) {
     const f = temporary(); let calls = 0;
     const transport: typeof fetch = async () => {
       calls++;
       if (calls > 1) return response();
       return new Response(JSON.stringify({ model: "jev-1.13.0", answers: { suggestion: {
-        type: "choice", choice, confidence: choice === "abstain" ? 0.95 : 0.1,
-        probabilities: choice === "abstain" ? { a: 0.025, b: 0.025, abstain: 0.95 }
-          : { a: 0.6, b: 0.3, abstain: 0.1 },
+        type: "choice", choice, confidence: choice === "unknown" ? 0.95 : 0.1,
+        probabilities: choice === "unknown" ? { a: 0.025, b: 0.025, unknown: 0.95 }
+          : { a: 0.6, b: 0.3, unknown: 0.1 },
       } }, usage: { input_tokens: 77, output_tokens: 8 } }));
     };
     try {
@@ -64,7 +73,7 @@ test("abstention and low confidence preserve baseline and usage without suppress
       assert.deepEqual(result.delivered, ["b", "a"]);
       assert.equal(result.suggested, null);
       assert.deepEqual(result.usage, { inputTokens: 77, outputTokens: 8 });
-      assert.equal((await adapter.decide(request)).method, "jev");
+      assert.equal((await adapter.decide({ ...request, purpose: "a separate subsequent observation" })).method, "jev");
       assert.equal(calls, 2);
     } finally { f.close(); }
   }
@@ -191,7 +200,7 @@ test("caller cancellation returns baseline, aborts transport and does not create
     assert.equal(cancelled.method, "baseline"); assert.equal(cancelled.suggested, null);
     const snapshot = structuredClone(cancelled); late!(response()); await Promise.resolve();
     assert.deepEqual(cancelled, snapshot);
-    assert.equal((await adapter.decide(request)).method, "jev");
+    assert.equal((await adapter.decide({ ...request, purpose: "a separate subsequent observation" })).method, "jev");
     assert.equal(calls, 2);
   } finally { f.close(); }
 });
@@ -206,7 +215,7 @@ test("separate processes share rate-limit suppression without retaining credenti
       const config = ${JSON.stringify(config)};
       let calls = 0;
       const result = await new JevDecisionAdapter(config, process.argv[1], {
-        token: "never-persist-this-test-token", now: () => 1000,
+        token: "never-persist-this-test-token", now: () => 1000, scope: { workspace: ${JSON.stringify(dirname(f.path))}, taskId: String(process.pid), taskRevision: "task@1" },
         fetch: async () => { calls++; return new Response("{}", { status: 429 }); }
       }).decide(${JSON.stringify(request)});
       console.log(JSON.stringify({ reason: result.reason, calls }));
@@ -218,6 +227,30 @@ test("separate processes share rate-limit suppression without retaining credenti
     };
     assert.deepEqual(invoke(), { reason: "provider-error", calls: 1 });
     assert.deepEqual(invoke(), { reason: "cooldown", calls: 0 });
-    assert.ok(!readFileSync(f.path, "utf8").includes("never-persist-this-test-token"));
+    assert.ok(!readFileSync(decisionProviderHealthPath(join(dirname(f.path), "decision-provider-health.json"), digest({ provider: "jev", model: config.model, revision: config.revision })), "utf8").includes("never-persist-this-test-token"));
+  } finally { f.close(); }
+});
+
+test("legacy callers need explicit scope, share the new budget and reuse the same event", async () => {
+  const f = temporary(); let calls = 0;
+  try {
+    const fetcher: typeof fetch = async () => { calls++; return response(); };
+    const absent = new SharedAdapter(config, f.path, { token: "fixture", fetch: fetcher });
+    assert.equal((await absent.decide(request)).reason, "scope-unavailable"); assert.equal(calls, 0);
+    const { legacyDecisionSettings } = await import("../src/decision-settings.ts");
+    const { DecisionRuntime } = await import("../src/decision-runtime.ts");
+    const settings = legacyDecisionSettings(config); settings.budget.maxCalls = 1;
+    const scope = { workspace: dirname(f.path), taskId: "shared-task", taskRevision: request.taskRevision };
+    const adapter = new SharedAdapter(config, f.path, { token: "fixture", fetch: fetcher, scope, settings });
+    assert.equal((await adapter.decide(request)).method, "jev");
+    assert.equal((await adapter.decide(request)).method, "jev"); assert.equal(calls, 1);
+    const runtime = new DecisionRuntime(settings, dirname(f.path), { token: "fixture", fetch: fetcher });
+    const next = await runtime.ask({ consumerId: "DL03", eventId: "separate-new-runtime-event", scope,
+      subject: { digest: digest("evidence"), revision: scope.taskRevision, environment: "test" },
+      evidence: [{ id: "a", text: "example", sourceDigest: digest("example"), provenance: "captured", trust: "untrusted" }],
+      coverage: { captured: 1, omitted: [], truncated: false, unavailable: [], limits: [] },
+      questions: [{ name: "suggestion", definitionId: "legacy.context-rank/1", consumerId: "DL03", evidenceIds: ["a"], candidates: [{ id: "a", description: "candidate" }] }],
+      legacyDataClass: "synthetic", policyDigest: settings.configDigest });
+    assert.equal(next.reason, "budget-exhausted"); assert.equal(calls, 1);
   } finally { f.close(); }
 });

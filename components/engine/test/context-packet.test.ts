@@ -36,9 +36,9 @@ test("auto advice changes optional selection while shadow preserves baseline del
     for (const mode of ["auto", "shadow"] as const) {
       const provider = new JevDecisionAdapter({ ...DEFAULT_DECISIONS, mode,
         allowedQuestions: ["rank_optional_context"], allowedDataClasses: ["source"], allowedSourcePaths: ["a", "b"] }, join(directory, mode), {
-        token: "fixture", fetch: async () => new Response(JSON.stringify({ model: DEFAULT_DECISIONS.model,
+        scope: { workspace: directory, taskId: mode, taskRevision: "1" }, token: "fixture", fetch: async () => new Response(JSON.stringify({ model: DEFAULT_DECISIONS.model,
           answers: { suggestion: { type: "choice", choice: "b", confidence: 0.9,
-            probabilities: { a: 0.05, b: 0.9, abstain: 0.05 } } }, usage: { input_tokens: 100, output_tokens: 10 } })),
+            probabilities: { a: 0.05, b: 0.9, unknown: 0.05 } } }, usage: { input_tokens: 100, output_tokens: 10 } })),
       });
       const packet = await buildContextPacket({ taskRevision: "1", purpose: "find bug", required: [candidate("rules")],
         optional: [candidate("a"), candidate("b")], maximumBytes: 350 }, provider);

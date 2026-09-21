@@ -4,17 +4,20 @@ import { object, text } from "./core.ts";
 import { narrativeFile } from "./narrative-inputs.ts";
 import { parseRecipe, type Recipe } from "./workflow-types.ts";
 import { createHash } from "node:crypto";
+import type { ValidationSubject } from "./change-subject.ts";
 
 export const OPERATION_CATALOG = "config/governance/operations.json";
 
 /** Project configuration defines executable operations; submitted recipes only select their IDs. */
-export function resolveWorkflowRecipe(raw: unknown): Recipe {
+export function resolveWorkflowRecipe(raw: unknown, subject?: ValidationSubject): Recipe {
   const value = object(raw, "workflow recipe");
   if (Object.hasOwn(value, "operations")) throw new Error("Submitted recipes cannot define operations; use the project operation catalog");
   const workspace = realpathSync(text(value["workspace"], "workspace"));
+  if (subject && realpathSync(subject.root) !== workspace) throw new Error("Recipe differs from captured workspace");
   const catalogPath = resolve(workspace, OPERATION_CATALOG);
-  if (realpathSync(catalogPath) !== catalogPath) throw new Error("Operation catalog must not use symlinks");
-  const source = narrativeFile(workspace, OPERATION_CATALOG);
+  if (!subject && realpathSync(catalogPath) !== catalogPath) throw new Error("Operation catalog must not use symlinks");
+  if (subject && subject.source(OPERATION_CATALOG)?.file_type !== "regular") throw new Error("Captured operation catalog unavailable");
+  const source = subject ? new TextDecoder("utf-8", { fatal: true }).decode(subject.read(OPERATION_CATALOG, 1024 * 1024)) : narrativeFile(workspace, OPERATION_CATALOG);
   const catalog = object(JSON.parse(source), "operation catalog");
   if (catalog["version"] !== 1 || Object.keys(catalog).some(key => !["version", "operations"].includes(key))) {
     throw new Error("Unsupported operation catalog");

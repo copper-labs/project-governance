@@ -1,3 +1,5 @@
+import { resolveDecisionScope } from "./decision-scope.ts";
+import { loadProfileDecisionSettings } from "./decision-settings.ts";
 import { discoverContext } from "./context-discovery.ts";
 import { resolveChangeScope, ValidationSubject } from "./change-subject.ts";
 import { parseArgs } from "node:util";
@@ -19,7 +21,7 @@ export function contextStateRoot(root: string): string {
 /** Evaluation is operator-invoked and shares the runtime adapter's explicit data-sharing policy. */
 export async function contextEvaluationCommand(args: string[], root: string, options: DecisionOptions = {}) {
   const { values } = parseArgs({ args, strict: true, allowPositionals: false, options: {
-    dataset: { type: "string" }, "decision-config": { type: "string" },
+    dataset: { type: "string" }, "decision-config": { type: "string" }, "decision-task": { type: "string" }, "decision-revision": { type: "string" },
   } });
   if (!values.dataset) throw new Error("An evaluation dataset is required");
   const cases = JSON.parse(narrativeFile(root, values.dataset)) as ContextEvaluationCase[];
@@ -27,7 +29,14 @@ export async function contextEvaluationCommand(args: string[], root: string, opt
   const config: DecisionConfig = values["decision-config"]
     ? JSON.parse(narrativeFile(root, values["decision-config"])) as DecisionConfig : loadProfileDecisionConfig(root);
   const stateRoot = contextStateRoot(root);
-  const result = await evaluateContext(cases, new JevDecisionAdapter(config, join(stateRoot, "provider-health.json")), options);
+  const scope = resolveDecisionScope(root, { ...(values["decision-task"] ? { taskId: values["decision-task"] } : {}), ...(values["decision-revision"] ? { revision: values["decision-revision"] } : {}) });
+  const adapter = new JevDecisionAdapter(config, join(stateRoot, "provider-health.json"), { scope,
+    ...(!values["decision-config"] ? { settings: loadProfileDecisionSettings(root) } : {}) });
+  // An explicit evaluation episode owns the shared budget; case prose/revisions cannot create scopes.
+  const result = await evaluateContext(cases, { async decide(request, callOptions) {
+    const result = await adapter.decide({ ...request, taskRevision: scope?.taskRevision ?? request.taskRevision }, callOptions);
+    return { ...result, inputDigest: digest(request) };
+  } }, options);
   const receiptId = randomUUID();
   durableJson(join(stateRoot, "evaluations", `${receiptId}.json`), {
     ...result, receiptId, workspace: realpathSync(root), createdAt: new Date().toISOString(),
@@ -38,7 +47,7 @@ export async function contextEvaluationCommand(args: string[], root: string, opt
 /** Explicit source inputs are captured once; the receipt records advice without copying source contents. */
 export async function contextCommand(args: string[], root: string, suppliedProvider?: DecisionProvider, options: DecisionOptions = {}) {
   const { values } = parseArgs({ args, strict: true, allowPositionals: false, options: {
-    purpose: { type: "string" }, revision: { type: "string" },
+    purpose: { type: "string" }, revision: { type: "string" }, "decision-task": { type: "string" },
     "discover-path": { type: "string", multiple: true },
     "required-path": { type: "string", multiple: true }, "optional-path": { type: "string", multiple: true },
     "optional-excerpt-bytes": { type: "string" },
@@ -65,7 +74,9 @@ export async function contextCommand(args: string[], root: string, suppliedProvi
   const config: DecisionConfig = values["decision-config"]
     ? JSON.parse(narrativeFile(canonicalRoot, values["decision-config"])) as DecisionConfig : loadProfileDecisionConfig(canonicalRoot);
   const stateRoot = contextStateRoot(canonicalRoot);
-  const provider = suppliedProvider ?? new JevDecisionAdapter(config, join(stateRoot, "provider-health.json"));
+  const scope = resolveDecisionScope(canonicalRoot, { ...(values["decision-task"] ? { taskId: values["decision-task"] } : {}), revision: values.revision });
+  const provider = suppliedProvider ?? new JevDecisionAdapter(config, join(stateRoot, "provider-health.json"), { scope,
+    ...(!values["decision-config"] ? { settings: loadProfileDecisionSettings(canonicalRoot) } : {}) });
   const packet = await buildContextPacket({ taskRevision: values.revision, purpose: values.purpose, required, optional,
     maximumBytes: Number(values["maximum-bytes"]), ...(values["optional-excerpt-bytes"] !== undefined ? { optionalExcerptBytes: Number(values["optional-excerpt-bytes"]) } : {}) }, provider, options);
   const receiptId = randomUUID();

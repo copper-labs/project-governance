@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-02-16
-updated: 2026-09-10
+updated: 2026-09-21
 summary: Active and completed execution plans for the current source repository.
 ---
 
@@ -16,11 +16,21 @@ Git remains the implementation history and recovery mechanism.
 
 ## Active
 
-- [Unified development engine transition](active/2026-09-20-unified-development-engine.md) owns the
-  new forward planning sequence. Review the [architecture decisions](../specs/unified-development-engine.md)
-  and [migration category decisions](../reference/2026-09-20-engine-migration-inventory.md) before
-  dependent runtime work. The direction is accepted; N1–N13 settle dependent cutover, authority, recovery and CI scope details. Source-only E1a and
-  authorized-adopter E1b have separate exits.
+- [Decision-layer delivery, release and pilot measurement](active/2026-09-21-major-adoption-and-measurement.md)
+  is the finalized delivery order and progress checklist after explicit-preview closeout: implement useful JEV consumers,
+  publish an RC, deliberately adopt it, compare real work with decisions off/enabled, and repeat for
+  successive batches before the selected stable-major launch. The prerelease publication extension
+  is proposed; existing release policy remains effective until changed.
+
+- Supporting [decision-layer technical packages](../reference/2026-09-20-decision-layer-work-packages.md)
+  preserve P0–P8 requirements and future qualification detail. They are a reference, not a second
+  active plan, schedule or progress checklist. The S0–S10 plan above owns their delivery boundaries.
+
+- [Unified development engine transition](active/2026-09-20-unified-development-engine.md) retains
+  the E0–E5 requirements and explicit-preview implementation closeout. Its earlier pending entries
+  are historical checkpoints. Use the adoption plan above for the next delivery sequence; preserve
+  the [architecture decisions](../specs/unified-development-engine.md) and
+  [migration category decisions](../reference/2026-09-20-engine-migration-inventory.md) as context.
 
 - [Continuity agent handoff](active/2026-09-19-continuity-agent-handoff.md) records scope, evidence and the next authorized work boundary.
 

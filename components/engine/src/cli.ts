@@ -36,7 +36,7 @@ import { hookCheckArguments } from "./git-hooks.ts";
 import { inspectRuntimeGeneration } from "./runtime-inspection.ts";
 import { invokeRuntimeGeneration } from "./runtime-invocation.ts";
 import { contextRouteCommand } from "./context-route-command.ts";
-import { workflowWaitCommand } from "./workflow-wait.ts";
+import { workflowObservationCommand } from "./decision-workflow-observation.ts";
 import { repositoryMap } from "./repository-map.ts";
 import { parseArgs } from "node:util";
 import { contextCommand, contextEvaluationCommand } from "./context-command.ts";
@@ -57,6 +57,7 @@ import { inspectCheckRun } from "./check-status.ts";
 import { dispatchChecks } from "./check-worker.ts";
 import { narrativeInputs } from "./narrative-inputs.ts";
 import { PackagedCheckerAssets } from "./checker-assets.ts";
+import { checkDecisionAdvice, type CheckAdviceOptions } from "./decision-check-advice.ts";
 
 /** Public argument parsing rejects conflicting subjects before reading a candidate. */
 export function prepareCommand(args: string[], root: string, builtinDirectory: string, command: "plan" | "check" = "plan") {
@@ -64,6 +65,8 @@ export function prepareCommand(args: string[], root: string, builtinDirectory: s
     stage: { type: "string" }, mode: { type: "string", default: "impacted" }, staged: { type: "boolean" },
     "changed-path": { type: "string", multiple: true }, "base-ref": { type: "string" }, pack: { type: "string", multiple: true },
     json: { type: "boolean" }, summary: { type: "boolean" },
+    "decision-task": { type: "string" }, "decision-revision": { type: "string" },
+    "decision-purpose": { type: "string" }, "review-rules": { type: "string" },
     ...(command === "check" ? { "json-output": { type: "string" as const }, "expected-status": { type: "string" as const }, trigger: { type: "string" as const }, detach: { type: "boolean" as const }, "timeout-seconds": { type: "string" as const }, "commit-message-file": { type: "string" as const }, "pr-body-file": { type: "string" as const }, "pr-title": { type: "string" as const } } : {}),
   } });
   if (positionals.length) throw new Error("Unexpected arguments");
@@ -90,7 +93,13 @@ export function prepareCommand(args: string[], root: string, builtinDirectory: s
     ...(typeof values["pr-body-file"] === "string" ? { prFile: values["pr-body-file"] } : {}),
     ...(typeof values["pr-title"] === "string" ? { prTitle: values["pr-title"] } : {}),
   }) : {};
-  return { plan: buildPlan(registry, { stage, mode, changedPaths: scope.records.map(record => record.path), explicitPackIds: packs }), scope, subject, registry, narrative, deadlineMs, ...observation, jsonOutput: typeof jsonOutput === "string" ? jsonOutput : null, summary: values.summary === true, detach: values["detach"] === true };
+  const decisionOptions: CheckAdviceOptions = {
+    ...(values["decision-task"] === undefined ? {} : { taskId: values["decision-task"] }),
+    ...(values["decision-revision"] === undefined ? {} : { revision: values["decision-revision"] }),
+    ...(values["decision-purpose"] === undefined ? {} : { purpose: values["decision-purpose"] }),
+    ...(values["review-rules"] === undefined ? {} : { reviewRules: values["review-rules"] }),
+  };
+  return { plan: buildPlan(registry, { stage, mode, changedPaths: scope.records.map(record => record.path), explicitPackIds: packs }), scope, subject, registry, narrative, decisionOptions, deadlineMs, ...observation, jsonOutput: typeof jsonOutput === "string" ? jsonOutput : null, summary: values.summary === true, detach: values["detach"] === true };
 }
 
 export function planCommand(args: string[], root: string, builtinDirectory: string) {
@@ -214,10 +223,10 @@ Use the owning command contract for structured request fields.
       console.log(JSON.stringify({ ...result, source: { base: scope.base_ref, mode: scope.mode, changes: scope.subject_digest } }));
       return result.issues.length ? 2 : 0;
     }
-    if (command === "workflow-wait") {
-      const result = await workflowWaitCommand(args.slice(1));
-      console.log(JSON.stringify(result));
-      return workflowExitCode(result.run.state);
+    if (command === "workflow-wait" || command === "workflow-status") {
+      const response = await withDecisionCancellation(options => workflowObservationCommand(command, args.slice(1), options));
+      console.log(JSON.stringify(response.value));
+      return response.exitCode ?? workflowExitCode(response.value.run.state);
     }
     if (command === "startup-help") {
       if(args.length!==1)throw new Error("Startup help accepts no arguments");
@@ -333,9 +342,9 @@ Use the owning command contract for structured request fields.
         console.log(JSON.stringify(providerTelemetry(JSON.parse(narrativeFile(process.cwd(), values.manifest))))); return 0;
       }
       if (args[1] === "decisions") {
-        const { values } = parseArgs({ args: args.slice(2), strict: true, allowPositionals: false, options: { since: { type: "string" }, limit: { type: "string" } } });
+        const { values } = parseArgs({ args: args.slice(2), strict: true, allowPositionals: false, options: { since: { type: "string" }, limit: { type: "string" }, "outcomes-manifest": { type: "string" } } });
         console.log(JSON.stringify(decisionTelemetry(contextStateRoot(process.cwd()), { ...(values.since ? { since: values.since } : {}),
-          ...(values.limit ? { limit: Number(values.limit) } : {}) }))); return 0;
+          ...(values.limit ? { limit: Number(values.limit) } : {}), ...(values["outcomes-manifest"] ? { outcomesManifest: values["outcomes-manifest"] } : {}) }))); return 0;
       }
       if (args[1] !== "status") throw new Error("Unsupported telemetry command");
       const parsed = parseArgs({ args: args.slice(2), strict: true, options: { since: { type: "string" }, stage: { type: "string" }, "runtime-version": { type: "string" }, trigger: { type: "string" } } });
@@ -355,20 +364,29 @@ Use the owning command contract for structured request fields.
     if (command !== "plan" && command !== "check") throw new Error("Unsupported command");
     const prepared = prepareCommand(args.slice(1), realpathSync(process.cwd()), fileURLToPath(new URL("../assets/packs/", import.meta.url)), command);
     if (command === "plan") {
-      const result = { ...prepared.plan, change_scope: prepared.scope }; console.log(JSON.stringify(prepared.summary ? checkSummary(result) : result)); return result.status === "ready" ? 0 : 1;
+      const advice = await withDecisionCancellation(options => checkDecisionAdvice(prepared, prepared.decisionOptions, false, options));
+      const result = { ...prepared.plan, change_scope: prepared.scope };
+      console.log(JSON.stringify({ ...(prepared.summary ? checkSummary(result) : result), ...(advice.value ? { decisionAdvice: advice.value } : {}) }));
+      return advice.exitCode ?? (result.status === "ready" ? 0 : 1);
     }
     const submission = dispatchChecks(prepared.registry, prepared.plan, {
       subject: prepared.subject, scope: prepared.scope, assets: new PackagedCheckerAssets(), packIds: new Set(Object.keys(prepared.registry)),
       stage: prepared.plan.stage ?? "", asOf: new Date().toISOString(), ...prepared.narrative,
     }, { deadlineMs: prepared.deadlineMs, ...checkObservationContext(prepared.trigger, prepared.expectedStatus) });
-    if (prepared.detach) { console.log(JSON.stringify({ status: "submitted", ...submission })); return 0; }
+    if (prepared.detach) {
+      const advice = await withDecisionCancellation(options => checkDecisionAdvice(prepared, prepared.decisionOptions, true, options));
+      console.log(JSON.stringify({ status: "submitted", ...submission, ...(advice.value ? { decisionAdvice: advice.value } : {}) })); return advice.exitCode ?? 0;
+    }
     console.error(JSON.stringify({ status: "submitted", ...submission }));
     const submittedAt = Date.now();
     while (true) {
       const observed = inspectCheckRun(submission.run_id);
       if (observed.state === "terminal") {
-        if (prepared.jsonOutput) durableJson(prepared.jsonOutput, observed.result);
-        console.log(JSON.stringify(prepared.summary ? checkSummary(observed.result) : observed.result)); return observed.status === "failed" ? 1 : 0; }
+        const advice = await withDecisionCancellation(options => checkDecisionAdvice(prepared, prepared.decisionOptions, true, options));
+        const projection = { ...observed.result, ...(advice.value ? { decisionAdvice: advice.value } : {}) };
+        if (prepared.jsonOutput) durableJson(prepared.jsonOutput, projection);
+        console.log(JSON.stringify(prepared.summary ? { ...checkSummary(observed.result), ...(advice.value ? { decisionAdvice: advice.value } : {}) } : projection));
+        return advice.exitCode ?? (observed.status === "failed" ? 1 : 0); }
       if (observed.state === "incomplete" || Date.now() - submittedAt >= prepared.deadlineMs + 5000) {
         if (prepared.jsonOutput) durableJson(prepared.jsonOutput, observed);
         console.log(JSON.stringify(observed)); return 2;

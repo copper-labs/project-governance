@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-08-21
-updated: 2026-08-21
+updated: 2026-09-21
 summary: Routes evaluators, operators, contributors, and agents through the shortest useful Project Governance documentation journeys.
 ---
 
@@ -45,10 +45,14 @@ acting and inspect its local sources for current implementation behavior.
 
 ## Unified engine design and migration
 
-Before new engine implementation, follow the [target specification](../specs/unified-development-engine.md),
+For the next implementation, follow the
+[decision-layer delivery plan](../exec-plans/active/2026-09-21-major-adoption-and-measurement.md)
+and its linked functional validation plan. It is the single delivery/progress owner; the
+[technical packages](../reference/2026-09-20-decision-layer-work-packages.md) supply reference detail.
+The [target specification](../specs/unified-development-engine.md),
 [category inventory](../reference/2026-09-20-engine-migration-inventory.md) and
-[transition plan](../exec-plans/active/2026-09-20-unified-development-engine.md). These distinguish current
-behavior from proposed replacements, preserving hook/check intent while changing runtime mechanisms.
+[transition closeout](../exec-plans/active/2026-09-20-unified-development-engine.md#implementation-closeout)
+retain the foundation and migration rationale, preserving established hook/check intent.
 The [local-CI and merge contract](../specs/engine-local-ci-and-merge-contract.md) owns local/VM/hosted
 profiles, result publication and candidate freshness for the future engine adapter.
 Both remote and local CI are required; the operator reports existing GitHub local-CI authorization.

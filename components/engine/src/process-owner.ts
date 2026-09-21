@@ -57,7 +57,7 @@ export function processFingerprint(pid: number): string | null {
 export function submitCommand(directory: string, request: Omit<CommandRequest, "ownerDigest" | "version">): { directory: string; requestDigest: string; submitted: boolean } {
   directory = resolve(directory);
   const bound: CommandRequest = { ...request, version: 1, ownerDigest: fileDigest(OWNER) };
-  validateRequest(bound);
+  validateCommandRequest(bound);
   const hash = digest(bound);
   const existing = () => {
     const path = join(directory, "request.json");
@@ -143,7 +143,7 @@ export async function waitCommand(directory: string, requestDigest: string, mill
   } while (true);
 }
 
-function validateRequest(request: CommandRequest): void {
+export function validateCommandRequest(request: CommandRequest): void {
   const grace = request.operation.terminationGraceMs;
   if (grace !== undefined && (!Number.isSafeInteger(grace) || grace < 1 || grace > 30000)) throw new Error("Invalid termination grace");
   if (request.version !== 1 || !Number.isSafeInteger(request.deadlineMs) || request.deadlineMs < (request.provider ? 0 : 1) || request.deadlineMs > (request.provider ? 604_800_000 : 86_400_000)) throw new Error("invalid command deadline/version");
@@ -164,7 +164,7 @@ function validateRequest(request: CommandRequest): void {
 
 async function execute(directory: string, expectedDigest: string): Promise<void> {
   const request = JSON.parse(readFileSync(join(directory, "request.json"), "utf8")) as CommandRequest;
-  validateRequest(request);
+  validateCommandRequest(request);
   if (digest(request) !== expectedDigest || request.ownerDigest !== fileDigest(OWNER)) throw new Error("command worker/request changed");
   closeSync(openSync(join(directory, "worker.claim"), "wx", 0o600));
   let generation: RuntimeReader | null = null;

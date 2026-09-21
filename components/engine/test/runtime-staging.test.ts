@@ -57,7 +57,20 @@ test("inactive installation verifies identity and preserves a failed-generation 
     const lock: CompiledRuntimeLock = { schema_version: 2, package: "@organta/project-governance", version: "3.0.0",
       artifact: { url: "file:///runtime.tgz", integrity: "sha512-" + createHash("sha512").update(readFileSync(archive)).digest("base64") },
       source_commit: "a".repeat(40), node: ">=24.16.0 <25", configuration_schema: 1 };
-    const result = stageRuntimeArchive(archive, lock, stages);
+    const parentManifest = JSON.stringify({ name: "unrelated-parent", version: "1.0.0", private: true });
+    writeFileSync(join(root, "package.json"), parentManifest);
+    const sentinelPath = join(root, "node_modules", "parent-sentinel", "package.json");
+    mkdirSync(join(root, "node_modules", "parent-sentinel"), { recursive: true });
+    writeFileSync(sentinelPath, "parent dependency must remain unchanged");
+    const priorGlobal = process.env.npm_config_global;
+    process.env.npm_config_global = "true";
+    let result: ReturnType<typeof stageRuntimeArchive>;
+    try { result = stageRuntimeArchive(archive, lock, stages); }
+    finally { if (priorGlobal === undefined) delete process.env.npm_config_global; else process.env.npm_config_global = priorGlobal; }
+    assert.equal(readFileSync(join(root, "package.json"), "utf8"), parentManifest);
+    assert.equal(readFileSync(sentinelPath, "utf8"), "parent dependency must remain unchanged");
+    assert.deepEqual(readdirSync(join(root, "node_modules")), ["parent-sentinel"]);
+    assert.equal(existsSync(join(root, "package-lock.json")), false);
     assert.equal(result.state, "staged"); assert.equal(result.activation, "not-performed");
     assert.equal(inspectRuntimeGeneration(result.directory).state, "verified");
     const operationDirectory=join(root,"stage-operation");

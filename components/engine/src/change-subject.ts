@@ -202,6 +202,28 @@ export class ValidationSubject {
     return readSubjectSource(this.root, source, limit);
   }
 
+  /**
+   * The exact unified diff for one captured path, produced by the same comparison that established
+   * `changed_ranges`. Optional semantic review reads this; it never becomes a new comparison base.
+   */
+  hunks(path: string, context = 3, limit = 256 * 1024): string {
+    safeSubjectPath(path);
+    if (this.#scope.scope === "all" || !this.#scope.base_ref) throw new Error("diff capture requires a compared subject");
+    if (!Number.isSafeInteger(context) || context < 0 || context > 16) throw new Error("invalid diff context");
+    const captured = this.source(path) ? this.read(path, limit) : null;
+    const diff = this.#scope.mode === "staged" ? ["--cached", this.#scope.base_ref] : [this.#scope.base_ref];
+    const bytes = git(this.root, ["-c", "core.quotePath=false", "diff", `--unified=${context}`, "--no-color", "--no-ext-diff",
+      "--no-textconv", "-M", ...diff, "--", `:(literal)${path}`], limit);
+    if (bytes.length > limit) throw new Error("captured diff exceeds read budget");
+    if (captured) this.read(path, limit);
+    if (!bytes.length && captured && this.#scope.records.some(record => record.path === path && !record.before)) {
+      const lines = decode(captured).split("\n");
+      if (lines.at(-1) === "") lines.pop();
+      return `--- /dev/null\n+++ b/${path}\n@@ -0,0 +1,${lines.length} @@\n${lines.map(line => `+${line}`).join("\n")}\n`;
+    }
+    return decode(bytes);
+  }
+
   paths(): string[] {
     const args = this.#scope.scope === "all" ? ["ls-files", "--cached", "--others", "--exclude-standard", "-z"] : ["ls-tree", "-r", "--name-only", "-z", this.#scope.base_ref!];
     const paths = new Set(decode(git(this.root, args)).split("\0").filter(Boolean).map(safeSubjectPath));

@@ -11,9 +11,9 @@ import { RuntimeGenerations } from "./runtime-generations.ts";
 import { inspectRuntimeGeneration } from "./runtime-inspection.ts";
 import { startupHookAdmission } from "./startup-hook-admission.ts";
 
-const readCommands = new Set(["resource-status", "runtime-inspect-legacy", "runtime-legacy-jobs", "runtime-migration-plan", "docs", "doctor", "--version", "plan", "source-map", "telemetry", "check-status", "runtime-inspect", "provider-list", "provider-status", "provider-events", "provider-wait", "provider-doctor", "provider-help", "startup-help", "skill-read"]);
+const readCommands = new Set(["resource-status", "runtime-inspect-legacy", "runtime-legacy-jobs", "runtime-migration-plan", "docs", "doctor", "--version", "source-map", "telemetry", "check-status", "runtime-inspect", "provider-list", "provider-events", "provider-doctor", "provider-help", "startup-help", "skill-read"]);
 // Workflow store opens can migrate schema even when the requested operation only observes a run.
-const writeCommands = new Set([...COMMAND_RECOVERY_COMMANDS, "harness", "workflow-resume-cleanup", "workflow-recover-observation", "workflow-reconcile-cleanup", "hooks", "hook", "context-route", "context-packet", "context-evaluate", "check-cancel", "workflow-cancel", "check", "workflow-submit", "workflow-status", "workflow-wait", "provider-resume-cleanup", "provider-recover", "provider-deliver", "provider-submit", "provider-follow-up", "provider-cancel", "provider-reconcile", "resource-maintenance", "host-instructions"]);
+const writeCommands = new Set([...COMMAND_RECOVERY_COMMANDS, "harness", "workflow-resume-cleanup", "workflow-recover-observation", "workflow-reconcile-cleanup", "provider-status", "provider-wait", "hooks", "hook", "plan", "context-route", "context-packet", "context-evaluate", "check-cancel", "workflow-cancel", "check", "workflow-submit", "workflow-status", "workflow-wait", "provider-resume-cleanup", "provider-recover", "provider-deliver", "provider-submit", "provider-follow-up", "provider-cancel", "provider-reconcile", "resource-maintenance", "host-instructions"]);
 
 export function managedCommandEffect(command: string): "read" | "write" | null {
   return writeCommands.has(command) ? "write" : readCommands.has(command) ? "read" : null;
