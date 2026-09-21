@@ -16,7 +16,7 @@ export interface CommandOperation {
 export interface Recipe {
   version: 1; id: string; workspace: string; inputs: InputFile[]; resources: string[];
   operations: Record<string, CommandOperation>; stages: Stage[]; deadlineMs: number;
-  policyDigest: string; claims: string[];
+  policyRevision: string; claims: string[];
 }
 export interface RunBinding {
   taskId: string; taskVersion: number; actionId: string; authorityRef: string;
@@ -26,6 +26,7 @@ export interface StageResult {
   state: StageState; exitCode: number | null; cleanup: "confirmed" | "unknown";
   startedAt: string; endedAt: string; log: string; inputValidity: "valid" | "stale" | "unknown";
   detail: string;
+  commandOutcome?: "unknown";
   cleanupRecovery?: { receiptDigest: string; recoveryDigest: string };
 }
 
@@ -44,7 +45,7 @@ function fields(value: Record<string, unknown>, allowed: string[], label: string
 /** Recipes select host-reviewed operations; input text cannot introduce a new executable. */
 export function parseRecipe(raw: unknown): Recipe {
   const value = object(raw, "recipe");
-  fields(value, ["version", "id", "workspace", "inputs", "resources", "operations", "stages", "deadlineMs", "policyDigest", "claims"], "recipe");
+  fields(value, ["version", "id", "workspace", "inputs", "resources", "operations", "stages", "deadlineMs", "policyRevision", "claims"], "recipe");
   if (value["version"] !== 1) throw new Error("unsupported recipe version");
   const workspace = realpathSync(text(value["workspace"], "workspace"));
   const operations: Record<string, CommandOperation> = Object.create(null) as Record<string, CommandOperation>;
@@ -95,7 +96,7 @@ export function parseRecipe(raw: unknown): Recipe {
   return { version: 1, id: text(value["id"], "recipe id"), workspace, inputs,
     resources: strings(value["resources"] ?? [], "resources", 64), operations, stages,
     deadlineMs: positive(value["deadlineMs"], "workflow deadline"),
-    policyDigest: text(value["policyDigest"], "policy digest"), claims: strings(value["claims"], "claims", 128) };
+    policyRevision: text(value["policyRevision"], "policy revision"), claims: strings(value["claims"], "claims", 128) };
 }
 
 /** Before and after checks bind observed bytes, without pretending the manifest proves completeness. */

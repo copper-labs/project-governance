@@ -8,21 +8,21 @@ export interface PackEvidence { status: string; findings: Finding[]; [key: strin
 export type PackFinalizer = (packId: string) => Promise<PackEvidence> | PackEvidence;
 export type CheckDispatcher = (request: BuiltinCheckRequest) => Promise<CheckResult>;
 /** Independent checks continue after ordinary findings; failed prerequisites never run. */
-export async function executeChecks(packs: Packs, plan: ValidationPlan, request: Omit<BuiltinCheckRequest, "id">, dispatch: CheckDispatcher = runBuiltinCheck, custom?: CustomCheckDispatcher, finalize?: PackFinalizer, cancelled: () => boolean = () => false) {
+export async function executeChecks(packs: Packs, plan: ValidationPlan, request: Omit<BuiltinCheckRequest, "id">, dispatch: CheckDispatcher = runBuiltinCheck, custom?: CustomCheckDispatcher, finalize?: PackFinalizer, cancelled: () => boolean = () => false, expired: () => boolean = () => false) {
   const results: Array<{ pack_id: string; status: string; commands: CheckResult[]; evidence_manifest?: PackEvidence }> = [], blocked: Record<string, string[]> = {}, failed = new Set<string>();
   let status = plan.status === "blocked" ? "failed" : "passed";
   if (plan.status === "blocked") return { status, results, blocked, plan };
   for (const id of plan.execution_order) {
-    if (cancelled()) return { status: "failed", termination_reason: "cancelled", results, blocked, plan };
+    if (expired() || cancelled()) return { status: "failed", termination_reason: expired() ? "deadline" : "cancelled", results, blocked, plan };
     const pack = packs[id]; if (!pack) throw new Error("Planned pack is unavailable");
     const prerequisites = pack.depends_on.filter(dependency => failed.has(dependency));
     if (prerequisites.length) { blocked[id] = prerequisites; failed.add(id); if (pack.enforcement === "blocking") status = "failed"; continue; }
     const commands: CheckResult[] = [];
     let integrity = false;
     for (const [commandIndex, raw] of pack.commands.entries()) {
-      if (cancelled()) {
+      if (expired() || cancelled()) {
         if (commands.length) results.push({ pack_id: id, status: "failed", commands });
-        return { status: "failed", termination_reason: "cancelled", results, blocked, plan };
+        return { status: "failed", termination_reason: expired() ? "deadline" : "cancelled", results, blocked, plan };
       }
       if (plan.stage && !commandApplies(raw, plan.stage)) continue;
       const command = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
@@ -56,5 +56,5 @@ export async function executeChecks(packs: Packs, plan: ValidationPlan, request:
     if (status === "passed" && ["failed", "warning"].includes(packStatus)) status = "warning";
     if (integrity) { status = "failed"; break; }
   }
-  return { status: cancelled() ? "failed" : status, termination_reason: cancelled() ? "cancelled" : "completed", results, blocked, plan };
+  return { status: expired() || cancelled() ? "failed" : status, termination_reason: expired() ? "deadline" : cancelled() ? "cancelled" : "completed", results, blocked, plan };
 }

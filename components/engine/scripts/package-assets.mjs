@@ -17,3 +17,7 @@ const providerSkill = readFileSync(new URL('../assets/provider-skill.md', import
 for (const provider of ['claude', 'codex', 'gemini']) {
   writeFileSync(new URL(`skills/harness-${provider}-agent/SKILL.md`, destination), providerSkill.replaceAll('{{provider}}', provider));
 }
+
+for (const name of ["compiled-provider-commands", "compiled-startup-updates"]) {
+  cpSync(new URL(`../assets/${name}.md`, import.meta.url), new URL(`skills/resources/${name}.md`, destination));
+}

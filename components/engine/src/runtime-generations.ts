@@ -47,7 +47,7 @@ export class RuntimeGenerations {
   #transaction<T>(operation: () => T): T {
     this.#db.exec("BEGIN IMMEDIATE");
     try { const result = operation(); this.#db.exec("COMMIT"); return result; }
-    catch (error) { this.#db.exec("ROLLBACK"); throw error; }
+    catch (error) { try { this.#db.exec("ROLLBACK"); } catch { /* Preserve the original transaction failure. */ } throw error; }
   }
   activation(operation: string) {
     return this.#db.prepare("SELECT revision,directory FROM activations WHERE operation=?").get(operation) ?? null;

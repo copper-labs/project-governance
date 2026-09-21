@@ -25,8 +25,8 @@ export interface ExecutionProfile {
 }
 /** Admission is a pure gate; existing resource owners still acquire capacity and supervise workers. */
 export function admitCiProfile(profile: ExecutionProfile | null): { state: 'ready' | 'blocked'; reason: string } {
-  if (!profile || !profile.available) return { state: 'blocked', reason: 'missing-capacity' };
-  if (!profile.id.trim() || !['local', 'vm', 'hosted'].includes(profile.placement) || profile.qualified !== true)
+  if (!profile || profile.available !== true) return { state: 'blocked', reason: 'missing-capacity' };
+  if (typeof profile.id !== "string" || !profile.id.trim() || !['local', 'vm', 'hosted'].includes(profile.placement) || profile.qualified !== true)
     return { state: 'blocked', reason: 'unqualified-profile' };
   if (profile.candidateCanAccessPublisherCredential !== false) return { state: 'blocked', reason: 'publisher-credential-reachable' };
   return { state: 'ready', reason: 'qualified-capacity' };

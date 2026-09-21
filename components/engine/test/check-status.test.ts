@@ -25,3 +25,21 @@ test("check observation distinguishes live owner, incomplete run and matching te
     assert.throws(() => inspectCheckRun("../other", root));
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test("queued checks remain pending until claimed and never hide a failed worker", () => {
+  const root = mkdtempSync(join(tmpdir(), "check-queued-")), id = randomUUID(), directory = join(root, id);
+  try {
+    mkdirSync(directory);
+    const intent = { version: 1, id, state: "queued", plan: { execution_order: [] }, owner: null };
+    durableJson(join(directory, "run.json"), intent);
+    assert.equal(inspectCheckRun(id, root).state, "queued");
+    durableJson(join(directory, "worker.claim"), {});
+    assert.equal(inspectCheckRun(id, root).state, "incomplete");
+    rmSync(join(directory, "worker.claim"));
+    durableJson(join(directory, "failure.json"), { id, reason: "worker-incomplete" });
+    assert.equal(inspectCheckRun(id, root).state, "incomplete");
+    rmSync(join(directory, "failure.json"));
+    durableJson(join(directory, "run.json"), { ...intent, state: "running" });
+    assert.equal(inspectCheckRun(id, root).state, "incomplete");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

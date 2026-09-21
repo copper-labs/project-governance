@@ -1,3 +1,4 @@
+import { COMMAND_RECOVERY_COMMANDS } from "./provider-job-command.ts";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { realpathSync } from "node:fs";
@@ -12,11 +13,15 @@ import { startupHookAdmission } from "./startup-hook-admission.ts";
 
 const readCommands = new Set(["resource-status", "runtime-inspect-legacy", "runtime-legacy-jobs", "runtime-migration-plan", "docs", "doctor", "--version", "plan", "source-map", "telemetry", "check-status", "runtime-inspect", "provider-list", "provider-status", "provider-events", "provider-wait", "provider-doctor", "provider-help", "startup-help", "skill-read"]);
 // Workflow store opens can migrate schema even when the requested operation only observes a run.
-const writeCommands = new Set(["harness", "workflow-resume-cleanup", "workflow-recover-observation", "workflow-reconcile-cleanup", "hooks", "hook", "context-route", "context-packet", "context-evaluate", "check-cancel", "workflow-cancel", "check", "workflow-submit", "workflow-status", "workflow-wait", "provider-resume-cleanup", "provider-recover", "provider-deliver", "provider-submit", "provider-follow-up", "provider-cancel", "provider-reconcile", "resource-maintenance", "host-instructions"]);
+const writeCommands = new Set([...COMMAND_RECOVERY_COMMANDS, "harness", "workflow-resume-cleanup", "workflow-recover-observation", "workflow-reconcile-cleanup", "hooks", "hook", "context-route", "context-packet", "context-evaluate", "check-cancel", "workflow-cancel", "check", "workflow-submit", "workflow-status", "workflow-wait", "provider-resume-cleanup", "provider-recover", "provider-deliver", "provider-submit", "provider-follow-up", "provider-cancel", "provider-reconcile", "resource-maintenance", "host-instructions"]);
+
+export function managedCommandEffect(command: string): "read" | "write" | null {
+  return writeCommands.has(command) ? "write" : readCommands.has(command) ? "read" : null;
+}
 
 /** Hold the selected generation through native process close; abrupt launcher loss retains its reader. */
 export async function invokeRuntimeGeneration(registryPath: string, args: string[], workspace: string): Promise<number> {
-  if (!args[0] || (!readCommands.has(args[0]) && !writeCommands.has(args[0]))) {
+  if (!args[0] || managedCommandEffect(args[0]) === null) {
     throw new Error("Command is not supported by managed invocation");
   }
   workspace = realpathSync(workspace);

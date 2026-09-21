@@ -30,6 +30,10 @@ test("custom pack receives captured packet bytes and durable terminal evidence",
     assert.equal(result.status, "passed");
     const projection = readRunProjection(runs, root);
     assert.equal(projection.state, "available");
+    const manifestVersion = JSON.parse(readFileSync(new URL("../../../package.json", import.meta.url), "utf8")).version;
+    const version = execFileSync(process.execPath, [fileURLToPath(new URL("../src/cli.ts", import.meta.url)), "--version"], { encoding: "utf8" }).trim();
+    assert.equal(version, `project-governance ${manifestVersion}`);
+    assert.equal(projection.metrics[0]?.runtime_version, manifestVersion);
     assert.equal(projection.metrics[0]?.trigger, "hook");
     assert.equal(projection.metrics[0]?.run_id, result.run_id);
     assert.equal(result.results[0]?.commands.length, 2);
@@ -49,4 +53,22 @@ test("manifest summaries reject duplicate keys and source identity mismatches", 
     writeFileSync(join(root, "evidence-manifest.json"), JSON.stringify(value).replace('"version":1', '"version":1,"version":1'));
     assert.equal(inspectEvidenceManifest(root, subject, schema).status, "invalid");
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("sequential commands share one check deadline", async () => {
+  const root = mkdtempSync(join(tmpdir(), "check-budget-")), runs = mkdtempSync(join(tmpdir(), "check-budget-records-"));
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: root });
+    execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-qm", "Initial"], { cwd: root });
+    const scope = resolveChangeScope(root, { all: true });
+    const command = { run: [process.execPath, "-e", "setTimeout(()=>console.log(JSON.stringify({status:'passed',findings:[]})),2400)"] };
+    const packs = mergePacks([{ source: "fixture", origin: "target", value: { id: "budget", enforcement: "blocking", stages: ["pre-commit"], commands: [command, command] } }]);
+    const plan = buildPlan(packs, { stage: "pre-commit", mode: "all", changedPaths: [] });
+    const started = Date.now();
+    const result = await runChecks(packs, plan, { scope, subject: new ValidationSubject(root, scope), assets: new PackagedCheckerAssets(defaults), packIds: new Set(["budget"]), stage: "pre-commit", asOf: new Date().toISOString() }, { root: runs, deadlineMs: 4000 });
+    assert.equal(result.status, "failed");
+    assert.equal(result.termination_reason, "deadline");
+    assert.equal(result.results[0]?.commands.length, 2);
+    assert.ok(Date.now() - started < 7000, "one budget plus process cleanup grace");
+  } finally { rmSync(root, { recursive: true, force: true }); rmSync(runs, { recursive: true, force: true }); }
 });

@@ -1,3 +1,4 @@
+import { workflowOperation } from "./workflow-operation.ts";
 import { existsSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { commandProcesses } from "./command-owner-recovery.ts";
@@ -40,7 +41,7 @@ export async function recoverStoppedWorkflow(directory: string, database: string
       if (realpathSync(commandDirectory) !== commandDirectory) throw new Error("Command recovery directory uses an alias");
       const command = JSON.parse(narrativeFile(commandDirectory, "request.json")) as CommandRequest;
       if (command.version !== 1 || command.id !== `${runId}:${stage.id}` ||
-          digest(command.operation) !== digest(run.binding.recipe.operations[spec.operation]) ||
+          digest(command.operation) !== digest(workflowOperation(run.binding.recipe, runId, spec, request.commandsDirectory)) ||
           !Number.isInteger(command.deadlineMs) || command.deadlineMs < 1 || command.deadlineMs > spec.deadlineMs ||
           Object.keys(command).some(key => !["version", "id", "operation", "deadlineMs", "outputLimit", "ownerDigest"].includes(key)))
         throw new Error("Original command differs from workflow stage");
@@ -49,10 +50,11 @@ export async function recoverStoppedWorkflow(directory: string, database: string
       const settled = await settleWorkflowCommandCleanup(commandDirectory, observed.receipt,
         run.binding.recipe.operations[spec.operation]!.expectedExitCodes, 0);
       const receipt = settled.receipt;
-      if (receipt.state === "unknown" || receipt.cleanup !== "confirmed") { unresolved.push(stage.id); continue; }
+      if ((receipt.state === "unknown" && !settled.verificationFailed) || receipt.cleanup !== "confirmed") { unresolved.push(stage.id); continue; }
       const inputValidity = validateInputs(run.binding.recipe) ? "valid" : "stale";
       observations.push({ id: stage.id, result: {
-        state: receipt.state === "succeeded" && inputValidity !== "valid" ? "failed" : receipt.state,
+        state: settled.verificationFailed || (receipt.state === "succeeded" && inputValidity !== "valid") ? "failed" : receipt.state,
+        ...(settled.verificationFailed ? { commandOutcome: "unknown" as const } : {}),
         exitCode: receipt.exitCode, cleanup: receipt.cleanup, startedAt: receipt.startedAt, endedAt: receipt.endedAt,
         log: receipt.log, inputValidity, detail: receipt.reason,
         ...(settled.recovery ? { cleanupRecovery: settled.recovery } : {}),

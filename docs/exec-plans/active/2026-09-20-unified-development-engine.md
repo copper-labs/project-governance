@@ -346,7 +346,7 @@ category semantics, optional-decision evaluation, or the final extra-high review
 
 ## Current completion work
 
-Latest coherent source boundary: 404 engine tests, 72 continuity tests and two release-metadata
+Latest coherent source boundary: 407 engine tests, 72 continuity tests and two release-metadata
 tests pass, with type checking. Ten new capability/CI contract assertions also pass against installed
 compiled modules, and 38 JEV/context assertions pass against the rebuilt package.
 The current preview archive installs offline and passes the installed workflow evidence-environment
@@ -382,7 +382,7 @@ The paired sample-readiness/owned-Metro-replacement comparison then completed wi
 inputs. Graceful-exit preparation failed to preserve Metro and is not counted as a comparison;
 the accepted case uses abrupt supervisor interruption identically for both versions. Keep source-runner
 corrections, actual device scenario proof, comparison acceptance, and native host activation distinct.
-| Final review | Opus extra-high architecture/code review and reconciliation after implementation completion | Not started; the high-effort progress consultation does not satisfy this gate |
+| Final review | Opus extra-high architecture/code review and reconciliation after implementation completion | Completed; substantive corrections received focused Opus 5 extra-high rechecks. The final managed recovery-route finding is closed. Installed package/API/guidance proof and SDK commit checks pass. Final requirement and artifact-applicability reconciliation remains open |
 
 Stop additional simulator comparison preparation until it closes a specific unmet requirement.
 The live sample readiness probe has passed, but does not establish recovery or comparative benefit.

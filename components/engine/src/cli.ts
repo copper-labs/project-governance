@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { RELEASE_VERSION } from "./release-version.ts";
 import { durableJson } from "./core.ts";
 import { checkSummary } from "./check-summary.ts";
 import { checkObservationContext } from "./check-observation-context.ts";
@@ -118,6 +119,8 @@ Project setup and context:
 Operations:
   telemetry | context-evaluate | resource-status | resource-maintenance
   workflow-wait | workflow-recover-observation | workflow-resume-cleanup
+  command-resume-cleanup | command-recover | command-reconcile
+    --directory <command-directory> --digest <request-digest> [--authority <authority>]
   runtime-stage | runtime-run | runtime-inspect | runtime-complete
   runtime-maintenance | runtime-backup | runtime-migration-plan | runtime-host-plan
   runtime-inspect-legacy | runtime-archive-legacy | runtime-legacy-jobs
@@ -317,7 +320,7 @@ Use the owning command contract for structured request fields.
       const result = await withDecisionCancellation(options => contextCommand(args.slice(1), process.cwd(), undefined, options));
       console.log(JSON.stringify(result.value)); return result.exitCode ?? 0;
     }
-    if (command === "--version") { console.log("project-governance 3.0.0-preview.1"); return 0; }
+    if (command === "--version") { console.log(`project-governance ${RELEASE_VERSION}`); return 0; }
     if (command === "telemetry") {
       if (args[1] === "review") {
         const { values } = parseArgs({ args: args.slice(2), strict: true, allowPositionals: false, options: { "run-id": { type: "string" }, disposition: { type: "string" } } });
@@ -366,15 +369,15 @@ Use the owning command contract for structured request fields.
       if (observed.state === "terminal") {
         if (prepared.jsonOutput) durableJson(prepared.jsonOutput, observed.result);
         console.log(JSON.stringify(prepared.summary ? checkSummary(observed.result) : observed.result)); return observed.status === "failed" ? 1 : 0; }
-      if (observed.state === "incomplete" && (observed.orchestrator_failure || Date.now() - submittedAt > 10000)) {
+      if (observed.state === "incomplete" || Date.now() - submittedAt >= prepared.deadlineMs + 5000) {
         if (prepared.jsonOutput) durableJson(prepared.jsonOutput, observed);
         console.log(JSON.stringify(observed)); return 2;
       }
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
   } catch (error) {
     // CLI parsing errors contain flags, not file contents. Source-loading diagnostics remain private.
-    console.error(JSON.stringify({ status: "failed", error: error instanceof TypeError ? "Invalid invocation" : "Planning could not resolve a valid invocation, candidate, or pack configuration." }));
+    console.error(JSON.stringify({ status: "failed", error: error instanceof TypeError ? "Invalid invocation" : "Command could not complete; inspect its operation receipt when available." }));
     return 2;
   }
 }

@@ -1,3 +1,4 @@
+import { workflowOperation } from "../src/workflow-operation.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, existsSync, readFileSync } from "node:fs";
@@ -11,7 +12,7 @@ import { ResourceRegistry } from "../src/resources.ts";
 import { parseRecipe, recipeDigest } from "../src/workflow-types.ts";
 import { executeWorkflow } from "../src/workflow-executor.ts";
 
-function fixture(fails: boolean, resources = ["fixture:device"], captureEnvironment = false) {
+function fixture(fails: boolean, resources = ["fixture:device"], captureEnvironment = false, loseSupervisor = false) {
   const dir = mkdtempSync(join(tmpdir(), "engine-execute-")), path = join(dir, "ledger.sqlite");
   const continuity = new Store(path), store = new WorkflowStore(path), registry = new ResourceRegistry(join(dir, "resources.sqlite"));
   const task = continuity.createTask("execute native tests", [{ kind: "scope", provenance: "operator", body: dir }]);
@@ -20,10 +21,10 @@ function fixture(fails: boolean, resources = ["fixture:device"], captureEnvironm
   const action = authorizeAction(continuity, proposeAction(continuity, task.taskId, request), request, policy, dir);
   const op = (code: string) => ({ argv: [process.execPath, "-e", code], cwd: dir, effect: "local" });
   const recipe = parseRecipe({ version: 1, id: "native", workspace: dir, inputs: [], resources,
-    operations: { test: op(captureEnvironment ? `require("fs").writeFileSync(require("path").join(process.env.PROJECT_GOVERNANCE_WORKFLOW_ARTIFACT_DIR,"identity.json"), JSON.stringify({run:process.env.PROJECT_GOVERNANCE_WORKFLOW_RUN_ID,stage:process.env.PROJECT_GOVERNANCE_WORKFLOW_STAGE_ID}))` : `process.exit(${fails ? 7 : 0})`), later: op("require('fs').writeFileSync('later','ran')"), cleanup: op(captureEnvironment ? "require('fs').writeFileSync('cleaned', process.env.PROJECT_GOVERNANCE_WORKFLOW_STAGE_ARTIFACTS_JSON)" : "require('fs').writeFileSync('cleaned','yes')") },
-    stages: [{ id: "test", operation: "test", deadlineMs: 1000 }, { id: "later", operation: "later", dependsOn: ["test"], deadlineMs: 1000 },
+    operations: { test: op(loseSupervisor ? "setInterval(()=>{},1000)" : captureEnvironment ? `require("fs").writeFileSync(require("path").join(process.env.PROJECT_GOVERNANCE_WORKFLOW_ARTIFACT_DIR,"identity.json"), JSON.stringify({run:process.env.PROJECT_GOVERNANCE_WORKFLOW_RUN_ID,stage:process.env.PROJECT_GOVERNANCE_WORKFLOW_STAGE_ID}))` : `process.exit(${fails ? 7 : 0})`), later: op("require('fs').writeFileSync('later','ran')"), cleanup: op(captureEnvironment ? "require('fs').writeFileSync('cleaned', process.env.PROJECT_GOVERNANCE_WORKFLOW_STAGE_ARTIFACTS_JSON)" : "require('fs').writeFileSync('cleaned','yes')") },
+    stages: [{ id: "test", operation: "test", deadlineMs: loseSupervisor ? 10000 : 1000 }, { id: "later", operation: "later", dependsOn: ["test"], deadlineMs: 1000 },
       { id: "cleanup", operation: "cleanup", cleanup: true, deadlineMs: 1000 }],
-    deadlineMs: 5000, policyDigest: policy.revision, claims: ["native fixture"] });
+    deadlineMs: 5000, policyRevision: policy.revision, claims: ["native fixture"] });
   const binding = { taskId: task.taskId, taskVersion: task.version, actionId: action.actionId, authorityRef: "host:test",
     recipe, recipeDigest: recipeDigest(recipe), operationId: "fixture" };
     store.authorizeWorkflow(binding);
@@ -178,7 +179,7 @@ test("a stopped cleanup worker is reconciled without replaying its completed com
     f.store.stage(run.id, run.owner!, "cleanup", "running");
     const commandDirectory = join(commandsDirectory, `${run.id}-2`);
     const command = submitCommand(commandDirectory, { id: `${run.id}:cleanup`,
-      operation: run.binding.recipe.operations.cleanup!, deadlineMs: 1000, outputLimit: 4096 });
+      operation: workflowOperation(run.binding.recipe, run.id, run.binding.recipe.stages[2]!, commandsDirectory), deadlineMs: 1000, outputLimit: 4096 });
     const observed = await waitCommand(commandDirectory, command.requestDigest, 5000);
     assert.equal(observed.receipt?.state, "succeeded");
     const receipt = readFileSync(join(commandDirectory, "result.json"));
@@ -214,4 +215,54 @@ test("commands receive execution-owned identity and a fresh artifact destination
     });
     assert.deepEqual(f.store.read(f.run.id).binding.recipe.operations.test!.env, {});
   } finally { f.close(); }
+});
+
+test("public command recovery releases workflow resources after worker and guardian loss without claiming command success", async () => {
+  const { spawnSync } = await import("node:child_process");
+  const { fileURLToPath } = await import("node:url");
+  const { processFingerprint } = await import("../src/process-owner.ts");
+  const { digest } = await import("../src/core.ts");
+  const f = fixture(false, ["fixture:device"], false, true);
+  const commands = join(f.dir, "commands"), commandDirectory = join(commands, `${f.run.id}-0`);
+  const cli = fileURLToPath(new URL("../src/cli.ts", import.meta.url));
+  let records: Array<{pid:number;fingerprint:string}> = [];
+  let execution: ReturnType<typeof executeWorkflow> | undefined;
+  try {
+    const observation = digest({ kind: "fixture-adapter", appAbsent: true });
+    execution = executeWorkflow(f.store, f.run.id, { commandsDirectory: commands, registry: f.registry,
+      observeCleanup: async () => existsSync(join(f.dir, "cleaned")) ? observation : null });
+    const until = Date.now() + 5000;
+    while ((!existsSync(join(commandDirectory, "launch.json")) || !existsSync(join(commandDirectory, "guardian.json")) || !existsSync(join(commandDirectory, "group-members.json"))) && Date.now() < until)
+      await new Promise(resolve => setTimeout(resolve, 20));
+    const read = (name: string) => JSON.parse(readFileSync(join(commandDirectory, name), "utf8"));
+    const launch = read("launch.json"), guardian = read("guardian.json"), request = read("request.json");
+    records = [guardian, launch.owner, launch.child];
+    const args = [cli, "command-resume-cleanup", "--directory", commandDirectory, "--digest", digest(request), "--authority", "test:recover"];
+    const premature = spawnSync(process.execPath, args, { encoding: "utf8", timeout: 5000 });
+    assert.equal(premature.status, 2, "live original worker refuses recovery");
+    for (const record of [guardian, launch.owner]) {
+      assert.equal(processFingerprint(record.pid), record.fingerprint);
+      process.kill(record.pid, "SIGKILL");
+    }
+    const stoppedBy = Date.now() + 3000;
+    while ([guardian, launch.owner].some(record => processFingerprint(record.pid) === record.fingerprint) && Date.now() < stoppedBy)
+      await new Promise(resolve => setTimeout(resolve, 20));
+    const recovered = spawnSync(process.execPath, args, { encoding: "utf8", timeout: 5000 });
+    assert.equal(recovered.status, 0, recovered.stderr);
+    const result = await execution;
+    assert.equal(result.state, "failed");
+    const first = f.store.stages(f.run.id)[0]!.result!;
+    assert.equal(first.commandOutcome, "unknown");
+    assert.equal(first.cleanup, "confirmed");
+    assert.ok(first.cleanupRecovery);
+    assert.equal(read("result.json").state, "unknown", "original command receipt remains unknown");
+    assert.equal(existsSync(join(f.dir, "later")), false);
+    assert.equal(existsSync(join(f.dir, "cleaned")), true);
+    assert.equal(f.registry.inspect()[0]!.state, "released");
+    assert.equal(f.registry.inspect()[0]!.observation, observation);
+  } finally {
+    for (const record of records) if (processFingerprint(record.pid) === record.fingerprint) process.kill(record.pid, "SIGKILL");
+    if (execution) await execution.catch(() => {});
+    f.close();
+  }
 });

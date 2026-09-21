@@ -338,3 +338,34 @@ and version-specific API stability. This supports qualifying the selected Node/d
 it does not justify choosing a runtime version merely because its documentation is newest.
 No paid inference, production performance comparison, published package adoption or device run was
 performed for this decision brief. Recommendations remain distinct from those proofs.
+
+
+### Qualified preview host API
+
+The package declares `@organta/project-governance/host/v1` with JavaScript and TypeScript
+declarations. Trusted host adapters create tasks, authorize actions, bind exact recipes through
+`WorkflowStore.authorizeWorkflow`, then use the public workflow CLI for dispatch and observation.
+The API exposes the task store, action authorization, workflow binding, recipe resolution and
+resource observation primitives; internal file paths are not a supported import surface. The host
+must obtain operator authority before calling approval methods. No model-facing self-approval
+command is introduced. Breaking this surface requires a new API version.
+
+Workflow recipes use `policyRevision`, the identifier compared with the authorized action's
+policy revision. This is not a content hash. CI candidate `policyDigest` remains a SHA256 binding.
+Pre-release recipes using the former misleading field name must be regenerated and reauthorized;
+historical receipts remain historical evidence and must not be rewritten.
+
+
+### Lost-command verification and release transition
+
+An independently confirmed command cleanup does not prove the command's result. If an owner was
+lost, its immutable command receipt stays `unknown`. The workflow records failed verification with
+`commandOutcome: unknown` and the recovery evidence digests. This permits only declared cleanup;
+dependent ordinary stages remain blocked. Resource release still requires the resource adapter's
+separate cleanup observation. A missing or mismatched cleanup proof retains the obligation.
+
+Until deliberate adopter cutover, CI exercises both runtime implementations and verifies the wheel
+as well as the compiled package. The 2.x tag channel retains wheel release support; the 3.x tag
+channel publishes the unified package. Neither channel runs without an explicitly authorized tag,
+and this implementation work publishes neither. Existing wheel installations are not migrated by
+a source change or by publication of a new major version.

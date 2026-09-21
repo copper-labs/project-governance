@@ -302,3 +302,13 @@ generations to remain held. It atomically records the recovery worker identity, 
 stages, preserves completed results and executes only pending cleanup. Live recovery workers block
 further observation takeover. Device release still requires independent readback; unresolved cleanup
 retains ownership. The command does not resume ordinary workflow work.
+
+
+### Recovery through the managed launcher
+
+The managed runtime admits `command-resume-cleanup`, `command-recover` and `command-reconcile`
+as writes against an original command directory and request digest. Resume requires an authority
+reference, proven command-worker absence and the original guardian/process identities. Recover
+requires independently observed process absence. Reconcile binds existing evidence. None replays
+ordinary work. A workflow failed-verification state may contain a stage with `commandOutcome: unknown`;
+consumers must inspect stage evidence and must not infer that no external or local effect occurred.

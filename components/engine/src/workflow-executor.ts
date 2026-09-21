@@ -1,3 +1,4 @@
+import { workflowOperation } from "./workflow-operation.ts";
 import { settleWorkflowCommandCleanup } from "./workflow-command-cleanup.ts";
 import { mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -68,17 +69,7 @@ export async function executeWorkflow(store: WorkflowStore, id: string, options:
       const directory = join(options.commandsDirectory, `${id}-${recipe.stages.indexOf(stage)}`);
       const artifactDirectory = resolve(`${directory}-artifacts`);
       mkdirSync(artifactDirectory, { recursive: true, mode: 0o700 });
-      const selectedOperation = recipe.operations[stage.operation]!;
-      // Bind evidence destinations to this execution, never to a previous catalog invocation.
-      const operation = { ...selectedOperation, env: { ...selectedOperation.env,
-        PROJECT_GOVERNANCE_WORKFLOW_RUN_ID: id,
-        PROJECT_GOVERNANCE_WORKFLOW_STAGE_ID: stage.id,
-        PROJECT_GOVERNANCE_WORKFLOW_ARTIFACT_DIR: artifactDirectory,
-        // Cleanup must find this execution's predecessor evidence even after worker loss.
-        PROJECT_GOVERNANCE_WORKFLOW_STAGE_ARTIFACTS_JSON: JSON.stringify(Object.fromEntries(
-          recipe.stages.slice(0, recipe.stages.indexOf(stage)).map((previous, index) =>
-            [previous.id, resolve(options.commandsDirectory, `${id}-${index}-artifacts`)]))),
-      } };
+      const operation = workflowOperation(recipe, id, stage, options.commandsDirectory);
       const command = submitCommand(directory, { id: `${id}:${stage.id}`, operation,
         deadlineMs: stage.cleanup ? stage.deadlineMs : Math.max(1, Math.min(stage.deadlineMs, deadline - Date.now())),
         outputLimit: options.outputLimit ?? 1024 * 1024 });
@@ -93,7 +84,8 @@ export async function executeWorkflow(store: WorkflowStore, id: string, options:
         recipe.operations[stage.operation]!.expectedExitCodes) : null;
       const receipt = settled?.receipt;
       const inputValidity = validateInputs(recipe) ? "valid" : "stale";
-      result = receipt ? { state: receipt.state === "succeeded" && inputValidity !== "valid" ? "failed" : receipt.state,
+      result = receipt ? { state: settled?.verificationFailed || (receipt.state === "succeeded" && inputValidity !== "valid") ? "failed" : receipt.state,
+        ...(settled?.verificationFailed ? { commandOutcome: "unknown" as const } : {}),
         exitCode: receipt.exitCode, cleanup: receipt.cleanup, startedAt: receipt.startedAt, endedAt: receipt.endedAt,
         log: receipt.log, inputValidity, detail: receipt.reason, ...(settled?.recovery ? { cleanupRecovery: settled.recovery } : {}) } : {
         state: "unknown", exitCode: null, cleanup: "unknown", startedAt, endedAt: new Date().toISOString(),

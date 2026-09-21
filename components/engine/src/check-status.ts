@@ -1,4 +1,4 @@
-import { constants, closeSync, fstatSync, openSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, constants, closeSync, fstatSync, openSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { digest, object } from "./core.ts";
 import { observeCommand, processFingerprint } from "./process-owner.ts";
@@ -40,5 +40,6 @@ export function inspectCheckRun(id: string, root = checkRunRoot()) {
   const active = Number.isSafeInteger(pid) && pid > 0 && typeof fingerprint === "string" && processFingerprint(pid) === fingerprint;
   const failure = readRecord(join(directory, "failure.json"));
   if (failure && failure["id"] !== id) throw new Error("Run failure identity mismatch");
-  return { run_id: id, state: active ? "running" : "incomplete", status: "outcome-unknown", orchestrator_failure: failure, commands };
+  const queued = intent["state"] === "queued" && intent["owner"] === null && !failure && !existsSync(join(directory, "worker.claim"));
+  return { run_id: id, state: active ? "running" : queued ? "queued" : "incomplete", status: "outcome-unknown", orchestrator_failure: failure, commands };
 }

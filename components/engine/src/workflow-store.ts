@@ -72,7 +72,7 @@ export class WorkflowStore {
   #atomic<T>(fn: () => T): T {
     this.#db.exec("BEGIN IMMEDIATE");
     try { const result = fn(); this.#db.exec("COMMIT"); return result; }
-    catch (error) { this.#db.exec("ROLLBACK"); throw error; }
+    catch (error) { try { this.#db.exec("ROLLBACK"); } catch { /* Preserve the original transaction failure. */ } throw error; }
   }
 
   #event(runId: string, kind: string, data: unknown): void {
@@ -87,7 +87,7 @@ export class WorkflowStore {
     const action = this.#db.prepare("SELECT * FROM action WHERE action_id=?").get(binding.actionId);
     if (!task || task["version"] !== binding.taskVersion || task["status"] !== "open") throw new Error("workflow task is stale or not open");
     if (!action || action["task_id"] !== binding.taskId || action["task_version"] !== binding.taskVersion ||
-        action["policy_revision"] !== binding.recipe.policyDigest || !["authorized", "prepared", "in-progress"].includes(String(action["status"]))) {
+        action["policy_revision"] !== binding.recipe.policyRevision || !["authorized", "prepared", "in-progress"].includes(String(action["status"]))) {
       throw new Error("workflow action is not authorized for this task/policy");
     }
     if (action["operation"] !== "check" || action["destination"] !== null) {

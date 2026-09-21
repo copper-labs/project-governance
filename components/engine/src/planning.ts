@@ -44,7 +44,7 @@ export function commandApplies(entry: unknown, stage: string): boolean {
   return !stages.length || stages.map(String).includes(stage);
 }
 function commandGap(pack: Pack, stage: string): boolean {
-  return pack.enforcement === "blocking" && pack.stages.includes(stage) && !pack.commands.some(entry => commandApplies(entry, stage));
+  return pack.stages.includes(stage) && !pack.commands.some(entry => commandApplies(entry, stage));
 }
 
 /** Pure selection preserves explicit ownership, supplemental checks, dependency order and fail-closed gaps. */

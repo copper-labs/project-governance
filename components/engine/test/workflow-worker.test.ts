@@ -28,7 +28,7 @@ test("a complete workflow survives caller exit; reconnect observes the same nati
     const action = authorizeAction(continuity, proposeAction(continuity, task.taskId, req), req, policy, dir);
     const recipe = parseRecipe({ version: 1, id: "detach", workspace: dir, inputs: [], resources: [],
       operations: { test: { argv: [process.execPath, "-e", "setTimeout(()=>require('fs').appendFileSync('count','once\\n'),250)"], cwd: dir, effect: "local" } },
-      stages: [{ id: "native", operation: "test", deadlineMs: 2000 }], deadlineMs: 4000, policyDigest: policy.revision, claims: ["native check"] });
+      stages: [{ id: "native", operation: "test", deadlineMs: 2000 }], deadlineMs: 4000, policyRevision: policy.revision, claims: ["native check"] });
     const binding = { taskId: task.taskId, taskVersion: task.version, actionId: action.actionId, authorityRef: "host:test",
       recipe, recipeDigest: recipeDigest(recipe), operationId: "once" };
     store.authorizeWorkflow(binding);

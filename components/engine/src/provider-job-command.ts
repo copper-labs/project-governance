@@ -13,7 +13,9 @@ import { providerDoctor } from "./provider-doctor.ts";
 import type { NativeProvider } from "./provider-binding.ts";
 import { providerResultSummary } from "./provider-result-summary.ts";
 
-export const PROVIDER_COMMANDS = ["provider-resume-cleanup", "provider-recover", "provider-deliver", "provider-list", "provider-submit", "provider-status", "provider-events", "provider-wait", "provider-cancel", "provider-follow-up", "provider-reconcile", "provider-doctor"];
+export const COMMAND_RECOVERY_COMMANDS = ["command-resume-cleanup", "command-recover", "command-reconcile"];
+
+export const PROVIDER_COMMANDS = [...COMMAND_RECOVERY_COMMANDS, "provider-resume-cleanup", "provider-recover", "provider-deliver", "provider-list", "provider-submit", "provider-status", "provider-events", "provider-wait", "provider-cancel", "provider-follow-up", "provider-reconcile", "provider-doctor"];
 
 /** File-backed assignments avoid shell quoting and keep private prompts out of argv. */
 export async function providerJobCommand(command: string, args: string[]) {
@@ -34,6 +36,8 @@ export async function providerJobCommand(command: string, args: string[]) {
     const result = providerDoctor(provider, options);
     return { result, exitCode: result.status === "passed" ? 0 : 1 };
   }
+  const genericRecovery = COMMAND_RECOVERY_COMMANDS.includes(command);
+  if (genericRecovery) command = command.replace("command-", "provider-");
   const names = command === "provider-submit" ? ["directory", "request", "completion-executable"]
     : ["directory", "digest", ...(command === "provider-follow-up" ? ["request"] : []),
       ...(command === "provider-events" ? ["after", "limit"] : []), ...(command === "provider-wait" ? ["milliseconds"] : []),
@@ -53,7 +57,7 @@ export async function providerJobCommand(command: string, args: string[]) {
   if (!directory) throw new Error("Provider job directory required");
   const hash = text(values.digest, "provider request digest", 80);
   const request = object(JSON.parse(narrativeFile(directory, "request.json")));
-  if (digest(request) !== hash || !request.provider || !request.assignment || request.runtime === undefined) throw new Error("Provider job request identity mismatch");
+  if (request.version !== 1 || digest(request) !== hash || (!genericRecovery && (!request.provider || !request.assignment || request.runtime === undefined))) throw new Error("Provider job request identity mismatch");
   if (command === "provider-resume-cleanup") return { result: await restartCommandGuardian(directory, hash, text(values.authority, "cleanup restart authority")), exitCode: 0 };
   if (command === "provider-recover") {
     const result = recoverCommandOwner(directory, hash, text(values.authority, "recovery authority"));

@@ -96,3 +96,13 @@ failed/uncertain attempt; duplication of a notice never authorizes rerunning the
 delivery lock remains uncertain and is not automatically stolen. Host restart survival and real queue
 delivery require separate host qualification; fake-host tests do not establish them.
 Do not bootstrap, update, publish, or change another project's installation from a delegated worker.
+
+## Generic workflow command recovery
+
+For a workflow stage command with lost supervision, use the managed runtime's
+`command-resume-cleanup --directory <original-command-directory> --digest <request-digest> --authority <authority>`.
+It resumes cleanup only and refuses while the original command worker is alive. It never reruns the assignment.
+`command-recover` with the same flags records independent absence evidence after all owned processes have gone.
+`command-reconcile --directory <original-command-directory> --digest <request-digest>` binds the existing cleanup
+evidence. These are write operations. A lost command outcome stays unknown in its original receipt;
+workflow verification fails even when cleanup is confirmed. Read stage evidence before interpreting a failed run.

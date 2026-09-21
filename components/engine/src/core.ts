@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { closeSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { closeSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 
@@ -32,8 +32,13 @@ export function durableText(path:string,value:string):void {
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   const temporary = `${path}.${randomUUID()}.tmp`;
   const fd = openSync(temporary, "wx", 0o600);
-  try { writeFileSync(fd, value); fsyncSync(fd); } finally { closeSync(fd); }
-  renameSync(temporary, path);
+  try {
+    try { writeFileSync(fd, value); fsyncSync(fd); } finally { closeSync(fd); }
+    renameSync(temporary, path);
+  } catch (error) {
+    try { rmSync(temporary, { force: true }); } catch { /* Preserve the original write failure. */ }
+    throw error;
+  }
   const directory = openSync(dirname(path), "r");
   try { fsyncSync(directory); } finally { closeSync(directory); }
 }

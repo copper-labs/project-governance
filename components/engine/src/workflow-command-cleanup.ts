@@ -8,7 +8,7 @@ import type { CommandReceipt } from "./process-owner.ts";
 export async function settleWorkflowCommandCleanup(directory: string, receipt: CommandReceipt,
   expectedExitCodes: readonly number[], waitMs = 5000) {
   if (!Number.isInteger(waitMs) || waitMs < 0 || waitMs > 5000) throw new Error("Invalid cleanup observation budget");
-  if (receipt.cleanup === "confirmed") return { receipt, recovery: undefined };
+  if (receipt.cleanup === "confirmed" && receipt.state !== "unknown") return { receipt, recovery: undefined };
   const deadline = performance.now() + waitMs;
   while (!hasConfirmedCommandCleanup(directory,receipt)) {
     const remaining = deadline-performance.now();
@@ -23,5 +23,6 @@ export async function settleWorkflowCommandCleanup(directory: string, receipt: C
   if (state === "unknown" && receipt.reason === "cancelled" && (receipt.exitCode !== null || receipt.signal !== null))
     state = "cancelled";
   const recovery = { receiptDigest: digest(receipt), recoveryDigest: fileDigest(join(directory,"owner-recovery.json")) };
-  return { receipt: { ...receipt, state, cleanup: "confirmed" as const }, recovery };
+  return { receipt: { ...receipt, state, cleanup: "confirmed" as const }, recovery,
+    verificationFailed: state === "unknown" && receipt.reason === "owner-lost" };
 }

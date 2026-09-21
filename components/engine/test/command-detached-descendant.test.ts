@@ -1,4 +1,7 @@
-import { restartCommandGuardian } from "../src/command-guardian-restart.ts";
+import { object } from "../src/core.ts";
+import { providerJobCommand } from "../src/provider-job-command.ts";
+const restartCommandGuardian = async (directory: string, digest: string, authority: string) =>
+  object((await providerJobCommand("command-resume-cleanup", ["--directory", directory, "--digest", digest, "--authority", authority])).result);
 import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";

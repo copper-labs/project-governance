@@ -73,7 +73,7 @@ export class ResourceRegistry {
   #atomic<T>(fn: () => T): T {
     this.#db.exec("BEGIN IMMEDIATE");
     try { const result = fn(); this.#db.exec("COMMIT"); return result; }
-    catch (error) { this.#db.exec("ROLLBACK"); throw error; }
+    catch (error) { try { this.#db.exec("ROLLBACK"); } catch { /* Preserve the original transaction failure. */ } throw error; }
   }
 
   #event(kind: string, data: unknown): void {

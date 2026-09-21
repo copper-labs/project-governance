@@ -20,7 +20,7 @@ test("workflow status observes the ledger and cancellation requires an authority
     const action = authorizeAction(continuity, proposeAction(continuity, task.taskId, request), request, policy, dir);
     const recipe = parseRecipe({ version: 1, id: "check", workspace: dir, inputs: [], resources: [],
       operations: { check: { argv: [process.execPath, "--version"], cwd: dir, effect: "read" } },
-      stages: [{ id: "check", operation: "check", deadlineMs: 2000 }], deadlineMs: 4000, policyDigest: policy.revision, claims: ["check"] });
+      stages: [{ id: "check", operation: "check", deadlineMs: 2000 }], deadlineMs: 4000, policyRevision: policy.revision, claims: ["check"] });
     const binding = { taskId: task.taskId, taskVersion: task.version, actionId: action.actionId, authorityRef: "host:test", recipe, recipeDigest: recipeDigest(recipe), operationId: "check" };
     store.authorizeWorkflow(binding);
     const run = store.submit(binding);

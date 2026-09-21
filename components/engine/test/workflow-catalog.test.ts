@@ -13,7 +13,7 @@ test("submitted workflows select catalog operations and become stale when the ca
     const operation = { argv: [process.execPath, "--version"], cwd: workspace, effect: "read" };
     writeFileSync(path, JSON.stringify({ version: 1, operations: { inspect: operation } }));
     const input = { version: 1, id: "inspect", workspace, inputs: [], resources: [],
-      stages: [{ id: "inspect", operation: "inspect", deadlineMs: 1000 }], deadlineMs: 2000, policyDigest: "policy-2", claims: ["inspection"] };
+      stages: [{ id: "inspect", operation: "inspect", deadlineMs: 1000 }], deadlineMs: 2000, policyRevision: "policy-2", claims: ["inspection"] };
     const recipe = resolveWorkflowRecipe(input);
     assert.deepEqual(recipe.operations.inspect!.argv, operation.argv);
     assert.equal(validateInputs(recipe), true);

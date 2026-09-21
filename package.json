@@ -33,5 +33,11 @@
   },
   "bin": {
     "project-governance": "dist/engine/src/cli.js"
+  },
+  "exports": {
+    "./host/v1": {
+      "types": "./dist/engine/src/host-api-v1.d.ts",
+      "import": "./dist/engine/src/host-api-v1.js"
+    }
   }
 }

@@ -1,3 +1,4 @@
+import { workflowOperation } from "../src/workflow-operation.ts";
 import { recoverStoppedWorkflow } from "../src/workflow-worker-recovery.ts";
 import { submitCommand, waitCommand, processFingerprint } from "../src/process-owner.ts";
 import { releaseRecoveredWorkflowReader } from "../src/workflow-reader-recovery.ts";
@@ -30,7 +31,7 @@ function fixture() {
   const recipe = parseRecipe({ version: 1, id: "fixture", workspace: dir,
     inputs: [{ path: "input.txt", digest: fileDigest(join(dir, "input.txt")) }], resources: ["fixture:device"],
     operations: { check: { argv: [process.execPath, "-e", "process.exit(0)"], cwd: ".", effect: "read" } },
-    stages: [{ id: "test", operation: "check", deadlineMs: 1000 }], deadlineMs: 3000, policyDigest: policy.revision, claims: ["fixture passed"] });
+    stages: [{ id: "test", operation: "check", deadlineMs: 1000 }], deadlineMs: 3000, policyRevision: policy.revision, claims: ["fixture passed"] });
   const binding: RunBinding = { taskId: task.taskId, taskVersion: 1, actionId: action.actionId,
     authorityRef: "host:fixture", recipe, recipeDigest: recipeDigest(recipe), operationId: "fixture:1" };
   const approvals = new WorkflowStore(path); approvals.authorizeWorkflow(binding); approvals.close();
@@ -269,7 +270,7 @@ test("stopped-worker observation refuses live owners and binds original command 
   const dead=spawnSync(process.execPath,["-e",""]);
   writeFileSync(ownerPath,JSON.stringify({requestDigest:digest(request),pid:dead.pid,fingerprint:"fixture exited worker"}));
   const commandDirectory=join(commands,`${run.id}-0`);
-  const job=submitCommand(commandDirectory,{id:`${run.id}:test`,operation:run.binding.recipe.operations.check!,deadlineMs:1000,outputLimit:4096});
+  const job=submitCommand(commandDirectory,{id:`${run.id}:test`,operation:workflowOperation(run.binding.recipe, run.id, run.binding.recipe.stages[0]!, commands),deadlineMs:1000,outputLimit:4096});
   const result=await waitCommand(commandDirectory,job.requestDigest,5000);assert.equal(result.receipt?.state,"succeeded");
   const original=readFileSync(join(commandDirectory,"result.json"));
   await assert.rejects(recoverStoppedWorkflow(directory,f.path,run.id,run.revision-1),/revision differs/);
