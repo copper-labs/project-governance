@@ -74,6 +74,10 @@ export async function executeWorkflow(store: WorkflowStore, id: string, options:
         PROJECT_GOVERNANCE_WORKFLOW_RUN_ID: id,
         PROJECT_GOVERNANCE_WORKFLOW_STAGE_ID: stage.id,
         PROJECT_GOVERNANCE_WORKFLOW_ARTIFACT_DIR: artifactDirectory,
+        // Cleanup must find this execution's predecessor evidence even after worker loss.
+        PROJECT_GOVERNANCE_WORKFLOW_STAGE_ARTIFACTS_JSON: JSON.stringify(Object.fromEntries(
+          recipe.stages.slice(0, recipe.stages.indexOf(stage)).map((previous, index) =>
+            [previous.id, resolve(options.commandsDirectory, `${id}-${index}-artifacts`)]))),
       } };
       const command = submitCommand(directory, { id: `${id}:${stage.id}`, operation,
         deadlineMs: stage.cleanup ? stage.deadlineMs : Math.max(1, Math.min(stage.deadlineMs, deadline - Date.now())),

@@ -20,7 +20,7 @@ function fixture(fails: boolean, resources = ["fixture:device"], captureEnvironm
   const action = authorizeAction(continuity, proposeAction(continuity, task.taskId, request), request, policy, dir);
   const op = (code: string) => ({ argv: [process.execPath, "-e", code], cwd: dir, effect: "local" });
   const recipe = parseRecipe({ version: 1, id: "native", workspace: dir, inputs: [], resources,
-    operations: { test: op(captureEnvironment ? `require("fs").writeFileSync(require("path").join(process.env.PROJECT_GOVERNANCE_WORKFLOW_ARTIFACT_DIR,"identity.json"), JSON.stringify({run:process.env.PROJECT_GOVERNANCE_WORKFLOW_RUN_ID,stage:process.env.PROJECT_GOVERNANCE_WORKFLOW_STAGE_ID}))` : `process.exit(${fails ? 7 : 0})`), later: op("require('fs').writeFileSync('later','ran')"), cleanup: op("require('fs').writeFileSync('cleaned','yes')") },
+    operations: { test: op(captureEnvironment ? `require("fs").writeFileSync(require("path").join(process.env.PROJECT_GOVERNANCE_WORKFLOW_ARTIFACT_DIR,"identity.json"), JSON.stringify({run:process.env.PROJECT_GOVERNANCE_WORKFLOW_RUN_ID,stage:process.env.PROJECT_GOVERNANCE_WORKFLOW_STAGE_ID}))` : `process.exit(${fails ? 7 : 0})`), later: op("require('fs').writeFileSync('later','ran')"), cleanup: op(captureEnvironment ? "require('fs').writeFileSync('cleaned', process.env.PROJECT_GOVERNANCE_WORKFLOW_STAGE_ARTIFACTS_JSON)" : "require('fs').writeFileSync('cleaned','yes')") },
     stages: [{ id: "test", operation: "test", deadlineMs: 1000 }, { id: "later", operation: "later", dependsOn: ["test"], deadlineMs: 1000 },
       { id: "cleanup", operation: "cleanup", cleanup: true, deadlineMs: 1000 }],
     deadlineMs: 5000, policyDigest: policy.revision, claims: ["native fixture"] });
@@ -82,7 +82,7 @@ test("cancellation before dispatch skips ordinary work but retains cleanup", asy
 });
 
 test("cleanup continuation keeps failed work and skips undispatched ordinary stages", async () => {
-  const f=fixture(true);
+  const f=fixture(true, ["fixture:device"], true);
   try {
     const run=f.store.claim(f.run.id,f.run.revision,"stopped-worker");
     f.registry.acquire(run.binding.recipe.resources,run.owner!,run.id);
@@ -99,6 +99,9 @@ test("cleanup continuation keeps failed work and skips undispatched ordinary sta
     assert.deepEqual(f.store.stages(run.id)[0]!.result,failed);
     assert.equal(existsSync(join(f.dir,"later")),false);
     assert.equal(existsSync(join(f.dir,"commands",`${run.id}-0`)),false);
+    assert.deepEqual(JSON.parse(readFileSync(join(f.dir, "cleaned"), "utf8")), {
+      test: join(f.dir, "commands", `${run.id}-0-artifacts`), later: join(f.dir, "commands", `${run.id}-1-artifacts`),
+    });
     assert.equal(f.registry.inspect()[0]!.state,"released");
     await assert.rejects(executeWorkflow(f.store,run.id,{commandsDirectory:join(f.dir,"commands"),registry:f.registry,
       cleanupContinuation:continuation,observeCleanup:async()=>"unused"}));
@@ -205,6 +208,10 @@ test("commands receive execution-owned identity and a fresh artifact destination
     assert.equal(result.state, "succeeded");
     const identity = JSON.parse(readFileSync(join(commandsDirectory, `${f.run.id}-0-artifacts`, "identity.json"), "utf8"));
     assert.deepEqual(identity, { run: f.run.id, stage: "test" });
+    assert.deepEqual(JSON.parse(readFileSync(join(f.dir, "cleaned"), "utf8")), {
+      test: join(commandsDirectory, `${f.run.id}-0-artifacts`),
+      later: join(commandsDirectory, `${f.run.id}-1-artifacts`),
+    });
     assert.deepEqual(f.store.read(f.run.id).binding.recipe.operations.test!.env, {});
   } finally { f.close(); }
 });
