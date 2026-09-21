@@ -106,6 +106,13 @@ function boundLog(run: WorkflowRun, failed: WorkflowStage): string | null {
   } catch { return null; }
 }
 
+/** Read only a log whose native request and result match the selected workflow stage. */
+export function workflowStageExcerpt(run: WorkflowRun, stage: WorkflowStage) {
+  if (!stage.result) return null;
+  const path = boundLog(run, stage);
+  return path ? boundedTail(path, LOG_WINDOW) : null;
+}
+
 /**
  * Interpret bounded evidence already captured for one failed stage. The run, stage, task revision,
  * source validity and worker request bind the evidence; missing fields stay explicitly missing.
@@ -120,7 +127,7 @@ export async function deviceAdvice(runtime: DecisionRuntime, run: WorkflowRun, s
   const base: DeviceAdvice = {
     version: 1, kind: "project-governance-device-advice",
     authority: "advisory only: no probe, reset, rebuild or recovery is dispatched; native classification, target identity and cleanup state are unchanged",
-    mode: eligibility.mode, effect: eligibility.effect, reason: eligibility.reasons[0] ?? "no-failed-stage", delivered: false,
+    mode: eligibility.mode, effect: "advise", reason: eligibility.reasons[0] ?? "no-failed-stage", delivered: false,
     stage: failed && result ? { id: failed.id, state: failed.state, exitCode: result.exitCode, cleanup: result.cleanup, inputValidity: result.inputValidity } : null,
     binding: { run: run.id, taskId: run.binding.taskId, taskRevision: run.binding.taskVersion, target: envelope?.target ?? null, artifact: null },
     evidence: { logPath: result?.log ?? null, logDigest: null, bytes: null, totalBytes: null, windowTruncated: false, envelope: envelope ? "supplied" : "absent" },
@@ -178,7 +185,7 @@ export async function deviceAdvice(runtime: DecisionRuntime, run: WorkflowRun, s
   } else limits.push("no eligible read-only probe supplied: no next-probe suggestion is possible");
   const coverage: DecisionCoverage = { captured: evidence.length, omitted: [], truncated: Boolean(log?.truncated), unavailable, limits };
   const evidenceDigest = digest(evidence.map(item => ({ id: item.id, sourceDigest: item.sourceDigest })));
-  const outcome = await runtime.ask({ consumerId: "DL05", eventId: `device:${run.id}:${failed.id}:${evidenceDigest}`, scope,
+  const outcome = await runtime.ask({ consumerId: "DL05", entryKind: "workflow-observe", eventId: `device:${run.id}:${failed.id}:${evidenceDigest}`, scope,
     subject: { digest: evidenceDigest, revision: String(run.binding.taskVersion), environment: options.environment },
     evidence, coverage, questions, runId: run.id,
     eligibilityDigest: digest({ probes: probes.map(probe => probe.id), target: envelope?.target ?? null }),

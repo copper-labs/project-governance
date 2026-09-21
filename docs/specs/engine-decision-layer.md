@@ -19,12 +19,14 @@ reading and coordination from development. It defines the shared contract. The
 criteria; the [integrated implementation plan](../exec-plans/active/2026-09-21-major-adoption-and-measurement.md)
 owns delivery and progress, with [technical packages](../reference/2026-09-20-decision-layer-work-packages.md)
 as supporting detail. The [local-CI decision specification](engine-decision-local-ci.md)
-expands check selection, reuse, resource-aware execution and adaptive validation.
+expands check selection, reuse, resource-aware execution and adaptive validation. The
+[next RC experiment specification](engine-decision-experiments.md) scopes attention routing,
+read-only diagnostic sequences and offline history analysis within the same owners.
 
 **Proposal, not activated policy.** Authoring these documents does not enable a provider, install a
 host integration, change a required check, or expand an existing action grant. The
-[unified engine](unified-development-engine.md) remains the implementation baseline. Its E3
-advice-only limits remain effective until the corresponding changes below are accepted and qualified.
+[unified engine](unified-development-engine.md) remains the implementation baseline. The current RC implements eight optional consumers; its advice-only execution limits remain
+effective until the corresponding effect extensions below are implemented and qualified.
 
 The intended result is a development loop that uses code for exact facts, JEV for bounded judgments,
 and a larger model for unfamiliar reasoning and code generation. Qualified judgments may select
@@ -32,16 +34,16 @@ already permitted actions. Permission, required proof, execution, and acceptance
 
 ## Current starting point
 
-The inspected implementation has a JEV adapter in `components/engine/src/decisions.ts`, with three
-question kinds: optional-context ranking, diagnostic ranking, and intent advice. It sends one Choice
-question, validates its response, and retains a deterministic baseline. Configuration, cancellation,
-provider suppression, and context telemetry already exist.
+The 3.0.0-rc.2 source implements DL01, DL02, DL03, DL04, DL05, DL07, DL09 and DL13 through
+`decision-runtime.ts` and registered caller integrations. The retained `decisions.ts` adapter also
+supports deliberate legacy context migration. Required execution remains deterministic. DL04/DL05/
+DL07 return recommendations; they do not dispatch workflows, probes or checks. DL03/DL13 can shape
+optional input text. No measured savings or live adopter qualification follows from source presence.
 
-The current integrated consumer is context packet assembly. The
-[E3 evaluation disposition](../reference/2026-09-20-e3-evaluation-disposition.md) records inconclusive
-development benefit for that question, not a general verdict on a decision layer. The
-[retained decision map](../exec-plans/active/2026-09-19-decision-first-development-loop.md) already
-covers the broader lifecycle; this proposal gives those opportunities explicit consumer contracts.
+The earlier [E3 evaluation disposition](../reference/2026-09-20-e3-evaluation-disposition.md) records
+inconclusive benefit for its context question, not a verdict on the wider layer. The
+[next RC experiments](engine-decision-experiments.md) extend existing consumers; broader proposals
+below remain capability ceilings, not silently activated behavior.
 
 ## Goals and scope
 
@@ -115,6 +117,10 @@ Scoped worker steering is a registered control operation under `choose-local`, u
 worker owner and its authority. Returning advice to the caller does not grant permission to message
 or interrupt another worker. Selecting build/test operations also uses existing execution authority;
 read-only inspection of a plan is distinct from running its commands.
+
+The [attention experiment](engine-decision-experiments.md#a--attention-routing) initially uses
+shadow/advice only. A future live delivery effect needs separate qualification; no `route-attention`
+effect is added to the next RC schema.
 
 Effects are explicit allowed capabilities, not a ladder of permissions. Granting `choose-local`
 does not implicitly enable operator prompts or plan shaping. A shaped plan still passes existing
@@ -424,6 +430,11 @@ inference or workflow execution. Required execution evidence keeps its existing 
 Expose this through the existing `telemetry decisions` entry point, with an optional
 `--outcomes-manifest <file>` for bounded references to native outcomes and reviewer labels. Preserve
 the provider-free existing summary when no manifest is supplied; do not add another reporting CLI.
+
+The version-1 outcome manifest below remains readable. The
+[next RC measurement extension](engine-decision-experiments.md#d--measurement-and-experimental-assignment)
+adds version 2 with explicit assignment and zero-decision baseline episodes; it is not implemented
+by the current RC reader.
 
 The version-1 outcome manifest contains at most 1,000 `episodes`. Each episode has an `id`,
 up to 64 decision `receiptId` strings in `decisions`, and a `caller` reference with `path` and

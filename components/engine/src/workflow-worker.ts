@@ -17,19 +17,21 @@ interface WorkerRequest {
   version: 1; database: string; runId: string; bindingDigest: string;
   registry: string; commandsDirectory: string; workerDigest: string;
   generation?: RuntimeReader | null;
+  execution?: { absoluteDeadline: number; outputLimit: number };
 }
 export interface WorkerObservation {
   run: WorkflowRun; worker: "pending" | "alive" | "stopped" | "terminal";
 }
 
 /** Reserve dispatch once. A lost acknowledgment never authorizes another worker launch. */
-export function dispatchWorkflow(database: string, runId: string, workersDirectory: string, registry: string): string {
+export function dispatchWorkflow(database: string, runId: string, workersDirectory: string, registry: string, execution?: WorkerRequest["execution"]): string {
+  if (execution && (!Number.isSafeInteger(execution.absoluteDeadline) || execution.absoluteDeadline < 1 || !Number.isSafeInteger(execution.outputLimit) || execution.outputLimit < 1 || execution.outputLimit > 1048576)) throw new Error("Invalid workflow execution bounds");
   const store = new WorkflowStore(database);
   let run: WorkflowRun;
   try { run = store.read(runId); } finally { store.close(); }
   const directory = join(resolve(workersDirectory), run.id);
   const request: WorkerRequest = { version: 1, database: resolve(database), runId: run.id,
-    bindingDigest: digest(run.binding), registry: resolve(registry), commandsDirectory: join(directory, "commands"), workerDigest: fileDigest(WORKER) };
+    bindingDigest: digest(run.binding), registry: resolve(registry), commandsDirectory: join(directory, "commands"), workerDigest: fileDigest(WORKER), ...(execution ? { execution } : {}) };
   mkdirSync(dirname(directory), { recursive: true, mode: 0o700 });
   const existing = () => {
     const file = join(directory, "request.json");
@@ -100,7 +102,7 @@ async function worker(directory: string, expectedDigest: string): Promise<void> 
   process.on("SIGTERM", cancel); process.on("SIGINT", cancel);
   try {
     if (digest(store.read(request.runId).binding) !== request.bindingDigest) throw new Error("workflow binding changed");
-    await executeWorkflow(store, request.runId, { commandsDirectory: request.commandsDirectory, registry,
+    await executeWorkflow(store, request.runId, { commandsDirectory: request.commandsDirectory, registry, ...request.execution,
       // Unknown resource types remain held; supported device claims require host readback.
       observeCleanup: async (observedRun, leases) => {
         const resources = leases.map(lease => lease.resource);

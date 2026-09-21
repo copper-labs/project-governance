@@ -49,6 +49,8 @@ For the next implementation, follow the
 [decision-layer delivery plan](../exec-plans/active/2026-09-21-major-adoption-and-measurement.md)
 and its linked functional validation plan. It is the single delivery/progress owner; the
 [technical packages](../reference/2026-09-20-decision-layer-work-packages.md) supply reference detail.
+The [next RC experiments](../specs/engine-decision-experiments.md) define the bounded N0–N6 batch
+inside that same plan. Its effects require separate host qualification and opt-in.
 The [target specification](../specs/unified-development-engine.md),
 [category inventory](../reference/2026-09-20-engine-migration-inventory.md) and
 [transition closeout](../exec-plans/active/2026-09-20-unified-development-engine.md#implementation-closeout)
@@ -64,3 +66,5 @@ while deferring full release implementation and host-specific adapters.
 The [continuity module](../../components/harness/README.md) owns task history and bounded resume.
 It is part of this governance product and wheel; policy and process supervision retain their existing
 owners. See the [process map](../../components/harness/docs/architecture/development-flow.md).
+
+For compiled optional consumers, see the [decision experiment guide](../guides/decision-experiments.md).

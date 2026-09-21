@@ -69,8 +69,10 @@ startup updates through its tracked profile; major releases and integration chan
 For the next delivery sequence, start with the
 [decision-layer delivery, release and pilot measurement plan](exec-plans/active/2026-09-21-major-adoption-and-measurement.md).
 The explicit-preview implementation has a recorded closeout; routine reading should not treat older
-pending checkpoints as new work. The next proposed RC includes useful decision consumers; deliberate
-adoption compares ordinary automation with JEV-enabled work. Successive consumer batches repeat this
+pending checkpoints as new work. The first RC includes eight optional decision consumers. The
+[next RC experiment specification](specs/engine-decision-experiments.md) and the delivery plan’s N0–N6
+slices add optional attention routing, read-only diagnostic sequences and offline history analysis;
+deliberate adoption compares ordinary automation with JEV-enabled work. Successive consumer batches repeat this
 release/update/measurement cycle before the selected stable-major launch.
 
 The [architecture decision register](specs/unified-development-engine.md) and

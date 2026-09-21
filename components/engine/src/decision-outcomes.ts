@@ -1,21 +1,26 @@
 import { createHash } from "node:crypto";
-import { closeSync, constants, fstatSync, openSync, readSync } from "node:fs";
+import { closeSync, constants, fstatSync, openSync, readSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
-import { object, text } from "./core.ts";
+import { digest, object, text } from "./core.ts";
 
 /** Offline, explicitly selected evidence. A file identity proves its bytes, not acceptance of work. */
-export function decisionOutcomeReport(stateRoot: string, manifestPath: string) {
-  const reader = boundedOutcomeReader(), read = reader.read;
+export function decisionOutcomeReport(stateRoot: string, manifestPath: string, reader = boundedOutcomeReader()) {
+  const read = reader.read;
   const manifest = read(resolve(manifestPath));
-  if (manifest.version !== 1 || !Array.isArray(manifest.episodes) || manifest.episodes.length > 1000) throw new Error("Outcome manifest requires version 1 and at most 1000 episodes");
-  const counts = { selected: manifest.episodes.length, joined: 0, invalid: 0, duplicate_episodes: 0, duplicate_decisions: 0, missing_decisions: 0, missing_native: 0, unlabelled: 0, unscoped_decisions: 0, no_linked_decisions: 0 };
+  if ((manifest.version !== 1 && manifest.version !== 2) || !Array.isArray(manifest.episodes) || manifest.episodes.length > 1000) throw new Error("Outcome manifest requires version 1 or 2 and at most 1000 episodes");
+  const counts = { selected: manifest.episodes.length, joined: 0, invalid: 0, duplicate_episodes: 0, duplicate_decisions: 0, missing_decisions: 0, missing_native: 0, unlabelled: 0, unscoped_decisions: 0, no_linked_decisions: 0, duplicate_native: 0, duplicate_reservations: 0, missing_captures: 0 };
   const labels: Record<string, number> = {};
   const seenEpisodes = new Set<string>(), seenDecisions = new Set<string>();
+  const seenNative = new Set<string>(), seenReservations = new Set<string>();
   const samples: Array<Record<string, unknown>> = [];
   const reference = (raw: unknown) => {
     const ref = object(raw), path = text(ref.path, "evidence path", 4096), hash = text(ref.digest, "evidence digest", 80);
     if (!/^sha256:[a-f0-9]{64}$/u.test(hash)) throw new Error("Canonical evidence digest required");
     return read(isAbsolute(path) ? path : resolve(dirname(manifestPath), path), hash);
+  };
+  const scopeIdentity = (value: unknown) => {
+    const binding = object(value, "episode scope");
+    return JSON.stringify([realpathSync(text(binding.workspace, "workspace")), text(binding.taskId, "task identity"), text(binding.taskRevision, "task revision")]);
   };
   // Only structured receiptId fields count as caller delivery links. Prose is never searched.
   const callerReceiptIds = (value: unknown, depth = 0): string[] => {
@@ -30,14 +35,32 @@ export function decisionOutcomeReport(stateRoot: string, manifestPath: string) {
       const episode = object(raw), id = text(episode.id, "episode id", 256);
       if (seenEpisodes.has(id)) { counts.duplicate_episodes++; continue; }
       seenEpisodes.add(id);
-      if (!Array.isArray(episode.decisions) || episode.decisions.length > 64 || !episode.decisions.length ||
+      if (!Array.isArray(episode.decisions) || episode.decisions.length > 64 || (manifest.version === 1 && !episode.decisions.length) ||
           episode.decisions.some(value => typeof value !== "string" || !/^[a-f0-9]{32}$/u.test(value))) throw new Error("Invalid episode decision references");
-      const caller = reference(episode.caller), links = new Set(callerReceiptIds(caller));
-      const decisions: Array<{ id: string; consumerIds: unknown; mode: unknown; delivered: unknown; reason: unknown }> = [];
+      let caller: Record<string, unknown>;
+      try { caller = reference(episode.caller); }
+      catch (error) { if (manifest.version === 2) counts.missing_captures++; throw error; }
+      const links = new Set(callerReceiptIds(caller));
+      let episodeScope: string | null = null;
+      if (manifest.version === 2) {
+        episodeScope = scopeIdentity(episode.scope);
+        if (caller.version !== 1 || caller.id !== id || scopeIdentity(caller.scope) !== episodeScope) throw new Error("Caller episode binding mismatch");
+        const native = object(caller.native, "caller native identity");
+        text(native.runId, "caller run id", 256);
+        if (![native.runDigest, native.stagesDigest, native.eventsDigest].every(value => /^sha256:[a-f0-9]{64}$/u.test(String(value)))) throw new Error("Caller native digests required");
+        if (caller.assignment !== undefined) {
+          const assignment = object(caller.assignment);
+          if (assignment.episodeId !== id || scopeIdentity(assignment.scope) !== episodeScope) throw new Error("Assignment scope conflicts with episode");
+        }
+        if (episode.assignment !== undefined && digest(episode.assignment) !== digest(caller.assignment)) throw new Error("Assigned arm conflicts with captured assignment");
+      }
+      const decisions: Array<Record<string, unknown>> = [];
       const pendingIds = new Set<string>();
-      let scope: string | null = null;
+      let scope: string | null = episodeScope;
+      const pendingReservations = new Set<string>(), pendingNative = new Set<string>();
       for (const receiptId of episode.decisions as string[]) {
-        if (seenDecisions.has(receiptId) || pendingIds.has(receiptId)) { counts.duplicate_decisions++; continue; }
+        if (pendingIds.has(receiptId) || (manifest.version === 1 && seenDecisions.has(receiptId))) { counts.duplicate_decisions++; continue; }
+        if (seenDecisions.has(receiptId)) counts.duplicate_decisions++;
         if (!links.has(receiptId)) { counts.missing_decisions++; continue; }
         let receipt: Record<string, unknown>;
         try { receipt = read(join(stateRoot, "decisions", `${receiptId}.json`)); }
@@ -47,15 +70,21 @@ export function decisionOutcomeReport(stateRoot: string, manifestPath: string) {
         if (outcome.scope === null) counts.unscoped_decisions++;
         else {
         const binding = object(outcome.scope);
-        const identity = JSON.stringify([text(binding.workspace, "workspace"), text(binding.taskId, "task identity"), text(binding.taskRevision, "task revision")]);
+        const identity = manifest.version === 2 ? scopeIdentity(binding) : JSON.stringify([text(binding.workspace, "workspace"), text(binding.taskId, "task identity"), text(binding.taskRevision, "task revision")]);
         if (scope !== null && scope !== identity) throw new Error("An episode cannot mix decision task revisions");
         scope = identity;
         }
         if (outcome.version !== 2 || typeof outcome.delivered !== "boolean") throw new Error("Invalid decision outcome");
-        decisions.push({ id: receiptId, consumerIds: outcome.consumers, mode: outcome.mode, delivered: outcome.delivered, reason: outcome.reason });
+        const budget = outcome.budget === undefined ? {} : object(outcome.budget);
+        const reservation = typeof budget.reservationId === "string" ? budget.reservationId : null;
+        const duplicateReservation = reservation !== null && (seenReservations.has(reservation) || pendingReservations.has(reservation));
+        if (duplicateReservation) counts.duplicate_reservations++;
+        if (reservation !== null) pendingReservations.add(reservation);
+        decisions.push({ id: receiptId, consumerIds: outcome.consumers, mode: outcome.mode, delivered: outcome.delivered, reason: outcome.reason,
+          ...(manifest.version === 2 ? { reservationId: reservation, duplicateReservation, usage: outcome.usage ?? null } : {}) });
         pendingIds.add(receiptId);
       }
-      if (!decisions.length) { counts.no_linked_decisions++; continue; }
+      if (!decisions.length && (manifest.version === 1 || episode.decisions.length > 0)) { counts.no_linked_decisions++; continue; }
       const native: Array<Record<string, unknown>> = [];
       if (episode.native === undefined || (Array.isArray(episode.native) && !episode.native.length)) counts.missing_native++;
       else {
@@ -63,6 +92,7 @@ export function decisionOutcomeReport(stateRoot: string, manifestPath: string) {
         const nativeSeen = new Set<string>();
         for (const rawRef of episode.native) {
           const ref = object(rawRef), record = reference(ref);
+          if (manifest.version === 2 && record.scope !== undefined && scopeIdentity(record.scope) !== episodeScope) throw new Error("Native scope conflicts with episode");
           const key = String(ref.digest); if (nativeSeen.has(key)) continue; nativeSeen.add(key);
           if (ref.kind === "command") {
             if (record.version !== 1 || !/^sha256:[a-f0-9]{64}$/u.test(String(record.requestDigest)) ||
@@ -73,6 +103,15 @@ export function decisionOutcomeReport(stateRoot: string, manifestPath: string) {
               !/^sha256:[a-f0-9]{64}$/u.test(String(record.result_digest))) throw new Error("Invalid native check metrics");
             native.push({ kind: "check", state: record.status, resultDigest: record.result_digest });
           } else throw new Error("Unsupported native outcome kind");
+          if (manifest.version === 2) {
+            const identity = ref.kind === "command" ? String(record.requestDigest) : String(record.result_digest);
+            const costKey = `${String(ref.kind)}:${identity}`;
+            const duplicateCost = seenNative.has(costKey) || pendingNative.has(costKey);
+            if (duplicateCost) counts.duplicate_native++;
+            pendingNative.add(costKey);
+            Object.assign(native[native.length - 1]!, { duplicateCost,
+              durationMs: typeof record.durationMs === "number" && Number.isFinite(record.durationMs) && record.durationMs >= 0 ? record.durationMs : null });
+          }
         }
       }
       const review = episode.labels ?? [];
@@ -85,26 +124,34 @@ export function decisionOutcomeReport(stateRoot: string, manifestPath: string) {
       }
       const observations = episode.observations === undefined ? {} : object(episode.observations);
       const observed: Record<string, number | null> = {};
-      for (const name of ["followupReadBytes", "interventions", "reworkMinutes", "llmInputTokens", "llmOutputTokens"]) {
+      for (const name of ["followupReadBytes", "interventions", "reworkMinutes", "llmInputTokens", "llmOutputTokens", ...(manifest.version === 2 ? ["elapsedMs", "summedProcessMs"] : [])]) {
         const value = observations[name] ?? null;
         if (value !== null && (typeof value !== "number" || !Number.isFinite(value) || value < 0)) throw new Error("Invalid outcome observation");
         observed[name] = value as number | null;
       }
       for (const key of pendingIds) seenDecisions.add(key);
+      for (const key of pendingReservations) seenReservations.add(key);
+      for (const key of pendingNative) seenNative.add(key);
       for (const label of selectedLabels) labels[label.disposition] = (labels[label.disposition] ?? 0) + 1;
       if (!selectedLabels.length) counts.unlabelled++;
       counts.joined++;
-      samples.push({ episode: id, decisions, native, labels: selectedLabels, observations: observed });
+      samples.push({ episode: id, decisions, native, labels: selectedLabels, observations: observed,
+        ...(manifest.version === 2 ? { scope: episode.scope, assignment: caller.assignment ?? null, exposure: caller.exposure ?? null } : {}) });
     } catch { counts.invalid++; }
   }
-  return { version: 1, counts, labels, samples, read_bytes: reader.bytesRead(),
+  const nativeCosts = samples.flatMap(sample => sample.native as Array<Record<string, unknown>>).filter(item => !item.duplicateCost);
+  const durations = nativeCosts.map(item => item.durationMs).filter((value): value is number => typeof value === "number");
+  return { version: manifest.version, counts, labels, samples,
+    ...(manifest.version === 2 ? { native_cost: { knownSummedDurationMs: durations.length ? durations.reduce((a, b) => a + b, 0) : null,
+      knownRecords: durations.length, unknownRecords: nativeCosts.length - durations.length, missingNativeEpisodes: counts.missing_native,
+      meaning: "deduplicated native process durations; not elapsed episode time or avoided work" } } : {}), read_bytes: reader.bytesRead(),
     association: "caller receipt links verified; later native results and labels associated by the operator manifest, not inferred proof",
     observation_provenance: "manifest-supplied; missing values are unknown; labels may disagree",
     selection: "explicit episodes; not a representative or causal comparison", avoided_llm_tokens: null, benefit_claim: "not-evaluated" };
 }
 
 /** Bound all explicit references under one per-report byte allowance. */
-function boundedOutcomeReader() {
+export function boundedOutcomeReader() {
   let bytesRead = 0;
   const read = (path: string, expected?: string): Record<string, unknown> => {
     const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);

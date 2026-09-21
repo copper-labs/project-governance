@@ -10,3 +10,7 @@ export type { Recipe, RunBinding, RunState } from "./workflow-types.ts";
 export type { WorkflowRun } from "./workflow-store.ts";
 export { digest, fileDigest } from "./core.ts";
 export { ResourceRegistry, resourceRegistryPath } from "./resources.ts";
+
+export { diagnoseWorkflow } from "./workflow-diagnose.ts";
+export { diagnosticEpisodeId, diagnosticOperationId, resolveDiagnosticManifest } from "./diagnostic-manifest.ts";
+export type { DiagnosticManifest } from "./diagnostic-manifest.ts";

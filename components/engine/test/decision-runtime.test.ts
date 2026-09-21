@@ -63,3 +63,35 @@ test("invalid answers never count as delivered and rejected envelopes retain nat
     assert.equal(result.reason, model === settings.legacy.model ? "no-usable-answers" : "invalid-or-unavailable");
   }
 });
+
+test("observation capability stays advisory and incompatible entries never reach transport", async t => {
+  const root = mkdtempSync(join(tmpdir(), "decision-entry-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const settings = profileDecisionSettings({ continuity: { decisions: { mode: "auto", allowed_data_classes: ["diagnostic"], consumers: { DL05: { mode: "auto" } } } } });
+  // Exercise the capability intersection before choose-read becomes a configurable public effect.
+  settings.consumers.DL05.effect = "choose-read";
+  settings.consumers.DL05.effectSource = "declared";
+  let calls = 0;
+  const runtime = new DecisionRuntime(settings, root, { token: "test-only", fetch: async () => {
+    calls++;
+    return Response.json({ model: settings.legacy.model, answers: { probe: { type: "choice", choice: "logs", confidence: 0.9, probabilities: { logs: 0.9, unknown: 0.1 } } } });
+  } });
+  const ask: DecisionAsk = { consumerId: "DL05", entryKind: "workflow-observe", eventId: "observation",
+    scope: { workspace: root, taskId: "task", taskRevision: "1" },
+    subject: { digest: digest("failure"), revision: "1", environment: "test" },
+    evidence: [{ id: "failure", text: "bundle unavailable", sourceDigest: digest("failure"), provenance: "captured", trust: "untrusted" }],
+    coverage: { captured: 1, omitted: [], truncated: false, unavailable: [], limits: [] },
+    questions: [{ name: "probe", definitionId: "runtime.next-probe/1", consumerId: "DL05", evidenceIds: ["failure"], candidates: [{ id: "logs", description: "Read service logs" }] }],
+    policyDigest: digest("policy") };
+  const observation = await runtime.ask(ask);
+  assert.equal(observation.delivered, true);
+  assert.equal(observation.effect, "advise");
+  assert.equal(observation.configuredEffect, "choose-read");
+  for (const entryKind of ["registered-default", "workflow-diagnose", "invented"] as const) {
+    const rejected = await runtime.ask({ ...ask, eventId: entryKind, entryKind: entryKind as NonNullable<DecisionAsk["entryKind"]> });
+    assert.equal(rejected.reason, "entry-effect-incompatible");
+    assert.equal(rejected.delivered, false);
+    assert.equal(rejected.budget.state, "not-required");
+  }
+  assert.equal(calls, 1);
+});

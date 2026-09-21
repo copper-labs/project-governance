@@ -17,6 +17,8 @@ import {
 
 export interface DecisionAsk {
   consumerId: DecisionConsumerId;
+  /** Registered code entry; observation can never acquire diagnostic execution capability. */
+  entryKind?: "registered-default" | "workflow-observe" | "workflow-diagnose";
   /** Additional consumers sharing one compatible batch. Every participant must resolve to the same mode. */
   participants?: DecisionConsumerId[];
   /** A stable identity for the decision event; repeated observations of it reuse the retained result. */
@@ -39,6 +41,8 @@ export interface DecisionOutcome {
   /** Labelled question-count allocation across a batch. Native usage is recorded once, never divided. */
   usageAllocation: Record<string, number>;
   mode: DecisionMode; ceiling: DecisionMode; effect: DecisionEffect; effectSource: "declared" | "default";
+  entryKind?: DecisionAsk["entryKind"];
+  configuredEffect?: DecisionEffect;
   requestId: string; requestIdentity: string | null; payloadDigest: string | null;
   scopeState: "bound" | "unavailable"; scope: BudgetScope | null;
   answers: Record<string, QuestionOutcome>;
@@ -126,7 +130,9 @@ export class DecisionRuntime {
     const base: DecisionOutcome = {
       version: 2, consumerId: ask.consumerId, consumers: participants, consumerVersion: consumer.version, caller: consumer.caller,
       usageAllocation: allocation,
-      mode: resolved.mode, ceiling: resolved.ceiling, effect: resolved.effect, effectSource: resolved.effectSource,
+      mode: resolved.mode, ceiling: resolved.ceiling,
+      effect: ask.entryKind === "workflow-observe" ? "advise" : resolved.effect,
+      configuredEffect: resolved.effect, entryKind: ask.entryKind ?? "registered-default", effectSource: resolved.effectSource,
       requestId, requestIdentity: null, payloadDigest: null,
       scopeState: ask.scope ? "bound" : "unavailable", scope: ask.scope,
       answers: {}, method: "baseline", reason: "off", delivered: false,
@@ -154,6 +160,17 @@ export class DecisionRuntime {
       !matchesPackPath(path, this.settings.legacy.allowedSourcePaths ?? [])))) return fallback("source-scope-disabled");
     if (ask.questions.some(question => !participants.includes(question.consumerId) ||
       !this.settings.questionIds[question.consumerId].includes(question.definitionId))) return fallback("question-disabled");
+    // Effects form explicit capability sets, not a permission ladder. A question's metadata alone
+    // must never turn a status read into an executable probe selection.
+    const entry = ask.entryKind ?? "registered-default";
+    if (!["registered-default", "workflow-observe", "workflow-diagnose"].includes(entry) ||
+      (entry !== "registered-default" && (participants.length !== 1 || ask.consumerId !== "DL05")) ||
+      ask.questions.some(question => {
+        const effect = DECISION_QUESTIONS[question.definitionId]?.effectCeiling;
+        if (effect === "choose-read") return entry !== "workflow-diagnose" || resolved.effect !== "choose-read";
+        if (entry === "workflow-diagnose") return true;
+        return effect !== "advise" || (resolved.effect !== "advise" && !(entry === "workflow-observe" && resolved.effect === "choose-read"));
+      })) return fallback("entry-effect-incompatible");
     if (!this.#client.tokenPresent) return fallback("missing-token");
     if (!ask.scope) return fallback("scope-unavailable");
 

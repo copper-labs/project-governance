@@ -14,6 +14,7 @@ import { runtimeMigrationPlan } from "./runtime-migration-plan.ts";
 import { legacyJobInventory } from "./legacy-job-inventory.ts";
 import { archiveLegacyHistory, inspectLegacyHistoryArchive } from "./legacy-history-archive.ts";
 import { runtimeMaintenanceCommand } from "./runtime-maintenance-command.ts";
+import { workflowDiagnoseCommand } from "./workflow-diagnose.ts";
 import { withDecisionCancellation } from "./decision-cancellation.ts";
 import { decisionDoctor } from "./decision-doctor.ts";
 import { PROVIDER_COMMANDS, providerJobCommand } from "./provider-job-command.ts";
@@ -29,7 +30,7 @@ import { initializeDocumentation } from "./documentation-installation.ts";
 import { routeDocumentation } from "./documentation.ts";
 import { runtimeDoctor } from "./runtime-doctor.ts";
 import { kmpDoctorFindings } from "./checkers/kmp-doctor.ts";
-import { decisionTelemetry } from "./decision-telemetry.ts";
+import { decisionTelemetryCommand } from "./decision-history.ts";
 import { contextStateRoot } from "./context-command.ts";
 import { installGitHooks, planGitHookInstallation } from "./git-hook-installation.ts";
 import { hookCheckArguments } from "./git-hooks.ts";
@@ -127,7 +128,7 @@ Project setup and context:
 
 Operations:
   telemetry | context-evaluate | resource-status | resource-maintenance
-  workflow-wait | workflow-recover-observation | workflow-resume-cleanup
+  workflow-wait | workflow-diagnose | workflow-recover-observation | workflow-resume-cleanup
   command-resume-cleanup | command-recover | command-reconcile
     --directory <command-directory> --digest <request-digest> [--authority <authority>]
   runtime-stage | runtime-run | runtime-inspect | runtime-complete
@@ -222,6 +223,10 @@ Use the owning command contract for structured request fields.
       const result = repositoryMap(new ValidationSubject(process.cwd(), scope));
       console.log(JSON.stringify({ ...result, source: { base: scope.base_ref, mode: scope.mode, changes: scope.subject_digest } }));
       return result.issues.length ? 2 : 0;
+    }
+    if (command === "workflow-diagnose") {
+      const response = await withDecisionCancellation(options => workflowDiagnoseCommand(args.slice(1), options));
+      console.log(JSON.stringify(response.value)); return response.exitCode ?? 1;
     }
     if (command === "workflow-wait" || command === "workflow-status") {
       const response = await withDecisionCancellation(options => workflowObservationCommand(command, args.slice(1), options));
@@ -342,9 +347,8 @@ Use the owning command contract for structured request fields.
         console.log(JSON.stringify(providerTelemetry(JSON.parse(narrativeFile(process.cwd(), values.manifest))))); return 0;
       }
       if (args[1] === "decisions") {
-        const { values } = parseArgs({ args: args.slice(2), strict: true, allowPositionals: false, options: { since: { type: "string" }, limit: { type: "string" }, "outcomes-manifest": { type: "string" } } });
-        console.log(JSON.stringify(decisionTelemetry(contextStateRoot(process.cwd()), { ...(values.since ? { since: values.since } : {}),
-          ...(values.limit ? { limit: Number(values.limit) } : {}), ...(values["outcomes-manifest"] ? { outcomesManifest: values["outcomes-manifest"] } : {}) }))); return 0;
+        const response = await withDecisionCancellation(options => decisionTelemetryCommand(args.slice(2), process.cwd(), options));
+        console.log(JSON.stringify(response.value)); return response.exitCode ?? 0;
       }
       if (args[1] !== "status") throw new Error("Unsupported telemetry command");
       const parsed = parseArgs({ args: args.slice(2), strict: true, options: { since: { type: "string" }, stage: { type: "string" }, "runtime-version": { type: "string" }, trigger: { type: "string" } } });

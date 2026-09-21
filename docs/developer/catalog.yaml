@@ -117,3 +117,18 @@ capabilities:
       - src/project_governance_runtime/skill_selection.py
       - src/project_governance_runtime/structured_documents.py
       - src/project_governance_runtime/validation_subject.py
+
+  - id: decision-experiments
+    title: Run bounded optional decision experiments
+    aliases: [read-only-diagnosis, decision-history]
+    tasks:
+      - configure independent decision consumers and fallback
+      - capture off and treatment episodes
+      - diagnose through preauthorized read-only probes
+    symbols: [project-governance workflow-diagnose, project-governance telemetry decisions]
+    reference: docs/specs/engine-decision-experiments.md
+    guides: [docs/guides/decision-experiments.md]
+    sources:
+      - components/engine/src/workflow-diagnose.ts
+      - components/engine/src/decision-history.ts
+      - components/engine/src/decision-attention.ts

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, realpathSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, realpathSync, writeFileSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Store } from "../../harness/src/store/store.ts";
@@ -10,6 +10,8 @@ import { WorkflowStore } from "../src/workflow-store.ts";
 import { parseRecipe, recipeDigest } from "../src/workflow-types.ts";
 import { workflowOperation } from "../src/workflow-operation.ts";
 import { workflowObservationCommand } from "../src/decision-workflow-observation.ts";
+import { decisionOutcomeReport } from "../src/decision-outcomes.ts";
+import { contextStateRoot } from "../src/context-command.ts";
 import { digest, durableJson, fileDigest } from "../src/core.ts";
 
 test("workflow status and wait add diagnosis, reuse its receipt and reject mismatched evidence", async t => {
@@ -76,4 +78,26 @@ test("workflow status and wait add diagnosis, reuse its receipt and reject misma
   durableJson(evidencePath, envelope); writeFileSync(join(root, "app.bin"), "changed");
   assert.equal((await workflowObservationCommand("workflow-status", [...args, "--diagnostic-evidence", evidencePath]) as any).deviceAdvice.reason, "stale-source");
   assert.equal(calls, 1); assert.deepEqual(store.read(initial.id), before); assert.deepEqual(store.stages(initial.id), stages);
+  durableJson(join(root, "config/governance/profile.yaml"), { continuity: { decisions: { mode: "off" } } });
+  const assignmentPath = join(root, "assignment.json");
+  durableJson(assignmentPath, { version: 1, id: "assignment", episodeId: "baseline", experiment: "diagnosis", definitionVersion: "1",
+    arm: "off", assignedAt: new Date(Date.now() - 1000).toISOString(), groupingUnit: task.taskId, sourceRevision: artifactDigest,
+    scope: { workspace: root, taskId: task.taskId, taskRevision: String(task.version) } });
+  const baseline = await workflowObservationCommand("workflow-status", [...args, "--pilot-assignment", assignmentPath]) as any;
+  assert.equal(baseline.collection.status, "recorded");
+  const episode = JSON.parse(readFileSync(baseline.collection.episode.path, "utf8"));
+  assert.deepEqual(episode.decisions, []); assert.equal(episode.exposure.mode, "off");
+  assert.equal(episode.assignment.arm, "off"); assert.equal(calls, 1);
+  assert.deepEqual(baseline.run, before); assert.deepEqual(baseline.stages, stages);
+  const broken = await workflowObservationCommand("workflow-status", [...args, "--pilot-assignment", "absent.json"]) as any;
+  assert.equal(broken.collection.status, "failed"); assert.deepEqual(broken.run, before);
+  durableJson(join(root, "config/governance/profile.yaml"), { continuity: { decisions: { mode: "auto", allowed_data_classes: ["diagnostic"], consumers: { DL05: { mode: "auto" } } } } });
+  const assigned = JSON.parse(readFileSync(assignmentPath, "utf8"));
+  durableJson(assignmentPath, { ...assigned, episodeId: "override-refused", arm: "auto" });
+  const mismatched = await workflowObservationCommand("workflow-status", [...args, "--pilot-assignment", assignmentPath, "--decision-task", "different-task"]) as any;
+  assert.equal(mismatched.deviceAdvice.reason, "decision-scope-conflict"); assert.equal(calls, 1);
+  const manifest = join(root, "outcomes.json");
+  durableJson(manifest, { version: 2, episodes: [{ id: "override-refused", scope: assigned.scope, decisions: [], caller: mismatched.collection.episode }] });
+  const joined = decisionOutcomeReport(contextStateRoot(root), manifest);
+  assert.equal(joined.counts.joined, 1); assert.equal(joined.counts.invalid, 0);
 });

@@ -32,19 +32,27 @@ and adopter changes retain their existing authorization boundaries. This documen
 Keep exact target identities, paths, tasks and runtime receipts in the external pilot record.
 
 The operator subsequently moved implementation ownership to Codex, with Claude providing code and
-architecture reviews at major seams. The first implementation batch covers **S0–S2 and S3 local release preparation**. It stops
+architecture reviews at major seams. The first implementation batch covers **S0–S2 and S3 local release
+preparation**. It stops
 with a frozen implementation, functional proof and review packet. The operator and coordinating
 agent then perform code and architecture review, reconcile findings, and decide publication/adoption.
 Neither implementation nor review implies permission to publish or activate automatically. Later consumer batches
 use the same handoff boundary after the preceding pilot has supplied useful observations.
 
-The shared runtime, legacy scope/budget migration, all eight caller integrations and offline outcome
-joins are implemented. All-eight compiled and installed-candidate smoke tests have passed with
-fixture inference. Full source suites and Python-wheel installation proof have also passed. These
-establish local functionality, not live provider benefit, device readiness or adopter acceptance.
-RC review identified evidence-binding and telemetry defects; repairs and focused regressions are
-under review. Final source freeze, refreshed exact-archive proof, release/staging qualification and
-slice-by-slice acceptance reconciliation remain open. Checklist completion requires those artifacts.
+The shared runtime, eight caller integrations, budget migration and outcome joins are implemented.
+The source is now version `3.0.0-rc.2`; its tagged release includes source/installed-package proof
+and review repairs. The initial release is the baseline for the next experiment batch. Published
+asset identities and runtime evidence remain in the external release/pilot record. SDK adoption,
+real host/device qualification and measured JEV benefit are distinct from release completion.
+Historical S0–S3 checklists below retain the original acceptance criteria; unchecked entries are
+not instructions to redo completed work. Reconcile them against retained evidence when adopting.
+
+The operator has now requested detailed design and independent review of the
+[next RC experiment batch](#next-rc-experiment-batch): attention routing, bounded read-only diagnostic
+sequences and offline history analysis. This authoring assignment does not implement or activate
+those effects. The [experiment specification](../../specs/engine-decision-experiments.md) owns their
+contracts. The N0–N6 slices below are the next delivery sequence within this plan, bringing small
+parts of S7/S9/S10 forward without replacing the remaining programme.
 
 ### Accepted implementation choices
 
@@ -85,15 +93,13 @@ scope and experimental assignment are different decisions. Use one shared task/c
 meaningful eligibility boundaries; do not run all eight questions on every event. The first pilot
 can compare useful subsets without another release just to add an already shipped consumer.
 
-Recommended first published pilot version: `3.0.0-rc.1`, subject to tag availability and candidate
-selection. Repairs and later batches use new RC identities. These are proposed names, not created
-or reserved tags. Never overwrite the local preview or promote its receipts to a new artifact.
+The first published candidate is `3.0.0-rc.2`. Select the next unused `3.0.0-rc.N` identity when
+the next candidate freezes; this document reserves no tag. Never overwrite an existing artifact
+or transfer its proof to changed package bytes without applicability checks.
 
-Current [release policy](../../governance/release-process.md) and `release-assets.mjs` accept stable
-publication only. Compiled locks accept exact prerelease strings, which does not prove publication
-or end-to-end RC adoption. S3 includes a narrow proposed policy/tooling extension. Until that is
-accepted and implemented, current stable-only publication policy remains effective. A pinned local
-pilot remains possible if the extension is declined; do not call it a published release.
+The [release policy](../../governance/release-process.md) now supports immutable RC publication
+with prerelease status and `latest: false`. Reuse its exact-source, archive, metadata and readback
+qualification. There is no new publication mechanism in the experiment batch.
 
 ## Slices in priority order
 
@@ -118,11 +124,261 @@ foundations while a pilot runs, but avoid enabling multiple unmeasured features 
 arm. A later slice may move earlier for a documented high-volume opportunity; update the ordering
 and comparison before activation. This is not an instruction to create more worktrees or agents.
 
-Recommended initial launch scope: the eight S2 consumers with qualified per-feature modes and honest
+Recommended initial launch scope remains the eight S2 consumers with qualified per-feature modes and honest
 experimental labels. S5 refinements and S6/S7 execution effects enter only when justified; automated
-model-driven recovery is not required to release an advisory feature. S9/S10 are later experiments.
+model-driven recovery is not required to release an advisory feature. The bounded N0–N6 subset below brings
+selected S9/S10 experiments forward; their remaining scope stays later.
 All thirteen need not mature before the major release. A negative result can lead to a disabled or
 revised consumer, but it must be an explicit launch disposition rather than a hidden omitted goal.
+
+## Next RC experiment batch
+
+RC3 implementation and independent review are complete on the existing implementation branch.
+The [implementation reconciliation](../../reviews/2026-09-21-rc3-implementation-reconciliation.md)
+records fixes, focused recheck and qualification. Commit/tag/publication readback is the remaining
+release step. The next release
+contains the shared engine consumers and fixture-qualified boundaries; SDK installation and its real
+simulator/device scenarios follow publication, as directed by the operator on 2026-09-21. No adopter
+checkout is modified for RC3 publication. Native host benefit and semantic quality remain unmeasured.
+
+Implemented source now includes assignment-aware off capture, version-2 outcome joins, explicit
+DL12 history analysis, entry/effect enforcement, the transactional diagnostic coordinator and native
+child dispatch, and DL06 native-bound residual advice. Source tests, type checking, legacy owner
+compatibility and installed-package proof passed; Claude Opus 5 high-effort recheck found no remaining
+publication blocker. Release readback determines publication completion. The detailed boxes below retain the
+programme's field-qualification requirements; they are not all claims made by fixture proof.
+
+
+This is the next implementation order. S0–S10 remains the programme map; N0–N6 is one bounded
+follow-on batch, not a second schedule. The [experiment specification](../../specs/engine-decision-experiments.md)
+owns semantics; this section owns dependencies, deliverables, tests and acceptance.
+Implementation starts only when assigned. Publish/adopt through existing S3 authority and evaluate
+through S4. Do not restart E0–E5 or all first-RC implementation work.
+The [review reconciliation](../../reviews/2026-09-21-next-rc-experiments-reconciliation.md) records
+source-checked fixes and closure; the [simplification
+pass](../../reviews/2026-09-21-next-rc-experiments-simplification.md)
+records applied reductions and retained flexibility.
+
+| Priority | Slice | Concrete outcome | Dependency / existing programme |
+| --- | --- | --- | --- |
+| 1 | N0 — Establish real boundaries and baseline | One supported host event path, one probe catalog and explicit experiment comparison | Current RC; bounded S9/S7 discovery |
+| 2 | N1 — Capture comparable episodes | Off/no-call, shadow and treatment episodes survive the same report | N0; extends S1/S4 |
+| 3 | N2 — Analyze selected history | Useful native report plus optional DL12 classification | N1; small S10 subset |
+| 4 | N4 — Run bounded diagnostic probes | DL05 read-only sequence with replay/authority/cleanup proof | N0/N1; read-only S7 subset, no broad S6 prerequisite |
+| 5 | N3 — Observe attention decisions | DL06 shadow/advice only; traffic gate before any later live effect | N0/N1; small S9 subset |
+| 6 | N5 — Freeze, review and publish candidate | One qualified immutable RC containing supported experimental capabilities | N2–N4 local proof; existing S3 release process |
+| 7 | N6 — Adopt, compare and decide | Real-work baseline/shadow/one-effect activation and individual dispositions | N5; existing S3 adoption/S4 measurement |
+
+N3 and N4 are independently gated. An unavailable host event boundary does not block offline
+analysis or read-only diagnostics. Record attention as shadow/advice/unsupported in this RC; do not invent a
+background supervisor to make the release look complete.
+Full local-CI plan shaping, automatic recovery, model-tier routing and release automation remain
+in their existing later slices. This batch adds no predictive omission of required checks.
+
+The design review has fixed the initial scope: N3 has no live suppression/coalescing effect in this
+RC. Current engine events are code-classifiable and its push path carries protected terminal results.
+N0 may identify a later useful host boundary, but cannot silently expand this release's scope. N4
+is the first controlled execution experiment. N2 is on-demand; it does not perturb live task routing.
+
+### N0 — Establish boundaries before adding hooks
+
+- [x] Read the current RC's `workflow-executor.ts`, `workflow-wait.ts`, `completion-delivery.ts`,
+  `host-api-v1.ts`, `decision-device-advice.ts` and `decision-outcomes.ts`. Record the current
+  owners, known automatic progression and gaps. Inspect the selected adopter read-only first.
+- [ ] Select an existing authorized worktree and host adapter. Capture at least a healthy progress
+  episode, an ambiguous update and a failed/unclean outcome from available traces or bounded wiring
+  proof. Distinguish actual LLM wakeups from events that the worker already handles internally.
+- [ ] Enumerate current event kinds and actual host deliveries; quantify the residual after code-only
+  filtering. The RC read boundary is `workflowObservationCommand` after `workflowWaitCommand` returns.
+  No residual means no classifier call. Record missing turn/timestamp observations as unknown.
+  A future live effect needs a supported pre-wake boundary and separate qualification; this RC does
+  not add a push adapter, cursor queue or change mandatory terminal notices.
+- [ ] Select one RN iOS simulator adapter and a digest-bound manifest of at most eight reviewed read-only
+  recipes. Resolve
+  exact source/artifact/target observations and action grants. Mark unavailable observations unknown.
+  Decide which useful observations survive parent cleanup; captured logs and current state differ.
+- [ ] Define one code-only runbook, the optional JEV choice, and one compact handoff. Freeze the
+  initial three-probe/three-selection-call limit and persisted absolute episode deadline. No
+  reset/rebuild/relaunch in this slice.
+- [ ] Freeze both arms at 16 calls/131072 bytes per task revision, keep unrelated consumers off, and
+  retain budget-exhausted counts. Freeze the pilot assignment and error tolerances in the external pilot
+  record, retaining
+  no-token/off baseline and actual usage coverage. Keep target paths, native commands and evidence
+  outside this checkout. Missing episodes are a collection gap, not invented baseline data.
+
+**Exit:** an implementation-ready integration map and representative inputs. No broad test run,
+paid inference, device build or new worktree is needed solely for this discovery checkpoint.
+
+### N1 — Comparable episode evidence
+
+- [x] Extend `decision-outcomes.ts` with the version-2 manifest contract; continue reading version 1.
+  Accept zero-decision baseline episodes only with bound caller/native identity. Reject conflicting
+  workspace/task/revision links. Preserve failed/cancelled, unsupported and fallback episodes.
+- [x] Add the assignment-aware episode recorder to `decision-workflow-observation.ts` and the diagnostic
+  entry before consumer/global-off early returns. Write immutable `episodes/<id>.json` under the
+  existing state root; bind identity, assignment, native refs, exposure and empty-or-populated
+  decision IDs using existing `durableJson`. The prewritten assignment record exposes missing
+  captures. Native behavior survives optional recording failure; expose a collection-status field
+  outside the broad optional-advice catch. Extend existing caller/telemetry records with native delivery IDs,
+  diagnostic child links and known usage/timing provenance. Keep capture bounded and reuse current
+  receipt stores. Assignment occurs before treatment; never rewrite it when JEV falls back.
+- [x] Keep analytics failure separate from operational safety. Failure to persist a diagnostic reservation
+  disables that effect; failure to project an optional report does not
+  stop a healthy job or erase its required evidence.
+- [x] Reuse `decisionTelemetry(...).pilot`, which already reads version-2 `decisions/` receipts.
+  Add assigned-episode joins rather than another collector. Deduplicate native command request/check
+  result digests report-wide, event/receipt/reservation IDs and nested child costs. Retain unknown metrics and
+  reader/retention gaps. Do not derive LLM tokens from log bytes or classify model labels as truth.
+
+**Checkpoint T1:** focused outcome/telemetry tests: old manifest compatibility, off episode,
+invalid/mixed binding, failed/cancelled inclusion, duplicate child spend, missing usage and loss.
+**Exit:** one report can compare both arms without requiring successful JEV calls in either arm.
+
+### N2 — Offline history analysis
+
+- [x] Register DL12 questions under the existing provider interface and shared analysis-task budget.
+  Wire `telemetry decisions --outcomes-manifest <file> --classify-history` to the v2 manifest's
+  optional analysis block (task/revision, input digest, selected excerpt refs, procedure candidates).
+  Use existing cancellation and the shared command argument parser for managed write admission. No new scope flags or
+  analysis manifest format. Derive fixed `decision-history` task identity and the revision from
+  canonical selected-input/question/preparation/model digests; reject manifest identity mismatches.
+  Terminal reports close scopes that reserved calls; rerenders reuse receipts, crashes resume the
+  same remaining allowance, and scope-closure failures stay visible. Reporting without that option stays
+  read-only and makes no provider call.
+- [x] Produce native aggregates regardless of credentials, optional work-class labels, and reviewed
+  procedure matches only when supplied. Report unclassified/mixed/unknown and versioned labels.
+- [x] Rank candidates from measured frequency/cost and cite representative episodes. Label
+  classifications as proposals; never automatically edit policy or install a procedure.
+
+**Checkpoint T2:** focused history tests: provider-free report, bounded selected inputs, repeated
+analysis reuses receipts, source permission/withdrawal, mixed/unknown, malformed response and
+no execution; identical inputs cannot mint a fresh task/revision allowance. Manually adjudicate a small
+real-history sample later; fixtures prove plumbing only.
+**Exit:** an independently useful report, without a new analytics service or historical warehouse.
+
+### N4 — Read-only diagnostic sequences
+
+- [x] Register `runtime.next-probe/2` separately from advisory `/1`. Only diagnostic entry with
+  explicit `choose-read` may instantiate `/2`; auto may execute, shadow scores the same choice but
+  executes the baseline. An advice-only profile cannot send `/2`. Enforce entry/question/effect compatibility
+  in shared request validation as well as the caller.
+  Add registered ask/receipt/episode entry kinds and separately report configured, question-applicable
+  and delivered effects. Observation remains advice under a choose-read profile; forged observation
+  `/2` requests fail before transport. Keep current `workflow-status`/`workflow-wait` observations non-dispatching.
+- [x] Add `workflow-diagnose` through the existing command/worker owner and typed host entry. Bind
+  parent/task/revision, native snapshot and full probe-manifest digest; require reconciled parent
+  cleanup. Define the engine-owned manifest schema (up to eight IDs/descriptions/recipe documents/
+  host-approved bindings). Resolve operations through the existing operation catalog. Before inference,
+  the host prepares each distinct authorized local-check action and exact workflow binding. Never
+  reuse the parent's action. Retire unused actions through the normal host lifecycle. Add the command
+  to managed write admission; record the selected scope before any model call or child submission.
+- [x] Add a small transactional diagnostic reservation/attempt record to `WorkflowStore`, migrating
+  engine schema 1/2 to 3 atomically on the first diagnostic episode/reservation write, not store open. Keep
+  aggregate slot reservation and coordinator owner fencing;
+  deterministic child IDs alone do not protect the shared cap. Persist the absolute deadline before
+  dispatch. The new constructor preserves schema 3; ordinary opening with diagnostics off leaves
+  schema 2 intact. Older binaries must refuse schema 3; adoption drains old readers and uses forward repair
+  after new writes. Prove migration on a copied ledger without modifying the adopter during staging.
+  Reuse ordinary child workflow recipes, process handles and resource
+  leases; never mutate parent recipes or create a second execution daemon.
+- [x] Drive code-first, then bounded-choice selection, revalidation, durable reservation, child
+  execution and fresh observation. Maximum three submissions, at most one per recipe, including
+  blocked-before-run submissions.
+  Clamp child execution deadlines to the remaining persisted episode deadline without mutating
+  host-approved recipe/binding digests. Expiry stops dispatch
+  and settles children; cleanup cannot be abandoned to meet the deadline. Restart observes prior
+  children and remaining limit; it never renews the deadline or resets attempts.
+- [x] Stop on unknown/stale/failed probe or lost ownership; preserve parent failure and return one
+  compact diagnostic packet. A completed diagnosis does not claim the app is repaired or tested.
+- [ ] Implement one adopter-owned simulator evidence/probe adapter when the selected host worktree
+  is authorized for edits. Record exact adapter/package identities outside this repository.
+
+**Checkpoint T4:** focused workflow tests: useful two-probe sequence, code-only/no-token route,
+unknown handoff, source/target/grant change before dispatch, malicious/unregistered recipe,
+advice-only never emits `/2`, shadow never dispatches a model choice, three-probe/deadline exhaustion,
+restart after expiry, two concurrent coordinators, crash after reservation/dispatch, duplicate invocation,
+failed/unclean child and global disable while a child is active. Test critical boundaries once,
+not their full Cartesian product. Simulator proof is one happy and one controlled diagnostic case;
+reuse unaffected build artifacts where valid. No physical unplug/reconnect test.
+**Exit:** one bounded sequence executes eligible probes and returns their results without extra LLM
+orchestration turns. Current probe advice is the comparison starting point, not a new benefit.
+
+### N3 — Attention observation (after N4)
+
+- [x] Register DL06 with advice as its only supported effect and off as its default. Register
+  `iteration.attention-needed/1`; freeze rubric/unknown handling. Do not add `route-attention` to
+  the schema for a capability that has no qualified live caller.
+- [x] At the existing workflow observation boundary, count code-classifiable events and genuinely
+  ambiguous eligible supplied observations. Use fixed `attention:<run-id>:iteration.attention-needed/1` as
+  decision event identity; assess
+  only the first eligible observation. Later changed excerpts are unassessed, not a new call; count
+  them separately. Existing SQLite event reservations enforce this sub-bound across processes. No eligible
+  residual means zero calls. Retain native wait/status results and timing contracts.
+- [x] Record shadow labels or return advice using the shared mode behavior. Capture independent
+  reviewer labels and available host delivery/turn timestamps. Unsupported observations stay explicit.
+- [x] Record the live-promotion prerequisite as a later candidate: actual residual traffic, supported
+  pre-wake boundary, protected-event bypass, original wait deadline (currently at most 30 seconds),
+  durable delivery/replay owner and observed benefit. Do not implement that machinery in this RC.
+
+**Checkpoint T3:** focused tests: structured events need no classifier; real supplied ambiguous
+observation; protected events bypass; no-token/unknown/timeout; unchanged native outcomes and
+shadow presentation; repeated polling with different excerpts still has one transport call; missing host
+metrics remain unknown. One host wiring observation
+at N6 proves actual exposure only, never suppressed wakes.
+**Exit:** a bounded answer to whether attention routing is worth pursuing, without speculative
+notification infrastructure. No claim of avoided LLM turns from this RC's attention experiment.
+
+### N5 — Freeze, review and release
+
+- [x] Freeze the coherent implementation. Run T1–T4 and existing decision tests at their checkpoints;
+  at the release boundary run `npm run typecheck`, `npm test`, `npm run pack:engine`, then
+  `node components/engine/scripts/verify-package.mjs <exact-archive>`. Extend that verifier with
+  installed off/shadow/effect opt-in, version-1/2 reporting and bounded child dispatch fixtures.
+  Use the release workflow's declared legacy Python/wheel proof if its boundary is affected.
+- [x] Independent Claude architectural/code review focuses on unchanged attention delivery and action
+  reservation seams plus evidence validity. Reconcile meaningful findings; rerun only affected
+  proof during repair, then certify the frozen release candidate under the release process.
+- [x] Verify conservative write admission for `workflow-diagnose` and classification-enabled telemetry,
+  with ordinary reporting still read-only. Prove schema 1/2 migration, rejection by older binaries,
+  first diagnostic-write stamping, open-with-off preservation, and no-new-writes restoration versus
+  post-write forward repair under existing generation markers. Release notes state that new
+  DL06/DL12 profile keys and v2 manifests are not readable by rc.2; both experiment arms use the same
+  new RC. Restoring old configuration alone does not downgrade a migrated ledger.
+- [x] Separate deterministic fixture results, live provider assessment and native host/device
+  evidence. Record unsupported capabilities and default-off flags in release notes. Prove disabling
+  effects preserves in-flight cleanup and original terminal completion delivery.
+- [ ] Under publication authorization, select an unused RC, bind the exact source/archive/metadata,
+  publish prerelease/non-latest and read back hashes. No new publishing tool or stable release here.
+
+**Exit:** an immutable candidate with honest capability limits and a reproducible proof packet.
+Positive JEV savings are not a prepublication requirement. Missing safety/wiring proof is not
+excused by default-off configuration; unsupported host effects must remain unavailable.
+
+### N6 — Adopt and decide using ordinary work
+
+- [ ] Pin the exact candidate in the selected existing worktree; reconcile current hooks/jobs and
+  verify normal entry, required checks, delivery and cleanup before treatment. SDK/app publication
+  is outside tooling adoption. Do not create another branch just for this pilot.
+- [ ] Retain code-only baseline assignments and enable qualified bounded effects actively when the
+  operator chooses that pilot. Shadow remains useful for unqualified callers, not a mandatory delay
+  for every consumer. Use a small independent labeled sample for
+  semantic quality; publish coverage and unresolved cases. If no useful attention traffic remains
+  after code filtering, record no demonstrated need and keep that live effect off.
+- [ ] Activate qualified effects with interleaved off assignments. The operator may start with a
+  balanced active bundle; retain its complete consumer set and reserve individual attribution for
+  later focused comparisons. Use the same RC, comparable
+  tasks/environments and required proof. Preserve assignments through failures/fallback and include
+  reopened work. Do not run every development task twice for a comparison.
+- [ ] Inspect initial attention labels and all diagnostic episodes for wrong advice, wasted probes,
+  stale inputs and rework. Stop on the specification's critical conditions; ordinary errors use
+  the predeclared tolerance. Report actual usage/turn coverage rather than projected savings.
+- [ ] At the predeclared window, choose adopt, refine, optional/inconclusive or retire per experiment.
+  Preserve reasons and representative evidence in the external runbook. Change defaults only via
+  a deliberate later release/configuration decision, never automatically from a model score.
+
+**Exit:** a bounded field decision. Negative or sparse results are useful outcomes and do not block
+unrelated RC consumers. Return to S5–S10 according to demonstrated value; full local-CI planning
+and recovery remain available opportunities, not implicit requirements for this batch.
 
 ## S0 — Freeze first consumers, target and comparisons
 
@@ -154,7 +410,8 @@ reason to invent labels or claim a benefit. No broad proof is rerun merely becau
 - [ ] Implement the minimum P1 contract for the selected consumers: registered/versioned questions,
   validated native answer shapes, evidence/source identity, per-consumer modes/effects, bounded
   provider calls and no-token/off/error fallback. Preserve current E3 compatibility deliberately.
-  Use the [first-RC configuration and budget contract](../../specs/engine-decision-layer.md#first-rc-configuration-and-aggregate-budget):
+  Use the [first-RC configuration and budget
+  contract](../../specs/engine-decision-layer.md#first-rc-configuration-and-aggregate-budget):
   one `continuity.decisions` owner, independent consumer settings, global mode ceiling, explicit
   old-profile mapping, advice as the omitted effect default, and transactional SQLite task/revision
   accounting across processes. No fresh per-command budget. Pass authoritative invocation identity
@@ -388,7 +645,8 @@ preparation; the live comparison begins once artifact, entry points and coverage
 - [ ] A proposed first window is five working days, targeting 10–20 accepted tasks per condition as
   a directional screen when workloads permit. Keep failed/cancelled/reopened tasks in denominators.
   Final window and stop rules are selected in S0; do not manufacture work or run until results look good.
-- [ ] Enable one consumer at a time initially. Use independent flags or a declared comparison for
+- [ ] Use independent flags or a declared active bundle initially. A bundle comparison measures the
+  combined intervention; use a focused comparison for individual attribution and a declared comparison for
   combinations later. Do not execute two runtime owners against the same side effect or run every
   development task twice merely for evaluation.
 - [ ] Record usage coverage, decisive-evidence omissions, errors, rework, interventions and elapsed
@@ -439,6 +697,9 @@ Publish/update/measure using S3/S4 with the same required proof in comparison ar
 
 ## S7 — Promote device-loop decisions
 
+N4 brings the read-only post-run sequence forward. It requires existing recipe dispatch and action
+authority, not completion of every S6 local-CI planner feature. Remaining recovery scope follows here.
+
 Promote the delivered DL05 diagnosis to eligible read probes first on the qualified RN iOS simulator
 path, then selected wired-device use. Native
 code still detects exact known conditions, binds the target/build and owns process/resource cleanup.
@@ -455,7 +716,8 @@ Publish/update/measure through S3/S4. Preserve deferred physical transport disru
 
 Freeze the launch set after the eight first-RC consumers have explicit dispositions. Recommended
 scope is those consumers at their justified advice/context-delivery effects; add later workflow/CI/
-device execution effects only when qualified. Every advertised enabled feature needs its own evidence and reliable fallback.
+device execution effects only when qualified. Every advertised enabled feature needs its own evidence and
+reliable fallback.
 An inconclusive consumer stays opt-in/experimental or is revised; do not advertise unmeasured savings.
 
 - [ ] Resolve adoption and required-proof defects. Review useful simplifications without deleting
@@ -472,6 +734,10 @@ conditioned on positive savings from every idea, and the broader programme conti
 
 ## S9 — Supervision and model routing
 
+N3 brings only bounded optional-event attention observation/advice forward; live routing stays deferred.
+Worker steering and model-tier
+changes below remain later; do not duplicate N3 implementation here.
+
 Deliver DL06 repetition/scope-drift advice and DL08 model-tier/produce-verify-escalate comparisons.
 Start with observation/advice; native host ownership, explicit model choices and required verification
 remain intact. Count all attempts, verifier/escalation cost, wrong interventions and repair. A healthy
@@ -479,6 +745,9 @@ worker must not be interrupted because a provider failed or a build was quiet. U
 separately qualified effects, then release/update/measure as above.
 
 ## S10 — Optional release and learning consumers
+
+N2 brings the small DL12 offline history report forward. Release preparation, signal grouping and
+more advanced historical prediction below remain later.
 
 Deliver DL10 release preparation, DL11 related post-release signal grouping and DL12 offline episode/
 procedure analysis when an actual host supplies the necessary inputs. These share the decision/evidence

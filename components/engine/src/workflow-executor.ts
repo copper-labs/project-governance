@@ -15,6 +15,8 @@ export interface ExecutionOptions {
   /** Resource-specific readback is required: exited processes alone do not prove device/Metro cleanup. */
   observeCleanup: (run: WorkflowRun, leases: readonly Lease[]) => Promise<string | null>;
   outputLimit?: number;
+  /** Additional persisted admission deadline; never changes the approved recipe identity. */
+  absoluteDeadline?: number;
   /** Internal continuation only; caller must verify original worker absence. */
   cleanupContinuation?: { revision: number; stagesDigest: string };
 }
@@ -35,7 +37,8 @@ export async function executeWorkflow(store: WorkflowStore, id: string, options:
   let run = continuation ? store.claimPendingCleanup(id, continuation.revision, continuation.stagesDigest, { pid: process.pid, fingerprint: fingerprint! })
     : store.claim(id, pending.revision, owner);
   const recipe = run.binding.recipe;
-  const deadline = Date.now() + recipe.deadlineMs;
+  if (options.absoluteDeadline !== undefined && (!Number.isSafeInteger(options.absoluteDeadline) || options.absoluteDeadline < 1)) throw new Error("Invalid execution deadline");
+  const deadline = Math.min(Date.now() + recipe.deadlineMs, options.absoluteDeadline ?? Infinity);
   let leases: Lease[] = retained, unresolved = false, failed = continuation ? store.stages(id).some(stage => stage.state !== "pending" && stage.state !== "succeeded") : false;
   mkdirSync(options.commandsDirectory, { recursive: true, mode: 0o700 });
   try {

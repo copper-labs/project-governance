@@ -8,6 +8,7 @@ import type { DecisionSettings } from "./decision-settings.ts";
 export function prepareDecisionRequest(ask: DecisionAsk, settings: DecisionSettings, participants: DecisionConsumerId[], requestId: string) {
     const request: DecisionRequest2 = {
       schemaVersion: DECISION_SCHEMA_VERSION, requestId, consumerId: ask.consumerId, consumers: participants, consumerVersion: DECISION_CONSUMERS[ask.consumerId].version,
+      entryKind: ask.entryKind ?? "registered-default",
       scope: { workspace: ask.scope!.workspace, taskId: ask.scope!.taskId, taskRevision: ask.scope!.taskRevision, ...(ask.runId ? { runId: ask.runId } : {}) },
       subject: ask.subject, evidence: ask.evidence, coverage: ask.coverage, questions: ask.questions,
       eligibilityDigest: ask.eligibilityDigest ?? null, policyDigest: ask.policyDigest, configDigest: settings.configDigest,

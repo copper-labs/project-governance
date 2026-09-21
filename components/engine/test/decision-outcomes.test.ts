@@ -59,3 +59,31 @@ test("unscoped fallback receipts retain episode labels and every selected episod
     assert.equal(c.joined + c.invalid + c.duplicate_episodes + c.no_linked_decisions, c.selected);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test("version two includes off and failed episodes, detects missing capture and deduplicates native costs", () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "decision-outcomes-v2-")));
+  try {
+    const scope = { workspace: root, taskId: "task", taskRevision: "1" };
+    const hash = `sha256:${"1".repeat(64)}`;
+    const nativePath = join(root, "native.json");
+    durableJson(nativePath, { version: 1, requestDigest: hash, state: "cancelled", cleanup: "confirmed", scope, durationMs: 25 });
+    const entries = ["one", "two"].map(id => {
+      const path = join(root, `${id}.json`);
+      durableJson(path, { version: 1, id, scope, native: { runId: "run", runDigest: hash, stagesDigest: hash, eventsDigest: hash },
+        exposure: { mode: "off", delivered: false }, decisions: [] });
+      return { id, scope, decisions: [], caller: { path, digest: fileDigest(path) }, native: [{ kind: "command", path: nativePath, digest: fileDigest(nativePath) }] };
+    });
+    const manifest = join(root, "manifest.json");
+    durableJson(manifest, { version: 2, episodes: [...entries, { ...entries[0], id: "missing", caller: { path: join(root, "missing.json"), digest: hash } }] });
+    const report = decisionTelemetry(root, { outcomesManifest: manifest }).outcome_report!;
+    assert.equal(report.counts.selected, 3); assert.equal(report.counts.joined, 2);
+    assert.equal(report.counts.invalid, 1); assert.equal(report.counts.missing_captures, 1);
+    assert.equal((report as any).native_cost.knownSummedDurationMs, 25);
+    assert.equal(report.counts.duplicate_native, 1); assert.equal(report.counts.no_linked_decisions, 0);
+    assert.equal((report.samples[0] as any).native[0].state, "cancelled");
+    assert.equal((report.samples[1] as any).native[0].duplicateCost, true);
+    assert.equal((report.samples[0] as any).observations.llmInputTokens, null);
+    durableJson(manifest, { version: 2, episodes: [{ ...entries[0], scope: { ...scope, taskRevision: "2" } }] });
+    assert.equal(decisionTelemetry(root, { outcomesManifest: manifest }).outcome_report!.counts.invalid, 1);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

@@ -1,4 +1,4 @@
-import { decisionOutcomeReport } from "./decision-outcomes.ts";
+import { boundedOutcomeReader, decisionOutcomeReport } from "./decision-outcomes.ts";
 import { DECISION_FAILURE_STAGES } from "./decisions.ts";
 import { opendirSync, lstatSync, realpathSync } from "node:fs";
 import { join } from "node:path";
@@ -7,7 +7,7 @@ import { object } from "./core.ts";
 import { DECISION_CONSUMER_IDS } from "./decision-schema.ts";
 
 /** Descriptive operational receipts only; frozen evaluation sets and source excerpts are never scanned. */
-export function decisionTelemetry(root: string, options: { limit?: number; since?: string; outcomesManifest?: string } = {}) {
+export function decisionTelemetry(root: string, options: { limit?: number; since?: string; outcomesManifest?: string } = {}, outcomesReader = boundedOutcomeReader()) {
   // macOS temporary/state roots commonly have a /var -> /private/var alias.
   try { root = realpathSync(root); }
   catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
@@ -91,7 +91,7 @@ export function decisionTelemetry(root: string, options: { limit?: number; since
     tokens: { decision_samples: decisionSamples, input_samples: inputSamples, output_samples: outputSamples,
       input_total: inputSamples ? inputTokens : null, output_total: outputSamples ? outputTokens : null },
     pilot: decisionPilotTelemetry(root, { limit, since }),
-    ...(options.outcomesManifest ? { outcome_report: decisionOutcomeReport(root, options.outcomesManifest) } : {}),
+    ...(options.outcomesManifest ? { outcome_report: decisionOutcomeReport(root, options.outcomesManifest, outcomesReader) } : {}),
     benefit_claim: "not-evaluated", avoided_llm_tokens: null };
 }
 

@@ -1,3 +1,4 @@
+import type { DiagnosticEpisode, DiagnosticOwner, DiagnosticAttempt, DiagnosticProbe } from "./diagnostic-types.ts";
 import { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
 import { Store } from "../../harness/src/store/store.ts";
@@ -30,7 +31,7 @@ export class WorkflowStore {
     try {
       this.#atomic(() => {
         const version = this.#db.prepare("SELECT value FROM meta WHERE key='engine_schema'").get();
-        if (version && !["1", "2"].includes(String(version["value"]))) throw new Error("unsupported engine schema; preserve the store");
+        if (version && !["1", "2", "3"].includes(String(version["value"]))) throw new Error("unsupported engine schema; preserve the store");
         this.#db.exec(`
           CREATE TABLE IF NOT EXISTS engine_action_binding (
             action_id TEXT PRIMARY KEY REFERENCES action(action_id), binding_digest TEXT NOT NULL
@@ -52,7 +53,7 @@ export class WorkflowStore {
             scope TEXT PRIMARY KEY, generation INTEGER NOT NULL, watermark INTEGER NOT NULL, incomplete INTEGER NOT NULL,
             withdrawals TEXT NOT NULL
           ) STRICT;
-          INSERT INTO meta VALUES('engine_schema','2') ON CONFLICT(key) DO UPDATE SET value='2';
+          INSERT INTO meta VALUES('engine_schema','2') ON CONFLICT(key) DO UPDATE SET value=CASE WHEN value='3' THEN '3' ELSE '2' END;
         `);
         this.#db.exec("INSERT OR IGNORE INTO engine_projection VALUES('repository',1,0,1,'[]')");
         // All canonical fact/intent mutations invalidate optional projections in the same transaction,
@@ -121,10 +122,13 @@ export class WorkflowStore {
 
   /** Submission persists exact identity before a worker exists; retries attach to the same run. */
   submit(binding: RunBinding): WorkflowRun {
+    return this.#atomic(() => this.#submit(binding));
+  }
+
+  #submit(binding: RunBinding): WorkflowRun {
     text(binding.authorityRef, "host authority reference"); text(binding.operationId, "operation id");
     if (recipeDigest(binding.recipe) !== binding.recipeDigest) throw new Error("recipe digest mismatch");
     const encoded = canonical(JSON.parse(JSON.stringify(binding)));
-    return this.#atomic(() => {
       const prior = this.#db.prepare("SELECT id,binding FROM engine_run WHERE operation_id=?").get(binding.operationId);
       if (prior) {
         if (prior["binding"] !== encoded) throw new Error("workflow submission identity conflict");
@@ -136,7 +140,6 @@ export class WorkflowStore {
       for (const stage of binding.recipe.stages) this.#db.prepare("INSERT INTO engine_stage VALUES(?,?,'pending',NULL)").run(id, stage.id);
       this.#event(id, "submitted", { recipeDigest: binding.recipeDigest, actionId: binding.actionId });
       return this.read(id);
-    });
   }
 
   read(id: string): WorkflowRun {
@@ -302,6 +305,77 @@ export class WorkflowStore {
       if (current.generation !== generation) return false;
       this.#db.prepare("UPDATE engine_projection SET watermark=?,incomplete=0 WHERE scope='repository' AND generation=?").run(generation, generation);
       return true;
+    });
+  }
+
+  /** Read admission is deliberately separate from creating a diagnostic schema. */
+  diagnosticRead(id: string): DiagnosticEpisode | null {
+    if (!this.#db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='engine_diagnostic'").get()) return null;
+    const row = this.#db.prepare("SELECT record FROM engine_diagnostic WHERE id=?").get(id);
+    return row ? JSON.parse(String(row["record"])) as DiagnosticEpisode : null;
+  }
+
+  /** First diagnostic write migrates atomically. Ordinary opens preserve schema 2 or 3. */
+  claimDiagnostic(initial: DiagnosticEpisode, owner: DiagnosticOwner, alive: (owner: DiagnosticOwner) => boolean): DiagnosticEpisode {
+    return this.#atomic(() => {
+      const prior = this.diagnosticRead(initial.id);
+      if (prior && prior.requestDigest !== initial.requestDigest) throw new Error("Diagnostic identity changed; a catalog edit cannot reset the allowance");
+      if (prior?.closedReason) return prior;
+      if (prior?.owner && prior.owner.token !== owner.token && alive(prior.owner)) throw new Error("Diagnostic coordinator already owned");
+      const record = { ...(prior ?? initial), owner, revision: (prior?.revision ?? 0) + 1 };
+      this.#db.exec("CREATE TABLE IF NOT EXISTS engine_diagnostic(id TEXT PRIMARY KEY, record TEXT NOT NULL) STRICT");
+      this.#db.prepare("INSERT INTO engine_diagnostic VALUES(?,?) ON CONFLICT(id) DO UPDATE SET record=excluded.record").run(record.id, canonical(record));
+      this.#db.exec("UPDATE meta SET value='3' WHERE key='engine_schema'");
+      return record;
+    });
+  }
+
+  #diagnosticOwned(id: string, owner: string, revision: number): DiagnosticEpisode {
+    const record = this.diagnosticRead(id);
+    if (!record || record.owner?.token !== owner || record.revision !== revision || record.closedReason) throw new Error("Diagnostic owner is stale");
+    return record;
+  }
+
+  /** Check existing host grants without minting or rebinding an action. */
+  validateWorkflowBinding(binding: RunBinding): void { this.#current(binding); }
+
+  /** Reserve the aggregate slot and native child in one transaction before any process dispatch. */
+  reserveDiagnosticProbe(id: string, owner: string, revision: number, probe: DiagnosticProbe,
+    selection: Pick<DiagnosticAttempt, "method" | "decisionReceiptId">): DiagnosticEpisode {
+    return this.#atomic(() => {
+      const record = this.#diagnosticOwned(id, owner, revision);
+      if (Date.now() >= record.deadline || record.attempts.length >= 3 ||
+          record.attempts.some(attempt => attempt.probeId === probe.id || attempt.recipeDigest === probe.binding.recipeDigest)) throw new Error("Diagnostic allowance exhausted or probe repeated");
+      this.#current(probe.binding);
+      if (this.#db.prepare("SELECT id FROM engine_run WHERE operation_id=?").get(probe.binding.operationId)) throw new Error("Diagnostic child already exists outside this reservation");
+      const child = this.#submit(probe.binding);
+      record.attempts.push({ probeId: probe.id, recipeDigest: probe.binding.recipeDigest, childRunId: child.id, ...selection });
+      record.revision++;
+      this.#db.prepare("UPDATE engine_diagnostic SET record=? WHERE id=?").run(canonical(record), id);
+      return record;
+    });
+  }
+
+  /** Retain abstentions and failed treatments even when no child is submitted. */
+  recordDiagnosticDecision(id: string, owner: string, revision: number, receiptId: string): DiagnosticEpisode {
+    return this.#atomic(() => {
+      const record = this.#diagnosticOwned(id, owner, revision);
+      if (!/^[a-f0-9]{32}$/u.test(receiptId)) throw new Error("Invalid decision receipt");
+      if (!record.decisions.includes(receiptId)) record.decisions.push(receiptId);
+      if (record.decisions.length > 3) throw new Error("Diagnostic selection-call limit exceeded");
+      record.revision++;
+      this.#db.prepare("UPDATE engine_diagnostic SET record=? WHERE id=?").run(canonical(record), id);
+      return record;
+    });
+  }
+
+  /** Closing/releasing ownership never changes the failed parent or erases retained attempts. */
+  finishDiagnostic(id: string, owner: string, revision: number, reason: string | null): DiagnosticEpisode {
+    return this.#atomic(() => {
+      const record = this.#diagnosticOwned(id, owner, revision);
+      record.owner = null; record.closedReason = reason; record.revision++;
+      this.#db.prepare("UPDATE engine_diagnostic SET record=? WHERE id=?").run(canonical(record), id);
+      return record;
     });
   }
 

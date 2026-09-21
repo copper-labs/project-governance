@@ -18,8 +18,8 @@ and failure cases to decide whether a consumer earns activation. The
 [shared decision contract](engine-decision-layer.md) owns request types, modes, fallback, authority
 and telemetry; this file owns domain-specific inputs, effects and qualification.
 
-All entries are proposals. Listed effects are ceilings to qualify, not permissions granted by this
-document. New consumers start disabled, then observe or advise. The
+The current RC implements the eight advisory subsets identified below. Broader listed effects
+remain proposals and ceilings to qualify, not permissions granted by this document. New consumers start disabled, then observe or advise. The
 [implementation plan](../exec-plans/active/2026-09-21-major-adoption-and-measurement.md) deliberately delivers useful
 subsets before every use case is implemented.
 
@@ -32,7 +32,7 @@ stage logs and target/artifact evidence. DL13 and DL09 use the selected owned ou
 presentation boundary recorded in S0. An explicit diagnostic evidence argument supports adopters
 without an emitted envelope; that does not prove automatic integration with their native loop.
 
-RC1 permits optional text selection and delivered advice only. Workflow/check/device execution
+The first released RC permits optional text selection and delivered advice only. Workflow/check/device execution
 effects described below are later qualifications, not required first-handoff implementations. Keep
 their contracts and tests scoped to the slice that activates each effect.
 
@@ -53,8 +53,8 @@ may assess separate candidates within one batch.
 | DL02 | `diff.rule-concern/1`, `diff.task-relevance/1` | Advice | Less repeated semantic review |
 | DL03 | `context.relevance/1`, `procedure.relevance/1` | Automatic optional-context assembly | Less LLM reading with sufficient evidence |
 | DL04 | `workflow.match/1` | Choose read/local workflow within a grant | Fewer orchestration turns |
-| DL05 | `runtime.diagnostic-match/1`, `runtime.next-probe/1`, `runtime.recovery-match/1` | Choose read/local operation within a grant | Fewer investigations and avoidable rebuilds |
-| DL06 | `iteration.repetition/1`, `iteration.scope-drift/1`, `iteration.next-review/1` | Advice, then scoped steering | Less unproductive work |
+| DL05 | `runtime.diagnostic-match/1`, `runtime.next-probe/1` (advice), `/2` (qualified reads), `runtime.recovery-match/1` | Choose read/local operation within a grant | Fewer investigations and avoidable rebuilds |
+| DL06 | `iteration.attention-needed/1` (initial shadow/advice), `iteration.repetition/1`, `iteration.scope-drift/1`, `iteration.next-review/1` | Advice, then scoped steering | Less unproductive work |
 | DL07 | `validation.scenario-relevance/1`, `validation.coverage-gap/1`, `validation.escalation-match/1` | Choose optional checks and eligible escalation; reorder work | Less CI compute and faster useful feedback |
 | DL08 | `assignment.complexity/1`, `assignment.procedure-fit/1` | Choose an allowed execution tier | Lower total model cost per accepted task |
 | DL09 | `claim.support/1`, `claim.completion-scope/1` | Advice; opt-in operator input for unresolved decisions | Fewer unsupported completion claims |
@@ -187,6 +187,10 @@ bounded workflow routing and later procedure reuse; this proposal keeps activati
 
 ## DL05 — Device/simulator development loop
 
+The [next RC diagnostic slice](engine-decision-experiments.md#b--bounded-read-only-diagnostic-sequences)
+selects read-only post-run probes first. It uses new `runtime.next-probe/2` semantics for executable
+recipe IDs; advisory `/1` remains unchanged. Repairs and relaunch remain later.
+
 **Inputs:** existing run/attempt identity; actual simulator or device identity; native build and
 installed artifact identity; app state; structured crash/exception signals; Metro endpoint, owner and
 bundle observations where applicable; bounded unresolved logs; prior probes and their results.
@@ -236,6 +240,11 @@ The public [jev-browser pattern](https://github.com/Ying-Kai-Liao/jev-browser) s
 routine interaction steps from the LLM, but is not evidence of native-device qualification.
 
 ## DL06 — Iteration supervision
+
+The [next RC attention slice](engine-decision-experiments.md#a--attention-routing) brings
+`iteration.attention-needed/1` forward in shadow/advice at the existing workflow observation
+boundary. Live coalescing is deferred until actual residual traffic and a supported pre-wake boundary
+justify a separately qualified effect. It cannot steer workers or change terminal delivery. Other questions below remain later.
 
 **Inputs:** task intent, bounded recent attempts, actual source/proof deltas, active job progress,
 previous advice and its disposition. Code supplies elapsed time, duplicate requests and retry counts;
@@ -433,6 +442,10 @@ time-window mismatch and missing release identity. Measure duplicate investigati
 distinct incidents. JEV does not compute time windows or statistical significance.
 
 ## DL12 — Telemetry analysis and procedure improvement
+
+The [next RC history slice](engine-decision-experiments.md#c--offline-history-analysis) brings a
+small on-demand classifier and native report forward. The provider-free report remains available;
+classification requires explicit invocation and cannot become an online policy tuning service.
 
 **Inputs:** explicitly selected completed episodes with task/source identity, decision receipts,
 operation outcomes, expansions and available model usage. Deduplicate completion notices and repeated

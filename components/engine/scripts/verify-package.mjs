@@ -1,3 +1,4 @@
+import { verifyDecisionExperiments } from "./verify-decision-experiments.mjs";
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
@@ -38,7 +39,8 @@ try {
   const staging = await verifyExplicitStaging(pkg, archive, manifest, root);
   assert.deepEqual(readFileSync(join(pkg, "package.json")), beforeStaging, "Staging must preserve the installed parent package");
   const pilot = await verifyDecisionPilot(pkg);
-  console.log(JSON.stringify({ staging, decisionPilot: pilot, hostApi: 'passed', version: manifest.version, installedCommand: 'passed', scope: 'offline installation and inactive staging, public host API and all eight decision consumers with fixture inference; not full semantic qualification; no live device or benefit claim' }));
+  const experiments = await verifyDecisionExperiments(pkg);
+  console.log(JSON.stringify({ staging, decisionPilot: pilot, experiments, hostApi: 'passed', version: manifest.version, installedCommand: 'passed', scope: 'offline installation and inactive staging, public host API and all eight decision consumers with fixture inference; not full semantic qualification; no live device or benefit claim' }));
 } finally { rmSync(root, { recursive: true, force: true }); }
 
 

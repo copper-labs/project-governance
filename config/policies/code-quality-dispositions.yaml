@@ -1,6 +1,28 @@
 version: 2
 owner: project-governance-maintainers
 dispositions:
+- finding: quality.large-function
+  path: components/engine/src/decision-outcomes.ts
+  symbol: decisionOutcomeReport
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex source reconciliation and Claude Opus 5 high-effort implementation recheck
+  approved_on: '2026-09-21'
+  responsibility: Join selected episodes while committing report-wide deduplication only after each episode validates.
+  rationale: The report fold keeps pending receipt, reservation and native-cost identities separate from
+    committed identities. Splitting the fold would distribute that validation boundary without isolating
+    another responsibility. Bounded reading and reference normalization already have separate owners.
+- finding: quality.large-function
+  path: components/engine/src/workflow-diagnose.ts
+  symbol: diagnoseWorkflow
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex source reconciliation and Claude Opus 5 high-effort implementation recheck
+  approved_on: '2026-09-21'
+  responsibility: Own one diagnostic coordinator from entry admission through fenced release and child reconciliation.
+  rationale: Selection gates share one episode revision and ownership lifetime. The store already owns
+    transactional reservations, the worker owns processes, and the manifest owner resolves recipes.
+    Keeping the remaining lifecycle visible avoids a second protocol for passing mutable ownership.
 - finding: quality.high-cyclomatic
   path: src/project_governance_runtime/execution_commands.py
   symbol: normalized_command
