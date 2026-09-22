@@ -5,6 +5,7 @@ import { routeContext } from "../src/context-routing.ts";
 import { materializeRoutedSkills } from "../src/routed-skills.ts";
 import { materializeRoutedContext } from "../src/routed-context.ts";
 import type { ValidationSubject } from "../src/change-subject.ts";
+import { contextCandidateInventory } from "../src/context-candidates.ts";
 
 const skill = (id: string, overrides: Partial<CatalogSkill> = {}): CatalogSkill => ({ id, path: `${id}.md`,
   sourceDigest: "sha256:test", content: "rule", packId: "pack", activationMode: "governed", defaultLevel: "required",
@@ -52,4 +53,15 @@ test("target skills fill unknown declarations but cannot replace a packaged skil
   assert.equal(result.ready, true);
   assert.equal(result.entries[0]?.content, "rule");
   assert.equal(result.entries[1]?.content, "target-owned guidance");
+});
+
+test("optional candidate limits never hide path-triggered skills after the first 64 files", () => {
+  const paths = [...Array.from({ length: 100 }, (_, i) => `src/a${i}.ts`), "src/z-special.swift"];
+  const subject = { paths: () => paths } as unknown as ValidationSubject;
+  const inventory = contextCandidateInventory(subject, ["src"], []);
+  const index = new Map([skill("router", { routerFor: ["pack"], packId: null }),
+    skill("swift", { applicability: { path_globs: ["*.swift"] } })].map(item => [item.id, item]));
+  const packet = materializeRoutedSkills(index, route(["router"]), "fix", inventory.routingPaths, {});
+  assert.equal(inventory.routingPaths.length, 101);
+  assert.ok(packet.entries.some(entry => entry.id === "swift"));
 });

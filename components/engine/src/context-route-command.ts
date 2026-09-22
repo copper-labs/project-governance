@@ -19,20 +19,30 @@ import { DecisionRuntime } from "./decision-runtime.ts";
 import { contextAdvice, type ContextAdvice } from "./decision-context-advice.ts";
 import { resolveDecisionScope } from "./decision-scope.ts";
 import { resolveWorkflowCandidates, workflowAdvice } from "./decision-workflow-advice.ts";
+import { resolveTaskContext, taskBindingReceipt } from "./decision-task-binding.ts";
+import { decisionTaskPurpose, type DecisionTaskContext } from "./decision-task-context.ts";
+import { automaticContextCandidates, contextCandidateInventory } from "./context-candidates.ts";
+import { recordEntryExposure } from "./decision-episodes.ts";
 
 /** Mandatory routing runs without a provider. Only captured project configuration selects requirements. */
 export async function contextRouteCommand(args: string[], root: string,
-  assetRoot = fileURLToPath(new URL("../assets/skills/", import.meta.url)), suppliedProvider?: DecisionProvider, options: DecisionOptions = {}) {
+  assetRoot = fileURLToPath(new URL("../assets/skills/", import.meta.url)), suppliedProvider?: DecisionProvider, options: DecisionOptions = {}, taskContext?: DecisionTaskContext) {
   const { values } = parseArgs({ args, strict: true, allowPositionals: false, options: {
     task: { type: "string" }, revision: { type: "string" }, staged: { type: "boolean" },
     "decision-task": { type: "string" },
+    "decision-context": { type: "string" },
     "workflow-candidates": { type: "string" },
     "base-ref": { type: "string" }, "include-expansion": { type: "boolean" }, "include-evaluation-skills": { type: "boolean" },
     "optional-excerpt-bytes": { type: "string" },
     "changed-path": {type:"string",multiple:true},
     "optional-path": { type: "string", multiple: true }, "discover-path": { type: "string", multiple: true },
   } });
-  const task = text(values.task, "task"), revision = text(values.revision, "task revision");
+  const binding = resolveTaskContext(root, { ...(taskContext ? { context: taskContext } : {}),
+    ...(values["decision-context"] ? { path: values["decision-context"] } : {}),
+    ...(values["decision-task"] ? { taskId: values["decision-task"] } : {}), ...(values.revision ? { revision: values.revision } : {}) });
+  if (!binding.context && (!values.task || !values.revision)) throw new Error(`Task context unavailable (${binding.status}); create or resume this session's harness task, or supply explicit --task and --revision.`);
+  const task = text(values.task ?? (binding.context ? decisionTaskPurpose(binding.context) : undefined), "task"),
+    revision = text(values.revision ?? binding.context?.revision, "task revision");
   if (values.staged && values["base-ref"]) throw new Error("Staged context cannot select another base");
   root = realpathSync(root);
   const scope = resolveChangeScope(root, values.staged ? { staged: true } : { baseRef: values["base-ref"] ?? "HEAD" });
@@ -49,8 +59,13 @@ export async function contextRouteCommand(args: string[], root: string,
   const facts = object(factsDocument.facts ?? {}), contextFacts = facts.skill_context == null ? null : object(facts.skill_context);
   const requestedPaths=values["changed-path"];
   if(requestedPaths && requestedPaths.length>64)throw new Error("Too many explicit routing paths");
-  const paths = requestedPaths ? [...new Set(requestedPaths.map(safeSubjectPath))].sort() : scope.records.map(record => record.path);
-  const routingPaths={mode:requestedPaths?"explicit":"captured-changes",paths};
+  const emptyScope = !!binding.context && !binding.context.sourcePaths.length && !requestedPaths;
+  const pathScopes = requestedPaths ? [...new Set(requestedPaths.map(safeSubjectPath))].sort()
+    : binding.context?.sourcePaths.length ? binding.context.sourcePaths : scope.records.map(record => record.path);
+  const settings = profileDecisionSettings(profile);
+  const inventory = contextCandidateInventory(subject, pathScopes, scope.records.map(record => record.path));
+  const paths = inventory.routingPaths;
+  const routingPaths={mode:requestedPaths?"explicit":emptyScope?"bound-task-empty-scope":binding.context?"bound-task":"captured-changes",paths};
   const route = routeContext(profile.context_router, task, paths);
   const targetSkillPaths: string[] = [];
   const localSkillDigests = new Map<string, string>();
@@ -81,19 +96,34 @@ export async function contextRouteCommand(args: string[], root: string,
   const packet = materializeRoutedContext(subject, route, values["include-expansion"], {
     index: loadSkillCatalog(assetRoot), task, changedPaths: paths, facts: contextFacts, includeEvaluation: values["include-evaluation-skills"] ?? false, targetSkill,
   });
+  if (inventory.unavailable) {
+    packet.blockers.push("context-inventory-unavailable"); packet.filesReady = false; packet.ready = false;
+  }
   const discovery = values["discover-path"]?.length ? discoverContext(subject, values["discover-path"]) : null;
   const mandatoryPaths = new Set([...route.primary, ...route.active, ...route.expansion]);
-  const optionalPaths = [...new Set([...(values["optional-path"] ?? []), ...(discovery?.paths ?? [])])].filter(path => !mandatoryPaths.has(path));
-  if (optionalPaths.length > 64) throw new Error("Too many optional context inputs");
-  const candidates: Candidate[] = optionalPaths.map(path => {
-    if (path.length > 128 || subject.source(path)?.file_type !== "regular") throw new Error("Optional source unavailable");
-    const bytes = subject.read(path, 1024 * 1024);
-    return { id: path, excerpt: new TextDecoder("utf-8", { fatal: true }).decode(bytes),
-      sourceDigest: `sha256:${createHash("sha256").update(bytes).digest("hex")}` };
-  });
+  const automatic = automaticContextCandidates(subject, emptyScope ? [] : inventory.relevant, mandatoryPaths,
+    settings.legacy.allowedSourcePaths ?? [], settings.legacy.maxCandidates);
+  const declaredFiles = binding.context?.sourcePaths.filter(path => { try { return subject.source(path)?.file_type === "regular"; } catch { return false; } }) ?? [];
+  const explicitOptional = new Set([...(values["optional-path"] ?? []), ...(discovery?.paths ?? [])].filter(path => !mandatoryPaths.has(path)));
+  if (explicitOptional.size > 64) throw new Error("Too many explicit optional context inputs");
+  const combinedPaths = [...new Set([...explicitOptional, ...declaredFiles.filter(path => !mandatoryPaths.has(path)), ...automatic.paths])];
+  const optionalPaths = combinedPaths.slice(0, 64);
+  for (const path of combinedPaths.slice(64)) { automatic.excluded.push({ path, reason: "candidate-limit" }); automatic.excludedCount++; }
+  const candidates: Candidate[] = [];
+  for (const path of optionalPaths) {
+    try {
+      if (path.length > 128 || subject.source(path)?.file_type !== "regular") throw new Error("Optional source unavailable");
+      const bytes = subject.read(path, 1024 * 1024);
+      if (bytes.includes(0)) throw new Error("Binary optional source");
+      candidates.push({ id: path, excerpt: new TextDecoder("utf-8", { fatal: true }).decode(bytes),
+        sourceDigest: `sha256:${createHash("sha256").update(bytes).digest("hex")}` });
+    } catch (error) {
+      if (explicitOptional.has(path)) throw error;
+      automatic.excluded.push({ path, reason: "source-unavailable-or-not-bounded-text" }); automatic.excludedCount++;
+    }
+  }
   const optionalBudget = Math.max(0, Math.min(packet.limits.expansion - packet.used.expansion, packet.limits.total - packet.used.total));
-  const settings = profileDecisionSettings(profile);
-  const decisionScope = resolveDecisionScope(root, { ...(values["decision-task"] === undefined ? {} : { taskId: values["decision-task"] }), revision });
+  const decisionScope = resolveDecisionScope(root, { ...(values["decision-task"] === undefined ? {} : { taskId: values["decision-task"] }), revision }, binding.context ?? undefined);
   let relevanceAdvice: ContextAdvice | null = null;
   const expandedContext = settings.questionIds.DL03.includes("context.relevance/1");
   const provider: DecisionProvider = suppliedProvider ?? (expandedContext ? {
@@ -113,7 +143,8 @@ export async function contextRouteCommand(args: string[], root: string,
   // Invalid mandatory context prevents any optional provider call or source transmission.
   const optional = packet.ready && candidates.length && optionalBudget >= 2 ? await buildContextPacket({
     taskRevision: revision, purpose: task, required: [], optional: candidates, maximumBytes: optionalBudget,
-    ...(values["optional-excerpt-bytes"] !== undefined ? { optionalExcerptBytes: Number(values["optional-excerpt-bytes"]) } : {}),
+    ...(values["optional-excerpt-bytes"] !== undefined ? { optionalExcerptBytes: Number(values["optional-excerpt-bytes"]) }
+      : !values["optional-path"]?.length && !values["discover-path"]?.length ? { optionalExcerptBytes: 2048 } : {}),
   }, provider, options) : null;
   let workflowRecommendation = null;
   if (packet.ready) {
@@ -130,7 +161,7 @@ export async function contextRouteCommand(args: string[], root: string,
   }
   const staleSources: string[] = [];
   // Re-read every captured candidate, including omitted sources, after optional advice returns.
-  for (const path of [...Object.keys(configDigests), ...packet.entries.map(entry => entry.path), ...optionalPaths, ...targetSkillPaths]) {
+  for (const path of [...Object.keys(configDigests), ...packet.entries.map(entry => entry.path), ...candidates.map(item => item.id), ...targetSkillPaths]) {
     try { subject.read(path, 1024 * 1024); } catch { staleSources.push(path); }
   }
   for (const [path, expected] of localSkillDigests) {
@@ -146,15 +177,23 @@ export async function contextRouteCommand(args: string[], root: string,
     skills: packet.skills?.entries.map(({ content, reasons, ...entry }) => entry) ?? [],
     optionalSources: candidates.map(({ excerpt, ...entry }) => entry),
     localSkillSources: Object.fromEntries(localSkillDigests) };
-  const receipt = { version: 1, receiptId, createdAt: new Date().toISOString(), ...identity,
+  const selection = { binding: taskBindingReceipt(binding), candidateCount: candidates.length, inventoryUnavailable: inventory.unavailable,
+    reason: !packet.ready ? "required-context-unavailable" : !candidates.length ? automatic.excludedCount ? "no-permitted-candidates" : "no-optional-candidates"
+      : optionalBudget < 2 ? "optional-budget-empty" : optional?.reason ?? "selection-unavailable",
+    automatic: { ...automatic, prefilter: "changed-first, explicit-next, then alphabetical; at most 256 inspected paths" } };
+  const receipt = { version: 1, receiptId, createdAt: new Date().toISOString(), ...identity, selection,
     inputDigest: digest(identity), ready: packet.ready && !staleSources.length, blockers: packet.blockers,
     omissions: packet.omissions, skillOmissions: packet.skills?.omissions ?? [],
     optional: optional ? { selected: optional.entries.map(entry => entry.id), omitted: optional.omitted,
       decision: optional.decision, measurement: optional.measurement, reason: optional.reason } : null,
     relevanceAdvice, workflowAdvice: workflowRecommendation, discovery, staleSources, outcome: staleSources.length ? "refused-stale-source" : packet.ready ? "delivered" : "blocked" };
   durableJson(join(contextStateRoot(root), "routes", `${receiptId}.json`), receipt);
+  recordEntryExposure(contextStateRoot(root), { caller: "context-route", entryKind: "context-delivery", scope: decisionScope,
+    native: { receiptId, inputDigest: receipt.inputDigest }, exposure: { ...selection, reached: true,
+      delivered: receipt.ready, used: null, acceptedOutcome: "unknown", totalModelTokens: null, outsideEntryActivity: "unknown" },
+    decisions: [(relevanceAdvice as ContextAdvice | null)?.decision?.receiptId, optional?.decision?.receiptId].filter((id): id is string => typeof id === "string") });
   if (staleSources.length) throw new Error("Context sources changed while preparing the routed packet");
   return { ...packet, route, routingPaths, receiptId, inputDigest: receipt.inputDigest, revision, source: identity.source,
     optional, relevanceAdvice: relevanceAdvice as ContextAdvice | null, workflowAdvice: workflowRecommendation,
-    optionalBudget, optionalOmitted: optional?.omitted ?? optionalPaths, discovery };
+    optionalBudget, optionalOmitted: optional?.omitted ?? optionalPaths, discovery, selection };
 }

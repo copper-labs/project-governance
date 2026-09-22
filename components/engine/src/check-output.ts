@@ -60,7 +60,7 @@ export async function checkOutput(id: string, workspace: string, options: Decisi
       outputs.push({ pack_id: pack.pack_id, request_digest: command.request_digest, ...selection });
     }
   }
-  const exposure = { reached: true, task: scope ? "bound" : "unavailable", used: null,
+  const exposure = { reached: true, task: scope ? "bound" : "unavailable", binding: dispatch?.taskBinding ?? null, used: null,
     outputs: outputs.map(({ selection, ...output }) => ({ requestDigest: output.request_digest, reason: output.reason,
       called: output.decision?.providerCalled ?? (output.decision ? null : false), delivered: output.delivered, deliveredBytes: selection?.bytes ?? 0,
       originalBytes: output.source.totalBytes, receiptId: output.decision?.receiptId ?? null })),

@@ -46,14 +46,25 @@ export function routeContext(raw: unknown, task: string, changedPaths: string[])
   }).sort((a, b) => b.score - a.score || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const selected = scores[0]?.score ? scores[0] : null;
   const tied = selected && scores[1]?.score === selected.score;
-  const outcome = selected ? tied ? "ambiguous" : "matched" : "fallback";
+  const pathOwners = scores.filter(item => item.reasons.some(reason => reason.startsWith("path:")));
+  const outcome = selected ? tied && !(selected.reasons.some(reason => reason.startsWith("path:")) &&
+    scores[1]!.reasons.some(reason => reason.startsWith("path:"))) ? "ambiguous" : "matched" : "fallback";
   const route = selected?.route ?? {};
-  const primary = [...new Set([...list(router.default_context), ...list(route.primary_context)])].map(safeSubjectPath);
-  const active = list(route.active_plan_context).map(safeSubjectPath).filter(path => !primary.includes(path));
-  const expansion = list(route.expansion_context).map(safeSubjectPath).filter(path => !primary.includes(path) && !active.includes(path));
+  // Every path owner remains mandatory, even outside the optional secondary display limit.
+  const owners = [...new Set([route, ...pathOwners.map(item => item.route)])];
+  // Mixed work gets the largest declared envelope, never a sum or a route-name-dependent cap.
+  const budgets = owners.map(owner => contextBudget(owner.token_budget));
+  const budget = Object.fromEntries(Object.keys(budgets[0]!).map(key => [key,
+    Math.max(...budgets.map(value => value[key as keyof typeof value])),
+  ])) as (typeof budgets)[number];
+  const primary = [...new Set([...list(router.default_context), ...owners.flatMap(owner => list(owner.primary_context))])].map(safeSubjectPath);
+  const active = [...new Set(owners.flatMap(owner => list(owner.active_plan_context)))].map(safeSubjectPath).filter(path => !primary.includes(path));
+  const expansion = [...new Set(owners.flatMap(owner => list(owner.expansion_context)))].map(safeSubjectPath).filter(path => !primary.includes(path) && !active.includes(path));
   return { outcome, selected: selected ? { id: selected.id, score: selected.score, reasons: selected.reasons } : null,
     secondary: scores.slice(1).filter(item => selected && item.score > 0 && selected.score - item.score <= threshold).slice(0, secondaryLimit).map(({ id, score, reasons }) => ({ id, score, reasons })),
-    primary, active, expansion, budget: contextBudget(route.token_budget),
-    skills: [...new Set([...list(router.default_skills), ...list(route.skills)])], routeSkills: list(route.skills), validations: list(route.validations),
+    matchedPathRoutes: pathOwners.map(item => item.id), primary, active, expansion, budget,
+    budgetAuthority: { mode: "largest-owner-envelope", routes: owners.map(owner => owner.id ?? "default") },
+    skills: [...new Set([...list(router.default_skills), ...owners.flatMap(owner => list(owner.skills))])],
+    routeSkills: [...new Set(owners.flatMap(owner => list(owner.skills)))], validations: [...new Set(owners.flatMap(owner => list(owner.validations)))],
     ready: false, remaining: "Required files and skills must be materialized and verified before this route is ready." };
 }

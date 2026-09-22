@@ -1,3 +1,4 @@
+import { verifyTaskContextEntry } from "./verify-task-context-entry.mjs";
 import { verifyProviderSelection } from "./verify-provider-selection.mjs";
 import { verifyDecisionConcurrency } from "./verify-decision-concurrency.mjs";
 import { verifyDecisionObservers } from "./verify-decision-observers.mjs";
@@ -109,8 +110,9 @@ export async function verifyDecisionPilot(packageRoot) {
     const observers = await verifyDecisionObservers({ packageRoot, repo, temporary, run, write, git, environment, callsPath });
     environment.JEV_TOKEN = "fixture-only";
     const providerSelection = await verifyProviderSelection({ packageRoot, repo, temporary, run, write, environment, callsPath });
+    const taskEntry = await verifyTaskContextEntry({ repo, temporary, run, write, git, environment });
     finished = true;
-    return { status: 'passed', providerSelection, consumers: ['DL01', 'DL02', 'DL07', ...observers].sort(), native_checks: 'passed', native_check_authority_unchanged: true, provider: 'fixture' };
+    return { status: 'passed', taskEntry, providerSelection, consumers: ['DL01', 'DL02', 'DL07', ...observers].sort(), native_checks: 'passed', native_check_authority_unchanged: true, provider: 'fixture' };
   } finally {
     await cleanupPilot(packageRoot, temporary, state, finished);
   }

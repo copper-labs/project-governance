@@ -15,10 +15,12 @@ import { validationAdvice, validationCounterfactual } from "./decision-validatio
 import type { DecisionOptions } from "./decisions.ts";
 import { decisionTaskContext, decisionTaskPurpose, type DecisionTaskContext } from "./decision-task-context.ts";
 import { recordEntryExposure } from "./decision-episodes.ts";
+import type { TaskBindingReceipt } from "./decision-task-binding.ts";
 
 export interface CheckAdviceOptions {
   taskId?: string; revision?: string; purpose?: string; reviewRules?: string;
   context?: DecisionTaskContext;
+  binding?: TaskBindingReceipt;
   runId?: string; compareRun?: string;
 }
 
@@ -36,7 +38,7 @@ export async function checkDecisionAdvice(prepared: { subject: ValidationSubject
     } catch { /* Missing telemetry cannot discard already computed advice or invent terminal proof. */ }
     return recordEntryExposure(contextStateRoot(prepared.subject.root), { caller: reviews ? "check" : "plan", entryKind: completion ? "check-completion" : "check-plan", scope: boundScope,
       native: { subjectDigest: prepared.scope.subject_digest ?? digest(prepared.scope), planDigest: digest(prepared.plan), stage: prepared.plan.stage, ...completion },
-      exposure: { reached: true, reason, reviewRequested: reviews, scope: boundScope ? "bound" : "unavailable", used: null,
+      exposure: { reached: true, reason, binding: options.binding ?? null, reviewRequested: reviews, scope: boundScope ? "bound" : "unavailable", used: null,
         decisions: decisions.map(row => ({ receiptId: row.receiptId, reason: row.reason, called: row.providerCalled ?? null, delivered: row.delivered })),
         outsideEntryActivity: "unknown", acceptedOutcome: "unknown", totalModelTokens: null },
       decisions: decisions.flatMap(row => row.receiptId ? [row.receiptId] : []) });
@@ -52,7 +54,8 @@ export async function checkDecisionAdvice(prepared: { subject: ValidationSubject
       ...(options.revision === undefined ? {} : { revision: options.revision }) }, context);
     boundScope = binding;
     if (settings.mode === "off") { record("consumer-off", []); return null; }
-    const purpose = context ? decisionTaskPurpose(context) : options.purpose;
+    const purpose = context ? [decisionTaskPurpose(context), ...(options.purpose && options.purpose !== context.requirement
+      ? [`Focus for this check (does not replace the task): ${options.purpose}`] : [])].join("\n") : options.purpose;
     const revision = binding?.taskRevision ?? "unbound";
     const identity = { subject: scope.subject_digest, config: settings.configDigest, purpose: purpose ?? null, plan: digest(plan), registry: digest(registry), reviewRules: options.reviewRules ?? null };
     const common = { eventId: digest(identity), policyDigest: digest(profile?.toString("base64") ?? null), environment: scope.mode,

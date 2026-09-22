@@ -57,6 +57,25 @@ test("bound provider context selects before native input and retains mandatory r
     assert.equal(fallback.delivery.reason, "missing-token");
     assert.ok(fallback.text.includes("MANDATORY:"));
     assert.ok(fallback.text.includes("src/feature.ts"));
+    const unsharedProfile = { ...profile, continuity: { decisions: { ...profile.continuity.decisions, allowed_source_paths: [] as string[] } } };
+    writeFileSync(join(root, "config/governance/profile.yaml"), JSON.stringify(unsharedProfile));
+    process.env.JEV_TOKEN = "fixture-only";
+    const unshared = await providerContext(root, { ...task, revision: "r3" }, {}, assets);
+    assert.equal(calls, 1, "no source-sharing declaration means no classifier transmission");
+    assert.ok(unshared.text.includes("src/feature.ts"), "explicit provider sources retain deterministic delivery");
+    assert.ok(unshared.text.includes("UNAPPROVED_SOURCE_CONTENT"));
+    writeFileSync(join(root, "config/governance/profile.yaml"), JSON.stringify(profile));
+    const sources = Array.from({ length: 12 }, (_, i) => `src/large${i}.ts`);
+    for (const path of sources) writeFileSync(join(root, path), original);
+    writeFileSync(join(root, "config/governance/profile.yaml"), JSON.stringify({ ...profile,
+      continuity: { decisions: { ...profile.continuity.decisions, allowed_source_paths: ["src/large*.ts"], evidence_bytes: 8192 } } }));
+    const large = await providerContext(root, { ...task, revision: "r4", sourcePaths: sources }, {}, assets);
+    assert.ok("receipt" in large.delivery);
+    const largeReceipt = JSON.parse(readFileSync(large.delivery.receipt, "utf8"));
+    assert.equal(calls, 2, "classifier excerpts can be smaller than delivered excerpts");
+    assert.equal(largeReceipt.relevanceAdvice.assessed.length, 12);
+    assert.ok(largeReceipt.relevanceAdvice.coverage.truncated);
+    writeFileSync(join(root, "config/governance/profile.yaml"), JSON.stringify(profile));
     assert.equal((await providerContext(root, undefined)).delivery.reason, "task-context-unavailable");
     const file = join(root, "context.json"); writeFileSync(file, JSON.stringify(task));
     assert.deepEqual(readDecisionTaskContext(file, root), task);

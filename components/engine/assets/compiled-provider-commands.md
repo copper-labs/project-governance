@@ -97,18 +97,24 @@ delivery lock remains uncertain and is not automatically stolen. Host restart su
 delivery require separate host qualification; fake-host tests do not establish them.
 Do not bootstrap, update, publish, or change another project's installation from a delegated worker.
 
-## RC4 task context and optional category routing
+## Task context and optional category routing
 
 Keep the coding model fixed by default. Supply the complete fixed pair in an explicit provider
 `config`, or preserve an explicit operator selection. Do not select a model from an old Markdown
 table. Optional category routing uses DL08 and an operator-defined category map; it never permits
 new delegation, different tools or extra jobs.
 
-Bind `decision` in the submission as `{version:1, workspace, taskId, revision, requirement,
-acceptance, sourcePaths}`. The normal submit path prepares mandatory instructions and bounded,
-source-linked optional context before native stdin. Missing JEV credentials use the ordinary
-context fallback. Omitted task binding is recorded as unavailable; it cannot count as a successful
-JEV exposure. Provider completion records native status separately from optional quality advice.
+Bind a task once with `harness task create --outcome <goal> --scope <path>` or `harness resume --task <id>`
+under the host's inherited `HARNESS_SESSION` or `CODEX_THREAD_ID`. New ordinary provider submissions
+resolve that binding automatically. An explicit `decision` object `{version:1, workspace, taskId,
+revision, requirement, acceptance, sourcePaths}` or `GOVERNANCE_DECISION_CONTEXT` file takes precedence.
+Guarded admission still requires its explicitly authorized decision object; an ambient binding grants
+no delegation or model-routing authority. Replay retains the job's original task, including no task.
+
+The normal submit path prepares required instructions and bounded optional context before native stdin.
+JEV only sees approved sources; explicitly supplied provider sources retain deterministic delivery when
+sharing or credentials are absent. Missing binding is recorded as unavailable and cannot count as a
+successful JEV exposure. Provider completion records native status separately from optional quality advice.
 The trusted host sets `dataDestination: local-only` when the assignment forbids cloud processing.
 Current native adapters then refuse before context selection or provider launch; RC4 has no qualified
 local generation backend. Omission retains the existing authorized cloud path, or the host may state
@@ -141,8 +147,9 @@ activate JEV selection. A guarded follow-up needs `authorizeProviderContinuation
 requirement and includes that new `admission` reference in its follow-up JSON. A changed requirement
 needs a new assignment; no self-issued continuation or retry cascade is allowed.
 
-For normal checks, bind the same context through `--decision-context <file>` or the explicit
-`GOVERNANCE_DECISION_CONTEXT` file path. `check-output --run <id>` selects existing optional log
+Normal checks and Git children resolve the same task automatically. Explicit `--decision-context <file>`
+and `GOVERNANCE_DECISION_CONTEXT` remain available. Detached checks freeze intent at submission;
+`--decision-purpose` can add check focus without replacing it. `check-output --run <id>` selects optional log
 content; `check-status --run <id>` returns compact terminal evidence and `--full` retrieves the full
 projection. Required failures, status, cleanup and original artifact references remain visible.
 `check-reconcile --run <id>` recovers only verified terminal ownership; it never reruns a check.

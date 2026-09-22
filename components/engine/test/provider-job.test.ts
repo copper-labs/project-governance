@@ -4,15 +4,19 @@ import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { submitProviderJob, submitProviderFollowUp } from "../src/provider-job.ts";
-import { waitCommand } from "../src/process-owner.ts";
+import { submitCommand, waitCommand } from "../src/process-owner.ts";
 import { reconcileCommandClaims } from "../src/command-claim-recovery.ts";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { providerJobCommand } from "../src/provider-job-command.ts";
+import { providerCommand } from "../src/provider-command.ts";
+import { Store } from "../../harness/src/store/store.ts";
+import { defaultDbPath, workContext } from "../../harness/src/store/location.ts";
 
 test("explicit provider submission and follow-up use one owner, preserve constraints and never repeat an acknowledged job", async () => {
-  const root = mkdtempSync(join(tmpdir(), "provider-job-")), previousState = process.env.XDG_STATE_HOME;
+  const root = mkdtempSync(join(tmpdir(), "provider-job-")), previousEnvironment = { ...process.env };
   process.env.XDG_STATE_HOME = join(root, "private-state");
+  delete process.env.GOVERNANCE_DECISION_CONTEXT; delete process.env.HARNESS_SESSION; delete process.env.CODEX_THREAD_ID;
   try {
     const executable = join(root, "native-agent"), count = join(root, "calls");
     writeFileSync(executable, `#!${process.execPath}
@@ -45,6 +49,28 @@ console.log(JSON.stringify({type:'result',subtype:'success',structured_output:{o
     await assert.rejects(() => providerJobCommand("provider-cancel", ["--directory", first.directory, "--digest", "wrong", "--authority", "parent"]), /identity mismatch/);
     await assert.rejects(() => providerJobCommand("provider-wait", [...handleArgs, "--milliseconds", "30001"]), /0..30000/);
     assert.equal((await submitProviderJob(first.directory, options)).submitted, false);
+    process.env.HARNESS_SESSION = "ambient";
+    const bind = (outcome: string) => {
+      const store = new Store(defaultDbPath(root)), where = workContext(root);
+      try {
+        const task = store.createTask(outcome, [], { ...where, session: "ambient", mode: "implement" });
+        store.bind(task.taskId, "ambient", store.workspace(where.locator, where.worktree), where.worktree);
+        return task;
+      } finally { store.close(); }
+    };
+    const ambient = bind("First task intent");
+    assert.equal((await submitProviderJob(first.directory, options)).submitted, false);
+    assert.equal(JSON.parse(readFileSync(join(first.directory, "request.json"), "utf8")).decisionBinding.task, null);
+    const boundOptions = { ...options, id: "ambient-job" };
+    const bound = await submitProviderJob(join(root, "ambient-job"), boundOptions);
+    assert.equal((await waitCommand(bound.directory, bound.requestDigest, 5000)).receipt?.state, "succeeded");
+    bind("Replacement task intent");
+    assert.equal((await submitProviderJob(bound.directory, boundOptions)).submitted, false);
+    assert.equal(JSON.parse(readFileSync(join(bound.directory, "request.json"), "utf8")).decisionBinding.task.taskId, ambient.taskId);
+    const legacyOptions = { ...options, id: "legacy-job" }, legacyDirectory = join(root, "legacy-job");
+    const legacy = submitCommand(legacyDirectory, { ...providerCommand(legacyOptions, legacyDirectory), runtime: null });
+    assert.equal((await waitCommand(legacy.directory, legacy.requestDigest, 5000)).receipt?.state, "succeeded");
+    assert.equal((await submitProviderJob(legacy.directory, legacyOptions)).submitted, false);
     const follow = { id: "second", prompt: "Inspect again", directory: join(root, "second") };
     const followFile = join(root, "follow.json"); writeFileSync(followFile, JSON.stringify({ id: follow.id, prompt: follow.prompt }));
     const second = (await providerJobCommand("provider-follow-up", [...handleArgs, "--request", followFile])).result as { directory: string; requestDigest: string };
@@ -54,12 +80,12 @@ console.log(JSON.stringify({type:'result',subtype:'success',structured_output:{o
     assert.equal(recorded.parent.requestDigest, first.requestDigest);
     assert.equal(recorded.provider.conversationId, "session-one");
     assert.equal(recorded.assignment.constraints, "Do not publish");
-    assert.equal(readFileSync(count, "utf8"), "called\ncalled\n");
+    assert.equal(readFileSync(count, "utf8"), "called\ncalled\ncalled\ncalled\n");
     reconcileCommandClaims(second.directory, second.requestDigest);
     const completedJobs = (await providerJobCommand("provider-list", ["--workspace", root])).result as { jobs: unknown[] };
-    assert.equal(completedJobs.jobs.length, 2);
+    assert.equal(completedJobs.jobs.length, 2, "the managed list excludes explicitly placed external fixture jobs");
   } finally {
-    if (previousState === undefined) delete process.env.XDG_STATE_HOME; else process.env.XDG_STATE_HOME = previousState;
+    process.env = previousEnvironment;
     rmSync(root, { recursive: true, force: true });
   }
 });

@@ -7,6 +7,17 @@ import { buildContextPacket } from "../src/context-packet.ts";
 import { DEFAULT_DECISIONS, JevDecisionAdapter } from "../src/decisions.ts";
 
 const candidate = (id: string) => ({ id, sourceDigest: "sha256:fixture", excerpt: id.repeat(30) });
+test("baseline ranks full captured meaning independently of delivery excerpt limits", async () => {
+  const input = { taskRevision: "whole-source", purpose: "alpha bravo charlie", required: [], maximumBytes: 4000,
+    optional: [{ id: "a", sourceDigest: "first", excerpt: "alpha bravo\n" },
+      { id: "b", sourceDigest: "second", excerpt: ["alpha\n", "unrelated\n".repeat(500), "bravo\n", "unrelated\n".repeat(500), "charlie\n"].join("") }] };
+  const provider = { async decide(): Promise<never> { throw new Error("offline"); } };
+  for (const optionalExcerptBytes of [128, 2048]) {
+    const packet = await buildContextPacket({ ...input, optionalExcerptBytes }, provider);
+    assert.deepEqual(packet.entries.map(entry => entry.id), ["b", "a"]);
+    assert.equal(packet.entries[0]!.sourceRange?.complete, false);
+  }
+});
 test("provider-free context preserves required evidence and bounds optional reading", async () => {
   const directory = mkdtempSync(join(tmpdir(), "context-packet-"));
   try {

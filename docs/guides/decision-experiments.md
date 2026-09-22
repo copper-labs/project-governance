@@ -177,3 +177,53 @@ new history.
 The installed-package fixtures prove wiring, bounds and fallback. They do not prove live JEV quality,
 SDK simulator/device integration, or performance improvement. SDK adoption and real-work measurement
 follow publication. Required checks and release authority remain deterministic.
+
+## Bind ordinary work once
+
+The [task entry contract](../specs/engine-task-context-entry.md) connects the continuity store to
+normal context and check commands. This is post-RC4 behavior; install a release containing it before
+using the automatic path. Do not patch a pinned runtime.
+
+```sh
+project-governance harness task create --outcome "Repair the request retry behavior" \
+  --acceptance "Preserve errors and pass the focused regression" --scope src/request.ts --scope docs/specs/retries.md
+project-governance context-route
+project-governance check --stage pre-commit --mode impacted --staged
+```
+
+Use `harness resume --task <id>` to continue known work. Task creation binds the existing host session;
+normal context/check commands and Git children then resolve it. Revising a task in its bound session
+atomically advances that session's binding to a new attempt; other sessions must deliberately resume
+the new revision. Root-wide scope preserves required changed-path guidance but does not request
+automatic optional source discovery. Choose specific files or directories, and preserve
+one task/version through ordinary retries. Explicit changed-path flags narrow retrieval when needed.
+
+The native Codex thread environment is recognized by the continuity owner. Other hosts should be
+launched with a stable `HARNESS_SESSION` set, with task creation/resume under the same value. Setting
+it in a short-lived startup subprocess cannot change the parent host environment. Missing session,
+stale intent, closed task and missing store are visible fallback reasons, not grounds to choose
+another active task. A custom `harness --db` store is not automatically discovered; use the default
+store or a validated explicit decision-context file for that integration.
+
+Candidate discovery examines changed paths first, then exact scope files, then an alphabetical prefix.
+This bounds work before JEV; it does not promise to find every relevant file. Inspect exclusions and
+omitted counts, and narrow task scopes when the prefix misses useful context. Mixed required routes
+use the largest declared budget envelope; required overflow remains a blocker.
+Directory scopes match every captured file beneath them, including unchanged files. Prefer specific
+task paths to avoid pulling in unrelated required owners. Failed inventory is a named context blocker.
+Explicitly scoped files remain available in the baseline packet without classifier sharing; automatic
+directory discovery needs approved source patterns before loading optional contents.
+Use `consumers.DL03` for the current relevance selector, which assesses permitted files individually.
+The older `allowed_questions` context adapter retains its whole-request fallback when any candidate
+is outside the sharing allowlist. Do not declare both forms for the same consumer.
+
+The returned `selection.binding`, candidate/exclusion summary and linked exposure receipt show which
+path actually ran. Required guidance remains deterministic; JEV only ranks optional approved text.
+Missing credentials use the same bounded baseline packet. No candidates and no source permission are
+different from successful ranking. Ordinary check execution remains available when optional intent
+is unavailable. A workflow's existing explicit action/task authority still owns workflow execution.
+
+Host instruction updates ship with the package. The host must invoke task entry and consume its
+packet before reading source; the runtime cannot intercept unrelated native file reads. Receipt
+coverage names that limit. Use an actual assigned task after immutable adoption to qualify the host
+and compare accepted work before making savings claims.

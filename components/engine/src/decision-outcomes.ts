@@ -48,7 +48,10 @@ export function decisionOutcomeReport(stateRoot: string, manifestPath: string, r
         if (caller.version !== 1 || caller.id !== id || scopeIdentity(caller.scope) !== episodeScope) throw new Error("Caller episode binding mismatch");
         const native = object(caller.native, "caller native identity");
         const hash = (value: unknown) => /^sha256:[a-f0-9]{64}$/u.test(String(value));
-        if (caller.entryKind === "check-plan") {
+        if (caller.entryKind === "context-delivery") {
+          text(native.receiptId, "context receipt id", 128);
+          if (!hash(native.inputDigest) || (Array.isArray(episode.native) && episode.native.length > 0)) throw new Error("Context delivery identity required; native outcome needs its own completion capture");
+        } else if (caller.entryKind === "check-plan") {
           if (!hash(native.subjectDigest) || !hash(native.planDigest) || (Array.isArray(episode.native) && episode.native.length > 0)) throw new Error("Check plan identity required");
         } else if (["check-output", "check-completion"].includes(String(caller.entryKind))) {
           text(native.runId, "caller run id", 256);

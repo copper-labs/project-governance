@@ -11,6 +11,8 @@ summary: Prioritized JEV implementation batches delivered through release candid
 
 # Decision layer delivery, release and pilot measurement
 
+The active post-RC4 corrective batch is [ordinary task context and selection adoption](2026-09-22-task-context-entry.md): reuse session-bound task intent, deliver context automatically, and repair adopter route coverage before measuring ordinary use.
+
 ## Objective and current status
 
 The main programme is to implement and evaluate the optional JEV decision layer: reduce repetitive

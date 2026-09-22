@@ -156,3 +156,18 @@ capabilities:
       - components/engine/src/decision-review.ts
       - components/engine/src/decision-validation-advice.ts
       - components/engine/src/decision-episodes.ts
+
+  - id: task-context-entry
+    title: Carry task intent through normal commands
+    aliases: [session-context, automatic-context-selection]
+    tasks:
+      - bind task intent once and diagnose missing ordinary-task exposure
+      - select bounded source context before model reading
+    symbols: [project-governance context-route, resolveTaskContext]
+    reference: docs/specs/engine-task-context-entry.md
+    guides: [docs/guides/decision-experiments.md, docs/exec-plans/active/2026-09-22-task-context-entry.md]
+    sources:
+      - components/engine/src/decision-task-binding.ts
+      - components/engine/src/context-route-command.ts
+      - components/engine/src/context-candidates.ts
+      - components/harness/src/store/store.ts

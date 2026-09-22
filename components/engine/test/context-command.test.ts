@@ -36,7 +36,7 @@ test("source edits during ranking refuse delivery while retaining decision usage
     const { digest } = await import("../src/core.ts");
     await assert.rejects(contextCommand(["--purpose", "find bug", "--revision", "1", "--optional-path", "source.ts", "--optional-excerpt-bytes", "160"], directory, {
       async decide(request) {
-        assert.ok(request.candidates[0]!.sourceRange);
+        assert.equal(request.candidates[0]!.excerpt, original, "adapter bounds classifier evidence independently of delivery excerpts");
         assert.ok(!request.candidates[0]!.excerpt.includes("outside excerpt"));
         writeFileSync(join(directory, "source.ts"), original + "outside excerpt changed\n");
         return { version: 1, kind: request.kind, inputDigest: digest(request), delivered: ["source.ts"], suggested: null,

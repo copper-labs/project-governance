@@ -100,3 +100,5 @@ records the latest design corrections, remaining decisions and limits of the rev
 The [continuity module](../components/harness/README.md) owns task history and bounded resume.
 It is part of this governance product and wheel; policy and process supervision retain their existing
 owners. See the [process map](../components/harness/docs/architecture/development-flow.md).
+
+The [ordinary task context contract](specs/engine-task-context-entry.md) and [corrective implementation plan](exec-plans/active/2026-09-22-task-context-entry.md) close the gap between enabled decisions and normal task use.

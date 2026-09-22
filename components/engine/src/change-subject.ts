@@ -224,10 +224,14 @@ export class ValidationSubject {
     return decode(bytes);
   }
 
-  paths(): string[] {
+  paths(prefixes?: string[]): string[] {
+    const scopes = prefixes?.map(safeSubjectPath);
+    if (scopes && !scopes.length) return [];
+    const included = (path: string) => !scopes || scopes.some(scope => path === scope || path.startsWith(scope + "/"));
     const args = this.#scope.scope === "all" ? ["ls-files", "--cached", "--others", "--exclude-standard", "-z"] : ["ls-tree", "-r", "--name-only", "-z", this.#scope.base_ref!];
+    if (scopes) args.push("--", ...scopes.map(path => `:(literal)${path}`));
     const paths = new Set(decode(git(this.root, args)).split("\0").filter(Boolean).map(safeSubjectPath));
-    for (const [path, source] of this.#overlay) if (source) paths.add(path); else paths.delete(path);
+    for (const [path, source] of this.#overlay) if (included(path)) { if (source) paths.add(path); else paths.delete(path); }
     return [...paths].sort();
   }
 }

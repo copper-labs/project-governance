@@ -14,6 +14,7 @@ import type { ValidationPlan } from "./planning.ts";
 import type { BuiltinCheckRequest } from "./builtin-checks.ts";
 import { retainRuntimeReader, releaseRuntimeReader, type RuntimeReader } from "./runtime-reader.ts";
 import type { DecisionTaskContext } from "./decision-task-context.ts";
+import type { TaskBindingReceipt } from "./decision-task-binding.ts";
 const WORKER = fileURLToPath(import.meta.url);
 interface CheckWork extends CheckObservationContext {
   version: 1; trigger?: "manual" | "hook" | "test"; id: string; root: string; runsRoot: string; assetsRoot: string; workerDigest: string;
@@ -21,15 +22,17 @@ interface CheckWork extends CheckObservationContext {
   narrative: Pick<BuiltinCheckRequest, "commit" | "pullRequest">; managedPaths: string[]; runFixtureProof: boolean; workId: string;
   generation: RuntimeReader | null;
   decisionContext?: DecisionTaskContext;
+  taskBinding?: TaskBindingReceipt;
 }
 /** Reserve a single detached owner before launching. Reconnection only observes the returned run ID. */
-export function dispatchChecks(packs: Packs, plan: ValidationPlan, request: Omit<BuiltinCheckRequest, "id" | "assets"> & { assets: PackagedCheckerAssets }, options: { root?: string; deadlineMs?: number; decisionContext?: DecisionTaskContext } & CheckObservationContext = {}) {
+export function dispatchChecks(packs: Packs, plan: ValidationPlan, request: Omit<BuiltinCheckRequest, "id" | "assets"> & { assets: PackagedCheckerAssets }, options: { root?: string; deadlineMs?: number; decisionContext?: DecisionTaskContext; taskBinding?: TaskBindingReceipt } & CheckObservationContext = {}) {
   const observation = checkObservationContext(options.trigger, options.expectedStatus);
   const root = options.root ?? checkRunRoot(); mkdirSync(root, { recursive: true, mode: 0o700 });
   const runsRoot = realpathSync(root), id = randomUUID(), directory = join(runsRoot, id); mkdirSync(directory, { mode: 0o700 });
   const work: CheckWork = { version: 1, ...observation, id, root: request.subject.root, runsRoot, assetsRoot: request.assets.root, workerDigest: fileDigest(WORKER),
     generation: retainRuntimeReader(`check:${id}`, { workspace: request.subject.root, stage: request.stage }),
     ...(options.decisionContext ? { decisionContext: options.decisionContext } : {}),
+    ...(options.taskBinding ? { taskBinding: options.taskBinding } : {}),
     deadlineAt: Date.now() + (options.deadlineMs ?? 300000),
     packs, plan, scope: request.scope, stage: request.stage, asOf: request.asOf, deadlineMs: options.deadlineMs ?? 300000,
     managedPaths: [...(request.managedPaths ?? [])], runFixtureProof: request.runFixtureProof ?? false, workId: request.workId ?? "",

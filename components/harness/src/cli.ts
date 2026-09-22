@@ -19,7 +19,7 @@ const HELP = `harness — task continuity and evidence, not an agent or process 
   task create --outcome TEXT --scope PATH [--constraint TEXT] [--acceptance TEXT] [--exploring]
   task list [--all]
   task show|fork --task ID [--outcome TEXT]
-  task revise --task ID --expected-version N [--note TEXT] [--constraint TEXT]
+  task revise --task ID --expected-version N [--note TEXT] [--constraint TEXT] [--acceptance TEXT]
               [--scope PATH] [--ruled-out TEXT] [--revoke N] [--status STATUS] [--authority-ref REF]
   resume --task ID [--session ID] [--parent-attempt ID] [--after N] [--budget BYTES]
   checkpoint --task ID --summary TEXT --next TEXT [--evidence ID] [--subject DIGEST]
@@ -186,10 +186,16 @@ function main(argv: string[], options: ContinuityCommandOptions = {}): void {
             const task = needTask();
             require("expected-version");
             const added: Omit<TaskItem, "seq" | "revoked">[] = [];
-            for (const [flag, kind, provenance] of [["note", "handoff", "hypothesis"], ["ruled-out", "ruled-out", "hypothesis"], ["open-question", "open-question", "hypothesis"], ["constraint", "constraint", "operator"], ["scope", "scope", "operator"]] as const)
+            for (const [flag, kind, provenance] of [["note", "handoff", "hypothesis"], ["ruled-out", "ruled-out", "hypothesis"], ["open-question", "open-question", "hypothesis"], ["constraint", "constraint", "operator"], ["acceptance", "acceptance", "operator"], ["scope", "scope", "operator"]] as const)
                 for (const body of flags[flag] ?? [])
                     added.push(item(kind, flag === "scope" ? resolve(root, body) : body, provenance));
-            return emit({ ok: true, task: store.reviseTask(task.taskId, added, { expectedVersion: number("expected-version", task.version), ...(one("outcome") ? { outcome: one("outcome")! } : {}), ...(one("status") ? { status: one("status") as TaskStatus } : {}), revoke: (flags["revoke"] ?? []).map(Number), ...(who ? { session: who } : {}), ...(one("authority-ref") ? { authorityRef: one("authority-ref")! } : {}) }) });
+            const revised = store.atomic(() => {
+                const changed = store.reviseTask(task.taskId, added, { expectedVersion: number("expected-version", task.version), ...(one("outcome") ? { outcome: one("outcome")! } : {}), ...(one("status") ? { status: one("status") as TaskStatus } : {}), revoke: (flags["revoke"] ?? []).map(Number), ...(who ? { session: who } : {}), ...(one("authority-ref") ? { authorityRef: one("authority-ref")! } : {}) });
+                if (who && store.boundAttempt(who, workspaceId)?.taskId === task.taskId)
+                    store.bind(task.taskId, who, workspaceId, root);
+                return changed;
+            });
+            return emit({ ok: true, task: revised });
         }
         if (group === "resume") {
             const task = needTask();

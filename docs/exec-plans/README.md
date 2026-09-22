@@ -83,3 +83,5 @@ Git remains the implementation history and recovery mechanism.
   telemetry, and clean-wheel proof.
 - [Governance streamlining](completed/2026-08-14-governance-streamlining.md) completed its source
   implementation and proof. Any shadow adoption is target-owned work outside this checkout.
+
+- [Ordinary task context and selection adoption](active/2026-09-22-task-context-entry.md) — post-RC4 integration repair under the major-adoption programme.

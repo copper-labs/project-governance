@@ -61,7 +61,7 @@ import { dispatchChecks } from "./check-worker.ts";
 import { narrativeInputs } from "./narrative-inputs.ts";
 import { PackagedCheckerAssets } from "./checker-assets.ts";
 import { checkDecisionAdvice, type CheckAdviceOptions } from "./decision-check-advice.ts";
-import { readDecisionTaskContext } from "./decision-task-context.ts";
+import { resolveTaskContext, taskBindingReceipt } from "./decision-task-binding.ts";
 import { resolveDecisionScope } from "./decision-scope.ts";
 
 /** Public argument parsing rejects conflicting subjects before reading a candidate. */
@@ -107,12 +107,12 @@ export function prepareCommand(args: string[], root: string, builtinDirectory: s
     ...(values["decision-purpose"] === undefined ? {} : { purpose: values["decision-purpose"] }),
     ...(values["review-rules"] === undefined ? {} : { reviewRules: values["review-rules"] }),
   };
-  const taskContextPath = values["decision-context"] ?? process.env.GOVERNANCE_DECISION_CONTEXT;
-  if (taskContextPath) {
-    decisionOptions.context = readDecisionTaskContext(taskContextPath, root);
+  const binding = resolveTaskContext(root, { ...decisionOptions,
+    ...(values["decision-context"] ? { path: values["decision-context"] } : {}) });
+  decisionOptions.binding = taskBindingReceipt(binding);
+  if (binding.context) {
+    decisionOptions.context = binding.context;
     resolveDecisionScope(root, decisionOptions, decisionOptions.context);
-    if (decisionOptions.purpose !== undefined && decisionOptions.purpose !== decisionOptions.context.requirement)
-      throw new Error("Explicit purpose conflicts with bound requirement");
   }
   const workId = command === "check" ? process.env["GOVERNANCE_WORK_ID"] ?? "" : "";
   return { plan: buildPlan(registry, { stage, mode, changedPaths: scope.records.map(record => record.path), explicitPackIds: packs }), scope, subject, registry, narrative, workId, decisionOptions, deadlineMs, ...observation, jsonOutput: typeof jsonOutput === "string" ? jsonOutput : null, summary: values.summary === true, detach: values["detach"] === true };
@@ -414,6 +414,7 @@ Use the owning command contract for structured request fields.
       subject: prepared.subject, scope: prepared.scope, assets: new PackagedCheckerAssets(), packIds: new Set(Object.keys(prepared.registry)),
       stage: prepared.plan.stage ?? "", asOf: new Date().toISOString(), workId: prepared.workId, ...prepared.narrative,
     }, { deadlineMs: prepared.deadlineMs, ...(prepared.decisionOptions.context ? { decisionContext: prepared.decisionOptions.context } : {}),
+      ...(prepared.decisionOptions.binding ? { taskBinding: prepared.decisionOptions.binding } : {}),
       ...checkObservationContext(prepared.trigger, prepared.expectedStatus) });
     if (prepared.detach) {
       const advice = await withDecisionCancellation(options => checkDecisionAdvice(prepared, { ...prepared.decisionOptions, runId: submission.run_id }, true, options));

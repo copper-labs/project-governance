@@ -1,9 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { submitCommand, waitCommand, cancelCommand } from "../src/process-owner.ts";
+import { removeFinishedCommandFixture } from "./support/finished-command-fixture.ts";
 
 test("provider idle, overall and disabled deadlines remain distinct and cancellable", async () => {
   const root = mkdtempSync(join(tmpdir(), "provider-timeouts-"));
@@ -26,5 +27,5 @@ test("provider idle, overall and disabled deadlines remain distinct and cancella
       assert.equal(result.receipt?.cleanup, "confirmed", fixture.id);
       assert.equal(result.receipt?.state, fixture.id === "active" ? "succeeded" : fixture.id === "cancel" ? "cancelled" : "failed");
     }
-  } finally { rmSync(root, { recursive: true, force: true }); }
+  } finally { await removeFinishedCommandFixture(root, ["idle", "active", "overall", "cancel"]); }
 });

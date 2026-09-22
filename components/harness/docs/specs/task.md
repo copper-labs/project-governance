@@ -76,3 +76,14 @@ paths and 8 MiB of blob output, within a shared 5-second Git inspection deadline
 They compare stored Git blob bytes with original worktree hashes, so EOL/clean-smudge/LFS filters
 can produce a conservative stale classification without a semantic source change. This limitation
 is in the receipt; no transformation-aware reuse is claimed.
+
+## Compiled engine projection
+
+The compiled engine can read the default store's current session/workspace binding without creating
+or migrating state. An open task at the recorded attempt version projects goal, acceptance and local
+scope into decision context. The [engine entry contract](../../../../docs/specs/engine-task-context-entry.md)
+owns its bounded projection, named fallback and delivery behavior; it grants no execution authority.
+CLI revision can add acceptance items. It atomically advances only the revising session's existing
+binding to a new attempt at the new version, preserving the earlier attempt as its parent.
+Other sessions keep their captured version until explicit resume. Detached work retains its dispatch
+projection even if later work rebinds the host session.

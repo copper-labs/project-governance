@@ -17,10 +17,9 @@ export async function providerContext(workspace: string, context: DecisionTaskCo
   context = decisionTaskContext(context, workspace);
   if (!existsSync(join(workspace, "config/governance/profile.yaml"))) return outside("context-integration-unavailable");
   const args = ["--task", decisionTaskPurpose(context), "--decision-task", context.taskId, "--revision", context.revision,
-    "--optional-excerpt-bytes", "2048", ...context.sourcePaths.flatMap(path => ["--changed-path", path, "--optional-path", path])];
-  if (context.sourcePaths.length) args.push(...context.sourcePaths.flatMap(path => ["--discover-path", path]));
+    "--optional-excerpt-bytes", "2048"];
   const skillAssetRoot = assetRoot ?? fileURLToPath(new URL("../assets/skills/", import.meta.url));
-  const packet = await contextRouteCommand(args, workspace, skillAssetRoot, undefined, options);
+  const packet = await contextRouteCommand(args, workspace, skillAssetRoot, undefined, options, context);
   if (!packet.ready) throw new Error(`Required provider context unavailable: ${packet.blockers.join(", ")}`);
   const mandatory = packet.entries.map(entry => ({ path: entry.path, text: entry.content, digest: entry.sourceDigest }));
   const skills = (packet.skills?.entries ?? []).map(entry => ({ path: entry.path, text: entry.content, digest: entry.sourceDigest }));

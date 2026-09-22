@@ -9,6 +9,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { cancelCommand, observeCommand, processFingerprint, submitCommand, waitCommand } from "../src/process-owner.ts";
+import { removeFinishedCommandFixture } from "./support/finished-command-fixture.ts";
 
 test("owned command preserves native failure and duplicate submission observes the same receipt", async () => {
   const dir = mkdtempSync(join(tmpdir(), "engine-command-"));
@@ -221,7 +222,7 @@ for (const graceful of [false, true]) test(`guardian cleans after owner death wi
   } finally {
     if (launch?.child && processFingerprint(launch.child.pid) === launch.child.fingerprint) process.kill(-launch.child.pid, "SIGKILL");
     if (launch?.owner && processFingerprint(launch.owner.pid) === launch.owner.fingerprint) process.kill(launch.owner.pid, "SIGKILL");
-    rmSync(root, { recursive: true, force: true });
+    await removeFinishedCommandFixture(root, ["job"]);
   }
 });
 

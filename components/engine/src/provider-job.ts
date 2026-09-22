@@ -7,7 +7,7 @@ import { digest } from "./core.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { reconcileCommand } from "./command-recovery.ts";
-import { decisionTaskContext, type DecisionTaskContext } from "./decision-task-context.ts";
+import { type DecisionTaskContext } from "./decision-task-context.ts";
 import { providerContext } from "./provider-context.ts";
 import { loadProfileDecisionSettings } from "./decision-settings.ts";
 import { narrativeFile } from "./narrative-inputs.ts";
@@ -17,6 +17,7 @@ import { contextStateRoot } from "./context-command.ts";
 import { resolveDecisionScope } from "./decision-scope.ts";
 import { assertProviderDestination, readProviderAdmission } from "./provider-admission.ts";
 import { routeProviderModel } from "./decision-model-routing.ts";
+import { resolveTaskContext, taskBindingReceipt } from "./decision-task-binding.ts";
 
 export type ProviderJobRequest = Parameters<typeof providerCommand>[0] & {
   decision?: DecisionTaskContext; admission?: string; dataDestination?: "cloud-allowed" | "local-only";
@@ -33,7 +34,6 @@ export async function submitProviderJob(directory: string, request: ProviderJobR
   const selectedOverride = admission?.binding.operatorOverride;
   const fixed = { ...request, ...(selectedOverride ? { model: selectedOverride.model, effort: selectedOverride.effort } : {}) };
   providerCommand(fixed, directory, admission?.binding.guard);
-  const task = request.decision === undefined ? undefined : decisionTaskContext(request.decision, request.workspace);
   const settings = loadProfileDecisionSettings(request.workspace);
   if (!admission && settings.modelRouting.providers[request.provider]?.require_governed_entry)
     throw new Error(`Provider ${request.provider} requires trusted guarded admission under require_governed_entry`);
@@ -47,9 +47,12 @@ export async function submitProviderJob(directory: string, request: ProviderJobR
       return submitCommand(directory, retained);
     }
     // Older immutable jobs retain the original replay path; they cannot acquire a new task binding.
-    if (task) throw new Error("Existing provider job lacks the requested decision binding");
+    if (request.decision) throw new Error("Existing provider job lacks the explicitly requested decision binding");
     return submitCommand(directory, { ...providerCommand(request, directory), runtime, ...(completion ? { completion } : {}) });
   }
+  // Replays use captured intent, including null. Ambient session changes cannot retarget an old job.
+  const taskResolution = resolveTaskContext(request.workspace, request.decision ? { context: request.decision } : {});
+  const task = taskResolution.context ?? undefined;
   const packet = await providerContext(request.workspace, task);
   const routing = admission && task ? await routeProviderModel(admission, task) : null;
   if (loadProfileDecisionSettings(request.workspace).configDigest !== settings.configDigest) throw new Error("Decision policy changed during provider preparation");
@@ -63,7 +66,7 @@ export async function submitProviderJob(directory: string, request: ProviderJobR
   recordEntryExposure(contextStateRoot(request.workspace), { caller: "provider-submit", entryKind: "provider-submit",
     scope: task ? resolveDecisionScope(request.workspace, {}, task) : null,
     native: { requestDigest: submitted.requestDigest, id: request.id, model: command.provider!.model, effort: command.provider!.effort },
-    exposure: { reached: true, context: packet.delivery, submitted: true, used: null,
+    exposure: { reached: true, binding: taskBindingReceipt(taskResolution), context: packet.delivery, submitted: true, used: null,
       routing, routeCoverage: admission ? "guarded-child" : "admission-only", outsideEntryActivity: "unknown", totalModelTokens: null, acceptedOutcome: "unknown" },
     decisions: [routing?.decision?.receiptId, "decisionReceipt" in packet.delivery ? packet.delivery.decisionReceipt : null]
       .filter((id): id is string => typeof id === "string") });

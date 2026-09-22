@@ -5,6 +5,9 @@ import { dirname, join } from "node:path";
 import { SCHEMA, SCHEMA_VERSION, V5, V6 } from "./schema.ts";
 import { ExecutionStateUnavailable, RevisionConflict, type Action, type ActionStatus, type Artifact, type Evidence, type Task, type TaskItem, type TaskMode, type Usage, type Attempt, type Checkpoint, type LedgerEvent, type ExecutionBinding, } from "../model/types.ts";
 const now = (): string => new Date().toISOString();
+export class StoreSchemaMismatch extends Error {
+    constructor() { super("read-only inspection needs the current store schema"); }
+}
 export const contentAddress = (s: string): string => "sha256:" + createHash("sha256").update(s).digest("hex");
 /**
  * The operational store.
@@ -29,7 +32,7 @@ export class Store {
                 value: string;
             } | undefined : undefined;
             if (options.readOnly) {
-                if (Number(old?.value) !== SCHEMA_VERSION) throw new Error("read-only inspection needs the current store schema");
+                if (Number(old?.value) !== SCHEMA_VERSION) throw new StoreSchemaMismatch();
                 return;
             }
             if (old && ![4, 5, SCHEMA_VERSION].includes(Number(old.value)))
@@ -553,6 +556,11 @@ export class Store {
         return Number((this.#db.prepare("SELECT MAX(seq) seq FROM ledger WHERE task_id=?").get(taskId) as {
             seq: number | null;
         }).seq ?? 0);
+    }
+    /** Observation must not register a new workspace or move an existing binding. */
+    workspaceId(locator: string): string | null {
+        const row = this.#db.prepare("SELECT workspace_id FROM workspace WHERE locator=?").get(locator) as { workspace_id: string } | undefined;
+        return row?.workspace_id ?? null;
     }
     workspace(locator: string, path: string): string {
         this.#db.prepare("INSERT INTO workspace VALUES(?,?,?) ON CONFLICT(locator) DO UPDATE SET path=excluded.path").run(randomUUID(), locator, path);

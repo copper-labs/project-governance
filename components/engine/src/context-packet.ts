@@ -24,7 +24,9 @@ export async function buildContextPacket(input: ContextPacketRequest, provider: 
   const optional = input.optionalExcerptBytes === undefined ? input.optional
     : input.optional.map(candidate => contextExcerpt(candidate, input.purpose, input.optionalExcerptBytes!));
   const request: DecisionRequest = { version: 1, kind: "rank_optional_context", taskRevision: input.taskRevision,
-    purpose: input.purpose, candidates: optional, dataClass: "source" };
+    // Each adapter bounds its own wire evidence. Delivery excerpts must not prevent a smaller
+    // classifier excerpt from being selected from the original captured source.
+    purpose: input.purpose, candidates: input.optional, dataClass: "source" };
   let decision: DecisionResult | null = null;
   let reason = "provider-unavailable";
   let order = lexicalContextOrder(request);
