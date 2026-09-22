@@ -7,6 +7,7 @@ import { DECISION_CONSUMERS } from "./decision-catalog.ts";
 import { DECISION_CONSUMER_IDS, DECISION_EFFECTS, DECISION_MODES, type DecisionConsumerId, type DecisionEffect, type DecisionMode } from "./decision-schema.ts";
 import { profileDecisionConfig, loadProfileDecisionConfig } from "./decision-configuration.ts";
 import type { DecisionConfig } from "./decisions.ts";
+import { modelRoutingSettings, type ModelRoutingSettings } from "./model-routing-settings.ts";
 
 export interface ConsumerSetting { mode: DecisionMode; effect: DecisionEffect; effectSource: "declared" | "default" }
 export interface DecisionBudgetLimits { maxCalls: number; maxRequestBytes: number }
@@ -20,6 +21,7 @@ export interface DecisionSettings {
   /** Explicit opt-in to new questions is separate from legacy context-ranking permission. */
   questionIds: Record<DecisionConsumerId, string[]>;
   configDigest: string;
+  modelRouting: ModelRoutingSettings;
 }
 
 export const DEFAULT_DECISION_BUDGET: DecisionBudgetLimits = { maxCalls: 16, maxRequestBytes: 131_072 };
@@ -28,7 +30,7 @@ const LEGACY_CONTEXT_QUESTION = "rank_optional_context";
 
 function consumerSetting(raw: unknown, id: DecisionConsumerId): ConsumerSetting {
   const entry = object(raw, `continuity.decisions.consumers.${id}`);
-  for (const key of Object.keys(entry)) if (!["mode", "effect"].includes(key)) throw new Error(`Unknown decision consumer key: ${id}.${key}`);
+  for (const key of Object.keys(entry)) if (!["mode", "effect", "questions"].includes(key)) throw new Error(`Unknown decision consumer key: ${id}.${key}`);
   const mode = entry["mode"] ?? "off";
   if (typeof mode !== "string" || !(DECISION_MODES as readonly string[]).includes(mode)) throw new Error(`Invalid decision mode for ${id}`);
   if (entry["effect"] === undefined) return { mode: mode as DecisionMode, effect: "advise", effectSource: "default" };
@@ -78,14 +80,23 @@ export function profileDecisionSettings(profile: unknown): DecisionSettings {
   }
   const budget = budgetLimits(settings["budget"]);
   const mode = legacy.mode;
-  const questionIds = Object.fromEntries(DECISION_CONSUMER_IDS.map(id => [id,
-    Object.hasOwn(declared, id) ? [...DECISION_CONSUMERS[id].questions] : id === "DL03" && legacyContext ? ["legacy.context-rank/1"] : [],
-  ])) as Record<DecisionConsumerId, string[]>;
-  const resolved: Omit<DecisionSettings, "configDigest"> = { mode, legacy, consumers, questionIds, budget, migration: { notes } };
+  const questionIds = Object.fromEntries(DECISION_CONSUMER_IDS.map(id => {
+    if (!Object.hasOwn(declared, id)) return [id, id === "DL03" && legacyContext ? ["legacy.context-rank/1"] : []];
+    const questions = object(declared[id]).questions;
+    if (questions === undefined) return [id, [...DECISION_CONSUMERS[id].defaultQuestions]];
+    if (!Array.isArray(questions) || new Set(questions).size !== questions.length ||
+        questions.some(question => typeof question !== "string" || !DECISION_CONSUMERS[id].questions.includes(question)))
+      throw new Error(`Invalid or incompatible questions for ${id}`);
+    if (id === "DL07" && new Set(questions.map(question => String(question).split("/")[0])).size !== questions.length)
+      throw new Error("Select one version per validation question");
+    return [id, [...questions]];
+  })) as Record<DecisionConsumerId, string[]>;
+  const modelRouting = modelRoutingSettings(root.continuity === undefined ? undefined : object(root.continuity).model_routing);
+  const resolved: Omit<DecisionSettings, "configDigest"> = { mode, legacy, consumers, questionIds, budget, modelRouting, migration: { notes } };
   return { ...resolved, configDigest: digest({ mode, model: legacy.model, revision: legacy.revision,
     allowedDataClasses: legacy.allowedDataClasses, allowedSourcePaths: legacy.allowedSourcePaths ?? [],
     deadlineMs: legacy.deadlineMs, evidenceBytes: legacy.evidenceBytes, maxCandidates: legacy.maxCandidates,
-    consumers, questionIds, budget }) };
+    consumers, questionIds, budget, modelRouting }) };
 }
 
 export function loadProfileDecisionSettings(root: string): DecisionSettings {

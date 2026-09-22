@@ -142,3 +142,38 @@ dispositions:
     and post-write evidence through subsequent transitions. Its assertions prove replay and preservation using
     that history. Splitting by file length would duplicate expensive setup or conceal cross-transition state;
     narrow owner tests remain separate.
+- finding: quality.large-function
+  path: components/engine/src/decision-runtime.ts
+  symbol: DecisionRuntime.ask
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex architecture review
+  approved_on: '2026-09-22'
+  responsibility: Own one bounded decision attempt from eligibility through budget admission and final receipt.
+  rationale: The short-circuit checks share one fallback record, event identity and deadline. Request
+    preparation, transport, interpretation and budget storage already have separate owners. Keeping
+    the remaining sequence together makes the no-call boundaries and one-charge lifecycle visible.
+- finding: quality.large-function
+  path: components/engine/src/workflow-executor.ts
+  symbol: executeWorkflow
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex architecture review
+  approved_on: '2026-09-22'
+  responsibility: Execute one durable workflow while preserving resource fences and cleanup after stage failure.
+  rationale: Stage admission, capacity refusal, native outcome and final cleanup share one lease
+    lifetime and failed-or-unresolved state. Platform observation, operation construction, command
+    supervision and cleanup reconciliation are already separate. The remaining loop keeps those
+    ownership transitions explicit and is covered through real command fixtures.
+- finding: quality.large-function
+  path: components/engine/scripts/verify-decision-pilot.mjs
+  symbol: verifyDecisionPilot
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex architecture review
+  approved_on: '2026-09-22'
+  responsibility: Qualify one installed decision pilot across its public commands and shared temporary state.
+  rationale: The fixture deliberately carries identical source, task and receipt identities through
+    check, comparison and telemetry assertions. Concurrency, observers, provider delivery and cleanup
+    already have separate helpers. Keeping this short orchestration together makes replay and native
+    result comparisons readable without another fixture-state abstraction.

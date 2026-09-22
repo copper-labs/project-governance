@@ -10,8 +10,9 @@ cleanup contract. Native provider binaries, tools and authentication remain prov
 Preserve the requested provider, model, effort, scope and restrictions. Missing support, credentials,
 quota or tools requires an explicit resolution; do not silently substitute a global wrapper or model.
 
-This route does not authorize delegation or increase team size. The parent's native same-model
-controls remain available within the operator's and host's authority. Read model-selection guidance
+This route does not authorize delegation or increase team size. Required-governed assignments must
+not use native subagents, direct CLIs or nested workers to bypass their frozen route or feature policy.
+The unrestricted parent remains outside runtime enforcement coverage. Read model-selection guidance
 with `skill-read --path resources/model-selection.md`; the host owns actual model availability.
 Higher-priority host restrictions still apply. Resolve conflicts explicitly.
 

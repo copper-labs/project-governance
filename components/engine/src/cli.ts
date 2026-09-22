@@ -2,6 +2,7 @@
 import { RELEASE_VERSION } from "./release-version.ts";
 import { durableJson } from "./core.ts";
 import { checkSummary } from "./check-summary.ts";
+import { checkOutput } from "./check-output.ts";
 import { checkObservationContext } from "./check-observation-context.ts";
 import { continuityCommand } from "../../harness/src/cli.ts";
 import { resumeStoppedWorkflowCleanup } from "./workflow-cleanup-continuation.ts";
@@ -55,10 +56,13 @@ import { checkTelemetry, reviewCheckRun } from "./check-telemetry.ts";
 import { checkRunRoot } from "./check-run.ts";
 import { requestCheckCancellation } from "./check-cancellation.ts";
 import { inspectCheckRun } from "./check-status.ts";
+import { CheckRecoveryRefusal, reconcileCheckRun } from "./check-recovery.ts";
 import { dispatchChecks } from "./check-worker.ts";
 import { narrativeInputs } from "./narrative-inputs.ts";
 import { PackagedCheckerAssets } from "./checker-assets.ts";
 import { checkDecisionAdvice, type CheckAdviceOptions } from "./decision-check-advice.ts";
+import { readDecisionTaskContext } from "./decision-task-context.ts";
+import { resolveDecisionScope } from "./decision-scope.ts";
 
 /** Public argument parsing rejects conflicting subjects before reading a candidate. */
 export function prepareCommand(args: string[], root: string, builtinDirectory: string, command: "plan" | "check" = "plan") {
@@ -67,6 +71,8 @@ export function prepareCommand(args: string[], root: string, builtinDirectory: s
     "changed-path": { type: "string", multiple: true }, "base-ref": { type: "string" }, pack: { type: "string", multiple: true },
     json: { type: "boolean" }, summary: { type: "boolean" },
     "decision-task": { type: "string" }, "decision-revision": { type: "string" },
+    "decision-context": { type: "string" },
+    "compare-run": { type: "string" },
     "decision-purpose": { type: "string" }, "review-rules": { type: "string" },
     ...(command === "check" ? { "json-output": { type: "string" as const }, "expected-status": { type: "string" as const }, trigger: { type: "string" as const }, detach: { type: "boolean" as const }, "timeout-seconds": { type: "string" as const }, "commit-message-file": { type: "string" as const }, "pr-body-file": { type: "string" as const }, "pr-title": { type: "string" as const } } : {}),
   } });
@@ -95,12 +101,21 @@ export function prepareCommand(args: string[], root: string, builtinDirectory: s
     ...(typeof values["pr-title"] === "string" ? { prTitle: values["pr-title"] } : {}),
   }) : {};
   const decisionOptions: CheckAdviceOptions = {
+    ...(values["compare-run"] === undefined ? {} : { compareRun: values["compare-run"] }),
     ...(values["decision-task"] === undefined ? {} : { taskId: values["decision-task"] }),
     ...(values["decision-revision"] === undefined ? {} : { revision: values["decision-revision"] }),
     ...(values["decision-purpose"] === undefined ? {} : { purpose: values["decision-purpose"] }),
     ...(values["review-rules"] === undefined ? {} : { reviewRules: values["review-rules"] }),
   };
-  return { plan: buildPlan(registry, { stage, mode, changedPaths: scope.records.map(record => record.path), explicitPackIds: packs }), scope, subject, registry, narrative, decisionOptions, deadlineMs, ...observation, jsonOutput: typeof jsonOutput === "string" ? jsonOutput : null, summary: values.summary === true, detach: values["detach"] === true };
+  const taskContextPath = values["decision-context"] ?? process.env.GOVERNANCE_DECISION_CONTEXT;
+  if (taskContextPath) {
+    decisionOptions.context = readDecisionTaskContext(taskContextPath, root);
+    resolveDecisionScope(root, decisionOptions, decisionOptions.context);
+    if (decisionOptions.purpose !== undefined && decisionOptions.purpose !== decisionOptions.context.requirement)
+      throw new Error("Explicit purpose conflicts with bound requirement");
+  }
+  const workId = command === "check" ? process.env["GOVERNANCE_WORK_ID"] ?? "" : "";
+  return { plan: buildPlan(registry, { stage, mode, changedPaths: scope.records.map(record => record.path), explicitPackIds: packs }), scope, subject, registry, narrative, workId, decisionOptions, deadlineMs, ...observation, jsonOutput: typeof jsonOutput === "string" ? jsonOutput : null, summary: values.summary === true, detach: values["detach"] === true };
 }
 
 export function planCommand(args: string[], root: string, builtinDirectory: string) {
@@ -115,9 +130,11 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
       console.log(`Usage: project-governance <command> [options]
 
 Checks:
-  plan --stage <stage> --mode impacted|all [--summary]
+  plan --stage <stage> --mode impacted|all [--summary] [--compare-run <run-id>]
   check --stage <stage> --mode impacted|all [--summary] [--json-output <path>]
-  check-status --run <run-id> | check-cancel --run <run-id>
+  check-status --run <run-id> [--full] | check-cancel --run <run-id>
+  check-output --run <run-id>
+  check-reconcile --run <run-id>
   hook <hook-name> [hook arguments]
 
 Project setup and context:
@@ -354,15 +371,35 @@ Use the owning command contract for structured request fields.
       const parsed = parseArgs({ args: args.slice(2), strict: true, options: { since: { type: "string" }, stage: { type: "string" }, "runtime-version": { type: "string" }, trigger: { type: "string" } } });
       console.log(JSON.stringify(checkTelemetry(checkRunRoot(), process.cwd(), { ...parsed.values, ...(parsed.values["runtime-version"] ? { runtimeVersion: parsed.values["runtime-version"] } : {}) }))); return 0;
     }
+    if (command === "check-reconcile") {
+      const { values } = parseArgs({ args: args.slice(1), strict: true, allowPositionals: false, options: { run: { type: "string" } } });
+      if (!values.run) throw new Error("Run ID is required");
+      try { console.log(JSON.stringify(reconcileCheckRun(values.run))); return 0; }
+      catch (error) {
+        console.log(JSON.stringify({ state: "refused", run_id: values.run, reason: error instanceof CheckRecoveryRefusal
+          ? error.message : "Check recovery evidence is unavailable or invalid; inspect the retained run and command receipts." })); return 2;
+      }
+    }
+    if (command === "check-output") {
+      const { values } = parseArgs({ args: args.slice(1), strict: true, options: { run: { type: "string" } } });
+      if (!values.run) throw new Error("Run ID is required");
+      const response = await withDecisionCancellation(options => checkOutput(values.run!, realpathSync(process.cwd()), options));
+      console.log(JSON.stringify(response.value));
+      return response.exitCode ?? (response.value?.status === "failed" ? 1 : response.value?.state === "terminal" ? 0 : 2);
+    }
     if (command === "check-status" || command === "check-cancel") {
-      const parsed = parseArgs({ args: args.slice(1), strict: true, options: { run: { type: "string" } } });
+      const parsed = parseArgs({ args: args.slice(1), strict: true, options: { run: { type: "string" },
+        ...(command === "check-status" ? { full: { type: "boolean" as const } } : {}) } });
       if (!parsed.values.run) throw new Error("Run ID is required");
       const observed = inspectCheckRun(parsed.values.run);
       if (command === "check-cancel" && observed.state !== "terminal") {
         requestCheckCancellation(join(checkRunRoot(), parsed.values.run), parsed.values.run, "operator:cli");
         console.log(JSON.stringify({ run_id: parsed.values.run, status: "cancellation-requested" })); return 0;
       }
-      console.log(JSON.stringify(observed));
+      // Reconnection should not replay the full archived output into the agent's context.
+      const presentation = command === "check-status" && !parsed.values.full && observed.state === "terminal"
+        ? { ...observed, result: checkSummary(observed.result) } : observed;
+      console.log(JSON.stringify(presentation));
       return observed.state === "terminal" ? (observed.status === "failed" ? 1 : 0) : 2;
     }
     if (command !== "plan" && command !== "check") throw new Error("Unsupported command");
@@ -375,10 +412,11 @@ Use the owning command contract for structured request fields.
     }
     const submission = dispatchChecks(prepared.registry, prepared.plan, {
       subject: prepared.subject, scope: prepared.scope, assets: new PackagedCheckerAssets(), packIds: new Set(Object.keys(prepared.registry)),
-      stage: prepared.plan.stage ?? "", asOf: new Date().toISOString(), ...prepared.narrative,
-    }, { deadlineMs: prepared.deadlineMs, ...checkObservationContext(prepared.trigger, prepared.expectedStatus) });
+      stage: prepared.plan.stage ?? "", asOf: new Date().toISOString(), workId: prepared.workId, ...prepared.narrative,
+    }, { deadlineMs: prepared.deadlineMs, ...(prepared.decisionOptions.context ? { decisionContext: prepared.decisionOptions.context } : {}),
+      ...checkObservationContext(prepared.trigger, prepared.expectedStatus) });
     if (prepared.detach) {
-      const advice = await withDecisionCancellation(options => checkDecisionAdvice(prepared, prepared.decisionOptions, true, options));
+      const advice = await withDecisionCancellation(options => checkDecisionAdvice(prepared, { ...prepared.decisionOptions, runId: submission.run_id }, true, options));
       console.log(JSON.stringify({ status: "submitted", ...submission, ...(advice.value ? { decisionAdvice: advice.value } : {}) })); return advice.exitCode ?? 0;
     }
     console.error(JSON.stringify({ status: "submitted", ...submission }));
@@ -386,10 +424,16 @@ Use the owning command contract for structured request fields.
     while (true) {
       const observed = inspectCheckRun(submission.run_id);
       if (observed.state === "terminal") {
-        const advice = await withDecisionCancellation(options => checkDecisionAdvice(prepared, prepared.decisionOptions, true, options));
+        const advice = await withDecisionCancellation(options => checkDecisionAdvice(prepared, { ...prepared.decisionOptions, runId: submission.run_id }, true, options));
         const projection = { ...observed.result, ...(advice.value ? { decisionAdvice: advice.value } : {}) };
         if (prepared.jsonOutput) durableJson(prepared.jsonOutput, projection);
-        console.log(JSON.stringify(prepared.summary ? { ...checkSummary(observed.result), ...(advice.value ? { decisionAdvice: advice.value } : {}) } : projection));
+        let output: Awaited<ReturnType<typeof checkOutput>> | null = null;
+        if (prepared.summary) {
+          try { output = (await withDecisionCancellation(options => checkOutput(submission.run_id, prepared.subject.root, options))).value; }
+          catch { /* Optional output delivery cannot change a native check result. */ }
+        }
+        console.log(JSON.stringify(prepared.summary ? { ...checkSummary(observed.result), ...(advice.value ? { decisionAdvice: advice.value } : {}),
+          outputDelivery: output && "outputs" in output ? { outputs: output.outputs, coverage: output.coverage, episode: output.episode } : { reason: "output-delivery-unavailable" } } : projection));
         return advice.exitCode ?? (observed.status === "failed" ? 1 : 0); }
       if (observed.state === "incomplete" || Date.now() - submittedAt >= prepared.deadlineMs + 5000) {
         if (prepared.jsonOutput) durableJson(prepared.jsonOutput, observed);

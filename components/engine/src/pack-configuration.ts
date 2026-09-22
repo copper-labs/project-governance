@@ -1,13 +1,14 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 import { parse } from "yaml";
-import { object } from "./core.ts";
+import { object, text } from "./core.ts";
 import type { ValidationSubject } from "./change-subject.ts";
 
 export interface Pack extends Record<string, unknown> {
   id: string; enforcement: "advisory" | "blocking"; commands: unknown[];
   path_globs: string[]; stages: string[]; depends_on: string[]; replaces_builtin_packs: string[];
   _source: string; _origin: "builtin" | "target";
+  decision_context?: { purpose: string; covers: string[]; limits: string[] };
 }
 export type Packs = Record<string, Pack>;
 
@@ -51,6 +52,16 @@ export function mergePacks(documents: Array<{ source: string; value: Record<stri
     if (!id) throw new Error(`${source}: id is required`);
     if (!["advisory", "blocking"].includes(String(value["enforcement"]))) throw new Error(`${source}: enforcement must be advisory or blocking`);
     if (!Array.isArray(value["commands"]) || !value["commands"].length) throw new Error(`${source}: commands must be a non-empty list`);
+    if (value.decision_context !== undefined) {
+      const context = object(value.decision_context, "pack decision context");
+      if (Object.keys(context).some(key => !["purpose", "covers", "limits"].includes(key))) throw new Error("Unknown pack decision context key");
+      text(context.purpose, "pack decision purpose", 1000);
+      for (const key of ["covers", "limits"]) {
+        const list = context[key];
+        if (!Array.isArray(list) || list.length > 8) throw new Error("Pack decision context requires bounded covers/limits lists");
+        for (const item of list) text(item, "pack decision context item", 300);
+      }
+    }
     const lists: Record<string, string[]> = {};
     for (const field of ["path_globs", "stages", "depends_on", "replaces_builtin_packs"]) {
       const list = value[field] ?? [];

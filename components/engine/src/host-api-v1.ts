@@ -14,3 +14,6 @@ export { ResourceRegistry, resourceRegistryPath } from "./resources.ts";
 export { diagnoseWorkflow } from "./workflow-diagnose.ts";
 export { diagnosticEpisodeId, diagnosticOperationId, resolveDiagnosticManifest } from "./diagnostic-manifest.ts";
 export type { DiagnosticManifest } from "./diagnostic-manifest.ts";
+export { authorizeProviderAssignment } from "./provider-admission.ts";
+export { authorizeProviderContinuation } from "./provider-continuation.ts";
+export { observeAndroidCapacity, observeAndroidEmulatorCleanup } from "./android-emulator.ts";

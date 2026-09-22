@@ -1,3 +1,4 @@
+import { observeAndroidEmulatorCleanup } from "./android-emulator.ts";
 import { credentialEnvironment } from "./credential-environment.ts";
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
@@ -106,7 +107,9 @@ async function worker(directory: string, expectedDigest: string): Promise<void> 
       // Unknown resource types remain held; supported device claims require host readback.
       observeCleanup: async (observedRun, leases) => {
         const resources = leases.map(lease => lease.resource);
-        const observation = await observeSimulatorCleanup(resources) ?? await observePhysicalCleanup(resources);
+        const observation = observedRun.binding.recipe.androidEmulator
+          ? await observeAndroidEmulatorCleanup(resources, observedRun.binding.recipe.androidEmulator, observedRun.binding.recipe.workspace)
+          : await observeSimulatorCleanup(resources) ?? await observePhysicalCleanup(resources);
         if (!observation) return null;
         const receipt = { runId: observedRun.id, bindingDigest: request.bindingDigest, leases, observation };
         // Preserve actual readback before permitting the registry to release these generations.

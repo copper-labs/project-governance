@@ -37,11 +37,17 @@ export interface EpisodeCapture {
   decisions: string[];
 }
 
+export interface EntryCapture {
+  id: string; scope: BudgetScope | null;
+  caller: string; entryKind: "check-plan" | "check-output" | "check-completion" | "provider-submit" | "provider-completion";
+  native: Record<string, unknown>; exposure: Record<string, unknown>; decisions: string[];
+}
+
 /** Immutable evidence uses atomic no-replace publication; it is not an operational budget store. */
-export function recordDecisionEpisode(stateRoot: string, capture: EpisodeCapture) {
-  const id = capture.assignment.episodeId, directory = join(stateRoot, "episodes"), path = join(directory, `${id}.json`);
+export function recordDecisionEpisode(stateRoot: string, capture: EpisodeCapture | EntryCapture) {
+  const id = "assignment" in capture ? capture.assignment.episodeId : capture.id, directory = join(stateRoot, "episodes"), path = join(directory, `${id}.json`);
   if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/u.test(id)) throw new Error("Invalid episode identifier");
-  const identity = { ...capture, scope: capture.assignment.scope };
+  const identity = { ...capture, scope: "assignment" in capture ? capture.assignment.scope : capture.scope };
   const identityDigest = digest(identity);
   const temporary = join(directory, `.${id}.${randomUUID()}.json`);
   try {
@@ -57,4 +63,10 @@ export function recordDecisionEpisode(stateRoot: string, capture: EpisodeCapture
     try { fsyncSync(fd); } finally { closeSync(fd); }
     return { status: "recorded" as const, episode: { path, digest: fileDigest(path) } };
   } finally { rmSync(temporary, { force: true }); }
+}
+
+/** Ordinary development is observational: no invented experimental arm, use or savings. */
+export function recordEntryExposure(stateRoot: string, capture: Omit<EntryCapture, "id">) {
+  try { return recordDecisionEpisode(stateRoot, { ...capture, id: digest(capture).slice(7) }); }
+  catch { return { status: "unavailable" as const, reason: "exposure-record-unavailable" }; }
 }

@@ -10,7 +10,9 @@ test("assignment preserves legacy authority restrictions for each workspace acce
     const legacy = { ...request, access: access === "reader" ? "shared" : "exclusive", allow_readers: access === "writer",
       additional_roots: request.additionalRoots, required_tools: request.requiredTools };
     const expected = execFileSync("python3", ["-c", "import json,sys;sys.path.insert(0,'src');from project_governance_runtime.provider_agents.protocol import prompt;print(prompt(json.load(sys.stdin)),end='')"], { input: JSON.stringify(legacy), encoding: "utf8" });
-    assert.equal(providerAssignment(request), expected);
+    // RC4 clarifies completion reporting without changing the inherited authority restrictions.
+    const completionGuidance = " Put scope limitations in the answer; reserve remaining for unfinished required work. Do not invent extra checks or expand the assignment to make it complete.";
+    assert.equal(providerAssignment(request).replace(completionGuidance, ""), expected);
   }
 });
 

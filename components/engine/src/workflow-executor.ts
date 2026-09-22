@@ -1,8 +1,9 @@
+import { observeAndroidCapacity } from "./android-emulator.ts";
 import { workflowOperation } from "./workflow-operation.ts";
 import { settleWorkflowCommandCleanup } from "./workflow-command-cleanup.ts";
 import { mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { digest } from "./core.ts";
+import { digest, durableJson } from "./core.ts";
 import { randomUUID } from "node:crypto";
 import { cancelCommand, submitCommand, waitCommand, processFingerprint } from "./process-owner.ts";
 import { ResourceRegistry, type Lease } from "./resources.ts";
@@ -72,6 +73,22 @@ export async function executeWorkflow(store: WorkflowStore, id: string, options:
       const directory = join(options.commandsDirectory, `${id}-${recipe.stages.indexOf(stage)}`);
       const artifactDirectory = resolve(`${directory}-artifacts`);
       mkdirSync(artifactDirectory, { recursive: true, mode: 0o700 });
+      if (recipe.androidEmulator?.capacity?.beforeStage === stage.id) {
+        const capacity = await observeAndroidCapacity(recipe.androidEmulator, recipe.workspace), evidence = join(artifactDirectory, "capacity.json");
+        durableJson(evidence, capacity);
+        if (capacity.state !== "ready") {
+          result = { state: "failed", exitCode: null, cleanup: "confirmed", startedAt, endedAt: new Date().toISOString(),
+            log: evidence, inputValidity: validateInputs(recipe) ? "valid" : "stale", detail: `android-capacity-${capacity.state}; install not started` };
+          store.stage(id, owner, stage.id, result.state, result); failed = true; continue;
+        }
+        // The bounded observation took time. Recheck cancellation, inputs and ownership before install.
+        for (const lease of leases) options.registry.assertHeld(lease);
+        if (store.read(id).cancelRequested || !validateInputs(recipe) || Date.now() >= deadline) {
+          result = { state: "failed", exitCode: null, cleanup: "confirmed", startedAt, endedAt: new Date().toISOString(),
+            log: evidence, inputValidity: validateInputs(recipe) ? "valid" : "stale", detail: "workflow admission changed during capacity observation; install not started" };
+          store.stage(id, owner, stage.id, result.state, result); failed = true; continue;
+        }
+      }
       const operation = workflowOperation(recipe, id, stage, options.commandsDirectory);
       const command = submitCommand(directory, { id: `${id}:${stage.id}`, operation,
         deadlineMs: stage.cleanup ? stage.deadlineMs : Math.max(1, Math.min(stage.deadlineMs, deadline - Date.now())),

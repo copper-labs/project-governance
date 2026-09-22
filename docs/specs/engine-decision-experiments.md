@@ -1,6 +1,6 @@
 ---
 id: spec.engine-decision-experiments
-title: Next RC Decision Experiments
+title: RC3 Decision Experiments
 type: spec
 status: draft
 owner: project-governance
@@ -9,7 +9,12 @@ updated: 2026-09-21
 summary: Optional attention routing, bounded read-only diagnostic sequences and offline history analysis, evaluated against ordinary automation before adoption.
 ---
 
-# Next RC decision experiments
+# RC3 decision experiments
+
+This specification retains the RC3 N-series scope. Its implementation is the starting point for
+[RC4 quality evaluation, routing and CI advice](engine-decision-rc4.md); the
+[R-series delivery plan](../exec-plans/active/2026-09-21-major-adoption-and-measurement.md#rc4-quality-routing-and-ci-batch)
+owns the next work. References below to the next RC describe that original RC3 scope, not RC4.
 
 ## Purpose and ownership
 

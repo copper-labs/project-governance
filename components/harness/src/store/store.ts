@@ -17,17 +17,21 @@ export class Store {
     #db: DatabaseSync;
     readonly directory: string | null;
     #depth = 0;
-    constructor(path: string) {
+    constructor(path: string, options: { readOnly?: boolean } = {}) {
         this.directory = path === ":memory:" ? null : dirname(path);
-        if (this.directory)
+        if (this.directory && !options.readOnly)
             mkdirSync(this.directory, { recursive: true, mode: 0o700 });
-        this.#db = new DatabaseSync(path);
+        this.#db = new DatabaseSync(path, { readOnly: options.readOnly ?? false });
         this.#db.exec("PRAGMA busy_timeout = 5000; PRAGMA foreign_keys = ON; PRAGMA synchronous = FULL");
         try {
             const meta = this.#db.prepare("SELECT name FROM sqlite_master WHERE name='meta'").get();
             const old = meta ? this.#db.prepare("SELECT value FROM meta WHERE key='schema_version'").get() as {
                 value: string;
             } | undefined : undefined;
+            if (options.readOnly) {
+                if (Number(old?.value) !== SCHEMA_VERSION) throw new Error("read-only inspection needs the current store schema");
+                return;
+            }
             if (old && ![4, 5, SCHEMA_VERSION].includes(Number(old.value)))
                 throw new Error(`unsupported schema ${old.value}; preserve this store`);
             this.#db.exec("PRAGMA journal_mode = WAL");

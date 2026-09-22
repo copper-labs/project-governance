@@ -30,5 +30,35 @@ test("Claude denied operations block completion until the same operation recover
     const { stream } = setup([]); stream.accept(init); stream.accept(tool); stream.accept(result(true, "Permission denied"));
     if (recovered) stream.accept(result(false, "ok"));
     stream.accept(terminal); assert.equal(stream.finish().state, recovered ? "succeeded" : "blocked");
+    assert.equal(stream.finish().policyRefusal, recovered ? undefined : "permission-denied");
   }
+});
+
+test("a later error or a separate unfinished operation cannot inherit a policy-refusal exemption", () => {
+  for (const later of ["same-id-error", "other-error", "active"]) {
+    const { stream } = setup([]); stream.accept(init); stream.accept(tool); stream.accept(result(true, "Permission denied"));
+    if (later === "same-id-error") stream.accept(result(true, "Native I/O failure"));
+    else {
+      stream.accept({ type: "assistant", message: { content: [{ type: "tool_use", id: "other", name: "Read" }] } });
+      if (later === "other-error") stream.accept({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: "other", is_error: true, content: "Native I/O failure" }] } });
+    }
+    stream.accept(terminal);
+    assert.equal(stream.finish().state, "blocked"); assert.equal(stream.finish().policyRefusal, undefined);
+  }
+});
+
+test("policy refusal requires native denial evidence and cannot hide unfinished work or other tool failures", () => {
+  const fileDenied = setup([]).stream; fileDenied.accept(init); fileDenied.accept(tool);
+  fileDenied.accept(result(true, "<tool_use_error>File is in a directory that is denied by your permission settings.</tool_use_error>"));
+  fileDenied.accept({ type: "assistant", message: { content: [{ type: "tool_use", id: "schema-repair", name: "StructuredOutput" }] } });
+  fileDenied.accept({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: "schema-repair", is_error: true, content: "Output does not match required schema" }] } });
+  fileDenied.accept(terminal); assert.equal(fileDenied.finish().policyRefusal, "permission-denied");
+  for (const pending of [[], ["required work remains"]]) {
+    const { stream } = setup([]); stream.accept(init); stream.accept(tool); stream.accept(result(true, "host-specific denial"));
+    stream.accept({ ...terminal, structured_output: { ...completion, remaining: pending }, permission_denials: [{ tool_use_id: "tool-1", tool_name: "Bash" }] });
+    assert.equal(stream.finish().policyRefusal, pending.length ? undefined : "permission-denied");
+  }
+  const { stream } = setup([]); stream.accept(init); stream.accept(tool); stream.accept(result(true, "native I/O failure"));
+  stream.accept({ ...terminal, permission_denials: [{ tool_use_id: "not-this-tool", tool_name: "Bash" }] });
+  assert.equal(stream.finish().policyRefusal, undefined);
 });

@@ -5,13 +5,22 @@ type: spec
 status: current
 owner: project-governance
 created: 2026-09-06
-updated: 2026-09-06
+updated: 2026-09-21
 summary: Defines optional Gemini, Claude, and Codex delegation with full native capabilities, durable jobs, and observable progress.
 ---
 
 # Optional Provider Agent Skills
 
 ## Unified engine migration boundary
+
+The proposed [RC4 selection contract](engine-decision-rc4.md#model-selection-one-owner-routing-off-by-default)
+adds optional DL08 selection before an already authorized compiled provider submission. It does not
+turn this legacy helper into another router. Automatic Markdown work-class selection will be
+replaced with fixed bindings by default and an explicitly enabled category-to-model mapping.
+The operator defines the categories and exact pairs; JEV only classifies the task. The
+[required-governed pilot](engine-decision-rc4.md#required-governed-delegation-and-feature-exposure)
+also binds operator overrides and prohibits unmanaged or nested routes through qualified host
+controls. The behavior below remains current until that implementation and deliberate adoption.
 
 This remains the current runtime contract. The [migration inventory](../reference/2026-09-20-engine-migration-inventory.md)
 assigns C04 to preserve native provider capabilities, model policy and one shared lifecycle. The
@@ -43,6 +52,11 @@ unknown cleanup remains unresolved. Replaying reconciliation cannot release anot
 `provider-doctor --provider <provider>` accepts explicit `--model`, `--effort`, `--executable`, and
 `--config` binding options. It reports configuration and executable availability without launching a
 provider. A passed diagnostic does not establish authentication, native capabilities or model access.
+RC4 additionally accepts `--request <assignment.json> --directory <job>` for passive assignment
+preflight, migration preview and retained capability evidence. See the
+[RC4 host boundary](engine-decision-rc4.md#implemented-command-and-host-boundary) for guarded
+admission, deliberate legacy-policy review and continuation. The unrestricted legacy route remains
+admission-only; child qualification does not cover an unrestricted parent.
 
 The compiled `provider-help` command reads its packaged command guide. After installation,
 `host-instructions --dry-run` plans thin pointers to that command; `host-instructions --plan-digest

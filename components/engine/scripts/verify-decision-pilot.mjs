@@ -1,3 +1,4 @@
+import { verifyProviderSelection } from "./verify-provider-selection.mjs";
 import { verifyDecisionConcurrency } from "./verify-decision-concurrency.mjs";
 import { verifyDecisionObservers } from "./verify-decision-observers.mjs";
 import assert from 'node:assert/strict';
@@ -34,6 +35,7 @@ export async function verifyDecisionPilot(packageRoot) {
   const run = (args, expectedStatus = 0) => {
     const result = spawnSync(process.execPath, ['--import', preload, cli, ...args], { cwd: repo, env: environment, encoding: 'utf8', timeout: 30000, maxBuffer: 2 * 1024 * 1024 });
     assert.equal(result.status, expectedStatus, result.stderr || result.error?.message);
+    if (expectedStatus !== 0 && !result.stdout.trim()) return { error: result.stderr.trim() };
     return JSON.parse(result.stdout.trim());
   };
   let finished = false;
@@ -58,6 +60,10 @@ export async function verifyDecisionPilot(packageRoot) {
     assert.notEqual(nextStage.decisionAdvice.validation.decision.receiptId, plan.decisionAdvice.validation.decision.receiptId);
     const checked = run(['check', ...common, '--review-rules', 'config/governance/review-rules.json']);
     assert.equal(checked.status, 'passed');
+    const comparison = run(['plan', ...common, '--compare-run', checked.run_id]).decisionAdvice.comparison;
+    assert.equal(comparison.status, 'compared');
+    assert.equal(comparison.comparisons[0].nativeStatus, 'not-observed');
+    assert.equal(comparison.savings, null);
     assert.equal(checked.decisionAdvice.review.batched, true);
     for (const id of ['DL01', 'DL02']) {
       const advice = checked.decisionAdvice.review.consumers.find(item => item.consumerId === id);
@@ -101,8 +107,10 @@ export async function verifyDecisionPilot(packageRoot) {
     environment.JEV_TOKEN = "fixture-only";
     await verifyDecisionConcurrency({ repo, cli, preload, environment, common, callsPath, run, git });
     const observers = await verifyDecisionObservers({ packageRoot, repo, temporary, run, write, git, environment, callsPath });
+    environment.JEV_TOKEN = "fixture-only";
+    const providerSelection = await verifyProviderSelection({ packageRoot, repo, temporary, run, write, environment, callsPath });
     finished = true;
-    return { status: 'passed', consumers: ['DL01', 'DL02', 'DL07', ...observers].sort(), native_checks: 'passed', native_check_authority_unchanged: true, provider: 'fixture' };
+    return { status: 'passed', providerSelection, consumers: ['DL01', 'DL02', 'DL07', ...observers].sort(), native_checks: 'passed', native_check_authority_unchanged: true, provider: 'fixture' };
   } finally {
     await cleanupPilot(packageRoot, temporary, state, finished);
   }

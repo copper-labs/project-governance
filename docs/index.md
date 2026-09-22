@@ -70,10 +70,16 @@ For the next delivery sequence, start with the
 [decision-layer delivery, release and pilot measurement plan](exec-plans/active/2026-09-21-major-adoption-and-measurement.md).
 The explicit-preview implementation has a recorded closeout; routine reading should not treat older
 pending checkpoints as new work. The first RC includes eight optional decision consumers. The
-[next RC experiment specification](specs/engine-decision-experiments.md) and the delivery plan’s N0–N6
-slices add optional attention routing, read-only diagnostic sequences and offline history analysis;
-deliberate adoption compares ordinary automation with JEV-enabled work. Successive consumer batches repeat this
+[RC3 experiment specification](specs/engine-decision-experiments.md) and the delivery plan’s N0–N6
+slices add attention advice, read-only diagnostic sequences and offline history analysis. Next,
+[RC4 quality evaluation, routing and CI advice](specs/engine-decision-rc4.md) follows the same plan’s
+R0–R6 slices: governed entry, fixed model defaults, opt-in routing, requirement-linked quality
+and richer CI recommendations. Deliberate adoption compares ordinary automation with JEV-enabled
+work and records authorized fallback or missing exposure. Successive consumer batches repeat this
 release/update/measurement cycle before the selected stable-major launch.
+The [September research reconciliation](research/2026-09-21-jev-agentic-development.md) and
+[RC4 simplification pass](reviews/2026-09-21-rc4-simplification.md) prioritize existing context/output
+selection and simple operator-defined category mappings, with fixed-model operation by default.
 
 The [architecture decision register](specs/unified-development-engine.md) and
 [transition plan](exec-plans/active/2026-09-20-unified-development-engine.md) describe the accepted

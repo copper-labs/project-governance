@@ -44,7 +44,7 @@ console.log(JSON.stringify({type:'result',subtype:'success',structured_output:{o
     assert.equal((await providerJobCommand("provider-events", handleArgs)).exitCode, 0);
     await assert.rejects(() => providerJobCommand("provider-cancel", ["--directory", first.directory, "--digest", "wrong", "--authority", "parent"]), /identity mismatch/);
     await assert.rejects(() => providerJobCommand("provider-wait", [...handleArgs, "--milliseconds", "30001"]), /0..30000/);
-    assert.equal(submitProviderJob(first.directory, options).submitted, false);
+    assert.equal((await submitProviderJob(first.directory, options)).submitted, false);
     const follow = { id: "second", prompt: "Inspect again", directory: join(root, "second") };
     const followFile = join(root, "follow.json"); writeFileSync(followFile, JSON.stringify({ id: follow.id, prompt: follow.prompt }));
     const second = (await providerJobCommand("provider-follow-up", [...handleArgs, "--request", followFile])).result as { directory: string; requestDigest: string };

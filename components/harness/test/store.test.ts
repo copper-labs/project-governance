@@ -117,3 +117,18 @@ test("two sessions are distinguishable in one shared store", () => {
     assert.equal(s.listTasks().length, 2, "one store holds both worktrees' jobs");
     s.close();
 });
+
+
+test("read-only authority inspection neither creates a missing store nor permits writes", async () => {
+    const { mkdtempSync, rmSync, readFileSync, existsSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os"), { join } = await import("node:path");
+    const root = mkdtempSync(join(tmpdir(), "readonly-store-")), path = join(root, "store.sqlite");
+    try {
+        assert.throws(() => new Store(path, { readOnly: true })); assert.equal(existsSync(path), false);
+        const writer = new Store(path), task = writer.createTask("Inspect existing authority", []); writer.close();
+        const bytes = readFileSync(path), reader = new Store(path, { readOnly: true });
+        assert.equal(reader.readTask(task.taskId)?.outcome, task.outcome);
+        assert.throws(() => reader.createTask("No writes", [])); reader.close();
+        assert.deepEqual(readFileSync(path), bytes);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+});

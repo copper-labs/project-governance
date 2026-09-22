@@ -5,14 +5,16 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-08-21
-updated: 2026-09-21
+updated: 2026-09-22
 summary: Routes evaluators, operators, contributors, and agents through the shortest useful Project Governance documentation journeys.
 ---
 
 # Developer Documentation
 
-Project Governance is a small Python-wheel runtime that selects and runs governance checks affected
-by a repository change. Choose the route that matches what you need to accomplish.
+Project Governance selects checks affected by a repository change and owns their execution evidence.
+The 3.x compiled TypeScript runtime adds durable workflows and optional decision advice; existing
+2.x wheel installations retain their owner until deliberate adoption. Choose the route that matches
+what you need to accomplish.
 
 ## Evaluate Or Operate The Runtime
 
@@ -49,8 +51,13 @@ For the next implementation, follow the
 [decision-layer delivery plan](../exec-plans/active/2026-09-21-major-adoption-and-measurement.md)
 and its linked functional validation plan. It is the single delivery/progress owner; the
 [technical packages](../reference/2026-09-20-decision-layer-work-packages.md) supply reference detail.
-The [next RC experiments](../specs/engine-decision-experiments.md) define the bounded N0–N6 batch
-inside that same plan. Its effects require separate host qualification and opt-in.
+The [RC3 experiments](../specs/engine-decision-experiments.md) define the preceding N0–N6 batch.
+Next, [RC4 quality evaluation, model routing and CI advice](../specs/engine-decision-rc4.md) follows
+R0–R6 within that same plan, including required governed delegation in the selected pilot.
+New effects require separate host qualification and explicit opt-in; a fixed model is the default.
+Optional category routing classifies work into the operator's predefined model/effort mapping.
+The [September research](../research/2026-09-21-jev-agentic-development.md) and
+[simplification review](../reviews/2026-09-21-rc4-simplification.md) explain the narrowed design.
 The [target specification](../specs/unified-development-engine.md),
 [category inventory](../reference/2026-09-20-engine-migration-inventory.md) and
 [transition closeout](../exec-plans/active/2026-09-20-unified-development-engine.md#implementation-closeout)

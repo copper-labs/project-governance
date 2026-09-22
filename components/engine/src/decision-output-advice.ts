@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { closeSync, fstatSync, openSync, readSync } from "node:fs";
+import { closeSync, constants, fstatSync, openSync, readSync } from "node:fs";
 import { digest } from "./core.ts";
 import type { BudgetScope } from "./decision-budget.ts";
 import { interpretNoul, type DecisionOutcome, type DecisionRuntime } from "./decision-runtime.ts";
@@ -45,16 +45,18 @@ export function segmentCommandOutput(content: string, options: { failed: boolean
   return { blocks, truncated };
 }
 
-function readTail(path: string): { text: string; digest: string; bytes: number; totalBytes: number; truncated: boolean } | null {
+export function captureOutput(path: string): { text: string; digest: string; bytes: number; totalBytes: number; truncated: boolean } | null {
   let fd: number | undefined;
   try {
-    fd = openSync(path, "r");
+    fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
     const stat = fstatSync(fd);
     if (!stat.isFile() || stat.size > 64 * 1024 * 1024) return null;
     const start = Math.max(0, stat.size - READ_WINDOW);
     const buffer = Buffer.alloc(Math.min(READ_WINDOW, stat.size));
     let read = 0;
     while (read < buffer.length) { const count = readSync(fd, buffer, read, buffer.length - read, start + read); if (!count) break; read += count; }
+    const after = fstatSync(fd);
+    if (stat.size !== after.size || stat.mtimeMs !== after.mtimeMs || stat.ctimeMs !== after.ctimeMs || read !== buffer.length) return null;
     const slice = buffer.subarray(0, read);
     return { text: new TextDecoder("utf-8", { fatal: false }).decode(slice), digest: `sha256:${createHash("sha256").update(slice).digest("hex")}`,
       bytes: read, totalBytes: stat.size, truncated: start > 0 };
@@ -73,7 +75,7 @@ export interface OutputSelection {
   overflow: { protectedBytes: number; limitBytes: number; note: string } | null;
   retrieval: { path: string; digest: string | null; note: string };
   coverage: DecisionCoverage;
-  decision: Pick<DecisionOutcome, "consumerId" | "requestId" | "receiptId" | "method" | "reason" | "delivered" | "model" | "usage" | "latencyMs" | "budget" | "scopeState"> | null;
+  decision: Pick<DecisionOutcome, "consumerId" | "requestId" | "receiptId" | "method" | "reason" | "delivered" | "providerCalled" | "model" | "usage" | "latencyMs" | "budget" | "scopeState"> | null;
 }
 
 /**
@@ -97,7 +99,7 @@ export async function outputSelection(runtime: DecisionRuntime, receipt: Command
   };
   const presentation = options.presentation;
   const captured = presentation ? { text: presentation.text, digest: `sha256:${createHash("sha256").update(presentation.text).digest("hex")}`,
-    bytes: Buffer.byteLength(presentation.text), totalBytes: Buffer.byteLength(presentation.text), truncated: presentation.truncated } : readTail(receipt.log);
+    bytes: Buffer.byteLength(presentation.text), totalBytes: Buffer.byteLength(presentation.text), truncated: presentation.truncated } : captureOutput(receipt.log);
   if (!captured) { unavailable.push("command-log"); limits.push("the archived command output could not be read; unmodified delivery applies"); return { ...base, reason: "archive-unavailable" }; }
   const failed = receipt.state !== "succeeded" || (receipt.exitCode !== null && receipt.exitCode !== 0);
   const { blocks, truncated } = segmentCommandOutput(captured.text, { failed, cleanupUnknown: receipt.cleanup !== "confirmed" });
@@ -149,7 +151,7 @@ export async function outputSelection(runtime: DecisionRuntime, receipt: Command
     subject: { digest: captured.digest, revision: options.revision, environment: options.environment },
     evidence, coverage, questions, eligibilityDigest: null, policyDigest: options.policyDigest });
   const decision = { consumerId: outcome.consumerId, requestId: outcome.requestId, receiptId: outcome.receiptId,
-    method: outcome.method, reason: outcome.reason, delivered: outcome.delivered, model: outcome.model,
+    method: outcome.method, reason: outcome.reason, delivered: outcome.delivered, providerCalled: outcome.providerCalled, model: outcome.model,
     usage: outcome.usage, latencyMs: outcome.latencyMs, budget: outcome.budget, scopeState: outcome.scopeState };
   if (!outcome.delivered) return { ...keepAll(), mode: outcome.mode, reason: outcome.reason, coverage, decision };
   const dropped = new Map<string, { reason: string; probability: number | null }>();

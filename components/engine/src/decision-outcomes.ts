@@ -19,6 +19,7 @@ export function decisionOutcomeReport(stateRoot: string, manifestPath: string, r
     return read(isAbsolute(path) ? path : resolve(dirname(manifestPath), path), hash);
   };
   const scopeIdentity = (value: unknown) => {
+    if (value === null) return null;
     const binding = object(value, "episode scope");
     return JSON.stringify([realpathSync(text(binding.workspace, "workspace")), text(binding.taskId, "task identity"), text(binding.taskRevision, "task revision")]);
   };
@@ -46,8 +47,18 @@ export function decisionOutcomeReport(stateRoot: string, manifestPath: string, r
         episodeScope = scopeIdentity(episode.scope);
         if (caller.version !== 1 || caller.id !== id || scopeIdentity(caller.scope) !== episodeScope) throw new Error("Caller episode binding mismatch");
         const native = object(caller.native, "caller native identity");
-        text(native.runId, "caller run id", 256);
-        if (![native.runDigest, native.stagesDigest, native.eventsDigest].every(value => /^sha256:[a-f0-9]{64}$/u.test(String(value)))) throw new Error("Caller native digests required");
+        const hash = (value: unknown) => /^sha256:[a-f0-9]{64}$/u.test(String(value));
+        if (caller.entryKind === "check-plan") {
+          if (!hash(native.subjectDigest) || !hash(native.planDigest) || (Array.isArray(episode.native) && episode.native.length > 0)) throw new Error("Check plan identity required");
+        } else if (["check-output", "check-completion"].includes(String(caller.entryKind))) {
+          text(native.runId, "caller run id", 256);
+          if (!hash(native.resultDigest)) throw new Error("Check result identity required");
+        } else if (["provider-submit", "provider-completion"].includes(String(caller.entryKind))) {
+          if (!hash(native.requestDigest) || (caller.entryKind === "provider-completion" && (!hash(native.commandResultDigest) || (native.resultDigest !== null && !hash(native.resultDigest))))) throw new Error("Provider identity required");
+        } else {
+          text(native.runId, "caller run id", 256);
+          if (![native.runDigest, native.stagesDigest, native.eventsDigest].every(hash)) throw new Error("Caller native digests required");
+        }
         if (caller.assignment !== undefined) {
           const assignment = object(caller.assignment);
           if (assignment.episodeId !== id || scopeIdentity(assignment.scope) !== episodeScope) throw new Error("Assignment scope conflicts with episode");
@@ -81,7 +92,7 @@ export function decisionOutcomeReport(stateRoot: string, manifestPath: string, r
         if (duplicateReservation) counts.duplicate_reservations++;
         if (reservation !== null) pendingReservations.add(reservation);
         decisions.push({ id: receiptId, consumerIds: outcome.consumers, mode: outcome.mode, delivered: outcome.delivered, reason: outcome.reason,
-          ...(manifest.version === 2 ? { reservationId: reservation, duplicateReservation, usage: outcome.usage ?? null } : {}) });
+          ...(manifest.version === 2 ? { reservationId: reservation, duplicateReservation, providerCalled: typeof outcome.providerCalled === "boolean" ? outcome.providerCalled : null, usage: outcome.usage ?? null } : {}) });
         pendingIds.add(receiptId);
       }
       if (!decisions.length && (manifest.version === 1 || episode.decisions.length > 0)) { counts.no_linked_decisions++; continue; }
@@ -104,6 +115,15 @@ export function decisionOutcomeReport(stateRoot: string, manifestPath: string, r
             native.push({ kind: "check", state: record.status, resultDigest: record.result_digest });
           } else throw new Error("Unsupported native outcome kind");
           if (manifest.version === 2) {
+            const captured = object(caller.native);
+            if (caller.entryKind === "provider-completion" || caller.entryKind === "provider-submit") {
+              if (ref.kind !== "command" || record.requestDigest !== captured.requestDigest || (caller.entryKind === "provider-completion" &&
+                  (digest(record) !== captured.commandResultDigest || (record.providerResultDigest ?? null) !== captured.resultDigest || record.state !== captured.status)))
+                throw new Error("Provider native evidence belongs to another submission or result");
+            } else if (caller.entryKind === "check-completion" || caller.entryKind === "check-output") {
+              // Check metrics bind the byte digest; the episode also binds the canonical result digest.
+              if (ref.kind !== "check" || record.run_id !== captured.runId || record.result_digest !== captured.resultFileDigest) throw new Error("Check native evidence belongs to another run");
+            }
             const identity = ref.kind === "command" ? String(record.requestDigest) : String(record.result_digest);
             const costKey = `${String(ref.kind)}:${identity}`;
             const duplicateCost = seenNative.has(costKey) || pendingNative.has(costKey);

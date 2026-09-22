@@ -20,7 +20,7 @@ export interface WorkflowAdvice {
   candidates: WorkflowCandidate[]; rejected: Array<{ id: string; reason: string }>;
   recommended: { id: string; recipeId: string; recipeDigest: string; confidence: number | null; margin: number | null } | null;
   unknownIntent: boolean; coverage: DecisionCoverage;
-  decision: Pick<DecisionOutcome, "consumerId" | "requestId" | "receiptId" | "method" | "reason" | "delivered" | "model" | "usage" | "latencyMs" | "budget" | "scopeState"> | null;
+  decision: Pick<DecisionOutcome, "consumerId" | "requestId" | "receiptId" | "method" | "reason" | "delivered" | "providerCalled" | "model" | "usage" | "latencyMs" | "budget" | "scopeState"> | null;
 }
 
 /**
@@ -96,7 +96,7 @@ export async function workflowAdvice(runtime: DecisionRuntime, supplied: { candi
     eligibilityDigest: digest(candidates.map(candidate => ({ id: candidate.id, recipeDigest: candidate.recipeDigest }))),
     policyDigest: options.policyDigest });
   const decision = { consumerId: outcome.consumerId, requestId: outcome.requestId, receiptId: outcome.receiptId,
-    method: outcome.method, reason: outcome.reason, delivered: outcome.delivered, model: outcome.model,
+    method: outcome.method, reason: outcome.reason, delivered: outcome.delivered, providerCalled: outcome.providerCalled, model: outcome.model,
     usage: outcome.usage, latencyMs: outcome.latencyMs, budget: outcome.budget, scopeState: outcome.scopeState };
   if (!outcome.delivered) return { ...base, mode: outcome.mode, reason: outcome.reason, decision };
   const answer = outcome.answers["match"];

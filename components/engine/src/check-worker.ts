@@ -13,23 +13,26 @@ import type { Packs } from "./pack-configuration.ts";
 import type { ValidationPlan } from "./planning.ts";
 import type { BuiltinCheckRequest } from "./builtin-checks.ts";
 import { retainRuntimeReader, releaseRuntimeReader, type RuntimeReader } from "./runtime-reader.ts";
+import type { DecisionTaskContext } from "./decision-task-context.ts";
 const WORKER = fileURLToPath(import.meta.url);
 interface CheckWork extends CheckObservationContext {
   version: 1; trigger?: "manual" | "hook" | "test"; id: string; root: string; runsRoot: string; assetsRoot: string; workerDigest: string;
   packs: Packs; plan: ValidationPlan; scope: ChangeScope; stage: string; asOf: string; deadlineMs: number; deadlineAt: number;
-  narrative: Pick<BuiltinCheckRequest, "commit" | "pullRequest">; managedPaths: string[]; runFixtureProof: boolean;
+  narrative: Pick<BuiltinCheckRequest, "commit" | "pullRequest">; managedPaths: string[]; runFixtureProof: boolean; workId: string;
   generation: RuntimeReader | null;
+  decisionContext?: DecisionTaskContext;
 }
 /** Reserve a single detached owner before launching. Reconnection only observes the returned run ID. */
-export function dispatchChecks(packs: Packs, plan: ValidationPlan, request: Omit<BuiltinCheckRequest, "id" | "assets"> & { assets: PackagedCheckerAssets }, options: { root?: string; deadlineMs?: number } & CheckObservationContext = {}) {
+export function dispatchChecks(packs: Packs, plan: ValidationPlan, request: Omit<BuiltinCheckRequest, "id" | "assets"> & { assets: PackagedCheckerAssets }, options: { root?: string; deadlineMs?: number; decisionContext?: DecisionTaskContext } & CheckObservationContext = {}) {
   const observation = checkObservationContext(options.trigger, options.expectedStatus);
   const root = options.root ?? checkRunRoot(); mkdirSync(root, { recursive: true, mode: 0o700 });
   const runsRoot = realpathSync(root), id = randomUUID(), directory = join(runsRoot, id); mkdirSync(directory, { mode: 0o700 });
   const work: CheckWork = { version: 1, ...observation, id, root: request.subject.root, runsRoot, assetsRoot: request.assets.root, workerDigest: fileDigest(WORKER),
     generation: retainRuntimeReader(`check:${id}`, { workspace: request.subject.root, stage: request.stage }),
+    ...(options.decisionContext ? { decisionContext: options.decisionContext } : {}),
     deadlineAt: Date.now() + (options.deadlineMs ?? 300000),
     packs, plan, scope: request.scope, stage: request.stage, asOf: request.asOf, deadlineMs: options.deadlineMs ?? 300000,
-    managedPaths: [...(request.managedPaths ?? [])], runFixtureProof: request.runFixtureProof ?? false,
+    managedPaths: [...(request.managedPaths ?? [])], runFixtureProof: request.runFixtureProof ?? false, workId: request.workId ?? "",
     narrative: { ...(request.commit ? { commit: request.commit } : {}), ...(request.pullRequest ? { pullRequest: request.pullRequest } : {}) } };
   durableJson(join(directory, "dispatch.json"), work);
   durableJson(join(directory, "run.json"), { version: 1, id, root: work.root, state: "queued", ...(work.trigger ? { trigger: work.trigger } : {}), ...(work.expectedStatus ? { expected_status: work.expectedStatus } : {}), started_at: new Date().toISOString(), plan, scope: work.scope, owner: null });
@@ -45,7 +48,7 @@ async function worker(directory: string, expectedDigest: string) {
   const claim = openSync(join(directory, "worker.claim"), "wx", 0o600); closeSync(claim);
   try {
     const result = await runChecks(work.packs, work.plan, { subject: new ValidationSubject(work.root, work.scope), scope: work.scope,
-      assets: new PackagedCheckerAssets(work.assetsRoot), packIds: new Set(Object.keys(work.packs)), stage: work.stage, asOf: work.asOf, managedPaths: new Set(work.managedPaths), runFixtureProof: work.runFixtureProof, ...work.narrative },
+      assets: new PackagedCheckerAssets(work.assetsRoot), packIds: new Set(Object.keys(work.packs)), stage: work.stage, asOf: work.asOf, workId: work.workId, managedPaths: new Set(work.managedPaths), runFixtureProof: work.runFixtureProof, ...work.narrative },
     { root: work.runsRoot, deadlineMs: work.deadlineMs, deadlineAt: work.deadlineAt, reservedRunId: work.id, ...checkObservationContext(work.trigger, work.expectedStatus) });
     // Native check completion resolves its generation obligation; exceptions retain it for reconciliation.
     const unresolved = result.results.some(pack => pack.commands.some(command => command.termination_reason === "cleanup-unknown" || command.termination_reason === "outcome-unknown"));

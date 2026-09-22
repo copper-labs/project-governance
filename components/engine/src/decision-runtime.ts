@@ -18,7 +18,7 @@ import {
 export interface DecisionAsk {
   consumerId: DecisionConsumerId;
   /** Registered code entry; observation can never acquire diagnostic execution capability. */
-  entryKind?: "registered-default" | "workflow-observe" | "workflow-diagnose";
+  entryKind?: "registered-default" | "workflow-observe" | "workflow-diagnose" | "provider-submit";
   /** Additional consumers sharing one compatible batch. Every participant must resolve to the same mode. */
   participants?: DecisionConsumerId[];
   /** A stable identity for the decision event; repeated observations of it reuse the retained result. */
@@ -47,6 +47,8 @@ export interface DecisionOutcome {
   scopeState: "bound" | "unavailable"; scope: BudgetScope | null;
   answers: Record<string, QuestionOutcome>;
   method: "baseline" | "jev"; reason: string; delivered: boolean;
+  /** Whether this retained event attempted transport, including failed/uncertain paid calls. Absent in older receipts. */
+  providerCalled?: boolean | undefined;
   model: string | null; latencyMs: number; usage: { inputTokens: number | null; outputTokens: number | null };
   failureStage?: DecisionFailureStage;
   coverage: DecisionCoverage;
@@ -125,7 +127,7 @@ export class DecisionRuntime {
     const requestId = randomUUID();
     const key = this.#eventKey(ask);
     const participants = [...new Set([ask.consumerId, ...(ask.participants ?? [])])];
-    const allocation: Record<string, number> = {};
+    const allocation: Record<string, number> = Object.fromEntries(participants.map(id => [id, 0]));
     for (const question of ask.questions) allocation[question.consumerId] = (allocation[question.consumerId] ?? 0) + 1;
     const base: DecisionOutcome = {
       version: 2, consumerId: ask.consumerId, consumers: participants, consumerVersion: consumer.version, caller: consumer.caller,
@@ -135,7 +137,7 @@ export class DecisionRuntime {
       configuredEffect: resolved.effect, entryKind: ask.entryKind ?? "registered-default", effectSource: resolved.effectSource,
       requestId, requestIdentity: null, payloadDigest: null,
       scopeState: ask.scope ? "bound" : "unavailable", scope: ask.scope,
-      answers: {}, method: "baseline", reason: "off", delivered: false,
+      answers: {}, method: "baseline", reason: "off", delivered: false, providerCalled: false,
       model: null, latencyMs: 0, usage: { inputTokens: null, outputTokens: null }, coverage: ask.coverage,
       budget: { state: "not-required", reservationId: null, calls: null, bytes: null, limits: { maxCalls: this.settings.budget.maxCalls, maxRequestBytes: this.settings.budget.maxRequestBytes } },
       tokenEstimate: null, receiptId: null,
@@ -151,6 +153,7 @@ export class DecisionRuntime {
     // Enabling one feature can never enable another: every batch participant is checked independently.
     if (participants.some(id => this.settings.consumers[id].mode === "off")) return fallback("consumer-off");
     if (participants.some(id => resolveConsumerMode(this.settings, id).mode !== resolved.mode)) return fallback("batch-incompatible");
+    if (!ask.questions.length) return fallback("no-enabled-questions");
     if (ask.legacyDataClass !== undefined && (participants.length !== 1 || participants[0] !== "DL03" ||
       ask.questions.some(question => question.definitionId !== "legacy.context-rank/1"))) return fallback("data-sharing-disabled");
     const dataClass = (id: DecisionConsumerId) => ask.legacyDataClass ?? DECISION_CONSUMERS[id].dataClass;
@@ -163,10 +166,11 @@ export class DecisionRuntime {
     // Effects form explicit capability sets, not a permission ladder. A question's metadata alone
     // must never turn a status read into an executable probe selection.
     const entry = ask.entryKind ?? "registered-default";
-    if (!["registered-default", "workflow-observe", "workflow-diagnose"].includes(entry) ||
-      (entry !== "registered-default" && (participants.length !== 1 || ask.consumerId !== "DL05")) ||
+    if (!["registered-default", "workflow-observe", "workflow-diagnose", "provider-submit"].includes(entry) ||
+      (entry !== "registered-default" && (participants.length !== 1 || ask.consumerId !== (entry === "provider-submit" ? "DL08" : "DL05"))) ||
       ask.questions.some(question => {
         const effect = DECISION_QUESTIONS[question.definitionId]?.effectCeiling;
+        if (effect === "route-model") return entry !== "provider-submit" || !["advise", "route-model"].includes(resolved.effect);
         if (effect === "choose-read") return entry !== "workflow-diagnose" || resolved.effect !== "choose-read";
         if (entry === "workflow-diagnose") return true;
         return effect !== "advise" || (resolved.effect !== "advise" && !(entry === "workflow-observe" && resolved.effect === "choose-read"));
@@ -187,7 +191,7 @@ export class DecisionRuntime {
       admittedReservation = reserveDecisionCall(this.stateRoot, ask.scope!, key, requestBytes, this.settings.budget,
         { busyTimeoutMs: Math.max(0, Math.min(1000, this.#options.busyTimeoutMs ?? 250, Math.floor(this.settings.legacy.deadlineMs - (performance.now() - started)))) });
       return admittedReservation.state === "reserved";
-    });
+    }, () => { base.providerCalled = true; });
     const reservation = admittedReservation;
     if (!reservation) return fallback(transport.ok ? "admission-unavailable" : transport.reason,
       { requestIdentity: identity, failureStage: transport.ok ? "budget" : transport.failureStage });

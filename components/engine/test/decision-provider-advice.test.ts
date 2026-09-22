@@ -157,3 +157,26 @@ test("supported narrow completion advice introduces no correction or acceptance 
   assert.equal(advice.evidenceBasis, "reported-only"); assert.equal(advice.scope, null);
   assert.match(advice.authority, /deterministic acceptance is unchanged/);
 });
+
+test("failed submissions without a provider result remain joinable and cannot borrow another native result", async t => {
+  const { providerDecisionAdvice } = await import("../src/decision-provider-advice.ts");
+  const { decisionOutcomeReport } = await import("../src/decision-outcomes.ts");
+  const { contextStateRoot } = await import("../src/context-command.ts");
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "provider-no-result-"))), prior = process.env.XDG_STATE_HOME;
+  process.env.XDG_STATE_HOME = join(root, "state");
+  t.after(() => { if (prior === undefined) delete process.env.XDG_STATE_HOME; else process.env.XDG_STATE_HOME = prior; rmSync(root, { recursive: true, force: true }); });
+  const request = { id: "refused", operation: { cwd: root } };
+  const receipt = { version: 1 as const, requestDigest: digest(request), state: "failed" as const, cleanup: "confirmed" as const,
+    reason: "guarded-admission-changed", exitCode: null, signal: null, startedAt: "2026-09-22T12:00:00Z", endedAt: "2026-09-22T12:00:01Z",
+    durationMs: 1000, log: "", logBytes: 0 };
+  const result = await providerDecisionAdvice(request, receipt, null), advice = result.decisionAdvice;
+  assert.ok(advice && "episode" in advice && advice.episode.status === "recorded");
+  const capture = advice.episode.episode, episode = JSON.parse(readFileSync(capture.path, "utf8"));
+  const nativePath = join(root, "native.json"), manifest = join(root, "manifest.json");
+  durableJson(nativePath, receipt);
+  const writeManifest = () => durableJson(manifest, { version: 2, episodes: [{ id: episode.id, scope: episode.scope, decisions: [], caller: capture,
+    native: [{ kind: "command", path: nativePath, digest: fileDigest(nativePath) }] }] });
+  writeManifest(); assert.equal(decisionOutcomeReport(contextStateRoot(root), manifest).counts.joined, 1);
+  durableJson(nativePath, { ...receipt, state: "succeeded" }); writeManifest();
+  assert.equal(decisionOutcomeReport(contextStateRoot(root), manifest).counts.invalid, 1);
+});

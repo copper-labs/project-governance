@@ -5,6 +5,7 @@ import type { Candidate } from "./decisions.ts";
 import type { BudgetScope } from "./decision-budget.ts";
 import { interpretNoul, type DecisionOutcome, type DecisionRuntime } from "./decision-runtime.ts";
 import type { DecisionCoverage, EvidenceItem, QuestionInstance } from "./decision-schema.ts";
+import { matchesPackPath } from "./planning.ts";
 
 export interface ContextAdvice {
   version: 1; kind: "project-governance-context-advice";
@@ -14,7 +15,7 @@ export interface ContextAdvice {
   order: string[]; baselineOrder: string[]; assessed: string[]; unassessed: string[];
   relevance: Array<{ id: string; probability: number | null; interpretation: string }>;
   coverage: DecisionCoverage;
-  decision: Pick<DecisionOutcome, "consumerId" | "requestId" | "receiptId" | "method" | "reason" | "delivered" | "model" | "usage" | "latencyMs" | "budget" | "scopeState"> | null;
+  decision: Pick<DecisionOutcome, "consumerId" | "requestId" | "receiptId" | "method" | "reason" | "delivered" | "providerCalled" | "model" | "usage" | "latencyMs" | "budget" | "scopeState"> | null;
 }
 
 /** Code-owned reciprocal-rank merge. A missing score keeps a candidate's baseline position. */
@@ -52,10 +53,13 @@ export async function contextAdvice(runtime: DecisionRuntime, candidates: Candid
   if (eligibility.mode === "off" || !candidates.length) return base;
 
   const available = Math.max(0, options.excerptBytes - Buffer.byteLength(options.purpose));
-  const count = Math.min(candidates.length, runtime.settings.legacy.maxCandidates, Math.floor(available / 128));
+  const eligible = baseline.filter(id => matchesPackPath(id, runtime.settings.legacy.allowedSourcePaths ?? []));
+  if (!eligible.length) return { ...base, reason: "source-scope-disabled", coverage: { ...base.coverage,
+    omitted: baseline, limits: ["No optional candidate is approved for classifier disclosure; lexical delivery remains available."] } };
+  const count = Math.min(eligible.length, runtime.settings.legacy.maxCandidates, Math.floor(available / 128));
   if (!count) return { ...base, reason: "input-budget", coverage: { ...base.coverage, omitted: baseline,
     limits: ["evidence budget cannot fit purpose and one minimum-size excerpt"], truncated: true } };
-  const selected = baseline.slice(0, count).map(id => candidates.find(candidate => candidate.id === id)!);
+  const selected = eligible.slice(0, count).map(id => candidates.find(candidate => candidate.id === id)!);
   const allowance = Math.min(65536, Math.floor(available / selected.length));
   const evidence: EvidenceItem[] = [], questions: QuestionInstance[] = [];
   const limits: string[] = [];
@@ -87,7 +91,7 @@ export async function contextAdvice(runtime: DecisionRuntime, candidates: Candid
     evidence, coverage, questions, sourcePaths: [...index.values()],
     eligibilityDigest: null, policyDigest: options.policyDigest });
   const decision = { consumerId: outcome.consumerId, requestId: outcome.requestId, receiptId: outcome.receiptId,
-    method: outcome.method, reason: outcome.reason, delivered: outcome.delivered, model: outcome.model,
+    method: outcome.method, reason: outcome.reason, delivered: outcome.delivered, providerCalled: outcome.providerCalled, model: outcome.model,
     usage: outcome.usage, latencyMs: outcome.latencyMs, budget: outcome.budget, scopeState: outcome.scopeState };
   const relevance: ContextAdvice["relevance"] = [], scores = new Map<string, number>();
   for (const [name, id] of index) {

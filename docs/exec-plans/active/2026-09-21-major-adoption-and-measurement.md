@@ -5,7 +5,7 @@ type: exec-plan
 status: active
 owner: project-governance
 created: 2026-09-21
-updated: 2026-09-21
+updated: 2026-09-22
 summary: Prioritized JEV implementation batches delivered through release candidates into a real development pilot, with ordinary-automation baselines and a measured stable-major launch scope.
 ---
 
@@ -39,20 +39,21 @@ agent then perform code and architecture review, reconcile findings, and decide 
 Neither implementation nor review implies permission to publish or activate automatically. Later consumer batches
 use the same handoff boundary after the preceding pilot has supplied useful observations.
 
-The shared runtime, eight caller integrations, budget migration and outcome joins are implemented.
-The source is now version `3.0.0-rc.2`; its tagged release includes source/installed-package proof
-and review repairs. The initial release is the baseline for the next experiment batch. Published
-asset identities and runtime evidence remain in the external release/pilot record. SDK adoption,
-real host/device qualification and measured JEV benefit are distinct from release completion.
+The shared runtime, eight original caller integrations, budget migration and outcome joins are
+implemented. The source release candidate is now `3.0.0-rc.4`, including the N-series experiments
+and the R0–R4 features below. Published asset identities, adoption status and runtime evidence remain in the external
+release/pilot record. Real host/device qualification and measured JEV benefit remain distinct
+from source and release completion.
 Historical S0–S3 checklists below retain the original acceptance criteria; unchecked entries are
 not instructions to redo completed work. Reconcile them against retained evidence when adopting.
 
-The operator has now requested detailed design and independent review of the
-[next RC experiment batch](#next-rc-experiment-batch): attention routing, bounded read-only diagnostic
-sequences and offline history analysis. This authoring assignment does not implement or activate
-those effects. The [experiment specification](../../specs/engine-decision-experiments.md) owns their
-contracts. The N0–N6 slices below are the next delivery sequence within this plan, bringing small
-parts of S7/S9/S10 forward without replacing the remaining programme.
+The current release candidate is [RC4 quality, routing and CI](#rc4-quality-routing-and-ci-batch).
+It brings bounded S5/S6/S9 work forward: connected evidence/quality advice, opt-in category routing replacing
+agent-selected work-class tables, richer CI advice, and required governed delegation for the pilot.
+The [RC4 specification](../../specs/engine-decision-rc4.md) owns that scope. R0–R6 below owns the next
+implementation sequence, with existing-consumer delivery in R2a moved ahead of routing; N0–N6
+retains the preceding RC3 contract and its field qualification.
+This document update plans implementation; it does not activate features or install another project.
 
 ### Accepted implementation choices
 
@@ -66,6 +67,10 @@ parts of S7/S9/S10 forward without replacing the remaining programme.
   effects still need explicit configuration and qualification.
 - Existing bound task/revision context travels automatically through supported caller integrations;
   manual entry retains explicit flags and honest missing-scope fallback.
+- RC4 disables automatic Markdown-table model choice. Fixed provider bindings and explicit operator
+  choices remain; DL08 is the sole optional automatic routing owner and defaults off.
+- The RC4 pilot requires governed delegation. An agent-supplied model argument is not an operator
+  override; permitted fallback and missing or bypassed feature exposure must be distinguishable.
 
 These choices preserve all eight first-RC consumers and their required functional proof. Their owning
 details are in the shared spec and consumer catalog; this list records the accepted scope decisions.
@@ -93,8 +98,9 @@ scope and experimental assignment are different decisions. Use one shared task/c
 meaningful eligibility boundaries; do not run all eight questions on every event. The first pilot
 can compare useful subsets without another release just to add an already shipped consumer.
 
-The first published candidate is `3.0.0-rc.2`. Select the next unused `3.0.0-rc.N` identity when
-the next candidate freezes; this document reserves no tag. Never overwrite an existing artifact
+The first published candidate is `3.0.0-rc.2`; RC3 is the source baseline for this batch. Target
+`3.0.0-rc.4` after checking that identity is unused at freeze; this document reserves no tag.
+Never overwrite an existing artifact
 or transfer its proof to changed package bytes without applicability checks.
 
 The [release policy](../../governance/release-process.md) now supports immutable RC publication
@@ -131,15 +137,378 @@ selected S9/S10 experiments forward; their remaining scope stays later.
 All thirteen need not mature before the major release. A negative result can lead to a disabled or
 revised consumer, but it must be an explicit launch disposition rather than a hidden omitted goal.
 
+## RC4 quality, routing and CI batch
+
+**Status (2026-09-22): implementation resumed at the operator's request.**
+The focused evidence-delivery, field-repair, routing and continuation suites pass. Detached workers
+now revalidate admission; trusted follow-ups preserve the restricted profile. Source includes
+passive assignment preflight, deliberate legacy-policy review, native outcome joins and a
+same-input CI comparison. Real Claude checks established read denials and successful baseline and
+alternative workers for one bounded read-only class. This does not qualify unrestricted parents.
+Compiled caller integration, the final frozen review and release proof are still in progress.
+No RC4 publication or adopter upgrade has occurred.
+R0–R6 owns feature progress; the S/P maps are references, not competing schedules. Installed profiles
+and releases remain unchanged.
+The [design reconciliation](../../reviews/2026-09-21-rc4-design-reconciliation.md) records the
+source-grounded review findings and their changes to this sequence. The subsequent
+[September research](../../research/2026-09-21-jev-agentic-development.md) and
+[simplification pass](../../reviews/2026-09-21-rc4-simplification.md) prioritize existing context/output
+selection and operator-defined task categories. Fixed models stay the default; category dispatch
+requires opt-in. A category maps to the operator's chosen pair, not a JEV-generated model ranking.
+
+The operator wants new features exercised through the actual development path, not bypassed by an
+agent choosing another model/tool. Make that exposure and authority boundary a prerequisite for
+the pilot. Do not interpret it as mandatory successful inference: legitimate no-token, uncertainty,
+budget and provider-failure fallbacks must still complete through the governed baseline.
+
+| Priority | Slice | Concrete outcome | Dependency |
+| --- | --- | --- | --- |
+| 1 | Field repairs and R0a — Trace real work and establish exposure | Preserve approval identity; address observed recovery gaps; map actual reads, callers and missing links | Current RC3 source and external adopter observations |
+| 2 | R2a — Deliver compact evidence before reading | Code-owned summaries and existing DL03/DL13 reach normal callers; preserve originals and required evidence | R0a binding/source scope for JEV; deterministic summaries need neither routing nor new questions |
+| 3 | R1 — Unify model policy and configuration | Fixed baseline by default; explicit operator overrides; one disabled-by-default routing owner and deliberate migration | R0a scope and proposed R0b admission contract |
+| 4 | R2b — Add requirement-linked quality evaluation | Test/change/claim advice reuses the connected evidence and existing outcome reader | R2a delivery and R1 question controls |
+| 5 | R0b / R3 — Qualify governed delegation and category mapping | One bounded provider/caller; optional task classification applies the operator's preselected pair | R0a/R1; same qualified host class for routing |
+| 6 | R4 — Improve local and remote CI advice | Meaningful scenario descriptions, optional recommendations and catalog-gap advice with unchanged required execution | R0a identity/exposure and R1 question controls; existing DL07/native planner |
+| 7 | R5 — Freeze, review and publish RC4 | Qualified immutable candidate, independent review, installed proof and readback | Field repairs and R0–R4 required functional proof |
+| 8 | R6 — Deliberately adopt and measure | Governed ordinary development with active selected features and independent outcome assessment | R5 and operator-selected existing adopter checkout |
+
+Implement sequentially in the existing working branch unless isolation becomes necessary for a
+concrete conflict. No extra worktree or delegated implementation lane is required. Discovery is
+small and shares one policy owner, so start with one writer; use the authorized Claude review at
+the architecture/frozen implementation seams. Do not add a review ceremony after every slice.
+
+### Current implementation checkpoint
+
+The full R0–R6 scope remains required. Source implementation now covers R0–R4, with focused tests
+for native identity, approval transport, recovery, bounded context/output delivery, question controls,
+requirement-linked quality and CI advice, routing fallback, explicit reviewer choice and continuation.
+Installed normal-caller delivery and native mapped dispatch have been exercised. Native continuation
+checks reject expired qualifications and changed source before another child starts. Consolidated source and installed-package proof are complete, and the independent implementation
+review is reconciled. Publication and exact asset readback are the remaining R5 steps. R6 adoption follows publication;
+keep the coding model fixed for initial measurement. Runtime evidence and host-specific qualification
+receipts remain in the external release dossier.
+
+### Immediate field repairs before release
+
+- [x] Preserve explicitly supplied `GOVERNANCE_WORK_ID` from check preparation through the durable
+  detached request to Apple approval checking. Pass the same bound value to custom checker commands;
+  do not widen ambient environment inheritance or infer authority from decision-task identity.
+- [x] Reproduce the missing identity and prove matching approval passes while missing, mismatched
+  and expired approval fails. Focused source tests, typecheck, build and a compiled public CLI smoke
+  cover the handoff; transient test fixtures are cleaned and evidence retained externally.
+- [ ] Include the fix in the frozen release candidate and verify the published/adopted artifact.
+  Source proof does not patch an installed RC3 or establish an adopter's build/feature result.
+
+This is a deterministic context-transport repair, not a JEV feature or a change to approval policy.
+Keep separate approval-check evidence from native application build/test outcomes.
+
+- [x] Add a supported detached-check reader recovery path in source. Release only the exact bound generation
+  after retained command/member cleanup is verified. Keep the original failed result; a dead PID or
+  expired wait cannot establish cleanup. Refuse live, mismatched and unresolved owners; replay must
+  be harmless. Reuse the existing command reconciler and installation registry.
+- [x] Add an opt-in deterministic capacity preflight for a declared emulator lane before install.
+  Repeated insufficient-storage failures justify an early actionable refusal, not automatic erasure,
+  uninstall, device replacement or extra rebuilds. Platform/app requirements remain adapter-owned.
+- [x] Support exact Android emulator cleanup observation through the existing resource boundary,
+  using target absence, port closure and adapter lock evidence. Reuse the established host readback;
+  do not infer resource release from command completion or expand first-release platform claims.
+  Confirmed command cleanup and resource cleanup are separate facts.
+
+These are bounded repairs justified by recorded operational friction. Application compiler/UI-test
+defects, project file-size findings, source-proof registration and changed-document inventory belong
+to their project owners. They are not reasons to weaken shared policy or extend the RC4 feature list.
+
+**Proof:** focused identity/recovery cases, captured low-capacity/unknown-capacity preflight cases,
+exact-target cleanup present/absent/unreadable cases, and one installed seam at release. Do not run
+device removal, a platform matrix, or repeat adopter builds for a planning or read-only monitoring pass.
+
+### R0 — Establish governed entry and real exposure
+
+**R0a — Identity and exposure, shared by all features:**
+
+- [x] Trace an ordinary post-adoption development cycle using existing checks, native workflow
+  results, decision receipts and ownership readback. Separate setup/negative tests from new work.
+  The external monitoring record shows source-scope fallback with missing identity, optional
+  context never supplied, large repeated output, and repeated environment/resource recovery work.
+- [x] Inspect actual RC3 caller behavior and external adoption evidence. Map check/plan,
+  provider submission/completion, native subagent tools, direct provider CLIs/APIs and child delegation.
+  For each path record existing owner, task/revision source, permitted source capture and enforceability.
+  Count real eligible assignments by class before expanding routing; report absent traffic honestly.
+  Identify where context/output selection can run before the worker reads the same full material.
+- [x] Carry already bound task/revision, requirement and selected source identity through one normal
+  check caller and one provider assignment/completion caller. Missing native integration remains
+  unsupported or explicit entry; never invent a global current-task state or broad source permission.
+- [x] Extend existing episode/outcome evidence to show reached/called/delivered/used, approved fallback,
+  explicit override, outside coverage and attempted bypass. Required-governed completion cannot
+  claim full exposure with missing receipts; no semantic judgment becomes a required pass verdict.
+  Ratios cover governed-entry assignments. Off-entry use by an unrestricted coordinator is an
+  unobserved inventory gap, not complete coverage or a zero-bypass result.
+
+**R0b — Governed admission and one bounded host path:**
+
+- [x] Qualify the Claude Code prototype using native restricted mode, safe mode and a narrow tool
+  allowlist. Do not rely on a shell hook alone. Start with a read/search-only worker class submitted by a trusted host; deny native child
+  agents, shell, network and unapproved tools. Reject assignments needing absent tools. Existing
+  full-access workers and unrestricted coordinators remain outside runtime enforcement coverage.
+  The pilot must route that same qualified worker class; qualifying an unused class is insufficient.
+- [x] Bind approved route, baseline, config realpath/content, executable identity, host tool profile,
+  category mapping and operator overrides through existing `record` actions with `destination: null`.
+  These carry provenance; provider admission owns dispatch. Refuse agent
+  executable overrides and unapproved binding/registry/access/root/tool/environment changes.
+- [x] Carry inherited constraints into child admission. Add guarded permission identity to native
+  launch/follow-up validation without weakening legacy identity checks. Prompt prose alone cannot
+  confine a worker or authenticate an operator; protect policy, credentials and authority evidence
+  against worker changes. Governed-entry failure visibly stops the assignment.
+  Resolve the protected hook/policy outside workspace, additional roots and job directory; constrain
+  source reads and deny credential reads. Retain launch argv/settings bytes, loaded-settings readback
+  and actual denial events. A child-reported permission string proves only identity consistency.
+- [x] Produce reusable adapter code and a dry-run host-policy proposal in this repository. Installing
+  project/managed settings requires deliberate operator adoption, with scope and effective settings
+  inspected. Do not install global policy or write another checkout during implementation planning.
+  Qualify any later shell-capable class using supported host isolation, not command-name filtering.
+- [x] Apply source/destination permission before every cloud decision or generation call. Reject a
+  local-only request with no eligible local provider; fallback cannot broaden data-sharing permission.
+
+**Owners:** existing host API/adapter and task/action authority, `provider-job-command.ts`,
+`provider-job.ts`, `provider-assignment.ts`, `decision-scope.ts`, `decision-episodes.ts`, check
+observation/context and the existing outcome reader. Do not add harness operations, destinations or
+broader authority policy for this feature. R0b also touches `claude-command.ts`, provider permission/identity
+and continuation validation. Add only narrow adapter glue after identifying a real capability.
+
+**Proof:** RC4-F1/F2 in the [functional matrix](../../reference/2026-09-21-decision-layer-functional-validation.md#rc4-required-proof).
+Prove a normal governed launch, rejected alternate route and config/executable override, a forged
+operator choice, inherited child admission, absent/conflicting task identity and a no-token fallback.
+Inspect actual host denials and failed policy-tampering attempts before claiming enforcement for
+the bounded worker. A fixture cannot qualify an unrestricted parent or worker. Unsupported coverage
+blocks that enforced pilot path, not independent R2/R4 advisory implementation.
+
+**Exit:** a concrete host/caller contract with a reusable exposure record. Preserve unknown capability
+and unbound inputs explicitly. Close R0a and R0b separately; do not assume every host can be intercepted.
+
+### R1 — Unify model policy and configuration
+
+- [x] Implement the [single-owner selection contract](../../specs/engine-decision-rc4.md#model-selection-one-owner-routing-off-by-default).
+  Default to the fixed provider binding. Preserve explicit model/effort/provider choices only with
+  trusted provenance in enforced assignments; a matching baseline argument is not an override.
+- [x] Register DL08 mode/effect and one typed category map: description plus exact model/effort for
+  each category, scoped to an eligible assignment class/provider. Default it off, with
+  advice as the omitted effect; live selection requires explicit `route-model`. Preserve the global
+  off/shadow ceiling, current budgets and immediate provider-free baseline.
+- [x] Add explicit per-consumer question allowlists. Omission preserves each existing RC3 question
+  set through frozen `DECISION_CONSUMERS.defaultQuestions`, not the live definition list. Pin the
+  exact RC3 sets in proof. Empty means no questions. Reject unknown/mismatched definitions.
+- [x] Keep profile parsing pure: include the category mapping in `configDigest`. Provider submission
+  separately freezes `bindingDigest` for approved config realpath/content, executable, loaded host
+  profile and operator constraints. Reuse `providerBinding` compatibility validation.
+- [x] Replace the installed Markdown table's automatic-selection instructions with fixed baseline,
+  explicit-choice and optional-router guidance. Reconcile planning/delegation/provider skills and
+  catalog references in this same slice; no two live model-selection authorities.
+- [x] Add a deliberate legacy-policy migration preview. Preserve project-owned Markdown overrides;
+  never infer routing consent or modify them during update. Report incompatible instructions before
+  auto activation. Legacy helper bindings remain usable and do not gain a second router.
+  Explain that RC3 ignores sibling routing declarations but rejects a new DL08 consumer/question
+  selector/effect inside decision settings; neither behavior establishes routing activation.
+- [x] Add optional workspace/assignment-scoped routing preflight to provider doctor; keep ordinary
+  binding checks compatible. Report effective policy, coverage and qualification without secrets
+  or paid probes. Invalid baseline/authority/required host boundary fails preflight; absent optional
+  candidates or JEV reports a fallback condition. Qualification uses explicit assignments in R3.
+
+**Owners:** `decision-settings.ts`, `decision-configuration.ts`, decision catalog/runtime/schema,
+profile schema assets, `provider-binding.ts`, provider doctor, canonical installed
+`resources/model-selection.md` and its existing skill references. Keep provider connection/executable
+configuration under its current owner; do not duplicate it in a model catalog.
+
+**Proof:** RC4-F1/F3: old profiles, global/per-feature ceilings, exact question opt-in, explicit partial
+choices, incompatible effort, old table preservation, unsupported model/capability and fixed baseline
+without JEV. Check the installed guidance and runtime behavior together, not just schema parsing.
+
+**Exit:** routing off never triggers model classification or changes the selected pair; enabled
+routing has one policy owner and cannot be bypassed through an agent-authored explicit-model field.
+
+### R2 — Connect evidence selection and quality evaluation
+
+**R2a — Deliver less evidence before reading, ahead of model routing:**
+
+- [x] Make terminal `check-status` compact by default, with explicit `--full` retrieval. Reuse the
+  existing summary owner; retain native status, all blocking/advisory finding text, command failures,
+  cleanup uncertainty and a content-bound reference to the complete original. Running/incomplete
+  observations, native persisted results and exit codes retain their meaning. No JEV call is needed.
+- [x] Wire existing DL03 context capture/selection before prompt assembly for one supported provider
+  caller; reuse DL13 at its existing completion/observation projection. Preserve required evidence,
+  contradictory facts, stale-source refusal, retrieval references and unchanged off/shadow delivery.
+  No new index, MCP server, compactor or selector. Reuse DL04 advice where a supplied recipe applies.
+- [x] Prove the actual delivered payload changes where eligible, and retain captured/omitted IDs,
+  delivery bytes and observed later expansion reads in existing outcome evidence. If material was
+  already read upstream, record that limit instead of claiming it as avoided reading.
+- [x] Connect existing DL13 to a bounded governed command/check output delivery point. Its current
+  provider-completion caller does not cover arbitrary build/test logs. Use trusted task/revision,
+  approved diagnostic capture and original receipt identity. No raw log disclosure follows merely
+  from enabling context selection. Preserve off/shadow/fallback semantics for optional filtering.
+
+**R2b — Requirement-linked quality, after R1 question controls:**
+
+- [x] Reuse immutable review capture and applicable claim evidence to join an explicit requirement,
+  changed subject, relevant implementation/tests and native outcomes. Use current source permissions;
+  expand an adopter allowlist only through an explicit reviewed adoption change.
+- [x] Implement the two new atomic requirement-support questions under DL01/DL02. Reuse DL09 for
+  completion support and existing DL12 for selected history; do not add an overall quality score,
+  a new judge agent, automatic policy learning or a second completion gate.
+- [x] Integrate check and terminal provider projections. Repeated status reads reuse receipts;
+  unchanged compatible questions are not paid for again at another milestone. Unavailable inputs
+  report unknown coverage. Off/unknown cases are recorded through the same episode path.
+- [x] Keep compatible batching in the existing preparation owner, with independent consumer controls
+  and one native usage count. Preserve native status, failures, cleanup and original evidence.
+- [x] Deliver compact source-linked concerns only in auto/advice; shadow cannot steer the caller.
+
+**Owners:** `check-summary.ts`, public check/status delivery, existing context-route/output projections,
+`decision-review.ts`, `decision-check-advice.ts`, `decision-provider-advice.ts`,
+`decision-claim-evidence.ts`, registered question definitions, episode/outcome joins and renderers.
+
+**Proof:** RC4-F1/F4/F6/F8: actual selected context/output delivery, mandatory and contradictory
+evidence preserved, unknown retrieval coverage, requirement addressed, plausible unrelated fix, meaningful versus ineffective
+test, legitimate behavior change, partial or wrong-platform proof, unknown setup, mixed feature
+modes, replay and changed source. Use a small fixed corpus and fake transport for functional proof;
+independent real-work labels follow during the pilot.
+
+**Exit:** one ordinary check and one provider assignment/completion path expose selected evidence and
+applicable quality advice without extra LLM identity bookkeeping or a changed native acceptance
+outcome. Semantic quality and net reading savings stay experimental.
+
+### R3 — Apply category mappings to eligible new assignments
+
+- [x] Extend the existing file-backed submission boundary and resolve the fixed baseline before
+  asking JEV. Apply R0's trusted route/override constraint; raw model flags must not bypass it.
+- [x] Implement `assignment.category/1` over the operator's category descriptions plus unknown.
+  Code applies each category's fixed model/effort binding; JEV does not rank models or predict which
+  model can solve the task. Uncertainty or an ineligible binding uses the authorized baseline.
+  Missing/mixed input must not force a category, and unavailable models must not relabel the work.
+  Start with one provider, one qualified guarded class, baseline plus one alternative. Validate
+  native capabilities; executable discovery alone is not proof that a candidate works.
+- [x] Bootstrap candidates using explicit operator-authorized fixed-model qualification assignments
+  through the governed entry. Existing native receipts/episodes retain exact pair/capability/host
+  proof. Do not require prior router selection to qualify a first candidate; declaration alone is
+  not proof. Record later capability failure and require requalification before reuse.
+- [x] Bind category and mapping to assignment, scope, source where applicable, policy, approved candidate set
+  and baseline. Freeze the resolved pair into the native job request and verify reported identity.
+- [x] Short-circuit durable replay before JEV: a persisted request reuses its original category,
+  pair/receipt and lifecycle reconciliation with no new call or worker. An existing directory with
+  no request returns unresolved-submission before JEV; reconcile ownership before a deliberate new
+  job identity, and count any extra decision cost. Reject changed input/policy rather than reroute it.
+  Qualify permitted baseline fallback and cancellation; never replace an unknown or started worker.
+- [x] Bind continuation to the original assignment, requirement/acceptance digest and class. Keep
+  its model and useful cached context. New scope needs a new governed submission; arbitrary
+  follow-up prose does not establish a same-task exemption.
+- [x] Capture all available JEV, generation, review and repair usage. An authorized later escalation
+  links to the original assignment; there is no automatic cheap-model retry cascade in RC4.
+
+**Owners:** a small selection function beside existing provider binding/submission, the shared
+decision runtime/catalog, provider request/identity evidence and existing lifecycle/coordination.
+Do not recreate a provider client or rebuild the native agent loop.
+
+**Proof:** RC4-F2/F3/F5/F6, including a lower-cost eligible pair, uncertain route, explicit reviewer,
+forged override, missing token, unavailable candidate, candidate bootstrap, configuration drift,
+zero-call replay, new-task follow-up rejection, native identity mismatch and clean shutdown.
+One bounded live qualified host/provider dispatch establishes actual
+route feasibility; deterministic fake-native fixtures cover edge cases without a provider matrix.
+
+**Exit:** optional auto plus `route-model` applies the operator's category binding to an eligible
+authorized new assignment. Fixed-model default and off/shadow/advice retain the baseline; every
+attempt has evidence and unchanged acceptance requirements. Live adoption is a separate choice.
+
+### R4 — Improve local and remote CI recommendations
+
+- [x] Reuse existing pack descriptions and add optional bounded `decision_context` only where useful.
+  Capture requirement/changed behavior under normal source permissions. No parallel scenario
+  registry or blanket metadata rewrite; target expensive optional integration/device scenarios first.
+- [x] Implement explicitly opted-in DL07 v2 questions against those descriptions and exact native
+  applicability facts. Reuse the existing advice projection and supported metadata/usage owners.
+- [x] Return eligible optional check recommendations and catalog-limited gaps. Use existing measured
+  timing only where identity matches; missing history remains unknown. Keep the actual required
+  plan, execution order, proof reuse, resource admission and merge rules unchanged.
+- [x] Include the original plan identity and whether a caller used the recommendation in outcomes.
+  Do not count generated advice or a changed recommendation order as reduced build compute.
+- [x] Join advice to already-required completed runs with matching source/pack/input identity. Report
+  failed packs advice would have omitted/deprioritized and unknown comparisons. No additional full
+  suite, per-test coverage service or actual skip effect follows from this counterfactual analysis.
+- [x] Retain applicable platform, tools, source/destination and existing machine-resource facts as
+  code-owned eligibility. Local inference must not imply free capacity alongside builds or devices;
+  unknown contention stays unknown. No new scheduler/resource monitor is required for this advice.
+
+**Owners:** existing pack declaration/schema, `planning.ts`, `decision-validation-advice.ts`, check/
+plan caller preparation and decision outcome reporting. The broader P5 scheduler/reuse work stays later.
+
+**Proof:** RC4-F3/F6/F7: relevant optional scenario, missing description, misleading or incomplete
+catalog, required-check preservation, wrong-platform candidate, absent history and local/remote
+equivalence of proof requirements. No simulator build is needed merely to prove recommendation logic.
+
+**Exit:** normal plan/check advice supplies useful declared check IDs and scoped gap evidence;
+no new test dispatch or omission effect is implied by enabling this feature.
+
+### R5 — Freeze, review and publish RC4
+
+- [x] Freeze R0–R4 implementation and documentation on one exact source candidate. Record supported
+  callers, actually enforced host routes, explicit gaps, migration and off/fallback behavior.
+- [x] Complete the [RC4 functional matrix](../../reference/2026-09-21-decision-layer-functional-validation.md#rc4-required-proof),
+  one complete release-candidate suite/typecheck and installed archive proof. Reuse unaffected
+  evidence; no mandatory full device/platform/model cross-product or synthetic productivity benchmark.
+- [x] Have Claude perform the independent code and architecture review at the frozen major seam.
+  Reconcile material findings and run their affected checks. A design review does not replace this
+  implementation review. Keep exact model/effort, reviewed content identity and receipt externally.
+- [x] Perform a simplification check against the agreed scope: no duplicate router, new database,
+  background evaluator, model-ranking service or always-on per-tool classifier. Keep useful boundaries.
+- [ ] Under explicit publication authority, use the existing prerelease process for unused
+  `3.0.0-rc.4`: exact candidate/archive/lock agreement, non-latest prerelease publication and readback.
+  If the tag is occupied, select a new immutable candidate identity rather than overwrite it.
+- [x] Prepare migration/adoption instructions naming defaults, opt-in questions/effects, approved
+  delegation route, fixed baseline and candidate qualification. All new effects remain off by default.
+
+**Release floor:** functional feature behavior, source/data boundaries, default compatibility,
+truthful coverage and one qualified guarded worker/launch path for the same class DL08 can route
+are required for the full planned RC4.
+R2/R4 advisory implementation and proof can finish without R0b. If no host path can be qualified,
+return an explicit scope decision before releasing an advisory-only subset; do not silently drop
+the operator's enforcement requirement or build a universal sandbox to close it. Missing comparative
+savings does not block an experimental RC. Publication, pilot installation and whole-session
+enforcement remain separate claims; an unrestricted coordinator is not qualified by a guarded child.
+
+### R6 — Adopt through real work and decide
+
+- [ ] Use the operator-selected existing adopter checkout. Verify its exact RC4 archive/lock,
+  baseline binding, legacy policy disposition, route enforcement, allowed source and task capture.
+  Do not create more branches/worktrees merely to adopt, or enroll other repositories implicitly.
+- [ ] Activate selected context/quality advice on the supported source scope. Keep the fixed coding
+  model initially; DL08 may run explicitly requested shadow category classification. If live routing
+  is approved, name the single simultaneously guarded/routable class and the operator's category
+  mapping before enabling auto/`route-model`. Explicit reviewer choices stay fixed. CI v2 is
+  auto/advice. All arms use the same governed entry; no uncontrolled comparison route.
+- [ ] Collect genuine development tasks, including failures and approved fallback. Review missing
+  exposure, unexpected model use and bypass attempts early; correct wiring before interpreting ROI.
+  Retain budget-exhausted and all other fallback assignments in total outcomes, with separately
+  reported actual routed exposure. An exhausted routing arm proves no classifier-quality result;
+  inspect demand/assignment timing before changing the shared allowance or adding quotas.
+  Keep category accuracy, suitability of the configured mapping, and total accepted-task token usage
+  separate. Cheap classification cannot establish cheap execution; include failed/repeated attempts.
+- [ ] Independently label a small representative set, including apparently successful cases. Compare
+  accepted outcomes, errors, repairs, time and total model usage. Keep separate quality/routing/CI
+  comparisons; not all features need activation in the same task.
+  Include available cache/cold-start/context-transfer and local contention evidence; a local-request
+  percentage or lower per-call price alone is not an accepted-task savings claim.
+- [ ] Record keep/revise/disable decisions per consumer and the next bounded release scope. Do not
+  claim improved accuracy, fewer tokens or faster builds from feature flags, inferred usage or JEV scores.
+
+Tool-risk classification, cross-provider routing, model switches within live sessions, predictive
+check omission, automatic recovery, physical-device removal and full platform expansion remain later.
+The R-series adds no release-management or Mnemos adoption prerequisite.
+
 ## Next RC experiment batch
 
-RC3 implementation and independent review are complete on the existing implementation branch.
+This section records the preceding RC3 batch. RC3 implementation and independent review are complete
+on the existing implementation branch.
 The [implementation reconciliation](../../reviews/2026-09-21-rc3-implementation-reconciliation.md)
-records fixes, focused recheck and qualification. Commit/tag/publication readback is the remaining
-release step. The next release
-contains the shared engine consumers and fixture-qualified boundaries; SDK installation and its real
-simulator/device scenarios follow publication, as directed by the operator on 2026-09-21. No adopter
-checkout is modified for RC3 publication. Native host benefit and semantic quality remain unmeasured.
+records fixes, focused recheck and qualification. Exact publication/adoption readback belongs to the
+external release/pilot record; R0 checks that state rather than relaunching release work from this
+historical checklist. RC3 contains shared consumers and fixture-qualified boundaries. Installation,
+real simulator/device scenarios and measured host benefit retain their separate evidence scopes.
 
 Implemented source now includes assignment-aware off capture, version-2 outcome joins, explicit
 DL12 history analysis, entry/effect enforcement, the transactional diagnostic coordinator and native
@@ -149,7 +518,7 @@ publication blocker. Release readback determines publication completion. The det
 programme's field-qualification requirements; they are not all claims made by fixture proof.
 
 
-This is the next implementation order. S0–S10 remains the programme map; N0–N6 is one bounded
+This was the RC3 implementation order. S0–S10 remains the programme map; N0–N6 is one bounded
 follow-on batch, not a second schedule. The [experiment specification](../../specs/engine-decision-experiments.md)
 owns semantics; this section owns dependencies, deliverables, tests and acceptance.
 Implementation starts only when assigned. Publish/adopt through existing S3 authority and evaluate
@@ -734,9 +1103,10 @@ conditioned on positive savings from every idea, and the broader programme conti
 
 ## S9 — Supervision and model routing
 
-N3 brings only bounded optional-event attention observation/advice forward; live routing stays deferred.
-Worker steering and model-tier
-changes below remain later; do not duplicate N3 implementation here.
+N3 brought bounded optional-event attention observation/advice forward. RC4 R0/R1/R3 now brings
+DL08 routing of new assignments forward under its single-owner policy and required-governed pilot.
+Worker steering, live attention suppression and produce/verify/retry cascades remain later; do not
+duplicate N3 or R3 implementation here.
 
 Deliver DL06 repetition/scope-drift advice and DL08 model-tier/produce-verify-escalate comparisons.
 Start with observation/advice; native host ownership, explicit model choices and required verification

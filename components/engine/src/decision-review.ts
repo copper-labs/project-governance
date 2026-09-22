@@ -2,14 +2,17 @@ import { createHash } from "node:crypto";
 import { digest, object, text } from "./core.ts";
 import type { ChangeScope, ValidationSubject } from "./change-subject.ts";
 import type { BudgetScope } from "./decision-budget.ts";
-import { interpretNoul, type DecisionOutcome, type DecisionRuntime } from "./decision-runtime.ts";
+import { interpretChoice, interpretNoul, type DecisionOutcome, type DecisionRuntime } from "./decision-runtime.ts";
+import { contextExcerpt } from "./context-excerpts.ts";
+import { DECISION_QUESTIONS } from "./decision-catalog.ts";
 import type { DecisionCoverage, EvidenceItem, QuestionInstance } from "./decision-schema.ts";
 
 const MAX_TEST_HUNKS = 4, MAX_DIFF_HUNKS = 4, MAX_RULES = 2, MAX_HUNK_BYTES = 4000;
 const TEST_PATH = /(?:^|\/)(?:tests?|__tests__|spec)\/|\.(?:test|spec)\.[cm]?[jt]sx?$|_test\.py$|Test\.kt$/u;
 
 export interface ReviewRule { id: string; title: string; rationale: string; examples: string[] }
-export interface ReviewHunk { id: string; path: string; kind: "test" | "source"; status: string; diff: string; diffDigest: string; bytes: number }
+export interface ReviewHunk { id: string; path: string; kind: "test" | "source"; status: string; diff: string; diffDigest: string; bytes: number;
+  source?: { text: string; digest: string; complete: boolean } }
 export interface ReviewCapture {
   subjectDigest: string; baseRef: string | null; purpose: string; purposeSource: string;
   hunks: ReviewHunk[]; rules: ReviewRule[]; coverage: DecisionCoverage; capturePaths: string[];
@@ -35,15 +38,16 @@ export function parseReviewRules(raw: unknown): ReviewRule[] {
  * their questions, coverage, modes and findings stay separate.
  */
 export function captureReviewEvidence(subject: ValidationSubject, scope: ChangeScope,
-  options: { purpose: string; purposeSource: string; rules?: ReviewRule[]; maximumBytes?: number }): ReviewCapture {
+  options: { purpose: string; purposeSource: string; rules?: ReviewRule[]; maximumBytes?: number; includeSource?: boolean }): ReviewCapture {
   const omitted: string[] = [], unavailable: string[] = [], limits: string[] = [];
   const hunks: ReviewHunk[] = [];
   let truncated = false;
   const candidates = scope.records.filter(record => record.status !== "deleted");
   const rules = (options.rules ?? []).slice(0, MAX_RULES);
   const ruleBytes = rules.reduce((bytes, rule) => bytes + Buffer.byteLength(`${rule.title}\n${rule.rationale}\n${rule.examples.join("\n")}`), 0);
-  const available = Math.max(0, (options.maximumBytes ?? 8192) - ruleBytes - Buffer.byteLength(options.purpose));
-  const hunkLimit = Math.min(MAX_HUNK_BYTES, Math.floor(available / Math.max(1, Math.min(candidates.length, MAX_TEST_HUNKS + MAX_DIFF_HUNKS))));
+  const available = Math.max(0, (options.maximumBytes ?? 8192) - ruleBytes - Buffer.byteLength(options.purpose) -
+    (options.includeSource ? 64 * Math.min(candidates.length, MAX_TEST_HUNKS + MAX_DIFF_HUNKS) : 0));
+  const hunkLimit = Math.min(MAX_HUNK_BYTES, Math.floor(available / (options.includeSource ? 2 : 1) / Math.max(1, Math.min(candidates.length, MAX_TEST_HUNKS + MAX_DIFF_HUNKS))));
   if (hunkLimit < 128) limits.push("evidence allowance cannot fit the supplied purpose, rules and a useful diff excerpt");
   for (const record of candidates) {
     if (!/\.[cm]?[jt]sx?$/u.test(record.path)) {
@@ -65,11 +69,23 @@ export function captureReviewEvidence(subject: ValidationSubject, scope: ChangeS
       diff = encoded.subarray(0, end).toString("utf8");
       truncated = true; limits.push(`${record.path}: diff truncated to ${hunkLimit} bytes`);
     }
-    hunks.push({ id: `hunk:${record.path}`, path: record.path, kind, status: record.status, diff,
-      diffDigest: `sha256:${createHash("sha256").update(diff).digest("hex")}`, bytes: Buffer.byteLength(diff) });
+    const hunk: ReviewHunk = { id: `hunk:${record.path}`, path: record.path, kind, status: record.status, diff,
+      diffDigest: `sha256:${createHash("sha256").update(diff).digest("hex")}`, bytes: Buffer.byteLength(diff) };
+    if (options.includeSource) {
+      try {
+        const bytes = subject.read(record.path, 1024 * 1024), sourceDigest = `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+        const candidate = contextExcerpt({ id: record.path, excerpt: new TextDecoder("utf8", { fatal: true }).decode(bytes), sourceDigest }, options.purpose, hunkLimit);
+        if (Buffer.byteLength(candidate.excerpt) <= hunkLimit) {
+          hunk.source = { text: candidate.excerpt, digest: sourceDigest, complete: !candidate.sourceRange };
+          if (candidate.sourceRange) { truncated = true; limits.push(`${record.path}: source/setup excerpt incomplete; requirement support may be unknown`); }
+        } else unavailable.push(`${record.path}:source-setup`);
+      } catch { unavailable.push(`${record.path}:source-setup`); }
+    }
+    hunks.push(hunk);
   }
   if ((options.rules ?? []).length > MAX_RULES) limits.push(`only the first ${MAX_RULES} supplied rules are assessed per request`);
   limits.push("Test runtime, fixtures and dependency behavior are not executed or independently established by diff advice.");
+  if (options.includeSource) limits.push("Source/setup capture covers only the supplied file; imported fixtures and dynamic behavior may be unavailable. Semantic support is not regression proof.");
   if (options.purposeSource === "unavailable") limits.push("Task-specific intent is unavailable; do not infer a requirement from the diff.");
   if (!rules.length) limits.push("no review rules supplied: DL02 assesses task relevance only");
   if (!hunks.some(hunk => hunk.kind === "test")) limits.push("no changed test file in the captured subject: DL01 has no assessable evidence");
@@ -82,6 +98,7 @@ export interface ReviewFinding {
   consumerId: "DL01" | "DL02"; questionId: string; ruleId: string | null; path: string;
   interpretation: "positive" | "negative" | "uncertain" | "unknown"; probability: number | null;
   message: string; evidence: { hunkId: string; diffDigest: string };
+  classification?: string; confidence?: number | null;
 }
 export interface ConsumerAdvice {
   consumerId: "DL01" | "DL02"; mode: string; effect: string; reason: string; delivered: boolean;
@@ -93,7 +110,7 @@ export interface ReviewAdvice {
   subjectDigest: string; purpose: string; purposeSource: string;
   batched: boolean; coverage: DecisionCoverage;
   consumers: ConsumerAdvice[];
-  decisions: Array<Pick<DecisionOutcome, "consumerId" | "consumers" | "requestId" | "receiptId" | "mode" | "effect" | "method" | "reason" | "delivered" | "model" | "usage" | "usageAllocation" | "latencyMs" | "budget" | "scopeState">>;
+  decisions: Array<Pick<DecisionOutcome, "consumerId" | "consumers" | "requestId" | "receiptId" | "mode" | "effect" | "method" | "reason" | "delivered" | "providerCalled" | "model" | "usage" | "usageAllocation" | "latencyMs" | "budget" | "scopeState">>;
 }
 
 const MESSAGES: Record<string, (path: string, rule: ReviewRule | null) => string> = {
@@ -102,18 +119,20 @@ const MESSAGES: Record<string, (path: string, rule: ReviewRule | null) => string
   "test.expectation-weakened/1": path => `Changed expectation in ${path} may have been weakened rather than corrected.`,
   "diff.rule-concern/1": (path, rule) => `${path} may exhibit the supplied rule concern: ${rule?.title ?? "unnamed rule"}.`,
   "diff.task-relevance/1": path => `${path} may be unrelated to the assigned task.`,
+  "test.requirement-support/1": path => `${path} may only partially assert, or contradict, the supplied requirement.`,
+  "change.requirement-support/1": path => `${path} may only partially implement, or contradict, the supplied requirement.`,
 };
 
 function receiptOf(outcome: DecisionOutcome) {
   return { consumerId: outcome.consumerId, consumers: outcome.consumers, requestId: outcome.requestId, receiptId: outcome.receiptId,
-    mode: outcome.mode, effect: outcome.effect, method: outcome.method, reason: outcome.reason, delivered: outcome.delivered,
+    mode: outcome.mode, effect: outcome.effect, method: outcome.method, reason: outcome.reason, delivered: outcome.delivered, providerCalled: outcome.providerCalled,
     model: outcome.model, usage: outcome.usage, usageAllocation: outcome.usageAllocation, latencyMs: outcome.latencyMs,
     budget: outcome.budget, scopeState: outcome.scopeState };
 }
 
 interface Prepared { evidence: EvidenceItem[]; questions: QuestionInstance[]; index: Map<string, { consumerId: "DL01" | "DL02"; definitionId: string; path: string; hunkId: string; diffDigest: string; rule: ReviewRule | null }> }
 
-function prepare(capture: ReviewCapture, consumers: Array<"DL01" | "DL02">): Prepared {
+function prepare(capture: ReviewCapture, consumers: Array<"DL01" | "DL02">, questionIds: DecisionRuntime["settings"]["questionIds"]): Prepared {
   const evidence: EvidenceItem[] = [], questions: QuestionInstance[] = [];
   const index: Prepared["index"] = new Map();
   const used = new Set<string>();
@@ -144,8 +163,23 @@ function prepare(capture: ReviewCapture, consumers: Array<"DL01" | "DL02">): Pre
         index.set(key, { consumerId: "DL02", definitionId: "diff.rule-concern/1", path: hunk.path, hunkId: hunk.id, diffDigest: hunk.diffDigest, rule });
       }
     }
+    if (capture.purposeSource !== "unavailable") for (const consumerId of consumers) {
+      if (consumerId === "DL01" && hunk.kind !== "test") continue;
+      const definitionId = consumerId === "DL01" ? "test.requirement-support/1" : "change.requirement-support/1";
+      if (!questionIds[consumerId].includes(definitionId)) continue;
+      const sourceId = `source:${hunk.path}`;
+      const source = hunk.source;
+      addEvidence({ id: sourceId, text: source ? `${source.complete ? "Complete file" : "Incomplete excerpt"}:\n${source.text}` : "Source/setup unavailable; choose unknown when required evidence is missing.",
+        sourceDigest: source?.digest ?? digest("unavailable"), provenance: "captured", trust: "untrusted" });
+      const key = name();
+      questions.push({ name: key, definitionId, consumerId, evidenceIds: [hunk.id, purposeId, sourceId],
+        candidates: DECISION_QUESTIONS[definitionId]!.options!.map(id => ({ id, description: id })) });
+      index.set(key, { consumerId, definitionId, path: hunk.path, hunkId: hunk.id, diffDigest: hunk.diffDigest, rule: null });
+    }
   }
-  return { evidence, questions, index };
+  const enabled = questions.filter(question => questionIds[question.consumerId].includes(question.definitionId));
+  const evidenceIds = new Set(enabled.flatMap(question => question.evidenceIds)), names = new Set(enabled.map(question => question.name));
+  return { evidence: evidence.filter(item => evidenceIds.has(item.id)), questions: enabled, index: new Map([...index].filter(([name]) => names.has(name))) };
 }
 
 function collect(prepared: Prepared, outcome: DecisionOutcome, consumerId: "DL01" | "DL02"): ReviewFinding[] {
@@ -154,6 +188,13 @@ function collect(prepared: Prepared, outcome: DecisionOutcome, consumerId: "DL01
   const seen = new Set<string>();
   for (const [name, meta] of prepared.index) {
     if (meta.consumerId !== consumerId) continue;
+    if (meta.definitionId.endsWith("requirement-support/1")) {
+      const reading = interpretChoice(outcome.answers[name]);
+      if (reading.value === "partial" || reading.value === "contradicted") findings.push({ consumerId, questionId: meta.definitionId,
+        ruleId: null, path: meta.path, interpretation: "negative", probability: null, classification: reading.value, confidence: reading.confidence,
+        message: MESSAGES[meta.definitionId]!(meta.path, null), evidence: { hunkId: meta.hunkId, diffDigest: meta.diffDigest } });
+      continue;
+    }
     const reading = interpretNoul(outcome.answers[name]);
     const concerning = meta.definitionId === "test.assertion-support/1" || meta.definitionId === "diff.task-relevance/1"
       ? reading.value === "negative" : reading.value === "positive";
@@ -204,7 +245,7 @@ export async function reviewAdvice(runtime: DecisionRuntime, capture: ReviewCapt
         summary: "No advice delivered; the ordinary baseline applies." });
     }
   } else if (batched) {
-    const prepared = prepare(capture, active);
+    const prepared = prepare(capture, active, runtime.settings.questionIds);
     const outcome = await runtime.ask({ consumerId: "DL01", participants: ["DL02"], eventId: `${options.eventId}:DL01+DL02`,
       scope, subject, evidence: prepared.evidence, coverage: capture.coverage, questions: prepared.questions,
       sourcePaths, eligibilityDigest: null, policyDigest: options.policyDigest });
@@ -212,7 +253,7 @@ export async function reviewAdvice(runtime: DecisionRuntime, capture: ReviewCapt
     for (const consumerId of active) record(consumerId, outcome, prepared);
   } else {
     for (const consumerId of active) {
-      const prepared = prepare(capture, [consumerId]);
+      const prepared = prepare(capture, [consumerId], runtime.settings.questionIds);
       const outcome = await runtime.ask({ consumerId, eventId: `${options.eventId}:${consumerId}`,
         scope, subject, evidence: prepared.evidence, coverage: capture.coverage, questions: prepared.questions,
         sourcePaths, eligibilityDigest: null, policyDigest: options.policyDigest });

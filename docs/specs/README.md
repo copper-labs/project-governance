@@ -16,7 +16,8 @@ summary: Active specifications for the package runtime, KMP surface validation, 
 | [Unified development engine](unified-development-engine.md) | Detailed TS engine planning baseline and category decisions |
 | [Decision layer proposal](engine-decision-layer.md) | Typed JEV judgments, bounded effects, fallback, telemetry and qualification; not yet activated |
 | [Decision use cases](engine-decision-use-cases.md) | Thirteen proposed consumers spanning tests, context/output selection, workflows, devices, CI, review, release and process learning |
-| [Next RC decision experiments](engine-decision-experiments.md) | Optional attention routing, bounded read-only probes, offline history analysis and comparable baseline/shadow/live evidence |
+| [RC3 decision experiments](engine-decision-experiments.md) | Optional attention advice, bounded read-only probes, offline history analysis and comparable baseline/shadow/live evidence |
+| [RC4 evidence, quality and category routing](engine-decision-rc4.md) | Existing evidence selection, focused quality advice, fixed models by default, simple opt-in category mappings and richer CI recommendations |
 | [Decision layer for local CI](engine-decision-local-ci.md) | Check applicability, proof reuse, focused selection, host capacity and adaptive validation across local and remote CI |
 | [Workflow and device round trip](engine-workflow-and-device-contract.md) | Approved stages, resource/recovery ownership, RN iOS simulator then real devices |
 | [Local CI and merge evidence](engine-local-ci-and-merge-contract.md) | Qualified local/VM/hosted execution, trusted publication and protected merge freshness |

@@ -25,9 +25,15 @@ export interface CommandRequest {
   completion?: CompletionTarget;
   coordination?: { registry: string; resources: string[] };
   assignment?: ProviderAssignment;
+  decisionBinding?: { submissionDigest: string; configDigest: string;
+    task: import("./decision-task-context.ts").DecisionTaskContext | null; context: Record<string, unknown>;
+    admission?: import("./provider-admission.ts").ProviderAdmission; admissionPath?: string;
+    sourceRequest?: import("./provider-job.ts").ProviderJobRequest;
+    continuation?: ReturnType<typeof import("./provider-continuation.ts").readProviderContinuation>;
+    routing?: Awaited<ReturnType<typeof import("./decision-model-routing.ts").routeProviderModel>> };
   runtime?: ReturnType<typeof providerRuntime>;
   parent?: { directory: string; requestDigest: string; resultDigest: string };
-  provider?: { kind: "claude" | "gemini" | "codex"; model: string; effort: string; conversationId?: string; requiredTools: string[]; additionalRoots?: string[]; access?: "reader" | "writer" | "exclusive" };
+  provider?: { kind: "claude" | "gemini" | "codex"; model: string; effort: string; conversationId?: string; requiredTools: string[]; additionalRoots?: string[]; access?: "reader" | "writer" | "exclusive"; guard?: import("./provider-guard.ts").ProviderGuard };
 }
 export interface CommandReceipt {
   version: 1; requestDigest: string; state: "succeeded" | "failed" | "cancelled" | "unknown";
@@ -194,6 +200,21 @@ async function execute(directory: string, expectedDigest: string): Promise<void>
         startedAt, endedAt: new Date().toISOString(), durationMs: Date.now() - started, log, logBytes: 0 });
       if (!leases.length) releaseRuntimeReader(generation, true);
       try { deliverCommandCompletion(directory, expectedDigest); } catch { /* Preserve the original admission result. */ }
+      return;
+    }
+  }
+  if (request.decisionBinding || request.provider?.guard) {
+    try {
+      if (request.provider?.guard || request.decisionBinding?.admission) (await import("./provider-dispatch-guard.ts")).validateGuardedDispatch(request, directory);
+      if (request.decisionBinding) (await import("./provider-context.ts")).validateProviderContext(request.operation.cwd, request.decisionBinding.context, request.assignment?.context ?? "");
+    }
+    catch {
+      durableJson(join(directory, "result.json"), { version: 1, requestDigest: expectedDigest, state: "failed",
+        exitCode: null, signal: null, reason: "guarded-admission-changed", cleanup: "confirmed",
+        startedAt, endedAt: new Date().toISOString(), durationMs: Date.now() - started, log, logBytes: 0 });
+      if (registry) { try { registry.release(leases, digest({ requestDigest: expectedDigest, admission: "refused-before-launch" })); } finally { registry.close(); } }
+      releaseRuntimeReader(generation, true);
+      try { deliverCommandCompletion(directory, expectedDigest); } catch { /* The refusal remains authoritative. */ }
       return;
     }
   }

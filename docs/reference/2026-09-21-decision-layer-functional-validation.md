@@ -32,6 +32,93 @@ of representative cases plus critical boundary tests is enough to enter an expli
 pilot. Statistical precision/recall, calibration, savings, long soak and platform expansion remain
 separate evaluations. Critical evidence, authority, privacy and cleanup cannot be postponed to telemetry.
 
+## RC4 required proof
+
+This matrix owns proof for the
+[R-series implementation plan](../exec-plans/active/2026-09-21-major-adoption-and-measurement.md#rc4-quality-routing-and-ci-batch)
+and [RC4 contract](../specs/engine-decision-rc4.md). It is planned proof, not a passing-test claim.
+Reuse the existing suite owners below; proposed file names are implementation suggestions, not
+commands to run before those files exist. Test through actual callers, not just helper returns.
+
+| ID | Minimum meaningful scenarios | Existing owner / proposed extension | Required result |
+| --- | --- | --- | --- |
+| RC4-F1 | Bound check/provider task identity; conflicting/missing binding; unchanged RC3 defaults; explicit question opt-in; actual DL03/DL13 delivery before reading; mandatory/conflicting evidence; missing shortlist candidate; off/shadow/no-token; replay; changed category policy/binding | Existing scope/settings/context-route/output/episode and provider caller tests | Correct scope, separate pure config and resolved binding identities, preserved required evidence, actual selected delivery and visible limits/fallback |
+| RC4-F2 | Governed launch; alternate native/CLI route; forged operator choice; baseline pretending to be an override; weakened child submission rejected at admission; guarded worker denies delegation/policy tampering; unavailable entry; missing receipt | Host/task authority, Claude command/permission/identity and provider admission suites; proposed governed-delegation fixtures | Denials proved at the named boundary, legacy full-access workers labeled admission-only, no entry-outage escape and no whole-session enforcement claim from child proof |
+| RC4-F3 | Fixed baseline; trusted partial override; category maps to exact pair; empty/unknown/mixed category; ineligible mapping does not relabel task; incompatible pair; unapproved executable/config/registry/access/roots/tools/environment; legacy guidance; DL08 modes/effects; global ceiling; doctor; local-only evidence | Provider binding/doctor, decision catalog/settings, installed skill assets; proposed `model-routing.test.ts` | Fixed default, one simple operator mapping, exact precedence, no model ranking, no pre-classification disclosure or broader fallback, no automatic opt-in |
+| RC4-F4 | Requirement-addressing and unrelated changes; effective and vacuous tests; legitimate expectation change; partial/wrong-platform proof; unknown setup | Existing decision review/check/provider/claim tests | Source-linked advice with honest limits; native verdict, required proof and cleanup unchanged |
+| RC4-F5 | Explicit qualification of a fresh pair; categorized assignment uses its mapped alternative; unknown/no-token fallback; cancellation; unavailable/demoted pair; policy drift; persisted-request replay versus directory without request; identity mismatch; continuation versus new scope | Provider command/job/follow-up/identity and decision runtime suites | Reachable bootstrap, one authorized worker, zero new JEV calls for persisted replay or unresolved-directory retry, visible interrupted submission, counted deliberate new-job cost, no implicit retry or changed-scope follow-up |
+| RC4-F6 | Compatible batch; mixed modes; replay; missing usage; override; exhausted budget; fallback; route violation; selected bytes followed by expansion reads; accurate category but expensive/failed execution; absent cache/resource facts | Existing decision budget/cancellation/telemetry/episodes/outcomes tests | One charge per request, all governed-entry assignments retained, separate category accuracy/delivery/accepted outcomes, off-entry activity unknown, no invented savings |
+| RC4-F7 | Optional expensive scenario; existing/absent metadata; incomplete catalog; required checks/dependencies; wrong platform; local/remote; matching completed pack contradicts advice; stale or missing comparison | Pack schema/planning, validation advice and existing outcome reader | Scoped advice and honest comparisons only; no extra full suite, required omission, executing-plan reorder or invented reuse/history |
+| RC4-F8 | Clean installed archive; old and proposed profiles; public check/provider/plan callers; guidance migration; receipt persistence; off/no-token operation and temporary cleanup | Existing package verifier and one installed decision companion | Compiled package works outside checkout; no imports back into source, leftover processes or accidental feature activation |
+
+R2a first proves the public terminal check-status boundary: compact default and explicit full
+retrieval, unchanged exit code/result bytes, complete blocking/advisory findings, visible unknown
+cleanup, and an original receipt path/digest. Keep running/incomplete observations unchanged.
+This deterministic presentation needs no provider or native-device run. Later DL03/DL13 caller
+proof must demonstrate selected content actually delivered before reading; a returned recommendation
+or smaller stored artifact is insufficient. Off-entry expansion reads remain unknown.
+
+Immediate field repairs additionally require exact/mismatched/live/already-released reader cases,
+unknown cleanup refusal, emulator capacity failure before install, and exact-target cleanup evidence.
+Use captured host observations for focused cases; qualify the installed adapter at the release seam.
+Do not erase device data or repeat a platform matrix as part of these tests.
+
+Use fake JEV and fake native-provider responses for deterministic edge cases. Combine related
+assertions into small scenarios. Do not multiply every case over all providers, models, languages
+and modes. Test at least one actual dispatch difference; returning a recommended model is not proof
+that the worker used it. Explicit unsupported-host coverage is a valid result, not enforcement proof.
+
+RC4-F2 additionally needs one real Claude Code guarded read-only worker smoke: an allowed governed
+launch, denied native delegation/general execution, and denied changes to effective policy/authority.
+Use the same class DL08 can route. Bind engine-owned launch argv/settings bytes, host loaded-settings
+readback and observed denial events. The child's permission string is only a drift detector.
+Attempt tampering at the exact resolved protected hook/policy path outside workspace, additional
+roots and job directory; deny credential/out-of-scope reads as well. Distinguish inherited
+admission constraints from restrictions on the running child. The existing full-access worker is
+not qualified by a prompt. Do not invoke destructive commands or make an unnecessary paid alternate
+call to test rejection. Any available tool/credential/network escape leaves that path unqualified.
+A guarded child cannot qualify an unrestricted parent; record the exact enforcement scope.
+Host-policy installation remains a deliberate operator step, not a package installer side effect.
+
+RC4-F3 includes an RC3 profile naming DL08: it must report the existing unknown-consumer error,
+not throw on an undefined registry entry. A sibling `model_routing` block is ignored by RC3;
+the migration preview must not present it as active. RC4-F1 pins both existing DL05 probe versions
+in the frozen defaults and keeps effect/entry compatibility separate from question selection.
+
+RC4-F5 needs one bounded, authorized live provider assignment using the qualified caller, with
+selection, actual model/effort, successful native capability evidence and cleanup linked. Test one
+eligible alternative and retain applicable fixed-baseline proof; no all-model live matrix is required.
+Provider unavailability does not fail deterministic source tests, but leaves this live capability
+unqualified. Account authentication and native model support cannot be inferred from doctor alone.
+
+The RC4 implementation uses `provider-admission.test.ts` for fixed/routed/override/continuation
+boundaries, `provider-context.test.ts` and `check-output.test.ts` for delivered evidence, and
+`android-emulator.test.ts` for deterministic capacity/cleanup behavior. The existing compiled pilot
+verifier also drives provider submission through the public CLI and checks the actual native stdin,
+replay/no-token behavior, passive preflight, a same-subject CI comparison and the installed Android
+adapter API. Native containment and live classification remain separately recorded host evidence;
+fixture scores do not establish JEV quality. The frozen suite also checks that guardian processes
+have exited before test fixtures are removed.
+
+During slices, run changed-owner suites and typecheck where types change. At the frozen RC4 release
+boundary, use existing `npm test`, `npm run typecheck`, exact archive packaging and installed verifier
+commands below once. Include affected legacy-owner/skill packaging proof under the existing release
+workflow. Claude consumes that candidate and evidence; review is not a request to replay the matrix.
+New material fixes need their affected recheck and a candidate whose proof still applies.
+
+For this specification-only authoring batch, run the normal impacted documentation/source-governance
+check and link/catalog validation. No provider job, device build or full runtime suite is required
+to prove prose changes. The architecture consultation is separate from runtime/provider qualification.
+
+Quality and productivity evaluation follows real work. Independently label a small varied sample,
+including unflagged successes, defects, misleading claims, allowed fallback and partial coverage.
+Separate tuning examples from evaluation cases. Compare fixed-baseline and treatment assignments
+with equal acceptance requirements; include all model usage, repairs and review. JEV scores and
+500 repeated judgments of a handful of examples cannot establish coding accuracy or token savings.
+Include no-match/near-match categories, irrelevant added text and contradictory evidence. Distinguish
+an accurate category from an efficient operator-selected model. This small sample guides thresholds;
+it is not a release requirement for a statistically comprehensive benchmark.
+
 ## Required first-handoff suites
 
 | ID | Suite / minimum cases | Existing owners and proposed additions | Done when |

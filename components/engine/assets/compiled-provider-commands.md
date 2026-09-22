@@ -97,6 +97,58 @@ delivery lock remains uncertain and is not automatically stolen. Host restart su
 delivery require separate host qualification; fake-host tests do not establish them.
 Do not bootstrap, update, publish, or change another project's installation from a delegated worker.
 
+## RC4 task context and optional category routing
+
+Keep the coding model fixed by default. Supply the complete fixed pair in an explicit provider
+`config`, or preserve an explicit operator selection. Do not select a model from an old Markdown
+table. Optional category routing uses DL08 and an operator-defined category map; it never permits
+new delegation, different tools or extra jobs.
+
+Bind `decision` in the submission as `{version:1, workspace, taskId, revision, requirement,
+acceptance, sourcePaths}`. The normal submit path prepares mandatory instructions and bounded,
+source-linked optional context before native stdin. Missing JEV credentials use the ordinary
+context fallback. Omitted task binding is recorded as unavailable; it cannot count as a successful
+JEV exposure. Provider completion records native status separately from optional quality advice.
+The trusted host sets `dataDestination: local-only` when the assignment forbids cloud processing.
+Current native adapters then refuse before context selection or provider launch; RC4 has no qualified
+local generation backend. Omission retains the existing authorized cloud path, or the host may state
+`cloud-allowed` explicitly. Free-form prompt text cannot substitute for this bound restriction.
+
+The first routable worker is a read-only Claude `bounded-summary` assignment. A trusted host calls
+`authorizeProviderAssignment` from `host/v1`, and the request carries its `admission` reference.
+Authority, model configuration, executable and registry stay outside all worker roots. Use an
+explicit protected job directory directly beneath the admission directory. The restricted worker
+has read/search tools and native structured output, with shell, writes and delegation unavailable.
+The unrestricted coordinator remains outside that claim.
+
+`provider-doctor --request <file> --directory <job>` inspects admission, legacy policy and existing
+native qualification without provider calls. It reports baseline-only when optional qualification
+is missing. `continuity.model_routing.providers.claude.require_governed_entry: true` separately
+requires this path even with routing off. Enabling DL08 shadow/advice does not itself prohibit
+legacy explicit submissions outside that required pilot.
+
+Live category selection requires both DL08 `mode: auto` and `effect: route-model`, under the global
+mode ceiling. Each category has one description and exact model/effort pair. Qualification uses
+successful native jobs under the same protected directory, host, roots and required tools; it
+expires after 24 hours or a later matching failure. Uncertainty, missing tokens or unqualified
+choices retain the fixed pair. A changed authority at detached dispatch refuses the job before a
+native child starts; it does not retry through another model or entry.
+
+Preserve project-owned `config/governance/model-selection.md`. The trusted host must attest its
+exact reviewed digest before activating category routing. Explicit reviewer overrides may name
+only a model or only an effort; the fixed configuration supplies the other value. They do not
+activate JEV selection. A guarded follow-up needs `authorizeProviderContinuation` for the same
+requirement and includes that new `admission` reference in its follow-up JSON. A changed requirement
+needs a new assignment; no self-issued continuation or retry cascade is allowed.
+
+For normal checks, bind the same context through `--decision-context <file>` or the explicit
+`GOVERNANCE_DECISION_CONTEXT` file path. `check-output --run <id>` selects existing optional log
+content; `check-status --run <id>` returns compact terminal evidence and `--full` retrieves the full
+projection. Required failures, status, cleanup and original artifact references remain visible.
+`check-reconcile --run <id>` recovers only verified terminal ownership; it never reruns a check.
+`plan --compare-run <id>` compares advice with existing matching native results without executing
+extra checks. Smaller delivery is an observation, not evidence of accepted-work savings.
+
 ## Generic workflow command recovery
 
 For a workflow stage command with lost supervision, use the managed runtime's

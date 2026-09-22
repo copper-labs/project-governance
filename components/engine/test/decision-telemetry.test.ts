@@ -7,6 +7,31 @@ import { randomUUID } from "node:crypto";
 import { durableJson } from "../src/core.ts";
 import { decisionTelemetry } from "../src/decision-telemetry.ts";
 
+test("exposure reports select newest captures with stable ties and disclose bounded sampling", () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "exposure-order-")));
+  try {
+    const add = (id: string, capturedAt: string, reason: string) => durableJson(join(root, "episodes", `${id}.json`),
+      { version: 1, id, capturedAt, entryKind: "check-plan", exposure: { reason }, scope: { taskId: "private-task" } });
+    add("a-old", "2026-09-21T00:00:00Z", "old");
+    add("z-new", "2026-09-22T00:00:00Z", "recent-second");
+    add("b-new", "2026-09-22T00:00:00Z", "recent-first");
+    symlinkSync("../foreign.json", join(root, "episodes", "foreign.json"));
+    const report = decisionTelemetry(root, { limit: 1 }).exposure;
+    assert.deepEqual({ ...report.reasons }, { "recent-first": 1 });
+    assert.equal(report.counts.observed, 1); assert.equal(report.counts.inspected, 4); assert.equal(report.counts.invalid, 1);
+    assert.equal(report.truncated, true); assert.equal(report.scanComplete, true); assert.match(report.selection, /newest-capture-first/);
+    assert.equal(JSON.stringify(report).includes("private-task"), false);
+    assert.equal(decisionTelemetry(root, { since: "2026-09-22" }).exposure.counts.observed, 2);
+    add("long-reason", "2026-09-22T00:00:00Z", "x".repeat(200000));
+    durableJson(join(root, "episodes", "bad-key.json"), { version: 1, id: "bad-key", capturedAt: "2026-09-22T00:00:00Z", entryKind: "__proto__", exposure: {} });
+    add("prototype-name", "2026-09-22T00:00:00Z", "constructor");
+    const invalid = decisionTelemetry(root).exposure;
+    assert.equal(invalid.counts.invalid, 3); assert.equal(invalid.reasons.constructor, 1);
+    assert.equal(Object.values(invalid.entries).reduce((sum, count) => sum + count, 0), invalid.counts.observed);
+    assert.ok(JSON.stringify(invalid).length < 2000);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test("decision report measures fallback, stale outcomes and partial native token coverage without exposing receipt content", () => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "decision-telemetry-")));
   try {

@@ -21,12 +21,12 @@ test("custom pack receives captured packet bytes and durable terminal evidence",
     git("init", "-q"); git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-qm", "Initial");
     writeFileSync(join(root, "example.txt"), "staged\n"); git("add", ".");
     const scope = resolveChangeScope(root, { staged: true }); writeFileSync(join(root, "example.txt"), "later\n");
-    const code = "const fs=require('fs');const p=JSON.parse(fs.readFileSync(process.env.PROJECT_GOVERNANCE_CHANGE_PACKET));if(fs.readFileSync(p.records[0].after_path,'utf8')!=='staged\\n')process.exit(7);console.error('diagnostic');console.log(JSON.stringify({status:'passed',findings:[]}));";
+    const code = "const fs=require('fs');const p=JSON.parse(fs.readFileSync(process.env.PROJECT_GOVERNANCE_CHANGE_PACKET));if(fs.readFileSync(p.records[0].after_path,'utf8')!=='staged\\n')process.exit(7);if(process.env.GOVERNANCE_WORK_ID!=='approved-work')process.exit(8);console.error('diagnostic');console.log(JSON.stringify({status:'passed',findings:[]}));";
     const draft = "require('fs').writeFileSync(require('path').join(process.env.PROJECT_GOVERNANCE_EVIDENCE_ROOT,'evidence-manifest.json'),'unfinished');";
     const finish = "const fs=require('fs');fs.writeFileSync(require('path').join(process.env.PROJECT_GOVERNANCE_EVIDENCE_ROOT,'evidence-manifest.json'),JSON.stringify({kind:'project-governance-evidence-manifest',version:1,subject_digest:process.env.PROJECT_GOVERNANCE_SUBJECT_DIGEST,claims:[]}));console.log(JSON.stringify({status:'passed',findings:[]}));";
     const packs = mergePacks([{ source: "fixture", origin: "target", value: { id: "fixture", enforcement: "blocking", stages: ["pre-commit"], commands: [{ run: [process.execPath, "-e", draft + code] }, { run: [process.execPath, "-e", finish] }] } }]);
     const plan = buildPlan(packs, { stage: "pre-commit", mode: "all", changedPaths: [] });
-    const result = await runChecks(packs, plan, { scope, subject: new ValidationSubject(root, scope), assets: new PackagedCheckerAssets(defaults), packIds: new Set(["fixture"]), stage: "pre-commit", asOf: "2026-09-20T12:00:00Z" }, { root: runs, deadlineMs: 3000, trigger: "hook" });
+    const result = await runChecks(packs, plan, { scope, subject: new ValidationSubject(root, scope), assets: new PackagedCheckerAssets(defaults), packIds: new Set(["fixture"]), stage: "pre-commit", asOf: "2026-09-20T12:00:00Z", workId: "approved-work" }, { root: runs, deadlineMs: 3000, trigger: "hook" });
     assert.equal(result.status, "passed");
     const projection = readRunProjection(runs, root);
     assert.equal(projection.state, "available");

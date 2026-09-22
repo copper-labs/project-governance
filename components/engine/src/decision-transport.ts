@@ -45,7 +45,7 @@ export class JevDecisionClient {
   }
   get tokenPresent(): boolean { return Boolean(this.#token); }
 
-  async ask(body: string, deadlineMs: number, signal?: AbortSignal, beforeDispatch?: () => boolean): Promise<TransportOutcome> {
+  async ask(body: string, deadlineMs: number, signal?: AbortSignal, beforeDispatch?: () => boolean, onDispatch?: () => void): Promise<TransportOutcome> {
     const started = performance.now();
     if (signal?.aborted) return { ok: false, reason: "cancelled", failureStage: "transport" };
     if (!Number.isSafeInteger(deadlineMs) || deadlineMs < 1 || deadlineMs > 30_000) return { ok: false, reason: "invalid-deadline", failureStage: "transport" };
@@ -77,6 +77,7 @@ export class JevDecisionClient {
       if (remaining <= 0) return { ok: false, reason: "deadline", failureStage: "budget" };
       timer = setTimeout(() => controller.abort(), remaining);
       failureStage = "transport";
+      onDispatch?.();
       const response = await abortable(this.#fetch(DECISION_ENDPOINT, { method: "POST",
         headers: { Authorization: `Bearer ${this.#token}`, "Content-Type": "application/json" },
         body, signal: controller.signal, redirect: "error" }), controller.signal);

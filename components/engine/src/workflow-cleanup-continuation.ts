@@ -8,6 +8,7 @@ import { WorkflowStore } from "./workflow-store.ts";
 import { ResourceRegistry } from "./resources.ts";
 import { observePhysicalCleanup } from "./physical-cleanup.ts";
 import { observeSimulatorCleanup } from "./simulator-cleanup.ts";
+import { observeAndroidEmulatorCleanup } from "./android-emulator.ts";
 import { releaseRecoveredWorkflowReader } from "./workflow-reader-recovery.ts";
 
 /** Continue only declared, undispatched cleanup under the original resource generations. */
@@ -23,7 +24,9 @@ export async function resumeStoppedWorkflowCleanup(directory: string, database: 
       cleanupContinuation:{revision:recovered.run.revision,stagesDigest:digest(store.stages(runId))},
       observeCleanup:async(observed,leases)=>{
         const resources=leases.map(lease=>lease.resource);
-        const observation=await observeSimulatorCleanup(resources) ?? await observePhysicalCleanup(resources);
+        const adapter = observed.binding.recipe.androidEmulator;
+        const observation = adapter ? await observeAndroidEmulatorCleanup(resources, adapter, observed.binding.recipe.workspace)
+          : await observeSimulatorCleanup(resources) ?? await observePhysicalCleanup(resources);
         if(!observation)return null;
         const receipt={runId,bindingDigest:digest(observed.binding),leases,observation};
         durableJson(join(directory,"resource-cleanup.json"),receipt);

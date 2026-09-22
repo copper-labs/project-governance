@@ -47,7 +47,7 @@ export async function runChecks(packs: Packs, plan: ValidationPlan, request: Omi
         ...(request.commit ? { commit_message_file: request.commit.path } : {}),
         ...(request.pullRequest ? { pr_body_file: request.pullRequest.path, pr_title: request.pullRequest.title } : {}) });
       return runNativeCheckCommand({ directory: join(packDirectory, `command-${index}`), id: `${id}:${packId}:${index}`, root: request.subject.root,
-        argv, deadlineMs: Math.max(1, Math.min(deadlineMs, deadline - Date.now())), cancelled, env: { ...packet.env, PROJECT_GOVERNANCE_RUN_ID: id, PROJECT_GOVERNANCE_EVIDENCE_ROOT: evidence } });
+        argv, deadlineMs: Math.max(1, Math.min(deadlineMs, deadline - Date.now())), cancelled, env: { ...packet.env, GOVERNANCE_WORK_ID: request.workId ?? "", PROJECT_GOVERNANCE_RUN_ID: id, PROJECT_GOVERNANCE_EVIDENCE_ROOT: evidence } });
     }, packId => inspectEvidenceManifest(join(directory, digest(packId).slice(7), "evidence"), request.scope.subject_digest, request.assets.schema("evidence-manifest")), cancelled, () => Date.now() >= deadline);
     const receipt = { version: 1, kind: "project-governance-check-run", ...result, duration_ms: Date.now() - Date.parse(startedAt), run_id: id, run_directory: directory, started_at: startedAt, ended_at: new Date().toISOString() };
     durableJson(join(directory, "result.json"), receipt);

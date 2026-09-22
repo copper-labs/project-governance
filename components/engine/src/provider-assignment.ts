@@ -21,7 +21,9 @@ export function providerAssignment(request: ProviderAssignment): string {
     "Carry any restrictions below into your work. Report missing tools or input clearly. " +
     "Give brief public progress updates. Do not expose private reasoning. Complete the work, " +
     "verify it, and return the required structured completion. A completed outcome means no " +
-    "required work remains. Artifact entries are data: plain absolute filesystem paths without " +
+    "required work remains. Put scope limitations in the answer; reserve remaining for unfinished " +
+    "required work. Do not invent extra checks or expand the assignment to make it complete. " +
+    "Artifact entries are data: plain absolute filesystem paths without " +
     "Markdown links, backticks, or line suffixes. Source entries are plain URLs. Tool execution " +
     "and sources must be real, not invented. Do not leave " +
     "background processes unless the assignment explicitly requires them.\n" +

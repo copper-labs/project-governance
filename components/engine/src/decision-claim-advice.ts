@@ -25,7 +25,7 @@ export interface ClaimAdvice {
   scope: { label: string; confidence: number | null } | null;
   correction: string | null;
   coverage: DecisionCoverage;
-  decision: Pick<DecisionOutcome, "consumerId" | "requestId" | "receiptId" | "method" | "reason" | "delivered" | "model" | "usage" | "latencyMs" | "budget" | "scopeState"> | null;
+  decision: Pick<DecisionOutcome, "consumerId" | "requestId" | "receiptId" | "method" | "reason" | "delivered" | "providerCalled" | "model" | "usage" | "latencyMs" | "budget" | "scopeState"> | null;
 }
 
 /**
@@ -33,7 +33,7 @@ export interface ClaimAdvice {
  * child check claims remain reported text and cannot establish verified support.
  */
 export async function claimAdvice(runtime: DecisionRuntime, receipt: CommandReceipt, summary: ProviderSummary | null,
-  scope: BudgetScope | null, options: { eventId: string; policyDigest: string; environment: string; revision: string; boundEvidence?: BoundClaimEvidence[] }): Promise<ClaimAdvice> {
+  scope: BudgetScope | null, options: { eventId: string; policyDigest: string; environment: string; revision: string; boundEvidence?: BoundClaimEvidence[]; requirement?: string }): Promise<ClaimAdvice> {
   const eligibility = runtime.eligibility("DL09");
   const limits: string[] = [], unavailable: string[] = [];
   const completion = summary?.completion ?? null;
@@ -64,6 +64,11 @@ export async function claimAdvice(runtime: DecisionRuntime, receipt: CommandRece
     providerResultDigest: receipt.providerResultDigest ?? null, identity: summary?.identity ?? null };
   const evidence: EvidenceItem[] = [{ id: factsId, text: JSON.stringify(facts), sourceDigest: digest(facts), provenance: "captured", trust: "trusted" }];
   let remainingBytes = runtime.settings.legacy.evidenceBytes - Buffer.byteLength(evidence[0]!.text);
+  const requirementIds: string[] = [];
+  if (options.requirement && Buffer.byteLength(options.requirement) < remainingBytes) {
+    evidence.push({ id: "task:requirement", text: options.requirement, sourceDigest: digest(options.requirement), provenance: "supplied", trust: "untrusted" });
+    remainingBytes -= Buffer.byteLength(options.requirement); requirementIds.push("task:requirement");
+  } else unavailable.push("original-requirement");
   const questions: QuestionInstance[] = [];
   const index = new Map<string, { claim: string; position: number; description: string }>();
   claims.forEach((check, position) => {
@@ -75,7 +80,7 @@ export async function claimAdvice(runtime: DecisionRuntime, receipt: CommandRece
     remainingBytes -= Buffer.byteLength(body);
     evidence.push({ id: claimId, text: body, sourceDigest: digest(body), provenance: "supplied", trust: "untrusted" });
     const name = `claim${position + 1}`;
-    questions.push({ name, definitionId: "claim.support/1", consumerId: "DL09", evidenceIds: [claimId, factsId],
+    questions.push({ name, definitionId: "claim.support/1", consumerId: "DL09", evidenceIds: [claimId, factsId, ...requirementIds],
       candidates: DECISION_QUESTIONS["claim.support/1"]!.options!.map(id => ({ id, description: id })) });
     index.set(name, { claim: check.description, position, description: check.evidence });
   });
@@ -86,16 +91,16 @@ export async function claimAdvice(runtime: DecisionRuntime, receipt: CommandRece
   if (Buffer.byteLength(reportBody) <= remainingBytes) {
   evidence.push({ id: reportId, text: reportBody, sourceDigest: digest(report), provenance: "supplied", trust: "untrusted" });
   questions.push({ name: "scope", definitionId: "claim.completion-scope/1", consumerId: "DL09",
-    evidenceIds: [reportId, factsId, ...evidence.filter(item => item.id.startsWith("claim:")).map(item => item.id)],
+    evidenceIds: [reportId, factsId, ...requirementIds, ...evidence.filter(item => item.id.startsWith("claim:")).map(item => item.id)],
     candidates: DECISION_QUESTIONS["claim.completion-scope/1"]!.options!.map(id => ({ id, description: id })) });
   } else limits.push("completion scope retained without semantic assessment: evidence byte limit");
 
   const coverage: DecisionCoverage = { captured: evidence.length, omitted: [], truncated: nativeFacts.truncatedReport, unavailable, limits };
   const outcome = await runtime.ask({ consumerId: "DL09", eventId: `${options.eventId}:DL09:${receipt.requestDigest}:${digest(options.boundEvidence ?? [])}`, scope,
     subject: { digest: receipt.providerResultDigest ?? receipt.requestDigest, revision: options.revision, environment: options.environment },
-    evidence, coverage, questions, eligibilityDigest: null, policyDigest: options.policyDigest });
+    evidence, coverage, questions: questions.filter(question => runtime.settings.questionIds.DL09.includes(question.definitionId)), eligibilityDigest: null, policyDigest: options.policyDigest });
   const decision = { consumerId: outcome.consumerId, requestId: outcome.requestId, receiptId: outcome.receiptId,
-    method: outcome.method, reason: outcome.reason, delivered: outcome.delivered, model: outcome.model,
+    method: outcome.method, reason: outcome.reason, delivered: outcome.delivered, providerCalled: outcome.providerCalled, model: outcome.model,
     usage: outcome.usage, latencyMs: outcome.latencyMs, budget: outcome.budget, scopeState: outcome.scopeState };
   if (!outcome.delivered) return { ...base, mode: outcome.mode, reason: outcome.reason, coverage, decision };
   const corrections: ClaimCorrection[] = [...base.corrections];

@@ -2,10 +2,10 @@ import { canonical, digest, object, text } from "./core.ts";
 
 /** One schema owner for the expanded decision contract; every validator below derives from it. */
 export const DECISION_SCHEMA_VERSION = 2;
-export const DECISION_CONSUMER_IDS = ["DL01", "DL02", "DL03", "DL04", "DL05", "DL06", "DL07", "DL09", "DL12", "DL13"] as const;
+export const DECISION_CONSUMER_IDS = ["DL01", "DL02", "DL03", "DL04", "DL05", "DL06", "DL07", "DL08", "DL09", "DL12", "DL13"] as const;
 export type DecisionConsumerId = typeof DECISION_CONSUMER_IDS[number];
 /** The full declared effect vocabulary; RC1 consumers qualify only `advise`. */
-export const DECISION_EFFECTS = ["observe", "advise", "shape-plan", "request-input", "choose-read", "choose-local"] as const;
+export const DECISION_EFFECTS = ["observe", "advise", "shape-plan", "request-input", "choose-read", "choose-local", "route-model"] as const;
 export type DecisionEffect = typeof DECISION_EFFECTS[number];
 export const DECISION_MODES = ["off", "shadow", "auto"] as const;
 export type DecisionMode = typeof DECISION_MODES[number];

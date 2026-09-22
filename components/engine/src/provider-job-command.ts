@@ -9,7 +9,7 @@ import { narrativeFile } from "./narrative-inputs.ts";
 import { submitProviderJob, submitProviderFollowUp } from "./provider-job.ts";
 import { observeCommand, observeProviderEvents, waitCommand, cancelCommand } from "./process-owner.ts";
 import { reconcileCommand } from "./command-recovery.ts";
-import { providerDoctor } from "./provider-doctor.ts";
+import { providerDoctor, providerAssignmentDoctor } from "./provider-doctor.ts";
 import type { NativeProvider } from "./provider-binding.ts";
 import { providerResultSummary } from "./provider-result-summary.ts";
 import { providerDecisionAdvice } from "./decision-provider-advice.ts";
@@ -32,7 +32,13 @@ export async function providerJobCommand(command: string, args: string[]) {
     return { result: listProviderJobs(text(values.workspace, "workspace"), Number(values.limit ?? 100)), exitCode: 0 };
   }
   if (command === "provider-doctor") {
-    const { values } = parseArgs({ args, strict: true, allowPositionals: false, options: Object.fromEntries(["provider", "model", "effort", "executable", "config"].map(name => [name, { type: "string" as const }])) });
+    const { values } = parseArgs({ args, strict: true, allowPositionals: false, options: Object.fromEntries(["provider", "model", "effort", "executable", "config", "request", "directory"].map(name => [name, { type: "string" as const }])) });
+    if (values.request || values.directory) {
+      if (!values.request || !values.directory || Object.keys(values).some(key => !["request", "directory"].includes(key))) throw new Error("Assignment preflight takes only --request and --directory");
+      const request = JSON.parse(narrativeFile(process.cwd(), values.request));
+      const result = providerAssignmentDoctor(request, resolve(values.directory));
+      return { result, exitCode: result.status === "passed" ? 0 : 1 };
+    }
     const provider = text(values.provider, "provider", 64) as NativeProvider;
     const options = Object.fromEntries(Object.entries(values).filter(([key]) => key !== "provider")) as { model?: string; effort?: string; executable?: string; config?: string };
     const result = providerDoctor(provider, options);
@@ -50,11 +56,11 @@ export async function providerJobCommand(command: string, args: string[]) {
   let directory = values.directory ? resolve(values.directory) : undefined;
   if (command === "provider-submit") {
     const request = object(JSON.parse(narrativeFile(process.cwd(), text(values.request, "provider request file"))));
-    const allowed = ["id", "provider", "workspace", "additionalRoots", "prompt", "model", "effort", "executable", "config", "conversationId", "requiredTools", "deadlineMs", "idleTimeoutMs", "outputLimit", "access", "registry", "assignment"];
+    const allowed = ["id", "provider", "workspace", "additionalRoots", "prompt", "model", "effort", "executable", "config", "conversationId", "requiredTools", "deadlineMs", "idleTimeoutMs", "outputLimit", "access", "registry", "assignment", "decision", "admission", "dataDestination"];
     if (Object.keys(request).some(key => !allowed.includes(key))) throw new Error("Unknown provider request field");
     const completion = values["completion-executable"] ? captureCompletionTarget(values["completion-executable"]) : undefined;
     directory ??= managedProviderDirectory(text(request.workspace, "workspace"), text(request.id, "provider job id", 256));
-    const result = submitProviderJob(directory, request as unknown as Parameters<typeof submitProviderJob>[1], completion);
+    const result = await submitProviderJob(directory, request as unknown as Parameters<typeof submitProviderJob>[1], completion);
     return { result: { status: "submitted", ...result }, exitCode: 0 };
   }
   if (!directory) throw new Error("Provider job directory required");
@@ -70,11 +76,11 @@ export async function providerJobCommand(command: string, args: string[]) {
   if (command === "provider-reconcile") return { result: reconcileCommand(directory, hash), exitCode: 0 };
   if (command === "provider-follow-up") {
     const next = object(JSON.parse(narrativeFile(process.cwd(), text(values.request, "provider follow-up file"))));
-    if (Object.keys(next).some(key => !["id", "prompt", "directory"].includes(key))) throw new Error("Unknown provider follow-up field");
+    if (Object.keys(next).some(key => !["id", "prompt", "directory", "admission"].includes(key))) throw new Error("Unknown provider follow-up field");
     const id = text(next.id, "follow-up id", 256);
     const followDirectory = next.directory === undefined
       ? managedProviderDirectory(text(object(request.operation).cwd, "workspace"), id) : resolve(text(next.directory, "follow-up directory"));
-    const result = submitProviderFollowUp(directory, hash, { id, prompt: text(next.prompt, "follow-up assignment", 400000), directory: followDirectory });
+    const result = submitProviderFollowUp(directory, hash, { id, prompt: text(next.prompt, "follow-up assignment", 400000), directory: followDirectory, ...(next.admission ? { admission: text(next.admission, "continuation admission") } : {}) });
     return { result: { status: "submitted", ...result }, exitCode: 0 };
   }
   if (command === "provider-events") return { result: observeProviderEvents(directory, hash, Number(values.after ?? 0), Number(values.limit ?? 100)), exitCode: 0 };

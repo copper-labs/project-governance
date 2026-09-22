@@ -18,10 +18,16 @@ and failure cases to decide whether a consumer earns activation. The
 [shared decision contract](engine-decision-layer.md) owns request types, modes, fallback, authority
 and telemetry; this file owns domain-specific inputs, effects and qualification.
 
-The current RC implements the eight advisory subsets identified below. Broader listed effects
+RC3 implements the eight original subsets plus DL06 attention advice and DL12 history analysis;
+DL05 also has qualified read-only diagnostic selection. Broader listed effects
 remain proposals and ceilings to qualify, not permissions granted by this document. New consumers start disabled, then observe or advise. The
 [implementation plan](../exec-plans/active/2026-09-21-major-adoption-and-measurement.md) deliberately delivers useful
 subsets before every use case is implemented.
+
+The [RC4 contract](engine-decision-rc4.md) brings connected DL01/DL02/DL09 quality evaluation,
+DL08 opt-in routing and richer DL07 advice forward. It requires governed delegation in the selected
+pilot and preserves an immediate fixed baseline. Its proposed question additions require explicit
+configuration; an existing auto consumer does not silently acquire them on upgrade.
 
 The [integrated first-RC plan](../exec-plans/active/2026-09-21-major-adoption-and-measurement.md#s2--first-jev-feature-batch)
 selects DL13, DL09, DL01, DL02, DL03, DL04, DL07 and DL05. Its initial callers are concrete:
@@ -49,14 +55,14 @@ may assess separate candidates within one batch.
 
 | ID | Area and initial questions | Proposed effect capability | Primary benefit |
 | --- | --- | --- | --- |
-| DL01 | `test.assertion-support/1`, `test.mocked-behavior/1`, `test.expectation-weakened/1` | Advice | Fewer ineffective tests and review cycles |
-| DL02 | `diff.rule-concern/1`, `diff.task-relevance/1` | Advice | Less repeated semantic review |
+| DL01 | `test.assertion-support/1`, `test.mocked-behavior/1`, `test.expectation-weakened/1`; RC4 adds `test.requirement-support/1` | Advice | Fewer ineffective tests and review cycles |
+| DL02 | `diff.rule-concern/1`, `diff.task-relevance/1`; RC4 adds `change.requirement-support/1` | Advice | Less repeated semantic review |
 | DL03 | `context.relevance/1`, `procedure.relevance/1` | Automatic optional-context assembly | Less LLM reading with sufficient evidence |
 | DL04 | `workflow.match/1` | Choose read/local workflow within a grant | Fewer orchestration turns |
 | DL05 | `runtime.diagnostic-match/1`, `runtime.next-probe/1` (advice), `/2` (qualified reads), `runtime.recovery-match/1` | Choose read/local operation within a grant | Fewer investigations and avoidable rebuilds |
 | DL06 | `iteration.attention-needed/1` (initial shadow/advice), `iteration.repetition/1`, `iteration.scope-drift/1`, `iteration.next-review/1` | Advice, then scoped steering | Less unproductive work |
-| DL07 | `validation.scenario-relevance/1`, `validation.coverage-gap/1`, `validation.escalation-match/1` | Choose optional checks and eligible escalation; reorder work | Less CI compute and faster useful feedback |
-| DL08 | `assignment.complexity/1`, `assignment.procedure-fit/1` | Choose an allowed execution tier | Lower total model cost per accepted task |
+| DL07 | `validation.scenario-relevance/1`, `validation.coverage-gap/1`; RC4 adds opt-in `/2` evidence; later `validation.escalation-match/1` | RC4 advice; later choose optional checks and eligible escalation or reorder work | Less CI planning work; later compute and feedback gains |
+| DL08 | RC4 `assignment.category/1`; later complexity/procedure comparisons only if warranted | Opt-in mapping of an operator-defined category to its fixed model/effort pair | Category accuracy and total accepted-task usage measured separately |
 | DL09 | `claim.support/1`, `claim.completion-scope/1` | Advice; opt-in operator input for unresolved decisions | Fewer unsupported completion claims |
 | DL10 | `release.caller-impact/1`, `release.migration-note/1`, `release.note-support/1` | Advice | Faster, more accurate release preparation |
 | DL11 | `release.signal-match/1` | Observation/advice | Less duplicate post-release investigation |
@@ -328,6 +334,18 @@ precision on each workload before a reviewed retry rule uses it; keep original o
 predictive-selection precedent, not a JEV benchmark.
 
 ## DL08 — Assignment and model routing
+
+**RC4 slice:** the [single-owner routing contract](engine-decision-rc4.md#model-selection-one-owner-routing-off-by-default)
+replaces automatic coordinator choice from the Markdown table. Fixed bindings are the default;
+DL08 is off unless enabled. Its first question is Choice `assignment.category/1` over operator-defined
+task categories plus unknown. Each category has a description and one preselected model/effort pair;
+code applies that mapping. No model ranking or guessing which model will solve a task. Unknown or
+an ineligible mapping retains the fixed baseline. Only explicit `route-model` may affect dispatch,
+within one already selected provider. Required-governed assignments reject agent-authored overrides and
+unmanaged routes through the qualified host boundary. Operator choices retain trusted provenance.
+Existing sessions and same-assignment follow-ups keep their model; new scope needs a new submission.
+The Score/procedure/cascade proposals below are unscheduled research alternatives, not additional
+RC4 requirements or a recommendation to enable automatic model optimization.
 
 **Inputs:** bounded assignment, available reviewed procedure IDs, allowed model tiers/capabilities,
 explicit operator selection, prior attempts and task sensitivity. Exact capability availability and

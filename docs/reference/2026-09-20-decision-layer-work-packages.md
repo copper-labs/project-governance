@@ -17,7 +17,9 @@ The [integrated implementation plan](../exec-plans/active/2026-09-21-major-adopt
 is the sole delivery order and progress checklist. This reference preserves P0-P8 technical
 requirements and future qualification boundaries; it does not schedule a second implementation
 programme or require all future effects in RC1. The former delivery-order recommendations are
-superseded. Implementation remains unstarted and operational activation retains its existing owner.
+superseded. First-consumer and RC3 subsets are implemented; remaining package detail is future
+scope. The [RC4 R-series](../exec-plans/active/2026-09-21-major-adoption-and-measurement.md#rc4-quality-routing-and-ci-batch)
+now owns the next bounded expansion. Operational activation retains its existing owner.
 
 Read the [shared contract](../specs/engine-decision-layer.md),
 [consumer catalog](../specs/engine-decision-use-cases.md), and
@@ -36,7 +38,7 @@ implemented; they are not extra first-handoff gates. Existing E3 evidence retain
 | P3 | Registered workflow selection | S2 advisory entry; S6 execution effects |
 | P4 | Device diagnosis, probes and recovery | S2 advice; S7 qualified execution effects |
 | P5 | Local/remote CI advice, planning, reuse and optional predictive research | S2 advice; S6 deeper effects |
-| P6 | Supervision and model routing | S9 |
+| P6 | Supervision and model routing | S9; RC3 N3 advice and RC4 R0/R1/R3 bounded routing |
 | P7 | Release advice and post-release signal grouping | S10 |
 | P8 | Offline semantic process analysis and memory projection | S10; basic measurement capture/reporting already belongs to S1 |
 
@@ -310,6 +312,13 @@ upside; it is not a gate for P5a–c, the first delivery or the core major relea
 It neither invents authorization from idle capacity nor introduces another background scheduler.
 
 ## P6 — Supervision and assignment routing: DL06, DL08
+
+RC4 implements only the [bounded new-assignment route](../specs/engine-decision-rc4.md), with fixed
+baseline, default off, trusted explicit overrides and required governed delegation in the pilot.
+JEV classifies an operator-defined category; code applies its one preselected model/effort pair.
+No independent model ranking is part of that route.
+Steering, cross-provider choice and produce/verify/escalate cascades below stay later. Reuse the
+existing provider lifecycle; the Markdown table must not remain a competing automatic selector.
 
 - Label completed iteration windows offline; distinguish slow useful work from semantic loops.
 - Deliver bounded advice at meaningful boundaries, with exact counters still owned by code.

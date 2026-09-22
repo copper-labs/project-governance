@@ -132,3 +132,27 @@ capabilities:
       - components/engine/src/workflow-diagnose.ts
       - components/engine/src/decision-history.ts
       - components/engine/src/decision-attention.ts
+
+  - id: rc4-decision-design
+    title: Implement RC4 quality evaluation and governed model routing
+    aliases: [rc4-model-routing, governed-delegation-design]
+    tasks:
+      - plan requirement-linked quality evaluation and richer local-CI advice
+      - replace automatic Markdown model selection with fixed defaults and optional routing
+      - enforce and measure the approved delegation path for a qualified pilot
+    symbols: [DL08, assignment.category/1]
+    reference: docs/specs/engine-decision-rc4.md
+    guides:
+      - docs/exec-plans/active/2026-09-21-major-adoption-and-measurement.md
+      - docs/reference/2026-09-21-decision-layer-functional-validation.md
+    sources:
+      - components/engine/src/provider-job-command.ts
+      - components/engine/src/provider-binding.ts
+      - components/engine/src/provider-admission.ts
+      - components/engine/src/provider-context.ts
+      - components/engine/src/check-output.ts
+      - components/engine/src/decision-model-routing.ts
+      - components/engine/src/android-emulator.ts
+      - components/engine/src/decision-review.ts
+      - components/engine/src/decision-validation-advice.ts
+      - components/engine/src/decision-episodes.ts

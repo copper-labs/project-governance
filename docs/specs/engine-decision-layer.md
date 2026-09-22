@@ -20,13 +20,16 @@ criteria; the [integrated implementation plan](../exec-plans/active/2026-09-21-m
 owns delivery and progress, with [technical packages](../reference/2026-09-20-decision-layer-work-packages.md)
 as supporting detail. The [local-CI decision specification](engine-decision-local-ci.md)
 expands check selection, reuse, resource-aware execution and adaptive validation. The
-[next RC experiment specification](engine-decision-experiments.md) scopes attention routing,
-read-only diagnostic sequences and offline history analysis within the same owners.
+[RC3 experiment specification](engine-decision-experiments.md) scopes attention routing,
+read-only diagnostic sequences and offline history analysis. The
+[RC4 specification](engine-decision-rc4.md) extends quality evaluation, optional model routing,
+required governed delegation for the pilot and CI advice within the same owners.
 
 **Proposal, not activated policy.** Authoring these documents does not enable a provider, install a
 host integration, change a required check, or expand an existing action grant. The
-[unified engine](unified-development-engine.md) remains the implementation baseline. The current RC implements eight optional consumers; its advice-only execution limits remain
-effective until the corresponding effect extensions below are implemented and qualified.
+[unified engine](unified-development-engine.md) remains the implementation baseline. The RC3 source
+implements ten optional consumers and the qualified DL05 read-only effect. Other effect extensions
+below remain proposals until implemented, qualified and deliberately enabled.
 
 The intended result is a development loop that uses code for exact facts, JEV for bounded judgments,
 and a larger model for unfamiliar reasoning and code generation. Qualified judgments may select
@@ -34,15 +37,17 @@ already permitted actions. Permission, required proof, execution, and acceptance
 
 ## Current starting point
 
-The 3.0.0-rc.2 source implements DL01, DL02, DL03, DL04, DL05, DL07, DL09 and DL13 through
-`decision-runtime.ts` and registered caller integrations. The retained `decisions.ts` adapter also
-supports deliberate legacy context migration. Required execution remains deterministic. DL04/DL05/
-DL07 return recommendations; they do not dispatch workflows, probes or checks. DL03/DL13 can shape
-optional input text. No measured savings or live adopter qualification follows from source presence.
+The `3.0.0-rc.3` source implements DL01–DL07, DL09, DL12 and DL13 through `decision-runtime.ts`
+and registered callers. The retained `decisions.ts` adapter supports deliberate legacy context
+migration. Required execution remains deterministic. DL04/DL07 return recommendations; DL05 can
+also select up to three preauthorized read-only probes through explicit `workflow-diagnose`.
+DL06 is attention advice; DL12 is on-demand history analysis. DL03/DL13 shape optional input text.
+DL08 model routing is not implemented. No measured savings or live adopter qualification follows
+from source presence.
 
 The earlier [E3 evaluation disposition](../reference/2026-09-20-e3-evaluation-disposition.md) records
 inconclusive benefit for its context question, not a verdict on the wider layer. The
-[next RC experiments](engine-decision-experiments.md) extend existing consumers; broader proposals
+[RC3 experiments](engine-decision-experiments.md) extend existing consumers; broader proposals
 below remain capability ceilings, not silently activated behavior.
 
 ## Goals and scope
@@ -112,6 +117,7 @@ Keep the existing `off`, `shadow`, and `auto` vocabulary. Effect limits are sepa
 | `request-input` effect | Ask through a supported caller interface when an unresolved decision needs operator input; no new approval requirement |
 | `choose-read` effect | Select among eligible read-only probes or registered read workflows |
 | `choose-local` effect | Select a specifically granted local workflow or recovery operation |
+| `route-model` effect (RC4 proposal) | Select an eligible model/effort pair within one already authorized new provider assignment; no delegation or live-session switching authority |
 
 Scoped worker steering is a registered control operation under `choose-local`, using the existing
 worker owner and its authority. Returning advice to the caller does not grant permission to message
@@ -157,6 +163,15 @@ An omitted consumer `effect` resolves to `advise`; first-RC setup needs only eac
 Doctor and receipts show the resolved effect. An explicit effect is strictly validated against the
 consumer's supported capabilities. The omitted-field default stays advice in future versions;
 new execution effects require explicit configuration and qualification, never an upgraded default.
+
+RC4 adds DL08 and explicit per-consumer question allowlists under the
+[RC4 contract](engine-decision-rc4.md#configuration-and-legacy-migration). An omitted question list
+preserves the RC3 definitions for an existing consumer; it does not activate new quality/CI questions.
+An enabled routing consumer also needs the explicit `route-model` effect for live selection.
+Fixed-model operation remains the default. When opted in, JEV classifies into operator-defined task
+categories and code applies their fixed model/effort mappings; it does not search or rank models.
+The [required-governed boundary](engine-decision-rc4.md#required-governed-delegation-and-feature-exposure)
+binds actual route and override authority at the host, not through agent-written model arguments.
 
 Migrate an old profile's `mode`/`allowed_questions` into only its existing E3 context behavior:
 DL03 may retain `rank_optional_context` and the old data, source and request limits if previously

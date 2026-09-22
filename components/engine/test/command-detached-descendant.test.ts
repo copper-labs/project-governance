@@ -57,6 +57,13 @@ for (const ending of ["worker-loss", "native-exit", "supervision-loss"] as const
   } finally {
     for (const record of [descendant, launch?.child, launch?.owner])
       if (record && processFingerprint(record.pid) === record.fingerprint) process.kill(record.pid, "SIGKILL");
+    // Native cleanup can precede the guardian's final receipt/reconciliation writes.
+    const path = join(root, "job", "guardian.json");
+    if (existsSync(path)) {
+      const guardian = JSON.parse(readFileSync(path, "utf8")), until = Date.now() + 5000;
+      while (processFingerprint(guardian.pid) === guardian.fingerprint && Date.now() < until) await pause();
+      assert.notEqual(processFingerprint(guardian.pid), guardian.fingerprint, `Retain evidence while guardian is alive: ${root}`);
+    }
     rmSync(root, { recursive: true, force: true });
   }
 });

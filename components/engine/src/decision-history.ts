@@ -112,7 +112,8 @@ export async function decisionTelemetryCommand(args: string[], workspace: string
       const outcome = await runtime.ask({ consumerId: "DL12", eventId: `history:${excerpt.hash}`, scope,
         subject: { digest: excerpt.hash, revision: identity.taskRevision, environment: "selected-history" }, policyDigest: settings.configDigest,
         evidence: [{ id: "episode", text: content, sourceDigest: excerpt.hash, provenance: "supplied", trust: "untrusted" }],
-        coverage: { captured: 1, omitted: [], truncated: false, unavailable: [], limits: ["explicit selected excerpt; not complete task history"] }, questions });
+        coverage: { captured: 1, omitted: [], truncated: false, unavailable: [], limits: ["explicit selected excerpt; not complete task history"] },
+        questions: questions.filter(question => settings.questionIds.DL12.includes(question.definitionId)) });
       const workClass = interpretChoice(outcome.answers["work-class"]).value;
       if (workClass) classes[workClass] = (classes[workClass] ?? 0) + 1;
       samples.push({ episodeId: excerpt.episodeId, workClass, procedure: interpretChoice(outcome.answers.procedure).value,

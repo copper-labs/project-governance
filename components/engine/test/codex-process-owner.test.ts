@@ -24,7 +24,7 @@ if(v.id===33)require('node:fs').writeFileSync('callback.json',JSON.stringify(v))
 });`;
       const executable = join(root, callback ? "callback-native" : "complete-native");
       writeFileSync(executable, `#!${process.execPath}\n${script}`); chmodSync(executable, 0o700);
-      const submitted = submitProviderJob(join(root, callback ? "callback" : "completed"), { id: callback ? "callback" : "completed", prompt: "assignment",
+      const submitted = await submitProviderJob(join(root, callback ? "callback" : "completed"), { id: callback ? "callback" : "completed", prompt: "assignment",
         provider: "codex", model: "fixture", effort: "high", requiredTools: [], additionalRoots: [extra],
         executable, workspace: root, registry: join(root, "registry.sqlite"), assignment: { role: "reviewer", constraints: "No publication", context: "" }, deadlineMs: 8000, outputLimit: 16384 });
       const result = await waitCommand(submitted.directory, submitted.requestDigest, 10000);

@@ -91,8 +91,56 @@ export function decisionTelemetry(root: string, options: { limit?: number; since
     tokens: { decision_samples: decisionSamples, input_samples: inputSamples, output_samples: outputSamples,
       input_total: inputSamples ? inputTokens : null, output_total: outputSamples ? outputTokens : null },
     pilot: decisionPilotTelemetry(root, { limit, since }),
+    exposure: entryExposureTelemetry(root, { limit, since }),
     ...(options.outcomesManifest ? { outcome_report: decisionOutcomeReport(root, options.outcomesManifest, outcomesReader) } : {}),
     benefit_claim: "not-evaluated", avoided_llm_tokens: null };
+}
+
+/** No provider calls. Exposed entries are a measured denominator; off-entry work stays unknown. */
+function entryExposureTelemetry(root: string, options: { limit: number; since: number }) {
+  const counts = { inspected: 0, observed: 0, invalid: 0, unbound: 0 };
+  const entries: Record<string, number> = Object.create(null), reasons: Record<string, number> = Object.create(null);
+  let scanComplete = true, scanned = 0, readBytes = 0;
+  const candidates: { at: number; id: string; entry: string; reason: string; bound: boolean }[] = [];
+  let directory: ReturnType<typeof opendirSync> | undefined;
+  try {
+    const collection = join(root, "episodes"), stat = lstatSync(collection);
+    if (!stat.isDirectory() || stat.isSymbolicLink() || realpathSync(collection) !== collection) throw new Error("Invalid episodes directory");
+    directory = opendirSync(collection);
+    const reader = boundedOutcomeReader();
+    for (let entry = directory.readSync(); entry; entry = directory.readSync()) {
+      if (scanned >= 10000) { scanComplete = false; break; }
+      scanned++;
+      if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}\.json$/u.test(entry.name)) continue;
+      counts.inspected++;
+      try {
+        const path = join(collection, entry.name), stat = lstatSync(path);
+        if (stat.isSymbolicLink() || !stat.isFile() || stat.size > 256 * 1024) throw new Error("Invalid episode");
+        if (readBytes + stat.size > 16 * 1024 * 1024) { scanComplete = false; break; }
+        readBytes += stat.size;
+        const episode = reader.read(path);
+        if (episode.version !== 1 || `${episode.id}.json` !== entry.name || typeof episode.capturedAt !== "string" ||
+            !Number.isFinite(Date.parse(episode.capturedAt))) throw new Error("Invalid episode identity");
+        if (Date.parse(episode.capturedAt) < options.since) continue;
+        const exposure = object(episode.exposure);
+        const reason = typeof exposure.reason === "string" ? exposure.reason : "see-linked-exposure";
+        if (typeof episode.entryKind !== "string" || !/^[a-z][a-z0-9-]{0,79}$/u.test(episode.entryKind) ||
+            !/^[a-z][a-z0-9-]{0,79}$/u.test(reason)) throw new Error("Invalid exposure metrics");
+        candidates.push({ at: Date.parse(episode.capturedAt), id: String(episode.id), entry: String(episode.entryKind), reason, bound: !!episode.scope });
+      } catch { counts.invalid++; }
+    }
+  } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") { counts.invalid++; scanComplete = false; } }
+  finally { directory?.closeSync(); }
+  candidates.sort((a, b) => b.at - a.at || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  for (const candidate of candidates.slice(0, options.limit)) {
+    counts.observed++; if (!candidate.bound) counts.unbound++;
+    entries[candidate.entry] = (entries[candidate.entry] ?? 0) + 1;
+    reasons[candidate.reason] = (reasons[candidate.reason] ?? 0) + 1;
+  }
+  return { counts, entries, reasons, truncated: !scanComplete || candidates.length > options.limit, scanned, scanComplete,
+    selection: scanComplete ? "newest-capture-first; id-tiebreak; not a representative sample" : "newest-capture-first within partial scan only; not globally recent or representative",
+    readBytes, outsideEntryActivity: "unknown", used: "unknown",
+    totalModelTokens: null, benefitClaim: "not-evaluated", note: "Distinct recorded deliveries, not unique tasks. Missing context and fallback stay in these totals; compare receipt-linked accepted outcomes before claiming savings." };
 }
 
 /** One read-only projection of the shared operational receipts; native usage belongs to a batch. */
@@ -100,6 +148,7 @@ function decisionPilotTelemetry(root: string, options: { limit: number; since: n
   const counts = { inspected: 0, matched: 0, invalid: 0, duplicate_reservations: 0 };
   const consumers: Record<string, { observations: number; delivered: number; questions: number }> = {};
   const reasons: Record<string, number> = {};
+  const transport = { called: 0, notCalled: 0, unknown: 0 };
   const tokens = { input_samples: 0, output_samples: 0, input_total: 0, output_total: 0 };
   const seen = new Set<string>();
   let readBytes = 0, truncated = false;
@@ -134,6 +183,7 @@ function decisionPilotTelemetry(root: string, options: { limit: number; since: n
           seen.add(reservation);
         }
         counts.matched++;
+        transport[outcome.providerCalled === true ? "called" : outcome.providerCalled === false ? "notCalled" : "unknown"]++;
         reasons[outcome.reason] = (reasons[outcome.reason] ?? 0) + 1;
         for (const id of outcome.consumers as string[]) {
           const totals = consumers[id] ??= { observations: 0, delivered: 0, questions: 0 };
@@ -146,7 +196,7 @@ function decisionPilotTelemetry(root: string, options: { limit: number; since: n
     }
   } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") counts.invalid++; }
   finally { entries?.closeSync(); }
-  return { counts, consumers, reasons, tokens: { ...tokens,
+  return { counts, consumers, reasons, transport, tokens: { ...tokens,
     input_total: tokens.input_samples ? tokens.input_total : null, output_total: tokens.output_samples ? tokens.output_total : null },
     usage_allocation: "native usage counted once per reservation; question counts shown per consumer", truncated, read_bytes: readBytes,
     outcomes: "not-joined", avoided_llm_tokens: null, benefit_claim: "not-evaluated" };

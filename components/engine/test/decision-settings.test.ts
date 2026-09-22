@@ -33,3 +33,31 @@ test("unsupported effects and conflicting legacy/new declarations fail closed", 
     { budget: { max_calls: 0 } },
   ]) assert.throws(() => profileDecisionSettings({ continuity: { decisions } }));
 });
+
+test("RC4 keeps RC3 defaults while new quality and CI questions need exact opt-in", () => {
+  const consumers = Object.fromEntries(DECISION_CONSUMER_IDS.map(id => [id, { mode: "auto" }]));
+  const settings = profileDecisionSettings({ continuity: { decisions: { mode: "auto", consumers } } });
+  assert.deepEqual(settings.questionIds.DL01, ["test.assertion-support/1", "test.mocked-behavior/1", "test.expectation-weakened/1"]);
+  assert.deepEqual(settings.questionIds.DL02, ["diff.rule-concern/1", "diff.task-relevance/1"]);
+  assert.deepEqual(settings.questionIds.DL05, ["runtime.diagnostic-match/1", "runtime.next-probe/1", "runtime.next-probe/2"]);
+  assert.deepEqual(settings.questionIds.DL07, ["validation.scenario-relevance/1", "validation.coverage-gap/1"]);
+  const parse = (questions: unknown) => profileDecisionSettings({ continuity: { decisions: { mode: "auto", consumers: { DL01: { mode: "auto", questions } } } } });
+  assert.deepEqual(parse(["test.requirement-support/1"]).questionIds.DL01, ["test.requirement-support/1"]);
+  assert.deepEqual(parse([]).questionIds.DL01, []);
+  for (const value of [["diff.rule-concern/1"], ["test.requirement-support/2"], ["test.requirement-support/1", "test.requirement-support/1"], "all"]) assert.throws(() => parse(value));
+});
+
+test("a flat category declaration changes config identity without enabling model routing", () => {
+  const mapping = { providers: { claude: { assignment_classes: ["bounded-summary"], categories: {
+    summarize: { description: "Summarize supplied evidence", model: "operator-model", effort: "high" },
+  } } } };
+  const parse = (model_routing: unknown) => profileDecisionSettings({ continuity: { model_routing, decisions: { mode: "auto", consumers: { DL03: { mode: "auto" } } } } });
+  const settings = parse(mapping);
+  assert.equal(resolveConsumerMode(settings, "DL08").mode, "off");
+  assert.notEqual(settings.configDigest, parse(undefined).configDigest);
+  assert.equal(settings.configDigest, parse(structuredClone(mapping)).configDigest);
+  assert.throws(() => parse({ ...mapping, mode: "auto" }), /Unknown model routing/);
+  assert.throws(() => parse({ providers: { other: {} } }), /Unknown model routing/);
+  assert.throws(() => parse({ providers: { claude: { ...mapping.providers.claude, categories: { unknown: mapping.providers.claude.categories.summarize } } } }), /reserved/);
+  assert.throws(() => profileDecisionSettings({ continuity: { decisions: { consumers: { DL03: { mode: "auto", effect: "route-model" } } } } }), /does not support/);
+});

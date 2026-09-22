@@ -22,6 +22,13 @@ The [local-CI and merge contract](engine-local-ci-and-merge-contract.md) continu
 trust, environment qualification, result publication and protected merging. Both local and remote
 CI remain supported. Existing authorization for local CI does not need to be established again.
 
+The [RC4 slice](engine-decision-rc4.md#ci-recommendations-with-meaningful-context) improves the existing
+DL07 advice with declared scenario meaning and requirement evidence. It adds explicit opt-in v2
+questions while keeping the actual required plan, order, reuse and execution unchanged. Reuse
+existing pack descriptions and already-required run results before adding metadata or evaluation
+work; begin with expensive optional scenarios. The wider
+planner, predictive omission and placement proposals below remain later implementation scope.
+
 The opportunity includes ordinary code improvements and JEV judgments. Their benefits must be
 measured separately. JEV is useful where interpreting changed behavior helps choose among known
 checks; it is unnecessary for calculating hashes, memory capacity or exact dependency impact.

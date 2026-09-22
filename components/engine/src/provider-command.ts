@@ -8,6 +8,7 @@ import type { CommandRequest } from "./process-owner.ts";
 import { resourceRegistryPath } from "./resources.ts";
 import { workspaceClaim } from "./workspace-claims.ts";
 import { providerAssignment, type ProviderAssignment } from "./provider-assignment.ts";
+import type { ProviderGuard } from "./provider-guard.ts";
 
 /** Plan native transport only. The job admission layer must establish assignment authority and workspace claims. */
 export function providerCommand(request: {
@@ -17,7 +18,7 @@ export function providerCommand(request: {
   access?: "reader" | "writer" | "exclusive"; registry?: string;
   idleTimeoutMs?: number;
   assignment?: { role: string; constraints: string; context: string };
-}, directory: string): Omit<CommandRequest, "version" | "ownerDigest"> {
+}, directory: string, guard?: ProviderGuard): Omit<CommandRequest, "version" | "ownerDigest"> {
   text(request.id, "provider job id", 256);
   text(request.prompt, "provider assignment", 500000);
   if (Buffer.byteLength(request.prompt) > 500000) throw new Error("Provider assignment exceeds 500 KB");
@@ -38,7 +39,9 @@ export function providerCommand(request: {
   const binding = providerBinding(request.provider, request);
   const session = request.conversationId === undefined ? {} : { conversationId: text(request.conversationId, "provider conversation", 256) };
   if (session.conversationId?.startsWith("-")) throw new Error("Invalid provider conversation");
-  const common = { executable: binding.backend, model: binding.model, effort: binding.effort, additionalRoots, ...session };
+  if (guard && (request.provider !== "claude" || request.access !== "reader" || requiredTools.some(tool =>
+    !guard.tools.includes(tool === "read" ? "Read" : tool)))) throw new Error("Assignment is incompatible with guarded read tools");
+  const common = { executable: binding.backend, model: binding.model, effort: binding.effort, additionalRoots, ...session, ...(guard ? { guard } : {}) };
   // Codex's full-access session receives authorized roots in its assignment, not a native CLI flag.
   if (request.provider === "codex" && additionalRoots.length && !request.assignment) throw new Error("Codex additional roots require a structured assignment");
   const argv = request.provider === "claude" ? claudeCommand(common)
@@ -48,12 +51,12 @@ export function providerCommand(request: {
     task: request.prompt, workspace, additionalRoots, requiredTools: [...new Set(requiredTools)], access: request.access ?? "exclusive" } : undefined;
   const prompt = assignment ? providerAssignment(assignment) : request.prompt;
   return {
-    id: request.id, operation: { argv, cwd: workspace, env: {}, expectedExitCodes: [0], effect: "local" },
+    id: request.id, operation: { argv, cwd: workspace, env: { ...guard?.environment }, expectedExitCodes: [0], effect: "local" },
     deadlineMs: request.deadlineMs, outputLimit: request.outputLimit,
     ...(request.idleTimeoutMs !== undefined ? { idleTimeoutMs: request.idleTimeoutMs } : {}),
     stdin: request.provider === "gemini" ? geminiInput(prompt) : prompt,
     ...(assignment ? { assignment } : {}),
-    provider: { kind: request.provider, model: binding.model, effort: binding.effort, ...session, requiredTools: [...new Set(requiredTools)], additionalRoots, access: request.access ?? "exclusive" },
+    provider: { kind: request.provider, model: binding.model, effort: binding.effort, ...session, requiredTools: [...new Set(requiredTools)], additionalRoots, access: request.access ?? "exclusive", ...(guard ? { guard } : {}) },
     coordination: { registry: resolve(request.registry ?? resourceRegistryPath()), resources: [workspaceClaim([workspace, ...additionalRoots], request.access ?? "exclusive", request.id,
       session.conversationId ? { provider: request.provider, conversationId: session.conversationId } : undefined)] },
   };

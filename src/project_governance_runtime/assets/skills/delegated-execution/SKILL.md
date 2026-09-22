@@ -66,8 +66,8 @@ and another can examine an independent platform constraint. Two agents broadly r
 unfinished patch are usually duplicated work.
 
 Choose roles before models. Read `.governance/runtime/skills/resources/model-selection.md` for
-the default table, project overrides, explicit task precedence, and availability checks. Keep the
-model recommendations in that one resource. Different evidence and questions matter more than
+fixed bindings, explicit task precedence, optional governed category routing and availability checks. Keep
+selection ownership in that one resource. Different evidence and questions matter more than
 superficial role names or model variety.
 
 ## Cost Discipline

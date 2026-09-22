@@ -9,14 +9,19 @@ export class ClaudeStream {
   readonly #session: ProviderSession;
   readonly #tools = new Map<string, ProviderToolEvidence>();
   readonly #denied: unknown[] = [];
+  readonly #permissionDeniedTools = new Set<string>();
   readonly #emit: (event: { kind: string; text?: string; tool?: string; state?: string }) => void;
   #bytes = 0;
   #failed = false;
   #done = false;
   #usage: unknown = null;
-  constructor(expected: { model: string; effort: string; conversationId?: string; requiredTools: string[] },
+  readonly #guarded: boolean;
+  readonly #guardTools: string[];
+  constructor(expected: { model: string; effort: string; conversationId?: string; requiredTools: string[]; guard?: import("./provider-guard.ts").ProviderGuard },
     emit: (event: { kind: string; text?: string; tool?: string; state?: string }) => void) {
-    this.#session = new ProviderSession({ ...expected, permissions: "bypassPermissions" }); this.#emit = emit;
+    this.#guarded = Boolean(expected.guard);
+    this.#guardTools = [...(expected.guard?.tools ?? []), "StructuredOutput"];
+    this.#session = new ProviderSession({ ...expected, permissions: expected.guard ? "dontAsk" : "bypassPermissions" }); this.#emit = emit;
   }
   accept(raw: unknown) {
     if (this.#failed || this.#done) throw new Error("Claude stream is already terminal");
@@ -29,6 +34,7 @@ export class ClaudeStream {
     text(item.type, "Claude event type", 128);
     if (item.session_id) this.#session.session(item.session_id);
     if (item.type === "system" && item.subtype === "init") {
+      if (this.#guarded && (!Array.isArray(item.tools) || item.tools.some(tool => !this.#guardTools.includes(String(tool))))) throw new Error("Unexpected guarded tool inventory");
       this.#session.initialize({ model: item.model, session: item.session_id, permissions: item.permissionMode, effort: item.effort });
       this.#emit({ kind: "started" });
     } else if (item.type === "stream_event") {
@@ -52,6 +58,7 @@ export class ClaudeStream {
         if (block.type !== "tool_use") continue;
         this.#session.assertToolAdmission();
         const id = text(block.id, "tool id", 256), name = text(block.name, "tool name", 256);
+        if (this.#guarded && !this.#guardTools.includes(name)) throw new Error("Guarded worker attempted an unavailable tool");
         if (this.#tools.has(id)) throw new Error("Duplicate Claude tool identity");
         if (this.#tools.size >= 5000) throw new Error("Tool evidence exceeds 5000 operations");
         this.#tools.set(id, { name, category: CATEGORIES[name] ?? name, state: "ACTIVE" });
@@ -69,8 +76,14 @@ export class ClaudeStream {
         tool.state = block.is_error ? "ERROR" : "DONE";
         if (block.is_error) {
           tool.error = true;
-          if (permissionDenied(block.content)) this.#denied.push({ tool_id: block.tool_use_id, resolved: false });
-        } else delete tool.error;
+          this.#permissionDeniedTools.delete(String(block.tool_use_id));
+          const denied = permissionDenied(block.content) || (typeof block.content === "string" &&
+            /^(?:<tool_use_error>)?File is in a directory that is denied by your permission settings\.(?:<\/tool_use_error>)?$/u.test(block.content));
+          if (denied) {
+            this.#permissionDeniedTools.add(String(block.tool_use_id));
+            this.#denied.push({ tool_id: block.tool_use_id, resolved: false });
+          }
+        } else { delete tool.error; this.#permissionDeniedTools.delete(String(block.tool_use_id)); }
         for (const denial of this.#denied) {
           if (denial && typeof denial === "object" && !Array.isArray(denial) && object(denial).tool_id === block.tool_use_id) object(denial).resolved = tool.state === "DONE" && !tool.error;
         }
@@ -79,6 +92,11 @@ export class ClaudeStream {
     } else if (item.type === "result") {
       if (item.permission_denials !== undefined && !Array.isArray(item.permission_denials)) throw new Error("Invalid Claude permission denials");
       this.#denied.push(...(item.permission_denials as unknown[] ?? []));
+      for (const raw of item.permission_denials as unknown[] ?? []) {
+        if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+        const denial = object(raw), id = String(denial.tool_use_id), tool = this.#tools.get(id);
+        if (tool?.state === "ERROR" && tool.name === denial.tool_name) this.#permissionDeniedTools.add(id);
+      }
       if (item.is_error || item.subtype !== "success") throw new Error("Claude native terminal failure");
       const completion = item.structured_output ?? JSON.parse(typeof item.result === "string" ? item.result : "null");
       this.#session.complete(completion); this.#done = true;
@@ -87,6 +105,13 @@ export class ClaudeStream {
   }
   finish() {
     if (this.#failed) throw new Error("Claude stream failed validation");
-    return { identity: this.#session.identity(), ...this.#session.finish([...this.#tools.values()], this.#denied), usage: structuredClone(this.#usage) };
+    const result = this.#session.finish([...this.#tools.values()], this.#denied);
+    // A native policy refusal is not a model capability failure. Model-authored prose cannot set this marker.
+    // A successful native terminal result has already validated any repaired StructuredOutput attempt.
+    const errors = [...this.#tools].filter(([, tool]) => tool.state === "ERROR" && tool.name !== "StructuredOutput");
+    const policyRefusal = result.state === "blocked" && result.completion.outcome === "completed" &&
+      result.completion.remaining.length === 1 && result.completion.remaining[0] === "Resolve denied operations or required client input" &&
+      errors.length > 0 && errors.every(([id]) => this.#permissionDeniedTools.has(id));
+    return { identity: this.#session.identity(), ...result, ...(policyRefusal ? { policyRefusal: "permission-denied" as const } : {}), usage: structuredClone(this.#usage) };
   }
 }

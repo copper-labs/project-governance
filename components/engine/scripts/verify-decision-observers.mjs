@@ -86,7 +86,7 @@ export async function verifyDecisionObservers({ packageRoot, repo, temporary, ru
     profile.continuity.decisions.mode = 'off'; write('config/governance/profile.yaml', profile);
     git('add', 'config/governance/profile.yaml'); git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'Freeze global disable');
     assert.equal(run(routeArgs).relevanceAdvice.delivered, false);
-    assert.equal(run(['provider-status', ...providerArgs]).decisionAdvice, undefined);
+    assert.equal(run(['provider-status', ...providerArgs]).decisionAdvice.exposure.reason, 'consumer-off');
     assert.equal(run(['workflow-status', ...args, '--diagnostic-evidence', evidencePath], 1).deviceAdvice, undefined);
     assert.equal(readFileSync(callsPath, 'utf8'), previousCalls, 'Missing credentials and global disable must dispatch no provider requests');
   } finally { store.close(); continuity.close(); }
