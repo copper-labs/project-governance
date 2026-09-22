@@ -184,7 +184,8 @@ for native identity, approval transport, recovery, bounded context/output delive
 requirement-linked quality and CI advice, routing fallback, explicit reviewer choice and continuation.
 Installed normal-caller delivery and native mapped dispatch have been exercised. Native continuation
 checks reject expired qualifications and changed source before another child starts. Consolidated source and installed-package proof are complete, and the independent implementation
-review is reconciled. Publication and exact asset readback are the remaining R5 steps. R6 adoption follows publication;
+review is reconciled. RC4 publication and exact asset readback are complete. R6 deliberate adoption
+and accepted-work measurement are next; publication does not activate an adopter. R6 adoption follows publication;
 keep the coding model fixed for initial measurement. Runtime evidence and host-specific qualification
 receipts remain in the external release dossier.
 
@@ -456,7 +457,7 @@ no new test dispatch or omission effect is implied by enabling this feature.
   implementation review. Keep exact model/effort, reviewed content identity and receipt externally.
 - [x] Perform a simplification check against the agreed scope: no duplicate router, new database,
   background evaluator, model-ranking service or always-on per-tool classifier. Keep useful boundaries.
-- [ ] Under explicit publication authority, use the existing prerelease process for unused
+- [x] Under explicit publication authority, use the existing prerelease process for unused
   `3.0.0-rc.4`: exact candidate/archive/lock agreement, non-latest prerelease publication and readback.
   If the tag is occupied, select a new immutable candidate identity rather than overwrite it.
 - [x] Prepare migration/adoption instructions naming defaults, opt-in questions/effects, approved
