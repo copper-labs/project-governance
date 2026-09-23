@@ -13,8 +13,8 @@ summary: Implements and qualifies the post-RC4 task binding and context selectio
 
 Owner: corrective batch of the [major adoption programme](2026-09-21-major-adoption-and-measurement.md).
 Contract: [task context entry](../../specs/engine-task-context-entry.md).
-Status: implementation, local qualification and Opus 5 extra-high recheck complete.
-RC5 release qualification is in progress; installed adoption remains a separate gate.
+Status: implementation, independent review and RC5 publication complete.
+Installed adoption remains a separate gate.
 
 ## Scope and acceptance
 
@@ -105,7 +105,7 @@ Do not claim deployment or token savings from source tests. Preserve concurrent 
   against that exact candidate; reconcile substantive findings and recheck affected proof.
 - [x] Run the release-equivalent engine, continuity, Python-wheel, TypeScript and installed-archive
   checks, plus the source governance signoff, on the final candidate.
-- [ ] Commit and tag one immutable RC5 source state, publish its compiled archive and matching lock,
+- [x] Commit and tag one immutable RC5 source state, publish its compiled archive and matching lock,
   and read back the public release, asset digests and source commit. Do not treat that as adopter use.
 
 ## Deferred work
