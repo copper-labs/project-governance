@@ -102,7 +102,8 @@ export async function contextRouteCommand(args: string[], root: string,
   const discovery = values["discover-path"]?.length ? discoverContext(subject, values["discover-path"]) : null;
   const mandatoryPaths = new Set([...route.primary, ...route.active, ...route.expansion]);
   const automatic = automaticContextCandidates(subject, emptyScope ? [] : inventory.relevant, mandatoryPaths,
-    settings.legacy.allowedSourcePaths ?? [], settings.legacy.maxCandidates);
+    settings.legacy.allowedSourcePaths ?? [], settings.legacy.maxCandidates,
+    { purpose: task, exact: pathScopes, changed: scope.records.map(record => record.path) });
   const declaredFiles = binding.context?.sourcePaths.filter(path => { try { return subject.source(path)?.file_type === "regular"; } catch { return false; } }) ?? [];
   const explicitOptional = new Set([...(values["optional-path"] ?? []), ...(discovery?.paths ?? [])].filter(path => !mandatoryPaths.has(path)));
   if (explicitOptional.size > 64) throw new Error("Too many explicit optional context inputs");
@@ -122,15 +123,25 @@ export async function contextRouteCommand(args: string[], root: string,
       automatic.excluded.push({ path, reason: "source-unavailable-or-not-bounded-text" }); automatic.excludedCount++;
     }
   }
+  const admittedPaths = new Set(candidates.map(candidate => candidate.id));
+  const excludedReasons = new Map(automatic.excluded.map(item => [item.path, item.reason]));
+  automatic.priorityPreview = automatic.priorityPreview.map(item => {
+    if (admittedPaths.has(item.path)) return item.disposition === "seeded" || item.disposition === "discovered"
+      ? item : { ...item, disposition: explicitOptional.has(item.path) ? "explicit-optional" : "task-declared" };
+    return item.disposition === "seeded" || item.disposition === "discovered"
+      ? { ...item, disposition: excludedReasons.get(item.path) ?? "candidate-not-materialized" } : item;
+  });
   const optionalBudget = Math.max(0, Math.min(packet.limits.expansion - packet.used.expansion, packet.limits.total - packet.used.total));
   const decisionScope = resolveDecisionScope(root, { ...(values["decision-task"] === undefined ? {} : { taskId: values["decision-task"] }), revision }, binding.context ?? undefined);
   let relevanceAdvice: ContextAdvice | null = null;
   const expandedContext = settings.questionIds.DL03.includes("context.relevance/1");
   const provider: DecisionProvider = suppliedProvider ?? (expandedContext ? {
     async decide(request) {
+      const policyDigest = digest({ captured: configDigests, decisions: settings.configDigest });
       relevanceAdvice = await contextAdvice(new DecisionRuntime(settings, contextStateRoot(root), options), request.candidates, decisionScope, {
-        purpose: task, eventId: digest({ revision, purpose: task, source: scope.subject_digest, candidates: request.candidates }),
-        policyDigest: digest(configDigests), environment: scope.mode, revision, subjectDigest: scope.subject_digest ?? digest(configDigests),
+        purpose: task, eventId: digest({ revision, purpose: task, source: scope.subject_digest,
+          candidates: request.candidates, policyDigest }),
+        policyDigest, environment: scope.mode, revision, subjectDigest: scope.subject_digest ?? digest(configDigests),
         excerptBytes: settings.legacy.evidenceBytes,
       });
       const decision = relevanceAdvice.decision;
@@ -143,8 +154,7 @@ export async function contextRouteCommand(args: string[], root: string,
   // Invalid mandatory context prevents any optional provider call or source transmission.
   const optional = packet.ready && candidates.length && optionalBudget >= 2 ? await buildContextPacket({
     taskRevision: revision, purpose: task, required: [], optional: candidates, maximumBytes: optionalBudget,
-    ...(values["optional-excerpt-bytes"] !== undefined ? { optionalExcerptBytes: Number(values["optional-excerpt-bytes"]) }
-      : !values["optional-path"]?.length && !values["discover-path"]?.length ? { optionalExcerptBytes: 2048 } : {}),
+    optionalExcerptBytes: values["optional-excerpt-bytes"] !== undefined ? Number(values["optional-excerpt-bytes"]) : 2048,
   }, provider, options) : null;
   let workflowRecommendation = null;
   if (packet.ready) {
@@ -180,16 +190,23 @@ export async function contextRouteCommand(args: string[], root: string,
   const selection = { binding: taskBindingReceipt(binding), candidateCount: candidates.length, inventoryUnavailable: inventory.unavailable,
     reason: !packet.ready ? "required-context-unavailable" : !candidates.length ? automatic.excludedCount ? "no-permitted-candidates" : "no-optional-candidates"
       : optionalBudget < 2 ? "optional-budget-empty" : optional?.reason ?? "selection-unavailable",
-    automatic: { ...automatic, prefilter: "changed-first, explicit-next, then alphabetical; at most 256 inspected paths" } };
+    optionalDelivery: optional ? optional.entries.length ? "delivered" : "none" : "not-attempted",
+    optionalClippedPaths: optional?.entries.filter(entry => entry.sourceRange).map(entry => entry.id) ?? [],
+    optionalOmissionReasons: optional?.omissionReasons ?? {},
+    automatic: { ...automatic, prefilter: "exact paths, changed paths, task-path term matches, then inventory order; at most 256 source paths inspected" } };
   const receipt = { version: 1, receiptId, createdAt: new Date().toISOString(), ...identity, selection,
     inputDigest: digest(identity), ready: packet.ready && !staleSources.length, blockers: packet.blockers,
     omissions: packet.omissions, skillOmissions: packet.skills?.omissions ?? [],
     optional: optional ? { selected: optional.entries.map(entry => entry.id), omitted: optional.omitted,
+      omissionReasons: optional.omissionReasons,
       decision: optional.decision, measurement: optional.measurement, reason: optional.reason } : null,
     relevanceAdvice, workflowAdvice: workflowRecommendation, discovery, staleSources, outcome: staleSources.length ? "refused-stale-source" : packet.ready ? "delivered" : "blocked" };
   durableJson(join(contextStateRoot(root), "routes", `${receiptId}.json`), receipt);
+  // The route receipt owns per-path diagnostics. Repeating its preview in every immutable
+  // exposure episode would exhaust the bounded outcome reader during an adoption study.
+  const { priorityPreview: _preview, ...automaticExposure } = selection.automatic;
   recordEntryExposure(contextStateRoot(root), { caller: "context-route", entryKind: "context-delivery", scope: decisionScope,
-    native: { receiptId, inputDigest: receipt.inputDigest }, exposure: { ...selection, reached: true,
+    native: { receiptId, inputDigest: receipt.inputDigest }, exposure: { ...selection, automatic: automaticExposure, reached: true,
       delivered: receipt.ready, used: null, acceptedOutcome: "unknown", totalModelTokens: null, outsideEntryActivity: "unknown" },
     decisions: [(relevanceAdvice as ContextAdvice | null)?.decision?.receiptId, optional?.decision?.receiptId].filter((id): id is string => typeof id === "string") });
   if (staleSources.length) throw new Error("Context sources changed while preparing the routed packet");

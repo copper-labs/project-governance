@@ -60,6 +60,20 @@ test("evaluation distinguishes useful files that no ordering can fit from retrie
   assert.equal(result.summary.oversizedUsefulCandidates, 1);
   assert.equal(result.results[0]!.candidate.usefulSelected, 0);
 });
+test("evaluation counts a useful single-line source that cannot fit its excerpt limit", async () => {
+  const entry: ContextEvaluationCase = { id: "unrepresentable-line", request: {
+    taskRevision: "1", purpose: "find contract", required: [], maximumBytes: 5000,
+    optionalExcerptBytes: 2048,
+    optional: [{ id: "contract", sourceDigest: "c1", excerpt: "x".repeat(3000) }],
+  }, usefulOptionalIds: ["contract"] };
+  const result = await evaluateContext([entry], { async decide(request) {
+    return { version: 1, kind: request.kind, inputDigest: digest(request), delivered: ["contract"],
+      suggested: ["contract"], method: "jev", reason: "fixture", model: "fixture", questionVersion: "1",
+      confidence: 1, latencyMs: 1, usage: { inputTokens: 1, outputTokens: 1 } };
+  } });
+  assert.deepEqual(result.results[0]?.oversizedUsefulCandidates, ["contract"]);
+  assert.equal(result.results[0]?.candidate.usefulSelected, 0);
+});
 
 test("a selected owner file does not imply its decisive lines were delivered", async () => {
   const request = { taskRevision: "span-1", purpose: "state", required: [], maximumBytes: 1000, optionalExcerptBytes: 128,

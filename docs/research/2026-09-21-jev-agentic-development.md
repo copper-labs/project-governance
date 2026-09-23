@@ -125,3 +125,44 @@ provider-free fallback, independent outcomes and deterministic authority.
 No runtime or adopter settings changed in this research pass. No new supervisor, plugin framework,
 source index, provider gateway, autonomous model optimizer, local classifier or release agent was
 added. Wider ideas remain documented opportunities, not hidden RC4 implementation obligations.
+
+## September 22 follow-up: learn from emerging harnesses
+
+This follow-up examines newer public implementations and TypeSafe examples. Their results are
+author-reported; none establishes an accepted-development saving in our system. It changes the
+**next comparison**, not the published RC4 contract.
+
+| Pattern already tried | What to borrow | Boundary or caution |
+| --- | --- | --- |
+| [TypeSafe skill suggestion](https://docs.typesafe.ai/cookbooks/skill_suggestion.md) ranks all 182 short catalog entries, then checks three detailed entries | Compare a complete, allowed path/description catalog against a narrow lexical shortlist. Fetch detailed source only for a small shortlist. | This is a two-stage skill experiment, not proof for source files. Its second stage can reject every candidate. |
+| [TypeSafe line search](https://docs.typesafe.ai/cookbooks/semantic_find.md) ranks 218 tagged lines and asks separately if the answer exists | Keep stable path/line IDs and ask an independent no-match question. Choice ranks even when nothing fits. | A path-only existence score may be uncertain. Check actual excerpts before suppressing a source or claiming success. |
+| [Jev Sift](https://github.com/kbhuw/jev-sift) loads bounded files outside the main model's context and returns compact relevance scores | Place selection before the model's first read, preserve original references, and report truncation/errors. | A tool exposed to an agent can be skipped. The normal governed entry must invoke the selector; source disclosure remains allowlisted. |
+| [Pi JEV harness](https://github.com/MoonTory/pi-jev-harness) prefetches task-matched windows and trims long tool results | Try pre-read windows and post-check evidence reduction where the normal host integration can actually deliver them. | Its model/tool routing is optional because removing tool schemas may disrupt prompt caching; its benchmark is author-run. |
+| [claude-jev](https://github.com/0x7067/claude-jev) filters instruction rules by edit subject, rechecks uncertain cases with enclosing code and experiments with verbatim compaction | Cheap code filters before semantic questions; a second, richer look only for uncertainty. Preserve exact constraints and errors when studying compaction. | The project's reported rule and compaction evaluations are not our proof. Compaction relies on a host-specific experimental hook. |
+| [jev-routing](https://github.com/nekowasabi/jev-routing) compares baseline, local, JEV and hybrid agent runs | Mark bypassed or incomparable runs as such; compare matched completion, cache conditions, upstream bytes, tokens and time. | A mock success or one run is not a saving. A proxy would duplicate our runtime owner and is not proposed. |
+
+The official [JEV 1.13 limits](https://docs.typesafe.ai/model-jaggedness/jev-1.13.md)
+warn that a large irrelevant state can reduce accuracy. Its current
+[model contract](https://docs.typesafe.ai/models.md) bounds a request at 64k tokens and the
+state plus longest question at 32k. Therefore “send the entire index” means a bounded,
+approved *metadata* inventory when it fits, not whole source files. For larger inventories,
+compare a code-filtered shortlist and an indexed/chunked two-stage route. Keep required sources,
+permissions, no-match behavior and fallback in code. Use the existing captured inventory and
+receipts; do not add a persistent vector store or a second file-access authority for this trial.
+
+The next controlled comparison should label cases that a narrow candidate cap misses, cases it
+already handles, and cases with no relevant source. Measure candidate recall, useful excerpt
+delivery, later manual reads, total coding-model input, accepted outcome and rework. A model call
+or a shorter packet alone is not a benefit. Any change to the normal selection contract needs its
+own specification and release qualification after that comparison.
+
+## Host instruction follow-up
+
+[OpenAI's September 2026 AGENTS.md guidance](https://developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra)
+warns against mandatory broad document reads on every task and favors short, conditional pointers.
+[Claude Code's guidance](https://code.claude.com/docs/en/best-practices) likewise keeps always-loaded
+instructions concise and distinguishes them from hooks that run deterministically. For this harness,
+one runtime-owned task-entry pointer belongs in each host file; project-specific rules remain authored
+outside it. A doctor can check the owned block, but behavior is established by ordinary task and route
+receipts. When instruction compliance proves unreliable, route delivery belongs in the supported host
+entry path rather than more emphatic prose or a duplicate JEV router.

@@ -15,6 +15,8 @@ to `context-route` for the current task's routing scope. At most 64 explicit pat
 The receipt records that selection. This selects guidance only: it does not narrow check selection,
 change the captured Git subject, or certify that a planned path already exists.
 
+Normal development stays with one coding agent on its fixed host model. Use these provider commands
+only when the operator requests a second agent or a project-owned required review calls for one.
 Delegate only an assignment authorized by the parent. Preserve the operator's provider, model,
 effort, scope and restrictions. Do not silently select another provider or global wrapper. Native
 agents retain their own tools and authentication; workspace declarations are not a sandbox.

@@ -57,3 +57,30 @@ test("partial relevance answers reorder only assessed slots", async t => {
   assert.equal(small.delivered, true);
   assert.equal(sentQuestions, 7);
 });
+
+test("expanded relevance stays within the evidence-item ceiling at max_candidates 64", async t => {
+  const root = mkdtempSync(join(tmpdir(), "context-advice-limit-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const settings = profileDecisionSettings({ continuity: { decisions: { mode: "auto", max_candidates: 64,
+    evidence_bytes: 32768, allowed_data_classes: ["source"], allowed_source_paths: ["src/**"],
+    consumers: { DL03: { mode: "auto" } } } } });
+  let calls = 0;
+  const runtime = new DecisionRuntime(settings, root, { token: "fixture", fetch: async (_url, init) => {
+    calls++;
+    const wire = JSON.parse(String(init?.body));
+    assert.equal(Object.keys(wire.questions).length, 63);
+    assert.deepEqual(wire.state.coverage, { captured: 63, omitted: 1, unavailable: 0, truncated: true });
+    return Response.json({ model: settings.legacy.model, answers: Object.fromEntries(
+      Object.keys(wire.questions).map(key => [key, { type: "noul", noul: 0.8 }])) });
+  } });
+  const candidates = Array.from({ length: 64 }, (_, index) => ({ id: `src/${String(index).padStart(2, "0")}.ts`,
+    excerpt: `Reference ${index}\n`, sourceDigest: `source-${index}` }));
+  const result = await contextAdvice(runtime, candidates, { workspace: root, taskId: "task", taskRevision: "r1" }, {
+    purpose: "find source", eventId: "max-candidates", policyDigest: digest("policy"), environment: "test",
+    revision: "r1", subjectDigest: digest("subject"), excerptBytes: 32768,
+  });
+  assert.equal(result.delivered, true);
+  assert.equal(result.assessed.length, 63);
+  assert.deepEqual(result.coverage.omitted, ["src/63.ts"]);
+  assert.equal(calls, 1);
+});

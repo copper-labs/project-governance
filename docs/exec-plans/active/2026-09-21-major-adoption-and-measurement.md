@@ -42,14 +42,15 @@ Neither implementation nor review implies permission to publish or activate auto
 use the same handoff boundary after the preceding pilot has supplied useful observations.
 
 The shared runtime, eight original caller integrations, budget migration and outcome joins are
-implemented. The source release candidate is now `3.0.0-rc.4`, including the N-series experiments
+implemented. RC4 was published as `3.0.0-rc.4`, including the N-series experiments
 and the R0–R4 features below. Published asset identities, adoption status and runtime evidence remain in the external
 release/pilot record. Real host/device qualification and measured JEV benefit remain distinct
 from source and release completion.
 Historical S0–S3 checklists below retain the original acceptance criteria; unchecked entries are
 not instructions to redo completed work. Reconcile them against retained evidence when adopting.
 
-The current release candidate is [RC4 quality, routing and CI](#rc4-quality-routing-and-ci-batch).
+The [RC4 quality, routing and CI batch](#rc4-quality-routing-and-ci-batch) is complete; the
+[RC5 task-context entry plan](2026-09-22-task-context-entry.md) owns the next release candidate.
 It brings bounded S5/S6/S9 work forward: connected evidence/quality advice, opt-in category routing replacing
 agent-selected work-class tables, richer CI advice, and required governed delegation for the pilot.
 The [RC4 specification](../../specs/engine-decision-rc4.md) owns that scope. R0–R6 below owns the next
@@ -71,8 +72,9 @@ This document update plans implementation; it does not activate features or inst
   manual entry retains explicit flags and honest missing-scope fallback.
 - RC4 disables automatic Markdown-table model choice. Fixed provider bindings and explicit operator
   choices remain; DL08 is the sole optional automatic routing owner and defaults off.
-- The RC4 pilot requires governed delegation. An agent-supplied model argument is not an operator
-  override; permitted fallback and missing or bypassed feature exposure must be distinguishable.
+- The RC4 pilot defaults to one coding agent on its fixed host model. Operator-requested or
+  project-required delegation must use the governed route. An agent-supplied model argument is not
+  an operator override; permitted fallback and missing or bypassed feature exposure must be distinguishable.
 
 These choices preserve all eight first-RC consumers and their required functional proof. Their owning
 details are in the shared spec and consumer catalog; this list records the accepted scope decisions.

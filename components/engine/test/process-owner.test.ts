@@ -37,7 +37,7 @@ test("deadline and cancellation terminate owned process groups without reporting
       assert.equal(result.state, "terminal"); assert.equal(result.receipt?.reason, reason);
       assert.equal(result.receipt?.cleanup, "confirmed"); assert.notEqual(result.receipt?.state, "succeeded");
     }
-  } finally { rmSync(dir, { recursive: true }); }
+  } finally { await removeFinishedCommandFixture(dir, ["deadline", "cancelled"]); }
 });
 
 test("output flooding is bounded and publisher/model credentials are not inherited", async () => {
@@ -67,7 +67,7 @@ test("native execution survives the submitting process exiting and reconnects wi
     assert.equal(result.receipt?.state, "succeeded");
     assert.equal(readFileSync(result.receipt!.log, "utf8"), "finished once\n");
     assert.deepEqual(observeCommand(submission.directory, submission.requestDigest), result);
-  } finally { rmSync(dir, { recursive: true }); }
+  } finally { await removeFinishedCommandFixture(dir, ["job"]); }
 });
 
 test("structured stdout stays separate from diagnostic stderr under the shared output budget", async () => {

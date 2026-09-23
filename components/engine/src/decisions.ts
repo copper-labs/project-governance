@@ -76,6 +76,7 @@ export class JevDecisionAdapter implements DecisionProvider {
       if (candidate.id === "unknown" || ids.has(candidate.id) || typeof candidate.excerpt !== "string") throw new Error("invalid or duplicate candidate");
       ids.add(candidate.id);
     }
+    const candidateIds = request.candidates.map(candidate => candidate.id);
     const baseline = request.kind === "rank_optional_context" ? lexicalContextOrder(request) : request.candidates.map(c => c.id);
     const inputDigest = digest(request);
     const result: DecisionResult = { version: 1, kind: request.kind, inputDigest, delivered: baseline,
@@ -88,24 +89,50 @@ export class JevDecisionAdapter implements DecisionProvider {
     if (!(this.#options.token ?? process.env["JEV_TOKEN"])) return fallback("missing-token");
     if (request.kind !== "rank_optional_context" || !this.config.allowedQuestions.includes(request.kind)) return fallback("question-disabled");
     if (!this.config.allowedDataClasses.includes(request.dataClass)) return fallback("data-sharing-disabled");
-    if (request.dataClass === "source" && request.candidates.some(candidate =>
-      candidate.id.startsWith("/") || candidate.id.includes("\\") || candidate.id.split("/").some(part => part === ".." || part === ".") ||
-      !matchesPackPath(candidate.id, this.config.allowedSourcePaths ?? []))) return fallback("source-scope-disabled");
+    // A decision receipt can name at most 256 omitted candidates. Larger direct requests
+    // keep their deterministic order without making an incomplete provider disclosure.
+    if (candidateIds.length > 256) return fallback("input-budget");
+    if (request.dataClass === "source") {
+      if (request.candidates.some(candidate => candidate.id.startsWith("/") || candidate.id.includes("\\") ||
+        candidate.id.split("/").some(part => part === ".." || part === "."))) return fallback("source-scope-disabled");
+      // Only approved candidates reach the provider. Others retain their lexical slots in delivery.
+      request.candidates = request.candidates.filter(candidate => matchesPackPath(candidate.id, this.config.allowedSourcePaths ?? []));
+      if (!request.candidates.length) return fallback("source-scope-disabled");
+    }
+    const approvedIds = new Set(request.candidates.map(candidate => candidate.id));
     if (!this.#options.scope) return fallback("scope-unavailable");
     if (this.#options.scope.taskRevision !== request.taskRevision) return fallback("scope-conflict");
-    if (!baseline.length || baseline.length > this.config.maxCandidates) return fallback("input-budget");
+    if (!baseline.length) return fallback("input-budget");
+    // Explicit/task candidates can extend the route's automatic set. Assess a bounded prefix
+    // instead of turning advice off for every candidate when that union crosses the cap.
+    // The decision schema admits 64 evidence items including the purpose.
+    const maxAssessed = Math.min(this.config.maxCandidates, 63);
+    request.candidates = request.candidates.slice(0, maxAssessed);
     const bounded = boundDecisionEvidence(request, this.config.evidenceBytes);
     if (!bounded) return fallback("input-budget");
     result.excerptCoverage = bounded.coverage;
     request = bounded.request;
+    const assessedIds = new Set(request.candidates.map(candidate => candidate.id));
+    const omitted = candidateIds.filter(id => !assessedIds.has(id));
+    const scopeOmitted = candidateIds.filter(id => !approvedIds.has(id)).length;
+    const countOmitted = Math.max(0, approvedIds.size - maxAssessed);
+    const excerptOmitted = bounded.coverage.filter(item => !assessedIds.has(item.id)).length;
+    const limits = [
+      ...(scopeOmitted ? [`${scopeOmitted} source candidates outside approved classifier scope`] : []),
+      ...(countOmitted ? [`${countOmitted} candidates beyond classifier count limit ${maxAssessed}`] : []),
+      ...(excerptOmitted ? [`${excerptOmitted} candidates without a representable whole-line excerpt`] : []),
+    ];
     const settings = this.#options.settings ?? legacyDecisionSettings(this.config);
     const runtime = new DecisionRuntime(settings, this.#stateRoot, { ...this.#options, ...options });
     const evidence = [{ id: "purpose", text: request.purpose, sourceDigest: digest(request.purpose), provenance: "supplied" as const, trust: "untrusted" as const },
       ...request.candidates.map((candidate, index) => ({ id: `candidate:${index}`, text: candidate.excerpt, sourceDigest: candidate.sourceDigest,
         provenance: "captured" as const, trust: "untrusted" as const }))];
-    const outcome = await runtime.ask({ consumerId: "DL03", eventId: `legacy-context:${inputDigest}`, scope: this.#options.scope,
+    const eventId = `legacy-context:${digest({ inputDigest, policyDigest: settings.configDigest,
+      assessedCandidates: request.candidates.map(candidate => ({ id: candidate.id, sourceDigest: candidate.sourceDigest })) })}`;
+    const outcome = await runtime.ask({ consumerId: "DL03", eventId, scope: this.#options.scope,
       subject: { digest: inputDigest, revision: request.taskRevision, environment: `legacy-context-${request.dataClass}` },
-      evidence, coverage: { captured: evidence.length, omitted: [], truncated: bounded.coverage.some(item => item.omittedBytes > 0), unavailable: [], limits: [] },
+      evidence, coverage: { captured: request.candidates.length, omitted,
+        truncated: omitted.length > 0 || bounded.coverage.some(item => item.omittedBytes > 0), unavailable: [], limits },
       questions: [{ name: "suggestion", definitionId: "legacy.context-rank/1", consumerId: "DL03", evidenceIds: evidence.map(item => item.id),
         candidates: request.candidates.map(candidate => ({ id: candidate.id, description: candidate.id })) }],
       sourcePaths: request.candidates.map(candidate => candidate.id), legacyDataClass: request.dataClass, policyDigest: settings.configDigest });
@@ -121,7 +148,11 @@ export class JevDecisionAdapter implements DecisionProvider {
     if (answer.status !== "answered" || answer.shape !== "choice") return fallback("invalid-or-unavailable");
     result.confidence = answer.confidence;
     if (answer.confidence === null || answer.confidence < this.config.minimumConfidence) return fallback("abstention");
-    result.suggested = [...baseline].sort((a, b) => Number(answer.probabilities[b]) - Number(answer.probabilities[a]) || baseline.indexOf(a) - baseline.indexOf(b));
+    const approved = new Set(request.candidates.map(candidate => candidate.id));
+    const ranked = baseline.filter(id => approved.has(id))
+      .sort((a, b) => Number(answer.probabilities[b]) - Number(answer.probabilities[a]) || baseline.indexOf(a) - baseline.indexOf(b));
+    let next = 0;
+    result.suggested = baseline.map(id => approved.has(id) ? ranked[next++]! : id);
     if (outcome.delivered) { result.delivered = result.suggested; result.method = "jev"; }
     result.reason = outcome.mode === "shadow" ? "shadow" : outcome.delivered ? "suggested" : outcome.reason;
     result.latencyMs = performance.now() - started;

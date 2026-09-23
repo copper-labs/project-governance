@@ -1,5 +1,6 @@
 import { decisionProviderHealthPath } from "../src/decision-transport.ts";
-import { digest } from "../src/core.ts";
+import { canonical, digest } from "../src/core.ts";
+import { buildContextPacket } from "../src/context-packet.ts";
 import { test } from "node:test";
 import { spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
@@ -134,15 +135,186 @@ test("source class approval also requires explicit matching source paths before 
   const transport: typeof fetch = async () => { calls++; return response(); };
   const sourceRequest = { ...request, dataClass: "source" as const };
   try {
-    for (const allowedSourcePaths of [undefined, [], ["a"]]) {
+    for (const allowedSourcePaths of [undefined, []]) {
       const settings = { ...config, allowedDataClasses: ["source" as const], ...(allowedSourcePaths ? { allowedSourcePaths } : {}) };
       const result = await new JevDecisionAdapter(settings, f.path, { token: "fixture", fetch: transport }).decide(sourceRequest);
       assert.equal(result.reason, "source-scope-disabled");
     }
     assert.equal(calls, 0);
+    const partial = await new JevDecisionAdapter({ ...config, allowedDataClasses: ["source"], allowedSourcePaths: ["a"] }, f.path,
+      { token: "fixture", fetch: async (_url, init) => {
+        calls++;
+        const wire = JSON.parse(String(init?.body));
+        assert.ok(!String(init?.body).includes("State transitions"), "Unapproved source text cannot reach the provider");
+        assert.deepEqual(wire.state.coverage, { captured: 1, omitted: 1, unavailable: 0, truncated: true });
+        return Response.json({ model: "jev-1.13.0", answers: { suggestion: {
+          type: "choice", choice: "a", confidence: 0.9, probabilities: { a: 0.9, unknown: 0.1 },
+        } }, usage: { input_tokens: 20, output_tokens: 2 } });
+      } }).decide(sourceRequest);
+    assert.equal(partial.method, "jev");
+    assert.deepEqual(partial.delivered, ["b", "a"], "Unapproved source keeps its baseline slot");
+    const partialReceipt = JSON.parse(readFileSync(join(dirname(f.path), "decisions", `${partial.receiptId}.json`), "utf8"));
+    assert.deepEqual(partialReceipt.outcome.coverage.omitted, ["b"]);
+    assert.match(partialReceipt.outcome.coverage.limits[0], /outside approved classifier scope/);
+    assert.equal(calls, 1);
     const result = await new JevDecisionAdapter({ ...config, allowedDataClasses: ["source"], allowedSourcePaths: ["a", "b"] }, f.path,
       { token: "fixture", fetch: transport }).decide(sourceRequest);
+    assert.equal(result.method, "jev"); assert.equal(calls, 2);
+  } finally { f.close(); }
+});
+
+test("broader source approval at one task revision gets a new decision event", async () => {
+  const f = temporary(); let calls = 0;
+  const sourceRequest: DecisionRequest = { ...request, dataClass: "source", candidates: [
+    { id: "src/a.ts", sourceDigest: "source-a", excerpt: "useful source" },
+    { id: "Makefile", sourceDigest: "build-file", excerpt: "build target" },
+  ] };
+  const scope = { workspace: dirname(f.path), taskId: "same-task", taskRevision: sourceRequest.taskRevision };
+  const transport: typeof fetch = async (_url, init) => {
+    calls++;
+    const keys = Object.keys(JSON.parse(String(init?.body)).questions.suggestion.criteria);
+    assert.equal(keys.includes("Makefile"), calls === 2);
+    return Response.json({ model: "jev-1.13.0", answers: { suggestion: {
+      type: "choice", choice: "src/a.ts", confidence: 0.9,
+      probabilities: Object.fromEntries(keys.map(key => [key, key === "src/a.ts" ? 0.9 : 0.1 / (keys.length - 1)])),
+    } }, usage: { input_tokens: 20, output_tokens: 2 } });
+  };
+  try {
+    const first = await new SharedAdapter({ ...config, allowedDataClasses: ["source"], allowedSourcePaths: ["src/*.ts"] }, f.path,
+      { token: "fixture", fetch: transport, scope }).decide(sourceRequest);
+    const second = await new SharedAdapter({ ...config, allowedDataClasses: ["source"], allowedSourcePaths: ["src/*.ts", "Makefile"] }, f.path,
+      { token: "fixture", fetch: transport, scope }).decide(sourceRequest);
+    assert.equal(first.method, "jev"); assert.equal(second.method, "jev");
+    assert.equal(calls, 2);
+    assert.notEqual(first.receiptId, second.receiptId);
+  } finally { f.close(); }
+});
+
+test("a candidate above the model count cap keeps bounded JEV advice active", async () => {
+  const f = temporary(); let calls = 0;
+  const sourceRequest: DecisionRequest = { ...request, dataClass: "source", purpose: "find explicit guidance",
+    candidates: [{ id: "docs/explicit.md", sourceDigest: "explicit", excerpt: "Explicit guidance\n" },
+      ...Array.from({ length: 16 }, (_, index) => ({ id: `docs/auto-${index}.md`, sourceDigest: `auto-${index}`,
+        excerpt: `Automatic reference ${index}\n` }))] };
+  try {
+    const result = await new JevDecisionAdapter({ ...config, allowedDataClasses: ["source"],
+      allowedSourcePaths: ["docs/**"], maxCandidates: 16 }, f.path,
+    { token: "fixture", fetch: async (_url, init) => {
+      calls++;
+      const wire = JSON.parse(String(init?.body));
+      const keys = Object.keys(wire.questions.suggestion.criteria);
+      assert.equal(keys.length, 17);
+      assert.ok(keys.includes("docs/explicit.md"));
+      assert.ok(!keys.includes("docs/auto-15.md"));
+      assert.deepEqual(wire.state.coverage, { captured: 16, omitted: 1, unavailable: 0, truncated: true });
+      return Response.json({ model: "jev-1.13.0", answers: { suggestion: {
+        type: "choice", choice: "docs/explicit.md", confidence: 0.9,
+        probabilities: Object.fromEntries(keys.map(key => [key, key === "docs/explicit.md" ? 1 : 0])),
+      } }, usage: { input_tokens: 20, output_tokens: 2 } });
+    } }).decide(sourceRequest);
     assert.equal(result.method, "jev"); assert.equal(calls, 1);
+    assert.equal(result.delivered.length, 17);
+    assert.equal(result.excerptCoverage?.length, 16);
+    const receipt = JSON.parse(readFileSync(join(dirname(f.path), "decisions", `${result.receiptId}.json`), "utf8"));
+    assert.deepEqual(receipt.outcome.coverage.omitted, ["docs/auto-15.md"]);
+    assert.match(receipt.outcome.coverage.limits[0], /beyond classifier count limit 16/);
+  } finally { f.close(); }
+});
+
+test("the maximum configured candidate count reserves the purpose evidence slot", async () => {
+  const f = temporary(); let calls = 0;
+  const candidates = Array.from({ length: 64 }, (_, index) => ({ id: `docs/${String(index).padStart(2, "0")}.md`,
+    sourceDigest: `source-${index}`, excerpt: `Reference ${index}\n` }));
+  try {
+    const result = await new JevDecisionAdapter({ ...config, allowedDataClasses: ["source"],
+      allowedSourcePaths: ["docs/**"], maxCandidates: 64, evidenceBytes: 32768 }, f.path,
+    { token: "fixture", fetch: async (_url, init) => {
+      calls++;
+      const wire = JSON.parse(String(init?.body));
+      const keys = Object.keys(wire.questions.suggestion.criteria);
+      assert.equal(keys.length, 64, "63 candidates and unknown fit the question");
+      assert.deepEqual(wire.state.coverage, { captured: 63, omitted: 1, unavailable: 0, truncated: true });
+      return Response.json({ model: "jev-1.13.0", answers: { suggestion: {
+        type: "choice", choice: keys[0], confidence: 0.9,
+        probabilities: Object.fromEntries(keys.map(key => [key, key === keys[0] ? 1 : 0])),
+      } }, usage: { input_tokens: 20, output_tokens: 2 } });
+    } }).decide({ ...request, dataClass: "source", candidates });
+    assert.equal(result.method, "jev"); assert.equal(calls, 1);
+    assert.equal(result.delivered.length, 64);
+    const receipt = JSON.parse(readFileSync(join(dirname(f.path), "decisions", `${result.receiptId}.json`), "utf8"));
+    assert.deepEqual(receipt.outcome.coverage.omitted, ["docs/63.md"]);
+    assert.match(receipt.outcome.coverage.limits[0], /classifier count limit 63/);
+  } finally { f.close(); }
+});
+
+test("an oversized direct request preserves baseline without incomplete omission accounting", async () => {
+  const f = temporary(); let calls = 0;
+  try {
+    const candidates = Array.from({ length: 257 }, (_, index) => ({ id: `source-${index}`,
+      sourceDigest: `digest-${index}`, excerpt: "Reference\n" }));
+    const result = await new JevDecisionAdapter(config, f.path, { token: "fixture", fetch: async () => {
+      calls++; throw new Error("Unexpected provider call");
+    } }).decide({ ...request, candidates });
+    assert.equal(result.reason, "input-budget");
+    assert.equal(result.delivered.length, 257);
+    assert.equal(calls, 0);
+  } finally { f.close(); }
+});
+
+test("indivisible approved evidence does not disable JEV for its peer", async () => {
+  const f = temporary(); let calls = 0;
+  const sourceRequest: DecisionRequest = { ...request, dataClass: "source", candidates: [
+    { id: "src/long.ts", sourceDigest: "long", excerpt: "x".repeat(1500) },
+    { id: "src/good.ts", sourceDigest: "good", excerpt: "Metro owner and recovery\n" },
+  ] };
+  try {
+    const result = await new JevDecisionAdapter({ ...config, allowedDataClasses: ["source"],
+      allowedSourcePaths: ["src/*.ts"], evidenceBytes: 600 }, f.path,
+    { token: "fixture", fetch: async (_url, init) => {
+      calls++;
+      const wire = JSON.parse(String(init?.body));
+      assert.deepEqual(Object.keys(wire.questions.suggestion.criteria), ["src/good.ts", "unknown"]);
+      assert.deepEqual(wire.state.coverage, { captured: 1, omitted: 1, unavailable: 0, truncated: true });
+      return Response.json({ model: "jev-1.13.0", answers: { suggestion: {
+        type: "choice", choice: "src/good.ts", confidence: 0.9,
+        probabilities: { "src/good.ts": 0.9, unknown: 0.1 },
+      } }, usage: { input_tokens: 20, output_tokens: 2 } });
+    } }).decide(sourceRequest);
+    assert.equal(result.method, "jev"); assert.equal(calls, 1);
+    assert.deepEqual(result.delivered, ["src/long.ts", "src/good.ts"]);
+    assert.equal(result.excerptCoverage?.find(item => item.id === "src/long.ts")?.excerptBytes, 0);
+    const receipt = JSON.parse(readFileSync(join(dirname(f.path), "decisions", `${result.receiptId}.json`), "utf8"));
+    assert.deepEqual(receipt.outcome.coverage.omitted, ["src/long.ts"]);
+    assert.match(receipt.outcome.coverage.limits[0], /without a representable whole-line excerpt/);
+  } finally { f.close(); }
+});
+
+test("unapproved baseline slots can crowd out approved advice under a tight packet budget", async () => {
+  const f = temporary(); let calls = 0;
+  const sourceRequest: DecisionRequest = { ...request, purpose: "unmatched purpose", dataClass: "source", candidates: [
+    { id: "Makefile", sourceDigest: "build", excerpt: "build target" },
+    { id: "src/a.ts", sourceDigest: "a", excerpt: "source A" },
+    { id: "src/b.ts", sourceDigest: "b", excerpt: "source B" },
+  ] };
+  try {
+    const adapter = new JevDecisionAdapter({ ...config, allowedDataClasses: ["source"],
+      allowedSourcePaths: ["src/*.ts"] }, f.path, { token: "fixture", fetch: async (_url, init) => {
+      calls++;
+      const keys = Object.keys(JSON.parse(String(init?.body)).questions.suggestion.criteria);
+      assert.deepEqual(keys, ["src/a.ts", "src/b.ts", "unknown"]);
+      return Response.json({ model: "jev-1.13.0", answers: { suggestion: {
+        type: "choice", choice: "src/b.ts", confidence: 0.9,
+        probabilities: { "src/a.ts": 0.05, "src/b.ts": 0.9, unknown: 0.05 },
+      } }, usage: { input_tokens: 20, output_tokens: 2 } });
+    } });
+    const packet = await buildContextPacket({ taskRevision: sourceRequest.taskRevision, purpose: sourceRequest.purpose,
+      required: [], optional: sourceRequest.candidates,
+      maximumBytes: Buffer.byteLength(canonical([sourceRequest.candidates[0]])) + 1 }, adapter);
+    assert.equal(calls, 1);
+    assert.equal(packet.decision?.method, "jev");
+    assert.deepEqual(packet.decision?.delivered, ["Makefile", "src/b.ts", "src/a.ts"]);
+    assert.deepEqual(packet.entries.map(entry => entry.id), ["Makefile"]);
+    assert.equal(packet.omissionReasons["src/b.ts"], "packet-budget");
   } finally { f.close(); }
 });
 

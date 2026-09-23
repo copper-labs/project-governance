@@ -33,6 +33,57 @@ test("provider-free context preserves required evidence and bounds optional read
     assert.ok(packet.bytes <= 350);
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
+test("an oversized single line cannot bypass the optional excerpt limit", async () => {
+  const packet = await buildContextPacket({ taskRevision: "single-line", purpose: "find the contract",
+    required: [{ id: "rules", sourceDigest: "required", excerpt: "Required rules" }],
+    optional: [{ id: "minified", sourceDigest: "large", excerpt: "x".repeat(3000) },
+      { id: "oversized-blank", sourceDigest: "blank-large", excerpt: " ".repeat(3000) },
+      { id: "contract", sourceDigest: "small", excerpt: "The relevant contract\n" }],
+    maximumBytes: 5000, optionalExcerptBytes: 2048 },
+  { async decide(): Promise<never> { throw new Error("offline"); } });
+  assert.deepEqual(packet.entries.map(entry => entry.id), ["rules", "contract"]);
+  assert.deepEqual(packet.omitted, ["minified", "oversized-blank"]);
+  assert.equal(packet.omissionReasons.minified, "excerpt-unrepresentable");
+  assert.equal(packet.omissionReasons["oversized-blank"], "excerpt-unrepresentable");
+  assert.ok(packet.bytes <= 5000);
+});
+test("a nonblank source with no informative whole-line excerpt is omitted", async () => {
+  const packet = await buildContextPacket({ taskRevision: "hidden-content", purpose: "find bug",
+    required: [], maximumBytes: 5000, optionalExcerptBytes: 2048,
+    optional: [{ id: "hidden", sourceDigest: "full", excerpt: "\n".repeat(2100) + "x".repeat(3000) }] },
+  { async decide(): Promise<never> { throw new Error("No assessable evidence"); } });
+  assert.deepEqual(packet.entries, []);
+  assert.deepEqual(packet.omitted, ["hidden"]);
+  assert.equal(packet.omissionReasons.hidden, "excerpt-unrepresentable");
+});
+test("undeliverable and blank sources do not suppress legacy advice for useful evidence", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "context-packet-legacy-"));
+  let calls = 0;
+  try {
+    const provider = new JevDecisionAdapter({ ...DEFAULT_DECISIONS, mode: "auto",
+      allowedQuestions: ["rank_optional_context"], allowedDataClasses: ["source"],
+      allowedSourcePaths: ["single-line", "blank", "good"] }, join(directory, "health"), {
+      scope: { workspace: directory, taskId: "task", taskRevision: "1" }, token: "fixture",
+      fetch: async () => {
+        calls++;
+        return new Response(JSON.stringify({ model: DEFAULT_DECISIONS.model,
+          answers: { suggestion: { type: "choice", choice: "good", confidence: 0.9,
+            probabilities: { good: 0.9, unknown: 0.1 } } },
+          usage: { input_tokens: 20, output_tokens: 2 } }));
+      },
+    });
+    const packet = await buildContextPacket({ taskRevision: "1", purpose: "find useful source",
+      required: [], maximumBytes: 5000, optionalExcerptBytes: 2048,
+      optional: [{ id: "single-line", sourceDigest: "long", excerpt: "x".repeat(3000) },
+        { id: "blank", sourceDigest: "blank", excerpt: "  \n" },
+        { id: "good", sourceDigest: "good", excerpt: "Useful source for the task\n" }] }, provider);
+    assert.equal(calls, 1);
+    assert.equal(packet.decision?.method, "jev");
+    assert.deepEqual(packet.entries.map(entry => entry.id), ["good", "blank"]);
+    assert.deepEqual(packet.omitted, ["single-line"]);
+    assert.equal(packet.omissionReasons["single-line"], "excerpt-unrepresentable");
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
 test("provider failure retains baseline and required context cannot be truncated", async () => {
   const provider = { decide: async (): Promise<never> => { throw new Error("unavailable"); } };
   const input = { taskRevision: "1", purpose: "find bug", required: [candidate("rules")], optional: [candidate("a")], maximumBytes: 1000 };

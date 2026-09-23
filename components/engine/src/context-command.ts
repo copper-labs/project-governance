@@ -87,7 +87,8 @@ export async function contextCommand(args: string[], root: string, suppliedProvi
   durableJson(join(stateRoot, "receipts", `${receiptId}.json`), {
     version: 1, receiptId, workspace: canonicalRoot, createdAt: new Date().toISOString(), inputDigest: packet.inputDigest,
     taskRevision: packet.taskRevision, sources: [...required, ...optional].map(({ id, sourceDigest }) => ({ id, sourceDigest })),
-    selected: packet.entries.map(entry => entry.id), omitted: packet.omitted, decision: packet.decision,
+    selected: packet.entries.map(entry => entry.id), omitted: packet.omitted,
+    omissionReasons: packet.omissionReasons, decision: packet.decision,
     reason: packet.reason, measurement: packet.measurement,
     discovery,
     outcome: staleSources.length ? "refused-stale-source" : "delivered", staleSources,

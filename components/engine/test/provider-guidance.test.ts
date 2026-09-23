@@ -18,7 +18,14 @@ test("compiled host entries install one thin route to the canonical packaged pro
     assert.equal(installHostInstructions(root, COMPILED_HOST_BLOCK).state, "installed");
     for (const name of ["AGENTS.md", "CLAUDE.md", "GEMINI.md"]) {
       const content = readFileSync(join(root, name), "utf8");
-      assert.ok(content.includes("project-governance provider-help"));
+      assert.ok(content.includes("fixed host model by default"));
+      assert.ok(content.includes("JEV advice does not authorize delegation"));
+      const launcher = content.indexOf(".governance/runtime/bin/project-governance");
+      assert.ok(launcher >= 0 && launcher < content.indexOf("When delegation is authorized"),
+        "Normal task entry names the pinned runtime before delegation guidance");
+      assert.ok(content.includes("runtime's `provider-help`"));
+      assert.ok(content.includes("At top-level development task entry"));
+      assert.ok(content.includes("Before task-specific source or documentation reads"));
       assert.ok(content.includes("required test-execution guidance"));
       assert.equal(content.includes("bin/harness-agent"), false);
     }

@@ -137,9 +137,16 @@ automatic reassignment. A configured baseline may differ by provider, but task d
 change it. The running parent retains its host settings; RC4 cannot switch a native conversation
 through a control the host does not expose.
 
+The ordinary task uses one coding agent on its fixed host model. Category advice does not initiate
+delegation. A second model or subagent is used only for an operator-requested assignment or an
+existing project-owned required review. The optional governed provider path controls such covered
+assignments; a top-level host with unrestricted native tools needs its own qualified tool controls
+before we can claim that unrequested delegation is blocked.
+
 ### Required governed delegation and feature exposure
 
-The selected RC4 pilot requires the governed submission path for agent-initiated model work.
+When the selected RC4 pilot delegates, it requires the governed submission path for agent-initiated
+model work. The pilot does not require delegation on every task.
 This requirement is independent of DL08's mode: with routing off the same path dispatches the fixed
 baseline; with routing on it runs selection or records an allowed fallback. An agent cannot choose
 another CLI, native subagent tool, helper, provider API or nested worker merely to bypass that path.

@@ -31,7 +31,8 @@ test("deadline covers response streaming and stalled cancellation cleanup", { ti
   const { client, path } = fixture(t, async () => new Response(new ReadableStream({
     pull: () => new Promise(() => {}), cancel: () => new Promise(() => {}),
   })));
-  const result = await client.ask("{}", 20);
+  // Parallel suites can consume the first few milliseconds before fetch reaches the body.
+  const result = await client.ask("{}", 500);
   assert.equal(result.ok, false);
   if (!result.ok) { assert.equal(result.reason, "deadline"); assert.equal(result.failureStage, "response-body"); }
   assert.equal(existsSync(`${path}.lock`), false);

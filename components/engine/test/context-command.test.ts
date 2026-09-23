@@ -19,6 +19,15 @@ test("context command captures source and stores a source-free receipt outside t
     const receipt = readFileSync(join(contextStateRoot(directory), "receipts", `${packet.receiptId}.json`), "utf8");
     assert.ok(!receipt.includes("uniquePrivateSourceText"));
     assert.ok(receipt.includes(packet.entries[1]!.sourceDigest));
+    writeFileSync(join(directory, "single.ts"), "x".repeat(3000));
+    const bounded = await contextCommand(["--purpose", "find bug", "--revision", "task-2",
+      "--optional-path", "single.ts", "--optional-excerpt-bytes", "256",
+      "--maximum-bytes", "5000"], directory);
+    assert.deepEqual(bounded.omitted, ["single.ts"]);
+    assert.equal(bounded.omissionReasons["single.ts"], "excerpt-unrepresentable");
+    const boundedReceipt = JSON.parse(readFileSync(join(contextStateRoot(directory), "receipts",
+      `${bounded.receiptId}.json`), "utf8"));
+    assert.equal(boundedReceipt.omissionReasons["single.ts"], "excerpt-unrepresentable");
     symlinkSync(join(directory, "source.ts"), join(directory, "alias.ts"));
     await assert.rejects(contextCommand(["--purpose", "find bug", "--revision", "1", "--optional-path", "alias.ts"], directory));
   } finally {

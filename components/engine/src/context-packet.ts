@@ -23,14 +23,20 @@ export async function buildContextPacket(input: ContextPacketRequest, provider: 
   if (input.optionalExcerptBytes !== undefined && (!Number.isSafeInteger(input.optionalExcerptBytes) || input.optionalExcerptBytes < 128 || input.optionalExcerptBytes > 65536)) throw new Error("Optional excerpt budget must be 128 to 65536 bytes");
   const optional = input.optionalExcerptBytes === undefined ? input.optional
     : input.optional.map(candidate => contextExcerpt(candidate, input.purpose, input.optionalExcerptBytes!));
+  const unrepresentable = new Set(input.optionalExcerptBytes === undefined ? [] : optional
+    .filter((candidate, index) => Buffer.byteLength(candidate.excerpt) > input.optionalExcerptBytes! ||
+      (!candidate.excerpt.trim() && Boolean(input.optional[index]!.excerpt.trim())))
+    .map(candidate => candidate.id));
+  const empty = new Set(input.optional.filter(candidate => !candidate.excerpt.trim()).map(candidate => candidate.id));
   const request: DecisionRequest = { version: 1, kind: "rank_optional_context", taskRevision: input.taskRevision,
     // Each adapter bounds its own wire evidence. Delivery excerpts must not prevent a smaller
     // classifier excerpt from being selected from the original captured source.
-    purpose: input.purpose, candidates: input.optional, dataClass: "source" };
+    purpose: input.purpose, candidates: input.optional.filter(candidate =>
+      !unrepresentable.has(candidate.id) && !empty.has(candidate.id)), dataClass: "source" };
   let decision: DecisionResult | null = null;
-  let reason = "provider-unavailable";
+  let reason = request.candidates.length ? "provider-unavailable" : "no-assessable-candidates";
   let order = lexicalContextOrder(request);
-  try {
+  if (request.candidates.length) try {
     if (options.signal?.aborted) { reason = "cancelled"; throw new Error("Context advice cancelled"); }
     const result = structuredClone(await provider.decide(structuredClone(request), options));
     if (result.version !== 1 || result.kind !== request.kind || result.inputDigest !== digest(request) ||
@@ -42,14 +48,20 @@ export async function buildContextPacket(input: ContextPacketRequest, provider: 
     }
     decision = result; order = [...result.delivered]; reason = result.reason;
   } catch { /* Optional advice failure preserves the same lexical baseline as disabled assistance. */ }
-  const selected = [...input.required], omitted: string[] = [];
-  for (const id of order) {
+  const selected = [...input.required], omitted = input.optional
+    .filter(candidate => unrepresentable.has(candidate.id))
+    .map(candidate => candidate.id);
+  const omissionReasons: Record<string, "excerpt-unrepresentable" | "packet-budget"> = {};
+  for (const id of omitted) omissionReasons[id] = "excerpt-unrepresentable";
+  const deliveryOrder = [...order, ...input.optional.filter(candidate =>
+    empty.has(candidate.id) && !unrepresentable.has(candidate.id)).map(candidate => candidate.id)];
+  for (const id of deliveryOrder) {
     const candidate = optional.find(entry => entry.id === id)!;
     if (bytes([...selected, candidate]) <= input.maximumBytes) selected.push(candidate);
-    else omitted.push(id);
+    else { omitted.push(id); omissionReasons[id] = "packet-budget"; }
   }
   return { version: 1 as const, taskRevision: input.taskRevision, inputDigest: digest(input),
-    entries: selected, omitted, bytes: bytes(selected), decision, reason,
+    entries: selected, omitted, omissionReasons, bytes: bytes(selected), decision, reason,
     measurement: { excerpts: selected.filter(entry => entry.sourceRange).map(entry => ({ id: entry.id, sourceDigest: entry.sourceDigest, ...entry.sourceRange! })), availableOptionalBytes: bytes(input.optional), deliveredBytes: bytes(selected),
       tokenSavings: null, benefit: "not-evaluated" as const } };
 }

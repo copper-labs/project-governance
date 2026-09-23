@@ -56,7 +56,8 @@ export async function contextAdvice(runtime: DecisionRuntime, candidates: Candid
   const eligible = baseline.filter(id => matchesPackPath(id, runtime.settings.legacy.allowedSourcePaths ?? []));
   if (!eligible.length) return { ...base, reason: "source-scope-disabled", coverage: { ...base.coverage,
     omitted: baseline, limits: ["No optional candidate is approved for classifier disclosure; lexical delivery remains available."] } };
-  const count = Math.min(eligible.length, runtime.settings.legacy.maxCandidates, Math.floor(available / 128));
+  // The decision schema admits 64 evidence items including the purpose.
+  const count = Math.min(eligible.length, runtime.settings.legacy.maxCandidates, 63, Math.floor(available / 128));
   if (!count) return { ...base, reason: "input-budget", coverage: { ...base.coverage, omitted: baseline,
     limits: ["evidence budget cannot fit purpose and one minimum-size excerpt"], truncated: true } };
   const selected = eligible.slice(0, count).map(id => candidates.find(candidate => candidate.id === id)!);

@@ -61,6 +61,7 @@ export async function evaluateContext(cases: ContextEvaluationCase[], provider: 
     const available = new Set(entry.request.optional.map(item => item.id));
     const omittedCandidates = entry.usefulOptionalIds.filter(id => !available.has(id));
     const oversizedUsefulCandidates = entry.usefulOptionalIds.filter(id => {
+      if (reference.omissionReasons[id] === "excerpt-unrepresentable") return true;
       const candidate = entry.request.optional.find(candidate => candidate.id === id);
       const delivered = candidate && entry.request.optionalExcerptBytes !== undefined ? contextExcerpt(candidate, entry.request.purpose, entry.request.optionalExcerptBytes) : candidate;
       return delivered !== undefined && Buffer.byteLength(canonical([...entry.request.required, delivered])) > entry.request.maximumBytes;

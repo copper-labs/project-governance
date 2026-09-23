@@ -10,11 +10,18 @@ export function contextExcerpt(candidate: Candidate, purpose: string, maximumByt
   const terms = [...new Set(purpose.toLowerCase().match(/[\p{L}\p{N}_]{3,}/gu) ?? [])];
   const sizes = lines.map(line => Buffer.byteLength(line));
   const scores = lines.map(line => terms.reduce((sum, term) => sum + Number(line.toLowerCase().includes(term)), 0));
-  let start = 0, bytes = 0, score = 0, bestStart = 0, bestEnd = 0, bestScore = -1, bestBytes = -1;
+  const informative = lines.map(line => Number(Boolean(line.trim())));
+  let start = 0, bytes = 0, score = 0, contentLines = 0;
+  let bestStart = 0, bestEnd = 0, bestScore = -1, bestContentLines = -1, bestBytes = -1;
   for (let end = 0; end < lines.length; end++) {
-    bytes += sizes[end]!; score += scores[end]!;
-    while (bytes > maximumBytes && start <= end) { bytes -= sizes[start]!; score -= scores[start]!; start++; }
-    if (start <= end && (score > bestScore || (score === bestScore && bytes > bestBytes))) { bestScore = score; bestBytes = bytes; bestStart = start; bestEnd = end + 1; }
+    bytes += sizes[end]!; score += scores[end]!; contentLines += informative[end]!;
+    while (bytes > maximumBytes && start <= end) {
+      bytes -= sizes[start]!; score -= scores[start]!; contentLines -= informative[start]!; start++;
+    }
+    if (start <= end && (score > bestScore || (score === bestScore &&
+      (contentLines > bestContentLines || (contentLines === bestContentLines && bytes > bestBytes))))) {
+      bestScore = score; bestContentLines = contentLines; bestBytes = bytes; bestStart = start; bestEnd = end + 1;
+    }
   }
   // A single oversized line cannot be represented faithfully as a whole-line excerpt.
   if (!bestEnd) return candidate;

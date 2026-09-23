@@ -72,6 +72,18 @@ values remain supported and must agree with a bound decision identity. An explic
 can narrow the retrieval query without changing the stored requirement used by task advice. A check's
 `--decision-purpose` adds focus to the bound requirement; it never replaces it or invalidates the check.
 
+The compiled runtime owns one short managed block in each supported host instruction file. It tells
+the top-level development agent to bind once and route before task-specific source or documentation
+reads, then expand from original references when the packet is incomplete. Host files retain their
+authored project policy outside that block; they must not duplicate the route table or force a broad
+index read before routing. A provider-specific wrapper may point to the shared block, but cannot
+silently make a separate task-entry rule. This instruction is guidance, not proof of execution.
+The ordinary development path keeps the current coding agent and fixed host model. Delegation is
+exceptional: an operator request or an existing project-owned required review must call for it.
+JEV context or category advice cannot itself create a child agent or authorize a second model.
+Governed provider admission controls covered submissions; unrestricted host-native delegation remains
+outside that claim until the adopter configures and qualifies its host controls.
+
 1. Capture one validation subject, including non-ignored new files in worktree mode. Staged requests
    see only the index and its base. Never import unstaged drafts into a staged result.
 2. Route from explicit relevant paths, otherwise task scope, otherwise the existing changed-path
@@ -85,14 +97,21 @@ can narrow the retrieval query without changing the stored requirement used by t
    Overlapping paths declare joint owners, so an adopter must not model mutually exclusive alternatives
    with overlapping required path rules.
 4. Query captured paths under the specific task scopes; exact files need no repository-wide inventory.
-   Preserve all matching paths for required route/skill applicability. Prioritize in-scope changed files,
-   exact files, then alphabetical paths. Inspect at most 256 paths and seed at most 32, bounded further
-   by the configured candidate limit. Reuse metadata discovery for related documents, manifests and
-   tests. This prefix is a cheap filter, not a semantic guarantee; omitted counts and unavailable inventory
+   Preserve all matching paths for required route/skill applicability. Rank optional path metadata
+   before the source-inspection cap: exact files first, then changed paths, then paths whose names
+   match task terms, then the prior inventory order. Term overlap is a cheap path-only prefilter;
+   the existing lexical source ranking and JEV advice still work on captured content. Record bounded
+   per-path match counts, priority flags and admission dispositions, without copying task prose.
+   The 128-path preview reserves room for the leading ranked paths, all seeded paths and related
+   discoveries; full inventory counts remain available when a large scope exceeds the preview.
+   Inspect at most 256 source paths and seed at most 32,
+   bounded further by the configured candidate limit. Reuse metadata discovery for related documents,
+   manifests and tests. This prefix is a cheap filter, not a semantic guarantee; omitted counts and unavailable inventory
    or discovery remain visible. An inventory failure retains scope references but blocks required-context
    readiness with `context-inventory-unavailable`; directory owners cannot be inferred safely without it.
    A prospective path can match an owner before the file exists; a route match is not source-existence
-   proof. Explicit discovery remains in the receipt's `discovery`; automatic discovery is under
+   proof. If changed files fill the candidate cap, an unchanged task-named file can still be missed;
+   narrow the task scope or name an exact file when that happens. Explicit discovery remains in the receipt's `discovery`; automatic discovery is under
    `selection.automatic.discovery`.
 5. Automatic candidates are limited to approved source patterns and ordinary text sources. Exclude
    required files, duplicates, unsafe paths and unavailable/oversized/binary candidates before calling
@@ -100,16 +119,39 @@ can narrow the retrieval query without changing the stored requirement used by t
    validation and existing sharing fallback; automatic discovery cannot broaden sharing permission.
    Explicitly scoped ordinary task files remain available in the deterministic packet even when
    classifier sharing is off. Manually supplied optional flags take priority, then scoped files, then
-   automatic additions within the 64-input bound. Unreadable task-derived files produce recorded
-   exclusions; malformed manually supplied optional files remain input errors. Path length, sharing
-   exclusion and source availability have distinct reasons.
+   automatic additions within the 64-input bound. The legacy classifier assesses at most the first
+   `min(max_candidates, 63)` approved files in that order, reserving one evidence slot for the task
+   purpose; expanded DL03 observes the same evidence-item ceiling. All other files keep their
+   deterministic delivery slots. The legacy decision receipt records which candidate IDs were not
+   assessed because of sharing scope, count limit or an unrepresentable excerpt, and the provider
+   sees the omitted count. Unreadable task-derived files produce recorded exclusions; malformed
+   manually supplied optional files remain input errors. Path length, sharing exclusion and source
+   availability have distinct reasons.
 6. Use existing excerpt selection and DL03 with configured limits, deadline, health and per-task
    budgets. No credential, low confidence, budget exhaustion or provider error uses the deterministic
    packet. Missing required context never calls JEV. Original references, digests and excerpt ranges
    remain available. Classifier excerpts and delivered excerpts are separately bounded from the original
-   captured source; a smaller classification allowance cannot invalidate an already clipped delivery
-   excerpt. Revalidate every captured candidate, including those omitted, before delivery.
-   Lexical fallback also ranks original captured text, independently of the delivery excerpt size.
+   captured source. The task-bound `context-route` entry applies a 2 KiB default delivery excerpt
+   limit to every optional file, whether named, task-declared or discovered; an explicit byte limit
+   may override it up to 64 KiB. This changes `context-route` delivery for previously named large
+   optional files; `selection.optionalClippedPaths` identifies delivered excerpts in the packet and
+   receipt. Whole-line excerpts prefer nonblank content on equal task relevance.
+   A single line that cannot fit, or a nonblank file with no informative whole-line excerpt, is
+   omitted with a visible reason.
+   Operators needing a full large file can follow its original reference or use the separate
+   explicit `context` command, whose default whole-file delivery is unchanged. A smaller
+   classification allowance cannot invalidate an already clipped delivery excerpt. Revalidate every
+   captured candidate, including those omitted, before delivery.
+   Lexical fallback ranks the original captured text of assessable candidates, independently of the
+   delivery excerpt size. Blank optional files can still be delivered but do not enter model advice.
+   Unrepresentable sources do not enter the optional ranking request, so one cannot suppress advice
+   for other candidates. A candidate whose whole lines cannot fit the classifier allowance also drops
+   out of model advice without suppressing its peers. Legacy advice submits only approved source paths
+   and keeps unapproved or classifier-unassessable paths in their lexical delivery slots. Under a tight
+   delivery budget, an earlier unapproved slot can crowd out an approved model pick; record this as a
+   selection limit when evaluating actual tasks rather than silently moving unapproved evidence.
+   An explicitly named path still fails if its source cannot be captured;
+   captured text that cannot be excerpted is omitted with a reason in the returned packet and receipt.
 
 Binding diagnostics distinguish missing session/store/workspace, stale version, non-open task,
 incompatible store schema, requirement/acceptance/scope/path limits and scope outside the workspace.
@@ -123,7 +165,8 @@ alongside provider and delivery status. A task can validly need no optional cand
 ## Exposure and measurement
 
 Route receipts record resolution source/status, task ID/version when available, attempted automatic
-candidate count, exclusions, selected/omitted sources, selection reason and provider receipt. Record
+candidate count, exclusions, selected/omitted sources, provider reason, optional delivery status and
+provider receipt. Record
 an entry exposure linked to the route receipt and decision receipts. Check exposure carries binding
 status; detached results use their captured status. Content stays in existing local source/task
 owners; telemetry carries hashes, identities and reasons, not duplicated task prose or source text.
@@ -132,6 +175,16 @@ Prepared/delivered bytes are observable; whether a model read them, subsequent m
 outcome and total model tokens remain unknown unless the host supplies matching observations. A
 provider call is not a saving. Qualification and installation calls remain separate from ordinary
 accepted development tasks.
+
+Installation doctor compares the owned host block with the executing runtime without editing it or
+interpreting authored prose. The normal installed launcher executes the selected generation. During
+an interrupted activation, a candidate or older direct executable can report host-instruction drift
+against its own block while the registry selects a different generation; the lock/selection findings
+must be considered with that verdict. Decision doctor reports configuration eligibility. Neither can
+establish that a top-level agent actually routed first. Compare ordinary task-binding, route and check receipts;
+mark missing route evidence as unknown use, not a successful JEV exposure. A future native host-entry
+adapter may deliver the route packet before the agent's first task read, but it must reuse the same
+task, route and receipt owners rather than infer a task from a hook or add another router.
 
 ## Adopter correction and rollout
 
@@ -156,7 +209,13 @@ qualification separately. Remote publication and host task acceptance retain the
 - Capture: new drafts appear only in the appropriate worktree subject; stale/unsafe/binary/oversized
   sources and undeclared sharing are rejected or visibly omitted before model transmission.
 - Selection: active fake-provider ordering reaches the returned packet; provider-free, uncertainty,
-  deadline and budget fallbacks preserve required evidence and original references. No live model is
-  necessary to prove this contract.
+  deadline and budget fallbacks preserve required evidence and original references. Large explicit
+  inputs remain deliverable as bounded excerpts. A broad scope can admit a task-named late path before
+  the candidate cap. Contract tests use a fake provider; bounded live-provider trials separately
+  establish actual transport, assessed coverage and delivered source references without claiming
+  accepted-work or token savings.
 - One integrated engine/continuity/typecheck and installed-package checkpoint after the coherent
   hook/selection batch, followed by Opus 5 extra-high architecture review and reconciliation.
+- Host entries: installation preserves authored text while updating the one managed block; doctor
+  detects a missing/stale block without writing; a conforming block still does not count as observed
+  ordinary-task use.

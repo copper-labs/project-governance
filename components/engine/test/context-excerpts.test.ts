@@ -36,3 +36,11 @@ test("explicit excerpt delivery fits oversized optional context without truncati
   assert.ok(packet.bytes <= input.maximumBytes);
   await assert.rejects(buildContextPacket({ ...input, optional: [], optionalExcerptBytes: 0 }, provider), /excerpt budget/);
 });
+
+test("excerpt windows favor actual source content over leading whitespace", () => {
+  const source = { id: "notes.md", sourceDigest: "whole", excerpt: "\n".repeat(2100) + "The retry budget is 30 seconds.\n" };
+  const excerpt = contextExcerpt(source, "find bug", 2048);
+  assert.ok(excerpt.excerpt.includes("The retry budget is 30 seconds."));
+  assert.ok(excerpt.excerpt.trim());
+  assert.ok(Buffer.byteLength(excerpt.excerpt) <= 2048);
+});

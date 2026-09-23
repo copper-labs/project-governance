@@ -16,6 +16,7 @@ import { runtimeCompletionCommand } from "../src/runtime-completion-command.ts";
 import { hostInstructionBackupScope } from "../src/host-instruction-backup.ts";
 import { completeHostInstructionTransition, requireHostInstructionCompletion } from "../src/host-instruction-transition.ts";
 import { COMPILED_HOST_BLOCK } from "../src/provider-guidance.ts";
+import { installHostInstructions } from "../src/host-instruction-installation.ts";
 import { DatabaseSync } from "node:sqlite";
 import { providerRuntime } from "../src/provider-runtime.ts";
 import { forwardRepairRuntime } from "../src/runtime-forward-repair.ts";
@@ -286,6 +287,8 @@ test("inactive installation verifies identity and preserves a failed-generation 
         assert.equal(finalized.state.maintenance, null);
         execFileSync("git", ["init", "-q"], { cwd: root });
         installGitHooks(root, { configure: true });
+        assert.ok(runtimeDoctor(root, registryPath).findings.some(finding => finding.id === "installation.host-instructions-drift"));
+        installHostInstructions(root, COMPILED_HOST_BLOCK);
         assert.equal(runtimeDoctor(root, registryPath).status, "passed");
         const verifiedLauncher = readFileSync(launcher, "utf8");
         writeFileSync(launcher, "changed launcher");
@@ -345,6 +348,7 @@ test("inactive installation verifies identity and preserves a failed-generation 
         const retained = new DatabaseSync(taskPath, { readOnly: true });
         try { assert.equal(retained.prepare("SELECT value FROM evidence").get()?.value, "new task evidence"); } finally { retained.close(); }
         writeFileSync(join(root, "AGENTS.md"), "Keep this authored instruction.\n", { mode: 0o640 });
+        chmodSync(join(root, "AGENTS.md"), 0o640);
         const hostScope = hostInstructionBackupScope(root, COMPILED_HOST_BLOCK);
         const hostMaintenance = reopened.beginMaintenance("host-migration", reopened.state().revision);
         const hostBackup = join(root, "host-backup"), hostInputs = [...inputs, ...hostScope.inputs];
