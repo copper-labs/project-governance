@@ -158,7 +158,8 @@ test("long sessions bind the newest prompt and duplicate index pointers do not l
     await promptContext("codex", f.event, f.root, { environment: {}, assetRoot: assets });
     const id = f.entryId(), entry = readPromptEntry(f.root, id), earlier = Date.parse(String(entry.submittedAt)) - 1000;
     for (let i = 0; i < 160; i++) turnMarker(f, { entryId: digest(i).slice(7), turn: `older-${i}`, submittedAt: new Date(earlier - i).toISOString() });
-    assert.equal(f.run("task", "create", "--outcome", "Latest intent").contextEntry.entryId, id);
+    const binding = f.run("task", "create", "--outcome", "Latest intent").contextEntry;
+    assert.equal(binding.entryId, id, JSON.stringify(binding));
     // Older runtime pointers can coexist with the timestamped pointer for this exact entry.
     const directory = join(contextStateRoot(f.root), "prompt-session-index", digest(f.event.session_id).slice(7));
     writeFileSync(join(directory, `${digest(f.event.turn_id).slice(7)}-${id}.json`), JSON.stringify({ entryId: id }));

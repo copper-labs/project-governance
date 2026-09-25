@@ -56,7 +56,7 @@ export function latestSessionPrompt(workspace: string, session: string) {
     const turns: Array<{ time: number; entryId: string; turn: string }> = [];
     const started = Date.now(); let count = 0;
     for (let file = handle.readSync(); file; file = handle.readSync()) {
-      if (++count > 10000 || Date.now() - started > 100) return { reason: "session-entry-scan-incomplete" };
+      if (++count > 10000 || Date.now() - started > 1000) return { reason: "session-entry-scan-incomplete" };
       if (!/^[a-f0-9]{64}\.json$/u.test(file.name)) continue;
       if (lstatSync(join(directory, file.name)).size > 4096) return { reason: "session-entry-scan-incomplete" };
       const marker = read(directory, file.name), time = Date.parse(String(marker.submittedAt));
