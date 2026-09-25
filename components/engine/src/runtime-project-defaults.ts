@@ -8,7 +8,7 @@ import { RuntimeGenerations } from "./runtime-generations.ts";
 import { GIT_HOOKS, gitHookLauncher } from "./git-hooks.ts";
 
 export const PROJECT_DEFAULTS: Record<string,string> = {
-  "config/governance/profile.yaml":"schema_version: 1\nproject_extensions: []\n",
+  "config/governance/profile.yaml":"schema_version: 1\nproject_extensions: []\ncontext_router:\n  default_route: project\n  routes:\n    - id: project\n      token_budget:\n        primary_context_tokens: 1500\n        active_plan_context_tokens: 500\n        expansion_context_tokens: 1500\n        total_context_tokens: 3500\n",
   "config/governance/facts.lock.yaml":"schema_version: 1\nfacts: {}\n",
   ".governance/.gitignore":"*\n!.gitignore\n",
   ...Object.fromEntries(GIT_HOOKS.map(hook=>[`.githooks/${hook}`,gitHookLauncher(hook)])),

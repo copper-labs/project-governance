@@ -9,7 +9,7 @@ test("explicit startup installation preserves authored hooks, mode and repeat by
  const root=realpathSync(mkdtempSync(join(tmpdir(),"startup-install-")));
  try{
   mkdirSync(join(root,".codex"));
-  const path=join(root,".codex/hooks.json"),receipts=join(root,"receipts.sqlite"),scope={workspace:root,registry:join(root,"registry.sqlite")};
+  const path=join(root,".codex/hooks.json"),scope={workspace:root,registry:join(root,"registry.sqlite")},receipts=join(root,"startup.sqlite");
   const original={hooks:{SessionStart:[{hooks:[{type:"command",command:"authored",timeout:2}]}]},custom:true};
   writeFileSync(path,JSON.stringify(original),{mode:0o640});
   const result=await startupCommand(["install-hooks","--receipts",receipts],scope) as {changed:boolean;updatePolicyChanged:boolean};
@@ -26,7 +26,7 @@ test("startup installation refuses legacy and redirected configuration without r
  const root=realpathSync(mkdtempSync(join(tmpdir(),"startup-install-refuse-")));
  try{
   mkdirSync(join(root,".codex"));
-  const path=join(root,".codex/hooks.json"),scope={workspace:root,registry:join(root,"registry.sqlite")},args=["install-hooks","--receipts",join(root,"receipts.sqlite")];
+  const path=join(root,".codex/hooks.json"),scope={workspace:root,registry:join(root,"registry.sqlite")},args=["install-hooks","--receipts",join(root,"startup.sqlite")];
   const bytes=JSON.stringify({hooks:{SessionStart:[{hooks:[{command:"python governance-startup.py"}]}]}});
   writeFileSync(path,bytes);
   await assert.rejects(startupCommand(args,scope),/Legacy/);assert.equal(readFileSync(path,"utf8"),bytes);

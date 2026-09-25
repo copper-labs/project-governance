@@ -158,6 +158,17 @@ projection. Required failures, status, cleanup and original artifact references 
 `plan --compare-run <id>` compares advice with existing matching native results without executing
 extra checks. Smaller delivery is an observation, not evidence of accepted-work savings.
 
+## Documentation as work progresses
+
+For changed behavior, update its canonical purpose, public contract and important constraints.
+Prefer one useful module overview with links to code, tests and guides over duplicated file boilerplate.
+Use the existing comments and documentation packs; new declarations are enforced only where the
+installed analyzer supports them. Context doctor reports the actual configured adapter coverage.
+Backfill older gaps when the area is touched or repeated context expansions show a missing explanation.
+Its observed overview gaps carry source digests and need current-source and module-guide review;
+symbol names and a heading alone do not establish a useful explanation. Do not bulk-generate a second
+prose version of the repository or block unrelated work on untouched legacy debt.
+
 ## Generic workflow command recovery
 
 For a workflow stage command with lost supervision, use the managed runtime's

@@ -39,7 +39,7 @@ export interface EpisodeCapture {
 
 export interface EntryCapture {
   id: string; scope: BudgetScope | null;
-  caller: string; entryKind: "check-plan" | "check-output" | "check-completion" | "provider-submit" | "provider-completion" | "context-delivery";
+  caller: string; entryKind: "check-plan" | "check-output" | "check-completion" | "provider-submit" | "provider-completion" | "context-delivery" | "prompt-delivery";
   native: Record<string, unknown>; exposure: Record<string, unknown>; decisions: string[];
 }
 

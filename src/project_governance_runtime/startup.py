@@ -134,7 +134,7 @@ def _register_and_discover(root: Path, provider: str, event: dict, task_id: str)
     receipt["result"] = {**answer, "task_id": task_id}
     write_json(path, receipt)
     if prior or event.get("hook_event_name") != "SessionStart" or event.get("source") != "startup":
-        return receipt["result"]
+        return {**receipt["result"], "discovery_fresh": False} if prior else receipt["result"]
     answer = _discover_for_task(root, event, current)
     receipt["result"] = {**answer, "task_id": task_id}
     write_json(path, receipt)
@@ -166,10 +166,11 @@ def hook_output(event: dict, answer: dict) -> dict:
     if not isinstance(event, dict) or event.get("hook_event_name") not in {"SessionStart", "UserPromptSubmit"}:
         return {}
     task = answer.get("task_id")
-    if task and event["hook_event_name"] == "UserPromptSubmit" and answer["status"] in {"current", "available", "deferred"} and not answer.get("must_wait") and not answer.get("refresh_context"):
-        message = "Governance task reservation is active. This prompt did not check for releases. "
-        message += "At task closeout run project-governance startup finish --task-id " + task + "."
-        return {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": message}}
+    if event["hook_event_name"] == "UserPromptSubmit" and answer["status"] in {"current", "available", "approval-required", "deferred"} and not answer.get("must_wait") and not answer.get("refresh_context"):
+        return {}
+    if event["hook_event_name"] == "SessionStart" and (answer["status"] == "current" or
+            answer.get("discovery_fresh") is False and answer["status"] in {"available", "approval-required"}):
+        return {}
     message = "Governance startup: " + answer["status"] + ". " + answer["reason"] + "."
     if answer["status"] == "available":
         message += (" Before substantial implementation, read .governance/runtime/skills/resources/startup-runtime-updates.md. "

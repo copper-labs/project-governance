@@ -1,4 +1,4 @@
-import {closeSync,fchmodSync,fsyncSync,lstatSync,openSync,readFileSync,realpathSync,renameSync,unlinkSync,writeFileSync} from "node:fs";
+import {closeSync,fchmodSync,fsyncSync,lstatSync,openSync,readFileSync,realpathSync,renameSync,unlinkSync,writeFileSync,mkdirSync,linkSync} from "node:fs";
 import {join,dirname} from "node:path";
 import {randomUUID} from "node:crypto";
 import {digest} from "./core.ts";
@@ -6,6 +6,7 @@ import {inspectRuntimeBackup} from "./runtime-backup-inspection.ts";
 import {narrativeFile} from "./narrative-inputs.ts";
 import {planStartupHookMigration} from "./startup-hook-migration.ts";
 import {RuntimeGenerations} from "./runtime-generations.ts";
+import {startupHooks} from "./startup-hooks.ts";
 
 /** Bind old and intended bytes to the same backup used by runtime activation. */
 export function backedStartupHookTransition(workspace:string,backupDirectory:string,receipts?:string) {
@@ -16,14 +17,23 @@ export function backedStartupHookTransition(workspace:string,backupDirectory:str
   return null;
  }
  if(record.kind==="absent") {
-  if(lstatSync(path,{throwIfNoEntry:false}))throw new Error("Native hooks appeared after backup");
-  return null;
+  const entry=lstatSync(path,{throwIfNoEntry:false});
+  if(!receipts) { if(entry)throw new Error("Native hooks appeared after backup"); return null; }
+  const proposal=startupHooks({},root,receipts),parent=dirname(path),parentEntry=lstatSync(parent,{throwIfNoEntry:false});
+  if(parentEntry && (!parentEntry.isDirectory() || realpathSync(parent)!==parent))throw new Error("Native hook directory changed");
+  if(entry && (!entry.isFile() || entry.nlink!==1 || realpathSync(path)!==path || (entry.mode&0o777)!==0o600 || narrativeFile(root,path)!==proposal.content))
+   throw new Error("Native hooks appeared outside backed transition");
+  const identity={path,original:null,content:proposal.content,mode:0o600,backupDigest:backup.receiptDigest,receipts};
+  return {...identity,planDigest:digest(identity),complete:Boolean(entry)};
  }
  if(record.kind!=="file" || typeof record.file!=="string")throw new Error("Invalid native hook backup");
  const original=readFileSync(join(backup.directory,record.file),"utf8");
- if(!original.includes("governance-startup.py"))return null;
- if(!receipts)throw new Error("Legacy startup hook migration requires an explicit startup receipt store");
- const proposal=planStartupHookMigration(JSON.parse(original),root,receipts);
+ if(!receipts) {
+  if(original.includes("governance-startup.py"))throw new Error("Legacy startup hook migration requires an explicit startup receipt store");
+  return null;
+ }
+ const proposal=original.includes("governance-startup.py") ? planStartupHookMigration(JSON.parse(original),root,receipts)
+  : startupHooks(JSON.parse(original),root,receipts);
  const entry=lstatSync(path),parent=dirname(path);
  if(!entry.isFile() || entry.nlink!==1 || realpathSync(path)!==path || realpathSync(parent)!==parent || (entry.mode&0o777)!==record.mode)
   throw new Error("Native hook path or mode changed since backup");
@@ -42,12 +52,15 @@ export function applyBackedStartupHooks(registry:string,workspace:string,backupD
   if(state.maintenance?.token!==token || state.maintenance.owner!==owner || backup.maintenance.token!==token ||
     backup.maintenance.owner!==owner || state.revision!==backup.revision+1 || !state.directory || state.written || state.readers.length)
    throw new Error("Native hook migration requires owned drained pre-write activation");
+  const parentDirectory=dirname(plan.path);
+  if(!lstatSync(parentDirectory,{throwIfNoEntry:false}))mkdirSync(parentDirectory,{mode:0o700});
+  if(realpathSync(parentDirectory)!==parentDirectory)throw new Error("Native hook directory changed");
   const temporary=`${plan.path}.${randomUUID()}.tmp`,fd=openSync(temporary,"wx",plan.mode as number);
   try {
    try{writeFileSync(fd,plan.content);fchmodSync(fd,plan.mode as number);fsyncSync(fd);}finally{closeSync(fd);}
    const current=backedStartupHookTransition(workspace,backupDirectory,receipts);
    if(!current || current.planDigest!==plan.planDigest || current.complete)throw new Error("Native hook migration changed before replacement");
-   renameSync(temporary,plan.path);
+   if(plan.original===null)linkSync(temporary,plan.path);else renameSync(temporary,plan.path);
    const parent=openSync(dirname(plan.path),"r");try{fsyncSync(parent);}finally{closeSync(parent);}
   }finally{try{unlinkSync(temporary);}catch(error){if((error as NodeJS.ErrnoException).code!=="ENOENT")throw error;}}
   const result=backedStartupHookTransition(workspace,backupDirectory,receipts);

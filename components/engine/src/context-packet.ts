@@ -5,12 +5,14 @@ import type { Candidate, DecisionOptions, DecisionProvider, DecisionRequest, Dec
 
 export interface ContextPacketRequest {
   taskRevision: string; purpose: string; required: Candidate[]; optional: Candidate[]; maximumBytes: number; optionalExcerptBytes?: number;
+  priorityIds?: string[];
+  sourceSpans?: Record<string, Array<{ name: string; start: number; end: number }>>;
 }
 
 /** Ranking can reorder optional evidence; it cannot remove required context or introduce source. */
 export async function buildContextPacket(input: ContextPacketRequest, provider: DecisionProvider, options: DecisionOptions = {}) {
   input = structuredClone(input);
-  text(input.taskRevision, "task revision"); text(input.purpose, "purpose");
+  text(input.taskRevision, "task revision"); text(input.purpose, "purpose", 16000);
   for (const candidate of [...input.required, ...input.optional]) {
     text(candidate.id, "context candidate id", 128); text(candidate.sourceDigest, "context source digest");
     if (typeof candidate.excerpt !== "string") throw new Error("invalid context source text");
@@ -22,7 +24,7 @@ export async function buildContextPacket(input: ContextPacketRequest, provider: 
   if (bytes(input.required) > input.maximumBytes) throw new Error("required context exceeds budget");
   if (input.optionalExcerptBytes !== undefined && (!Number.isSafeInteger(input.optionalExcerptBytes) || input.optionalExcerptBytes < 128 || input.optionalExcerptBytes > 65536)) throw new Error("Optional excerpt budget must be 128 to 65536 bytes");
   const optional = input.optionalExcerptBytes === undefined ? input.optional
-    : input.optional.map(candidate => contextExcerpt(candidate, input.purpose, input.optionalExcerptBytes!));
+    : input.optional.map(candidate => contextExcerpt(candidate, input.purpose, input.optionalExcerptBytes!, input.sourceSpans?.[candidate.id]));
   const unrepresentable = new Set(input.optionalExcerptBytes === undefined ? [] : optional
     .filter((candidate, index) => Buffer.byteLength(candidate.excerpt) > input.optionalExcerptBytes! ||
       (!candidate.excerpt.trim() && Boolean(input.optional[index]!.excerpt.trim())))
@@ -48,6 +50,10 @@ export async function buildContextPacket(input: ContextPacketRequest, provider: 
     }
     decision = result; order = [...result.delivered]; reason = result.reason;
   } catch { /* Optional advice failure preserves the same lexical baseline as disabled assistance. */ }
+  if (input.priorityIds) {
+    if (!Array.isArray(input.priorityIds) || input.priorityIds.length > 128 || input.priorityIds.some(id => !ids.includes(id))) throw new Error("Invalid context priority paths");
+    order = [...new Set([...input.priorityIds.filter(id => order.includes(id)), ...order])];
+  }
   const selected = [...input.required], omitted = input.optional
     .filter(candidate => unrepresentable.has(candidate.id))
     .map(candidate => candidate.id);

@@ -16,7 +16,7 @@ export interface DecisionRequest {
 }
 export interface DecisionConfig {
   mode: "off" | "auto" | "shadow"; revision: string; model: string;
-  allowedQuestions: DecisionKind[]; allowedDataClasses: DecisionRequest["dataClass"][];
+  allowedQuestions: DecisionKind[]; allowedDataClasses: Array<DecisionRequest["dataClass"] | "metadata">;
   deadlineMs: number; evidenceBytes: number; maxCandidates: number; minimumConfidence: number;
   allowedSourcePaths?: string[];
 }
@@ -43,7 +43,7 @@ export function validateDecisionConfig(config: DecisionConfig): void {
   text(config.revision, "decision configuration revision", 128);
   if (!["off", "auto", "shadow"].includes(config.mode) || typeof config.model !== "string" || !/^jev-\d+\.\d+\.\d+$/.test(config.model)) throw new Error("invalid decision mode/revision/pinned model");
   if (!Array.isArray(config.allowedQuestions) || config.allowedQuestions.some(q => !KINDS.includes(q))) throw new Error("unsupported decision question");
-  if (!Array.isArray(config.allowedDataClasses) || config.allowedDataClasses.some(c => !["source", "diagnostic", "synthetic"].includes(c))) throw new Error("unsupported decision data class");
+  if (!Array.isArray(config.allowedDataClasses) || config.allowedDataClasses.some(c => !["source", "diagnostic", "synthetic", "metadata"].includes(c))) throw new Error("unsupported decision data class");
   if (config.allowedSourcePaths !== undefined && (!Array.isArray(config.allowedSourcePaths) || config.allowedSourcePaths.some(path =>
     typeof path !== "string" || !path || path.startsWith("/") || path.includes("\\") || path.includes("\0") || path.split("/").some(part => part === ".." || part === ".")))) throw new Error("invalid decision source scope");
   if (!Number.isInteger(config.deadlineMs) || config.deadlineMs < 1 || config.deadlineMs > 30_000 ||

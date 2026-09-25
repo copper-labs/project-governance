@@ -44,9 +44,9 @@ test("routed materialization blocks missing required content and keeps optional 
   assert.ok(packet.blockers.includes("skill-catalog-not-supplied"));
 });
 
-test("context routes retain fnmatch semantics for a leading recursive segment", () => {
+test("context routes share pack matcher semantics for a leading recursive segment", () => {
   const router = { routes: [{ id: "nested", match: { path_globs: ["**/code.ts"] } }] };
-  assert.equal(routeContext(router, "fix", ["code.ts"]).outcome, "fallback");
+  assert.equal(routeContext(router, "fix", ["code.ts"]).outcome, "matched");
   assert.equal(routeContext(router, "fix", ["src/code.ts"]).outcome, "matched");
 });
 

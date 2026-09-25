@@ -1,10 +1,11 @@
-import { glob } from "./planning.ts";
+import { matchesPackPath } from "./planning.ts";
+import { localContextPath } from "./context-path-policy.ts";
 import { discoverContext } from "./context-discovery.ts";
 import type { ValidationSubject } from "./change-subject.ts";
 
 const within = (path: string, scope: string) => path === scope || path.startsWith(scope + "/");
 
-/** Inventory paths only. Sharing policy is applied before optional source bytes are loaded. */
+/** Inventory paths only. Hosted sharing is checked separately before provider disclosure. */
 export function contextCandidateInventory(subject: ValidationSubject, scopes: string[], changed: string[]) {
   let inventory: string[];
   try {
@@ -22,7 +23,7 @@ export function contextCandidateInventory(subject: ValidationSubject, scopes: st
 
 export function automaticContextCandidates(subject: ValidationSubject, relevant: string[],
   mandatory: Set<string>, allowed: string[], maximum: number,
-  priority?: { purpose: string; exact: string[]; changed: string[] }) {
+  priority?: { purpose: string; exact: string[]; changed: string[]; ordered?: string[] }) {
   if (!Number.isSafeInteger(maximum) || maximum < 1 || maximum > 64) throw new Error("Invalid candidate limit");
   const excluded: Array<{ path: string; reason: string }> = [];
   const dispositions = new Map<string, string>();
@@ -34,7 +35,8 @@ export function automaticContextCandidates(subject: ValidationSubject, relevant:
   const permitted = (path: string) => {
     if (mandatory.has(path)) { dispositions.set(path, "required-context"); return false; }
     if (path.length > 128) { exclude(path, "candidate-path-too-long"); return false; }
-    if (!allowed.some(pattern => glob(path, pattern))) { exclude(path, "sharing-not-enabled"); return false; }
+    if (!localContextPath(path)) { exclude(path, "automatic-path-excluded"); return false; }
+    if (!matchesPackPath(path, allowed)) { exclude(path, "local-scope-excluded"); return false; }
     try { if (subject.source(path)?.file_type !== "regular") { exclude(path, "source-unavailable"); return false; } }
     catch { exclude(path, "source-unavailable"); return false; }
     return true;
@@ -52,7 +54,7 @@ export function automaticContextCandidates(subject: ValidationSubject, relevant:
   })).sort((left, right) => Number(right.exact) - Number(left.exact) ||
     Number(right.changed) - Number(left.changed) || right.match - left.match ||
     left.index - right.index) : null;
-  const ranked = rankedMetadata?.map(item => item.path) ?? relevant;
+  const ranked = priority?.ordered ?? rankedMetadata?.map(item => item.path) ?? relevant;
   // Bound source inspection as well as the resulting packet. Metadata inventory is not source reading.
   let inspectedCount = 0;
   for (const path of ranked.slice(0, 256)) {

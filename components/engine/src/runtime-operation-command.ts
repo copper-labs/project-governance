@@ -1,5 +1,5 @@
 import { existsSync, lstatSync, mkdirSync, realpathSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { parseArgs } from "node:util";
@@ -7,6 +7,7 @@ import { parse } from "yaml";
 import { digest, object } from "./core.ts";
 import { narrativeFile } from "./narrative-inputs.ts";
 import { compiledRuntimeLock } from "./runtime-lock.ts";
+import { assertPortableStartupCutover } from "./startup-hook-cutover.ts";
 import { prepareRuntimeOperation, type RuntimePreparation } from "./runtime-operation-preparation.ts";
 import { completePreparedRuntimeOperation } from "./runtime-operation-completion.ts";
 import { legacyMigrationInvocation } from "./legacy-migration-launch.ts";
@@ -40,9 +41,12 @@ export async function runtimeOperationCommand(command: "init" | "update" | "repa
   });
   if(new Set(paths).size!==paths.length)throw new Error("Duplicate installation backup input");
   if(raw.startupReceipts!==undefined && (typeof raw.startupReceipts!=="string" || resolve(raw.startupReceipts)!==raw.startupReceipts || command==="repair"))throw new Error("Startup receipt store requires an absolute path and a host migration");
+  if(raw.startupReceipts!==undefined && raw.startupReceipts!==join(dirname(raw.registry),"startup.sqlite"))
+    throw new Error("Managed Codex hooks require the receipt store next to this worktree's installation registry");
   compiledRuntimeLock(raw.lock);
   if(raw.lockedCheckout!==undefined && (raw.lockedCheckout!==true || command!=="init"))throw new Error("Locked checkout requires explicit initial installation");
-  const request=raw as unknown as RuntimePreparation;
+  const request={ ...raw, ...(command === "init" && raw.startupReceipts === undefined
+    ? { startupReceipts: join(dirname(String(raw.registry)), "startup.sqlite") } : {}) } as unknown as RuntimePreparation;
   const workspace=realpathSync(request.workspace),directory=resolve(values["operation-directory"]);
   if(installedScope) {
     if(process.env.GOVERNANCE_MAINTENANCE_PROBE)throw new Error("Maintenance probe permits version readback only");
@@ -51,6 +55,7 @@ export async function runtimeOperationCommand(command: "init" | "update" | "repa
   }
   if(workspace!==request.workspace||resolve(request.registry)!==request.registry||realpathSync(request.archive)!==request.archive)
     throw new Error("Installation request paths must be canonical");
+  if(command==="update" && !request.startupReceipts)assertPortableStartupCutover(workspace,request.registry);
   const savedPath=join(directory,"operation.json");
   const saved=existsSync(savedPath)?JSON.parse(narrativeFile(directory,savedPath)):null;
   if(command === "init") {

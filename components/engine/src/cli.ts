@@ -38,6 +38,10 @@ import { hookCheckArguments } from "./git-hooks.ts";
 import { inspectRuntimeGeneration } from "./runtime-inspection.ts";
 import { invokeRuntimeGeneration } from "./runtime-invocation.ts";
 import { contextRouteCommand } from "./context-route-command.ts";
+import { contextIndexCommand } from "./context-index-command.ts";
+import { ContextRouteError, CONTEXT_ROUTE_HELP } from "./context-route-errors.ts";
+import { associatePromptTask, contextObservationStatus, importContextUsage, recordContextObservation } from "./context-observations.ts";
+import { contextDoctor } from "./context-doctor.ts";
 import { workflowObservationCommand } from "./decision-workflow-observation.ts";
 import { repositoryMap } from "./repository-map.ts";
 import { parseArgs } from "node:util";
@@ -140,7 +144,7 @@ Checks:
 Project setup and context:
   doctor | docs | hooks
   init | update | repair     Use the versioned installation request contract
-  context-route | context-packet | source-map | skill-read
+  context-route | context-packet | context-index | source-map | skill-read
   harness --help            Task, history and continuity commands
 
 Operations:
@@ -160,7 +164,7 @@ Use the owning command contract for structured request fields.
     }
     if (command === "harness") {
       // The canonical parser owns global flags and help as well as task/history operations.
-      return continuityCommand(args.slice(1), {groups: ["governance", "task", "resume", "checkpoint", "context", "artifact", "budget", "paths", "status", "reconcile", "usage", "export", "import", "events"]});
+      return continuityCommand(args.slice(1), {groups: ["governance", "task", "resume", "checkpoint", "context", "artifact", "budget", "paths", "status", "reconcile", "usage", "export", "import", "events"], observeBinding: associatePromptTask});
     }
     if (command === "hook") return main(["check", "--trigger", "hook", ...hookCheckArguments(realpathSync(process.cwd()), args[1] ?? "", args.slice(2))]);
     if (command === "docs") {
@@ -189,6 +193,9 @@ Use the owning command contract for structured request fields.
       if (values.capability === "decisions" && !values.registry) {
         const result = decisionDoctor(realpathSync(process.cwd()));
         console.log(JSON.stringify(result)); return result.status === "passed" ? 0 : 1;
+      }
+      if (values.capability === "context" && !values.registry) {
+        const result = contextDoctor(realpathSync(process.cwd())); console.log(JSON.stringify(result)); return result.status === "configured" ? 0 : 2;
       }
       if (values.capability !== "kmp-surface-validation" || values.registry) throw new Error("Unsupported capability doctor arguments");
       const root = realpathSync(process.cwd()), subject = new ValidationSubject(root, resolveChangeScope(root, { all: true }));
@@ -227,7 +234,9 @@ Use the owning command contract for structured request fields.
       const result = await startupCommand(args.slice(1));
       console.log(JSON.stringify(result));return startupExitCode(result);
     }
+    if (command === "context-index") { console.log(JSON.stringify(contextIndexCommand(args.slice(1), process.cwd()), null, 2)); return 0; }
     if (command === "context-route") {
+      if (args.length === 2 && args[1] === "--help") { console.log(CONTEXT_ROUTE_HELP); return 0; }
       const result = await withDecisionCancellation(options => contextRouteCommand(args.slice(1), process.cwd(), undefined, undefined, options));
       console.log(JSON.stringify(result.value));
       return result.exitCode ?? (result.value.ready ? 0 : 2);
@@ -353,6 +362,20 @@ Use the owning command contract for structured request fields.
     }
     if (command === "--version") { console.log(`project-governance ${RELEASE_VERSION}`); return 0; }
     if (command === "telemetry") {
+      if (args[1] === "context") {
+        const operation = args[2] ?? "status";
+        const { values } = parseArgs({ args: args.slice(3), strict: true, allowPositionals: false, options: {
+          entry: { type: "string" }, transcript: { type: "string" }, path: { type: "string" }, disposition: { type: "string" }, evidence: { type: "string" },
+        } });
+        if (operation === "status" && !Object.keys(values).length) { console.log(JSON.stringify(contextObservationStatus(process.cwd()))); return 0; }
+        if (!values.entry) throw new Error("Context observation requires --entry ID");
+        if (operation === "import" && values.transcript) { console.log(JSON.stringify(importContextUsage(process.cwd(), values.entry, values.transcript))); return 0; }
+        if (operation === "expansion" && values.path) { console.log(JSON.stringify(recordContextObservation(process.cwd(), values.entry, { kind: "expansion", path: values.path }))); return 0; }
+        if (operation === "outcome" && values.evidence && ["accepted", "reopened"].includes(values.disposition ?? "")) {
+          console.log(JSON.stringify(recordContextObservation(process.cwd(), values.entry, { kind: "outcome", disposition: values.disposition as "accepted" | "reopened", evidence: values.evidence }))); return 0;
+        }
+        throw new Error("Use telemetry context status|import|expansion|outcome with explicit entry references");
+      }
       if (args[1] === "review") {
         const { values } = parseArgs({ args: args.slice(2), strict: true, allowPositionals: false, options: { "run-id": { type: "string" }, disposition: { type: "string" } } });
         if (!values["run-id"] || !values.disposition) throw new Error("Run ID and disposition required");
@@ -444,7 +467,8 @@ Use the owning command contract for structured request fields.
     }
   } catch (error) {
     // CLI parsing errors contain flags, not file contents. Source-loading diagnostics remain private.
-    console.error(JSON.stringify({ status: "failed", error: error instanceof TypeError ? "Invalid invocation" : "Command could not complete; inspect its operation receipt when available." }));
+    console.error(JSON.stringify(error instanceof ContextRouteError ? { status: "failed", code: error.code, error: error.message, receipt: error.receiptPath }
+      : { status: "failed", error: error instanceof TypeError ? "Invalid invocation" : "Command could not complete; inspect its operation receipt when available." }));
     return 2;
   }
 }

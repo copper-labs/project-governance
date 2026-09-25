@@ -23,6 +23,26 @@ test("public help works outside a repository without creating state", () => {
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test("context index status is passive and help shows index and expansion commands", () => {
+  const root = mkdtempSync(join(tmpdir(), "governance-context-index-"));
+  try {
+    const cli = fileURLToPath(new URL("../src/cli.ts", import.meta.url));
+    const options = { cwd: root, encoding: "utf8" as const, timeout: 10000,
+      env: { ...process.env, JEV_TOKEN: "" } };
+    const status = spawnSync(process.execPath, [cli, "context-index", "status", "--cache-root", join(root, "cache")], options);
+    assert.equal(status.status, 0, status.stderr);
+    assert.equal(JSON.parse(status.stdout).status, "absent");
+
+    const help = spawnSync(process.execPath, [cli, "--help"], options);
+    assert.equal(help.status, 0, help.stderr);
+    assert.match(help.stdout, /context-route \| context-packet \| context-index/);
+    const routeHelp = spawnSync(process.execPath, [cli, "context-route", "--help"], options);
+    assert.equal(routeHelp.status, 0, routeHelp.stderr);
+    assert.match(routeHelp.stdout, /--entry <id> --expansion <1\|2>/);
+    assert.deepEqual(readdirSync(root), []);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 
 test("CLI modules can be imported by a stdin-driven caller", () => {
   const cli = new URL("../src/cli.ts", import.meta.url).href;

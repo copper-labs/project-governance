@@ -66,10 +66,11 @@ test("routed command captures staged policy, delivers mandatory content and writ
         suggested: null, method: "baseline", reason: "fixture", model: null, questionVersion: "1",
         confidence: null, latencyMs: 1, usage: { inputTokens: null, outputTokens: null } };
     } });
-    assert.deepEqual(single.optional?.entries, []);
+    assert.ok(!single.optional?.entries.some(entry => entry.id === "single.ts"));
+    assert.ok(single.optional?.entries.some(entry => entry.id === "optional.ts"), "safe local candidates remain available without sharing approval");
     assert.equal(single.optional?.omissionReasons["single.ts"], "excerpt-unrepresentable");
-    assert.equal(single.selection.reason, "no-assessable-candidates");
-    assert.equal(single.selection.optionalDelivery, "none");
+    assert.equal(single.selection.reason, "fixture");
+    assert.equal(single.selection.optionalDelivery, "delivered");
     assert.equal(single.selection.optionalOmissionReasons["single.ts"], "excerpt-unrepresentable");
     const singleReceipt = JSON.parse(readFileSync(join(contextStateRoot(root), "routes",
       `${single.receiptId}.json`), "utf8"));

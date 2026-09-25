@@ -12,7 +12,8 @@ and the runtime's native-parent, release and worktree checks permit a compatible
 
 Configured Codex hooks observe initial startup, continuation and close events. Only initial startup
 can discover a release. Do not synthesize a startup event or rerun discovery because the hook output
-is quiet. Manual policy, no update and routine continuation are normally quiet.
+is quiet. Cached discovery, prerelease or local-archive locks, manual policy, no update and routine
+continuation are normally quiet. The default release-metadata refresh interval is 24 hours.
 
 Use the task identity supplied by the hook and the receipt-store path configured in that hook:
 

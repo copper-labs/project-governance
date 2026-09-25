@@ -1,5 +1,5 @@
 import { object, text } from "./core.ts";
-import { glob } from "./planning.ts";
+import { matchesPackPath } from "./planning.ts";
 import { safeSubjectPath } from "./change-subject.ts";
 import { contextBudget } from "./checkers/context-router.ts";
 
@@ -33,7 +33,7 @@ export function routeContext(raw: unknown, task: string, changedPaths: string[])
     const match = object(route.match ?? {}), globs = list(match.path_globs), reasons: string[] = [];
     let score = 0;
     for (const path of paths) {
-      const pattern = globs.find(pattern => glob(path, pattern));
+      const pattern = globs.find(pattern => matchesPackPath(path, [pattern]));
       if (pattern) { reasons.push(`path:${path}->${pattern}`); score += pathWeight; }
     }
     for (const term of [...new Set([...list(match.product_terms), ...list(route.aliases)])]) {
@@ -44,8 +44,10 @@ export function routeContext(raw: unknown, task: string, changedPaths: string[])
     }
     return { id, score, reasons, route };
   }).sort((a, b) => b.score - a.score || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-  const selected = scores[0]?.score ? scores[0] : null;
-  const tied = selected && scores[1]?.score === selected.score;
+  const defaultRoute = router.default_route === undefined ? null : scores.find(item => item.id === text(router.default_route, "default route"));
+  if (router.default_route !== undefined && !defaultRoute) throw new Error("Context default_route must name a declared route");
+  const selected = scores[0]?.score ? scores[0] : defaultRoute ?? null;
+  const tied = selected && selected.score > 0 && scores[1]?.score === selected.score;
   const pathOwners = scores.filter(item => item.reasons.some(reason => reason.startsWith("path:")));
   const outcome = selected ? tied && !(selected.reasons.some(reason => reason.startsWith("path:")) &&
     scores[1]!.reasons.some(reason => reason.startsWith("path:"))) ? "ambiguous" : "matched" : "fallback";

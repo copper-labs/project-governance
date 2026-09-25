@@ -21,6 +21,9 @@ test("startup discovery composes published identities and never downloads the ar
 test("startup discovery distinguishes manual, current, major and failed discovery",async()=>{
  const never=(async()=>{throw new Error("must not fetch");}) as typeof fetch;
  assert.equal((await discoverStartupRelease({},lock("3.0.0"),{fetch:never})).status,"manual");
+ assert.deepEqual(await discoverStartupRelease(profile,lock("3.0.0-rc.5"),{fetch:never}),{status:"manual",reason:"prerelease-runtime"});
+ assert.deepEqual(await discoverStartupRelease(profile,{...lock("3.0.0"),artifact:{...lock("3.0.0").artifact,url:"file:///tmp/runtime.tgz"}},{fetch:never}),
+  {status:"manual",reason:"unsupported-distribution"});
  assert.equal((await discoverStartupRelease(profile,lock("3.0.0"),{fetch:(async()=>new Response("[]")) as typeof fetch})).status,"current");
  const major=await discoverStartupRelease(profile,lock("3.0.0"),{fetch:(async()=>new Response(JSON.stringify([{tag_name:"4.0.0",draft:false,prerelease:false}]))) as typeof fetch});
  assert.equal(major.status,"approval-required");

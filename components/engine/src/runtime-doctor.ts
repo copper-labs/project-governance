@@ -10,6 +10,7 @@ import { digest } from "./core.ts";
 import { planGitHookInstallation } from "./git-hook-installation.ts";
 import { planHostInstructions } from "./host-instruction-plan.ts";
 import { COMPILED_HOST_BLOCK } from "./provider-guidance.ts";
+import { contextDoctor } from "./context-doctor.ts";
 
 /** Observe without creating, migrating or taking a generation reader; usable during interrupted activation. */
 export function runtimeDoctor(workspace: string, registry: string) {
@@ -64,5 +65,5 @@ export function runtimeDoctor(workspace: string, registry: string) {
     if (instructions.writes.length) add("installation.host-instructions-drift", "Managed agent instructions are missing or differ from this runtime; run host-instructions --dry-run, then apply the reviewed --plan-digest.");
   } catch { add("installation.host-instructions-unavailable", "Managed agent instructions could not be inspected safely; reconcile their ownership and markers."); }
   return { version: 1, scope: "compiled-installation", status: findings.length ? "failed" : "passed", selection, findings,
-    execution_readback: "not-performed", active_readers: "reported-without-releasing", mutations: "none" };
+    context: contextDoctor(workspace), execution_readback: "not-performed", active_readers: "reported-without-releasing", mutations: "none" };
 }

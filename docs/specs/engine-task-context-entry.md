@@ -5,7 +5,7 @@ type: spec
 status: current
 owner: project-governance
 created: 2026-09-22
-updated: 2026-09-22
+updated: 2026-09-25
 summary: Reuses session-bound continuity intent and bounded discovery for ordinary context and check delivery.
 ---
 
@@ -14,6 +14,10 @@ summary: Reuses session-bound continuity intent and bounded discovery for ordina
 Status: accepted corrective design; implementation and qualification tracked in the
 [delivery plan](../exec-plans/active/2026-09-22-task-context-entry.md).
 This extends [RC4 decision delivery](engine-decision-rc4.md), not its authority or model policy.
+The [RC6 extension](engine-rc6-linked-retrieval.md) adds prompt-time provisional entry and metadata
+selection through these same owners, with a maintained current-source projection and bounded expansion.
+The [guide](../guides/rc6-prompt-context.md) defines opt-in and
+qualification. A qualified prompt packet precedes deliberate task creation; it is not an accepted task.
 
 ## Problem and intended behavior
 
@@ -50,9 +54,9 @@ cannot set its parent's environment; installing a startup hook alone does not qu
 Do not guess a session from process IDs, directories, last activity, or another agent's task.
 
 Projection uses task ID, task version as decision revision, outcome as requirement, live acceptance
-items, and project-relative scope paths. Root-wide or revoked scope preserves required routing from
-captured changed paths but supplies no automatic optional candidates; use specific files or directories
-for selection. Paths outside the worktree, excessive context, unavailable store,
+items, and project-relative scope paths. Root-wide or empty scope preserves required routing from
+captured changed paths; RC6 can select safe local optional metadata from the workspace without
+granting hosted disclosure. Revoked paths do not remain explicit priorities. Paths outside the worktree, excessive context, unavailable store,
 closed task, stale attempt or missing identity produce a named unavailable result. Inferred context
 failure does not block native checks. Explicit malformed context or conflicting explicit identity is
 an input error. A decision binding does not confer action authority or replace an Apple approval ID.
@@ -96,7 +100,7 @@ outside that claim until the adopter configures and qualifies its host controls.
    never add budgets together or depend on route-name order. Report remaining required overflow.
    Overlapping paths declare joint owners, so an adopter must not model mutually exclusive alternatives
    with overlapping required path rules.
-4. Query captured paths under the specific task scopes; exact files need no repository-wide inventory.
+4. For the legacy body-selection path, query captured paths under the specific task scopes; exact files need no repository-wide inventory.
    Preserve all matching paths for required route/skill applicability. Rank optional path metadata
    before the source-inspection cap: exact files first, then changed paths, then paths whose names
    match task terms, then the prior inventory order. Term overlap is a cheap path-only prefilter;
@@ -112,16 +116,22 @@ outside that claim until the adopter configures and qualifies its host controls.
    A prospective path can match an owner before the file exists; a route match is not source-existence
    proof. If changed files fill the candidate cap, an unchanged task-named file can still be missed;
    narrow the task scope or name an exact file when that happens. Explicit discovery remains in the receipt's `discovery`; automatic discovery is under
-   `selection.automatic.discovery`.
-5. Automatic candidates are limited to approved source patterns and ordinary text sources. Exclude
+   `selection.automatic.discovery`. This legacy relevance prefix does not apply to the RC6 metadata
+   discovery path: the RC6 contract independently retains the complete permitted inventory before
+   semantic assessment and exposes bounded continuation. Required route applicability remains here.
+5. RC6 automatic local candidates use safe ordinary text paths independently of hosted sharing. Exclude
    required files, duplicates, unsafe paths and unavailable/oversized/binary candidates before calling
    a provider. Record exclusions and inventory limits. Explicit optional candidates keep their strict
-   validation and existing sharing fallback; automatic discovery cannot broaden sharing permission.
+   validation and existing sharing fallback; automatic discovery cannot broaden hosted sharing permission.
    Explicitly scoped ordinary task files remain available in the deterministic packet even when
    classifier sharing is off. Manually supplied optional flags take priority, then scoped files, then
    automatic additions within the 64-input bound. The legacy classifier assesses at most the first
    `min(max_candidates, 63)` approved files in that order, reserving one evidence slot for the task
-   purpose; expanded DL03 observes the same evidence-item ceiling. All other files keep their
+   purpose; source-excerpt DL03 observes the same evidence-item ceiling. RC6's opt-in metadata
+   question instead traverses the complete approved inventory in bounded batches before source capture,
+   with shared purpose, permissioned literal descriptors, explicit partial coverage and continuation
+   under the [RC6 contract](engine-rc6-linked-retrieval.md). It has no 126-path/two-batch relevance cap.
+   Raw source files and historical summaries are not hosted by that metadata question. All other files keep their
    deterministic delivery slots. The legacy decision receipt records which candidate IDs were not
    assessed because of sharing scope, count limit or an unrepresentable excerpt, and the provider
    sees the omitted count. Unreadable task-derived files produce recorded exclusions; malformed

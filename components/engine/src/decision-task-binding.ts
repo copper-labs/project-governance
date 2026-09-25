@@ -14,26 +14,26 @@ export interface TaskContextResolution {
 
 /** Reuse the continuity owner. Missing optional intent never creates state or guesses another task. */
 export function resolveTaskContext(workspace: string, explicit: {
-  context?: DecisionTaskContext; path?: string; taskId?: string; revision?: string;
+  context?: DecisionTaskContext; path?: string; taskId?: string; revision?: string; session?: string;
 } = {}): TaskContextResolution {
-  const path = explicit.path ?? process.env.GOVERNANCE_DECISION_CONTEXT;
+  const path = explicit.path ?? (explicit.session ? undefined : process.env.GOVERNANCE_DECISION_CONTEXT);
   let result: TaskContextResolution;
   if (explicit.context) result = { context: decisionTaskContext(explicit.context, workspace), source: "explicit", status: "bound" };
   else if (path) result = { context: readDecisionTaskContext(path, workspace), source: "context-file", status: "bound" };
-  else result = sessionTaskContext(workspace);
+  else result = sessionTaskContext(workspace, explicit.session);
   if (result.context) resolveDecisionScope(workspace, explicit, result.context);
   return result;
 }
 
-function sessionTaskContext(workspace: string): TaskContextResolution {
+function sessionTaskContext(workspace: string, hostSession?: string): TaskContextResolution {
   const unavailable = (status: string): TaskContextResolution => ({ context: null, source: "unavailable", status });
-  const session = sessionId();
+  const session = sessionId(hostSession);
   if (!session) return unavailable("session-unavailable");
   let store: Store | undefined;
   try {
     const where = workContext(workspace), database = defaultDbPath(where.worktree);
     if (!existsSync(database)) return unavailable("task-store-unavailable");
-    store = new Store(database, { readOnly: true });
+    store = new Store(database, { readOnly: true, busyTimeoutMs: hostSession ? 100 : 5000 });
     const workspaceId = store.workspaceId(where.locator);
     if (!workspaceId) return unavailable("workspace-unbound");
     const attempt = store.boundAttempt(session, workspaceId);

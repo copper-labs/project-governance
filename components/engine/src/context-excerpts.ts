@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type { Candidate } from "./decisions.ts";
 
 /** Select one contiguous whole-line window; retain full-source identity and make omitted context explicit. */
-export function contextExcerpt(candidate: Candidate, purpose: string, maximumBytes: number): Candidate {
+export function contextExcerpt(candidate: Candidate, purpose: string, maximumBytes: number, spans: Array<{ name: string; start: number; end: number }> = []): Candidate {
   if (!Number.isSafeInteger(maximumBytes) || maximumBytes < 128 || maximumBytes > 65536) throw new Error("Optional excerpt budget must be 128 to 65536 bytes");
   if (candidate.sourceRange) throw new Error("Cannot excerpt an already ranged candidate");
   if (Buffer.byteLength(candidate.excerpt) <= maximumBytes) return candidate;
@@ -10,6 +10,10 @@ export function contextExcerpt(candidate: Candidate, purpose: string, maximumByt
   const terms = [...new Set(purpose.toLowerCase().match(/[\p{L}\p{N}_]{3,}/gu) ?? [])];
   const sizes = lines.map(line => Buffer.byteLength(line));
   const scores = lines.map(line => terms.reduce((sum, term) => sum + Number(line.toLowerCase().includes(term)), 0));
+  const anchors = spans.filter(span => Number.isSafeInteger(span.start) && span.start > 0 && span.start <= lines.length)
+    .map(span => ({ ...span, score: terms.reduce((sum, term) => sum + Number(span.name.toLowerCase().includes(term)), 0) }))
+    .sort((a, b) => b.score - a.score || a.start - b.start);
+  if (anchors[0]?.score) scores[anchors[0].start - 1]! += terms.length + 1;
   const informative = lines.map(line => Number(Boolean(line.trim())));
   let start = 0, bytes = 0, score = 0, contentLines = 0;
   let bestStart = 0, bestEnd = 0, bestScore = -1, bestContentLines = -1, bestBytes = -1;

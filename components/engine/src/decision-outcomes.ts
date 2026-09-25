@@ -51,6 +51,10 @@ export function decisionOutcomeReport(stateRoot: string, manifestPath: string, r
         if (caller.entryKind === "context-delivery") {
           text(native.receiptId, "context receipt id", 128);
           if (!hash(native.inputDigest) || (Array.isArray(episode.native) && episode.native.length > 0)) throw new Error("Context delivery identity required; native outcome needs its own completion capture");
+        } else if (caller.entryKind === "prompt-delivery") {
+          if (!/^[a-f0-9]{64}$/u.test(String(native.entryId)) || native.provider !== "codex" ||
+              (Array.isArray(episode.native) && episode.native.length > 0)) throw new Error("Prompt preparation cannot assert a native task outcome");
+          text(native.session, "prompt session", 128); text(native.turn, "prompt turn", 128);
         } else if (caller.entryKind === "check-plan") {
           if (!hash(native.subjectDigest) || !hash(native.planDigest) || (Array.isArray(episode.native) && episode.native.length > 0)) throw new Error("Check plan identity required");
         } else if (["check-output", "check-completion"].includes(String(caller.entryKind))) {

@@ -6,6 +6,8 @@ import {startupEvent} from "./startup-event.ts";
 import type {StartupHostOwner} from "./startup-host-owner.ts";
 import type {RuntimeReader} from "./runtime-reader.ts";
 
+export class StartupOwnerChanged extends Error {}
+
 /** Task startup receipts only; generation activation remains owned by RuntimeGenerations. */
 export class StartupTasks {
  readonly #db:DatabaseSync;
@@ -40,7 +42,7 @@ export class StartupTasks {
    const task=this.#db.prepare("SELECT state FROM tasks WHERE id=?").get(taskId);
    if(task?.state!=="open")throw new Error("Open startup task required for owner binding");
    const prior=this.#db.prepare("SELECT binding FROM owners WHERE task_id=?").get(taskId);
-   if(prior && prior.binding!==binding)throw new Error("Startup owner changed; reconcile the prior reservation");
+   if(prior && prior.binding!==binding)throw new StartupOwnerChanged("Startup owner changed; reconcile the prior reservation");
    if(!prior)this.#db.prepare("INSERT INTO owners VALUES(?,?)").run(taskId,binding);
    this.#db.exec("COMMIT");
   }catch(error){this.#db.exec("ROLLBACK");throw error;}

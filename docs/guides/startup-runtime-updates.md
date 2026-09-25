@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-09-06
-updated: 2026-09-06
+updated: 2026-09-23
 summary: Opt a repository into top-level Codex startup updates while preserving ongoing work and ordinary Git hooks.
 ---
 
@@ -33,7 +33,10 @@ manufactures a startup reservation.
 
 ## What Happens At Startup
 
-The hook checks once, with a bounded metadata cache, and gives the parent agent a short result.
+The hook checks at the first top-level task start. After a successful check, release metadata is
+reused for 24 hours by default, and cached results do not repeat the candidate notice. A failed
+check can retry on a later task without claiming the version is current. Prerelease runtimes
+require deliberate updates and do not perform automatic release discovery.
 The parent decides whether its actual assignment permits a compatible update. Investigation,
 planning, a small fix, and unrelated staged or unstaged work can already be underway. Execution
 of a substantial implementation plan, independent review, release certification, and read-only
@@ -63,7 +66,7 @@ The tracked profile supports:
 ```yaml
 runtime_updates:
   policy: compatible
-  cache_seconds: 43200
+  cache_seconds: 86400
   discovery_seconds: 5
   install_seconds: 180
 ```

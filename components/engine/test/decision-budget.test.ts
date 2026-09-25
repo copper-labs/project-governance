@@ -83,6 +83,14 @@ test("closed tombstones do not consume the active-scope capacity", t => {
   assert.equal(reserveDecisionCall(root, { ...scope, taskId: "closed-0" }, "late", 10, limits).state, "unavailable");
 });
 
+test("prompt scope capacity cannot displace ordinary decision scopes", t => {
+  const { root, scope, limits } = fixture(t);
+  for (let index = 0; index < 512; index++) assert.equal(reserveDecisionCall(root,
+    { ...scope, taskId: `prompt-${index}`, taskRevision: "1#context-selection" }, "first", 10, limits).state, "reserved");
+  assert.equal(reserveDecisionCall(root, { ...scope, taskId: "overflow", taskRevision: "1#context-selection" }, "first", 10, limits).state, "unavailable");
+  assert.equal(reserveDecisionCall(root, scope, "ordinary", 10, limits).state, "reserved");
+});
+
 
 test("oversized budget stores visibly fail closed without resetting previous spending", t => {
   const { root, scope, limits } = fixture(t);

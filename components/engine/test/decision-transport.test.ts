@@ -25,6 +25,9 @@ test("deadline bounds a transport that ignores cancellation", { timeout: 2000 },
   assert.equal(result.ok, false);
   if (!result.ok) assert.equal(result.reason, "deadline");
   assert.equal(existsSync(`${path}.lock`), false);
+  const suppressed = await client.ask("{}", 100);
+  assert.equal(suppressed.ok, false);
+  if (!suppressed.ok) assert.equal(suppressed.reason, "cooldown", "A provider's own timeout still suppresses immediate retry");
 });
 
 test("deadline covers response streaming and stalled cancellation cleanup", { timeout: 2000 }, async t => {

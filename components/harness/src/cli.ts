@@ -75,7 +75,15 @@ function jsonFile(path: string): unknown {
     return JSON.parse(readFileSync(path, "utf8"));
 }
 function emit(value: unknown, code = 0): void { process.stdout.write(JSON.stringify(value, null, 2) + "\n"); process.exitCode = code; }
-interface ContinuityCommandOptions { groups?: readonly string[]; }
+export interface TaskBindingObservation {
+    workspace: string; session: string; taskId: string; revision: string; attemptId: string;
+    requestedAt: string;
+}
+interface ContinuityCommandOptions {
+    groups?: readonly string[];
+    /** Optional analytics after a successful bind; it cannot change task authority or its result. */
+    observeBinding?: (binding: TaskBindingObservation) => unknown;
+}
 function commandHelp(groups?: readonly string[]): string {
     if (!groups) return HELP;
     let include = false;
@@ -88,6 +96,7 @@ function commandHelp(groups?: readonly string[]): string {
     }).join("\n") + "\nUse unified workflow/check commands for execution and host-instructions/startup for host integration.\n";
 }
 function main(argv: string[], options: ContinuityCommandOptions = {}): void {
+    const requestedAt = new Date().toISOString();
     const { flags, words, command } = parse(argv), [group, verb] = words;
     const one = (key: string) => flags[key]?.[0];
     const require = (key: string) => {
@@ -154,6 +163,15 @@ function main(argv: string[], options: ContinuityCommandOptions = {}): void {
             throw new Error("stable --session or HARNESS_SESSION is required for this operation");
         return who;
     };
+    const bindingObservation = () => {
+        if (!who || !options.observeBinding) return {};
+        try {
+            const attempt = store.boundAttempt(who, workspaceId);
+            if (!attempt || attempt.taskId !== taskId) return {};
+            return { contextEntry: options.observeBinding({ workspace: root, session: who,
+                taskId: attempt.taskId, revision: String(attempt.taskVersion), attemptId: attempt.attemptId, requestedAt }) };
+        } catch { return { contextEntry: { status: "unavailable", reason: "binding-observation-unavailable" } }; }
+    };
     const item = (kind: TaskItem["kind"], body: string, provenance: TaskItem["provenance"]): Omit<TaskItem, "seq" | "revoked"> => ({ kind, body, provenance });
     try {
         if (group === "init") {
@@ -168,7 +186,7 @@ function main(argv: string[], options: ContinuityCommandOptions = {}): void {
             taskId = task.taskId;
             if (who)
                 store.bind(taskId, who, workspaceId, root);
-            return emit({ ok: true, task, provenance: "host-reported intent" });
+            return emit({ ok: true, task, provenance: "host-reported intent", ...bindingObservation() });
         }
         if (group === "task" && verb === "list")
             return emit({ ok: true, tasks: store.listTasks().filter(t => flags["all"] || t.worktree === root).map(t => ({ taskId: t.taskId, version: t.version, status: t.status, outcome: t.outcome, worktree: t.worktree, parentTask: t.parentTask })), boundTask: who ? store.boundAttempt(who, workspaceId)?.taskId ?? null : null });
@@ -180,7 +198,7 @@ function main(argv: string[], options: ContinuityCommandOptions = {}): void {
             taskId = child.taskId;
             if (who)
                 store.bind(taskId, who, workspaceId, root);
-            return emit({ ok: true, task: child, note: "Inherited findings retain original applicability; no actions or acceptance were copied." });
+            return emit({ ok: true, task: child, note: "Inherited findings retain original applicability; no actions or acceptance were copied.", ...bindingObservation() });
         }
         if (group === "task" && verb === "revise") {
             const task = needTask();
@@ -201,7 +219,7 @@ function main(argv: string[], options: ContinuityCommandOptions = {}): void {
             const task = needTask();
             const attempt = who ? store.bind(task.taskId, who, workspaceId, root, one("parent-attempt") ?? null) : null;
             const p = resume(store, task.taskId, number("after", 0), number("budget", 16000), attempt, root);
-            return emit(p, p.ok ? 0 : 2);
+            return emit({ ...p, ...(p.ok ? bindingObservation() : {}) }, p.ok ? 0 : 2);
         }
         if (group === "checkpoint") {
             const task = needTask();

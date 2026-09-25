@@ -136,7 +136,7 @@ def policy(root: Path) -> dict:
     if selected not in {"manual", "compatible"}:
         raise StartupError("runtime_updates.policy must be manual or compatible")
     result = {"policy": selected}
-    for key, default, maximum in (("cache_seconds", 43200, 604800), ("discovery_seconds", 5, 60),
+    for key, default, maximum in (("cache_seconds", 86400, 604800), ("discovery_seconds", 5, 60),
                                   ("install_seconds", 180, 3600)):
         number = value.get(key, default)
         if isinstance(number, bool) or not isinstance(number, (int, float)) or not 0 < number <= maximum:

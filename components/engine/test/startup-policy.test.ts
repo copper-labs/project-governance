@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {startupPolicy,startupWorkAssessment} from "../src/startup-policy.ts";
 
 test("startup is manual by default and preserves bounded repository settings",()=>{
- assert.deepEqual(startupPolicy({}),{policy:"manual",cache_seconds:43200,discovery_seconds:5,install_seconds:180});
+ assert.deepEqual(startupPolicy({}),{policy:"manual",cache_seconds:86400,discovery_seconds:5,install_seconds:180});
  assert.equal(startupPolicy({runtime_updates:{policy:"compatible",discovery_seconds:0.5}}).discovery_seconds,0.5);
  for(const value of [null,[],{policy:null},{policy:"always"},{unknown:true},{discovery_seconds:0},{discovery_seconds:61},{install_seconds:true},{cache_seconds:Infinity},{install_seconds:null}])
   assert.throws(()=>startupPolicy({runtime_updates:value}));

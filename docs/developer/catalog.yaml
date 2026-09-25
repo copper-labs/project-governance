@@ -1,5 +1,39 @@
 version: 1
 capabilities:
+  - id: source-control-worktrees
+    title: Coordinate source changes and Codex worktrees
+    aliases: [codex-workflow, parallel-worktrees, worktree-upgrades]
+    tasks:
+      - choose and verify a task checkout without colliding with another writer
+      - review and integrate changes while preserving source and evidence identity
+      - coordinate governance adoption and safe worktree cleanup
+    symbols: [git worktree, workContext, defaultDbPath]
+    reference: docs/specs/engine-rc6-linked-retrieval.md
+    guides: [docs/developer/guides/source-control-and-worktrees.md]
+    sources:
+      - components/harness/src/store/location.ts
+      - components/engine/src/runtime-invocation.ts
+      - components/engine/src/runtime-generations.ts
+      - components/engine/src/git-hook-installation.ts
+  - id: prompt-context
+    title: Deliver governed context at prompt submission
+    aliases: [rc6-context, pre-read-retrieval, repository-context-index]
+    tasks:
+      - configure automatic prompt delivery and bounded metadata selection
+      - diagnose missing routes and link actual host usage to context receipts
+      - understand the accepted maintained-index and expansion design and its qualification limits
+    symbols: [project-governance telemetry context, project-governance doctor --capability context]
+    reference: docs/specs/engine-rc6-linked-retrieval.md
+    guides: [docs/guides/rc6-prompt-context.md]
+    sources:
+      - components/engine/src/prompt-context.ts
+      - components/engine/src/context-route-command.ts
+      - components/engine/src/context-metadata.ts
+      - components/engine/src/context-source-index.ts
+      - components/engine/src/context-history.ts
+      - components/engine/src/context-observations.ts
+      - components/engine/src/context-doctor.ts
+      - components/engine/src/context-documentation.ts
   - id: test-execution
     title: Run necessary tests with bounded supervision cost
     aliases: [external-test-batch]

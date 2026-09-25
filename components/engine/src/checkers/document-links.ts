@@ -3,6 +3,13 @@ import { ValidationSubject, type ChangeScope } from "../change-subject.ts";
 import { documentMetadata } from "./document-metadata.ts";
 const links = (source: string) => [...source.matchAll(/(?<!!)\[[^\]]+\]\(([^)]+)\)/gu)].map(match => match[1]!.trim());
 const local = (target: string) => !target.startsWith("#") && !target.startsWith("mailto:") && !target.includes("://");
+/** Literal local links with source ranges, shared by validation and the disposable context index. */
+export function localDocumentLinks(source: string) {
+  return [...source.matchAll(/(?<!!)\[[^\]]+\]\(([^)]+)\)/gu)].flatMap(match => {
+    const target = match[1]!.trim();
+    return local(target) ? [{ target: target.split("#")[0]!, line: source.slice(0, match.index).split("\n").length }] : [];
+  });
+}
 const activePrefix = "docs/exec-plans/active/", indexPath = "docs/exec-plans/README.md";
 
 /** Validate selected Markdown using captured source and targets from the same candidate graph. */
@@ -24,7 +31,8 @@ export function documentLinkIssues(subject: ValidationSubject, scope: ChangeScop
     let source: string;
     try { source = read(path); } catch { errors.push(`${path}: selected Markdown must be readable regular UTF-8 source`); continue; }
     if (path.startsWith("docs/")) {
-      const metadata = documentMetadata(path, source, seen); errors.push(...metadata.errors);
+      // A whole inventory has no change provenance. New retrieval fields must not turn old debt into a blocker.
+      const metadata = documentMetadata(path, source, seen, scope.mode !== "all"); errors.push(...metadata.errors);
       if (path.startsWith(activePrefix)) {
         if ((metadata.data["type"] ?? metadata.data["doc_type"]) !== "exec-plan") errors.push(`${path}: active execution plan type must be exec-plan`);
         if (metadata.data["status"] !== "active") errors.push(`${path}: active execution plan status must be active`);

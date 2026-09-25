@@ -3,7 +3,7 @@ import { randomUUID, createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync, openSync, fsyncSync, closeSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { SCHEMA, SCHEMA_VERSION, V5, V6 } from "./schema.ts";
-import { ExecutionStateUnavailable, RevisionConflict, type Action, type ActionStatus, type Artifact, type Evidence, type Task, type TaskItem, type TaskMode, type Usage, type Attempt, type Checkpoint, type LedgerEvent, type ExecutionBinding, } from "../model/types.ts";
+import { ExecutionStateUnavailable, RevisionConflict, type Action, type ActionStatus, type Artifact, type Evidence, type Task, type TaskItem, type TaskMode, type TaskStatus, type Usage, type Attempt, type Checkpoint, type LedgerEvent, type ExecutionBinding, } from "../model/types.ts";
 const now = (): string => new Date().toISOString();
 export class StoreSchemaMismatch extends Error {
     constructor() { super("read-only inspection needs the current store schema"); }
@@ -20,12 +20,14 @@ export class Store {
     #db: DatabaseSync;
     readonly directory: string | null;
     #depth = 0;
-    constructor(path: string, options: { readOnly?: boolean } = {}) {
+    constructor(path: string, options: { readOnly?: boolean; busyTimeoutMs?: number } = {}) {
         this.directory = path === ":memory:" ? null : dirname(path);
         if (this.directory && !options.readOnly)
             mkdirSync(this.directory, { recursive: true, mode: 0o700 });
         this.#db = new DatabaseSync(path, { readOnly: options.readOnly ?? false });
-        this.#db.exec("PRAGMA busy_timeout = 5000; PRAGMA foreign_keys = ON; PRAGMA synchronous = FULL");
+        const busy = options.busyTimeoutMs ?? 5000;
+        if (!Number.isInteger(busy) || busy < 0 || busy > 5000) { this.#db.close(); throw new Error("Invalid store contention deadline"); }
+        this.#db.exec(`PRAGMA busy_timeout = ${busy}; PRAGMA foreign_keys = ON; PRAGMA synchronous = FULL`);
         try {
             const meta = this.#db.prepare("SELECT name FROM sqlite_master WHERE name='meta'").get();
             const old = meta ? this.#db.prepare("SELECT value FROM meta WHERE key='schema_version'").get() as {
@@ -236,6 +238,16 @@ export class Store {
         }[];
         return ids.map((r) => this.readTask(r.task_id)!);
     }
+    /** Bounded, read-only history projection. Latest versions stay with the operational owner. */
+    recentTaskReferences(limit = 32) {
+        if (!Number.isInteger(limit) || limit < 1 || limit > 64) throw new Error("Invalid history limit");
+        return this.#db.prepare(`SELECT t.task_id AS taskId,t.version,t.status,t.worktree,t.created_at AS observedAt,
+          substr(t.outcome,1,1000) AS summary FROM task t
+          WHERE t.version=(SELECT MAX(v.version) FROM task v WHERE v.task_id=t.task_id)
+          AND t.status!='cancelled' ORDER BY t.created_at DESC,t.task_id LIMIT ?`).all(limit) as unknown as Array<{
+            taskId: string; version: number; status: TaskStatus; worktree: string | null; observedAt: string; summary: string;
+        }>;
+    }
     // -------------------------------------------------------------- actions
     insertAction(a: Omit<Action, "revision" | "createdAt" | "updatedAt">): Action {
         const ts = now();
@@ -416,6 +428,9 @@ export class Store {
             return null;
         }
         return { ...u, usageId, recordedAt };
+    }
+    hasUsageMeasurement(source: string, measurementId: string): boolean {
+        return Boolean(this.#db.prepare("SELECT 1 FROM usage WHERE source=? AND measurement_id=?").get(source, measurementId));
     }
     usageTotals(taskId?: string) {
         const rows = this.#db.prepare(`SELECT * FROM usage${taskId ? " WHERE task_id=?" : ""}`).all(...(taskId ? [taskId] : [])) as Record<string, unknown>[];

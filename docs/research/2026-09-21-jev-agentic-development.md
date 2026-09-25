@@ -166,3 +166,61 @@ one runtime-owned task-entry pointer belongs in each host file; project-specific
 outside it. A doctor can check the owned block, but behavior is established by ordinary task and route
 receipts. When instruction compliance proves unreliable, route delivery belongs in the supported host
 entry path rather than more emphatic prose or a duplicate JEV router.
+
+## September 23 reassessment: reach the read boundary
+
+The success measure is useful evidence delivered to an accepted development task with less total
+coding-model reading, fewer turns or less rework. JEV call count is an exposure measure, not a
+benefit measure. A small call count can mean deliberate reuse; it can also mean that ordinary agent
+tools never reach the decision layer. Current operational receipts cannot distinguish those cases
+without observations of native host reads and whether the model used the selected packet.
+
+Recent firsthand work sharpens this distinction:
+
+- [TypeSafe's agent skill](https://docs.typesafe.ai/agent-skill) teaches agents to design and use the
+  API; its troubleshooting advice is to invoke the skill explicitly when the agent does not load it.
+  [OpenAI's skill contract](https://developers.openai.com/plugins/concepts/skills) and
+  [Claude Code's skill documentation](https://code.claude.com/docs/en/skills) likewise make skill
+  selection conditional. In [Vercel's Next.js eval](https://vercel.com/blog/agents-md-outperforms-skills-in-our-agent-evals),
+  an available skill went unused in 56% of cases. This is one framework-doc task suite, not a measured
+  failure rate for our hosts. It is enough to reject a pair of new skills as the primary way to make
+  automatic JEV decisions happen. A focused, explicit workflow skill may still help an operator run
+  semantic code searches or inspect decision receipts.
+- [A new Claude Code source-navigation implementation](https://github.com/BorisLeMeec/jev)
+  reduces files to declaration skeletons, screens them for relevance, verifies likely files against
+  fuller content, then returns line references. Its small paired agent runs report lower billed input
+  tokens at equal observed answer quality; wall-clock was roughly unchanged. The author also reports
+  that a selective large-file read hook reduced model-visible text in a small held-out window set.
+  The private query labels, tuned thresholds, few paired tasks and host-specific hook limit transfer.
+  The useful hypothesis is pre-read selection for unknown symbols or broad semantic properties,
+  not an always-on classifier for every exact lookup.
+- [TypeSafe's line-search cookbook](https://docs.typesafe.ai/cookbooks/semantic_find) combines a
+  relative Choice ranking with an independent no-answer Noul. That is important when no candidate
+  is relevant: a Choice always has a winner. [TypeSafe's own 1.13 limits](https://docs.typesafe.ai/model-jaggedness/jev-1.13)
+  warn that large irrelevant state hurts judgment. An approved, bounded declaration/path index can
+  be trialed, but sending an entire raw repository to JEV is not the default design.
+- [Harness's September 21-22 experiments](https://www.harness.io/blog/jev-decision-primitive-agent-governance)
+  found mixed evaluator accuracy on 18 labeled examples and no guaranteed whole-run savings from
+  automatic model routing. [LangChain's five-case judge study](https://www.langchain.com/blog/jev-agent-evals-langsmith)
+  shows inexpensive repeatable bounded evaluation, not broad coding-task correctness. These support
+  a small offline trace-evaluation trial, while keeping the coding model fixed by default.
+- [Leanest's test selector](https://github.com/baronunread/leanest) demonstrates code-owned
+  changed-file/import overrides before semantic judgments on expensive tests, with uncertainty
+  retaining tests. It offers a concrete local-CI comparison, but no published proof here that
+  skipped tests remain safe on our workloads. [Deep Agents v0.7](https://www.langchain.com/blog/deep-agents-v0-7)
+  also cut its base prompt/tool input substantially by removing unneeded harness prose and a default
+  todo tool, without JEV. Deterministic reduction remains a required comparison arm.
+
+The next experiment is a **host-entry funnel**, not a new catalog of consumers: record task start,
+first native source/search/output read, governed route timing, approved candidates, provider answer
+or fallback, model-visible bytes, later expansion reads, total billed/cached input, accepted outcome
+and elapsed time. Observe without changing the read first. Then compare a deterministic shortlist,
+the existing DL03 packet, and a bounded two-stage semantic-find path on matched tasks with known-file,
+unknown-file, misleading-match and no-answer cases. Preserve original references and required context;
+label a missed relevant source or weaker accepted outcome as a failure regardless of token savings.
+
+If the route is useful but agents routinely skip it, trial one thin native host-entry/read adapter
+that calls the existing engine. Verify each host's actual hook contract before relying on it; do not
+add a second index, runtime authority or a mandatory per-read model call. If route coverage is high
+and outcomes do not improve, tune or remove the selector instead of trying to increase dashboard use.
+Separate optional expensive-test advice and offline trace judging into their own matched trials.

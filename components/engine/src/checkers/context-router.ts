@@ -86,6 +86,8 @@ export function checkContextRouter(subject: ValidationSubject, packIds: Readonly
         try { contextBudget(route["token_budget"]); } catch (error) { errors.push(`${label}: ${(error as Error).message}`); }
         list(route["validations"], `${label}.validations`, (item, owner) => { if (typeof item !== "string" || !packIds.has(item)) errors.push(`${owner}: unknown validation pack`); });
       });
+      if (router.default_route !== undefined && (typeof router.default_route !== "string" || !seen.has(router.default_route)))
+        errors.push("context_router.default_route: must name a declared route");
     }
   }
   const findings: Finding[] = errors.map(message => ({ rule_id: "context-router.configuration", severity: "blocking", message }));

@@ -20,7 +20,7 @@ from .state_io import atomic_write_text
 START = "<!-- governance-startup:start -->"
 END = "<!-- governance-startup:end -->"
 RESOURCE = ".governance/runtime/skills/resources/startup-runtime-updates.md"
-BLOCK = START + "\nAt top-level task entry, follow `" + RESOURCE + "`. Minor work may already be underway.\nSubagents inherit the parent runtime and never check for or initiate updates.\n" + END
+BLOCK = START + "\nThe native startup hook checks for compatible updates. Follow `" + RESOURCE + "` only when the hook reports an actionable update or recovery, or the operator asks about updates. Do not check the governance version during routine tasks.\nSubagents inherit the parent runtime and never check for or initiate updates.\n" + END
 SUPPORTED = {"codex"}
 HOOK_COMMAND = 'python3 "$(git rev-parse --show-toplevel)/tools/governance-startup.py" {provider}'
 HOOK_TIMEOUTS = {"SessionStart": 90, "SubagentStart": 90, "SessionEnd": 3, "UserPromptSubmit": 10}

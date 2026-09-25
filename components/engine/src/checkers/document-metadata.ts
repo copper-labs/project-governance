@@ -4,7 +4,7 @@ import { objectValue } from "./dependency-manifests.ts";
 const required = ["id", "title", "status", "owner", "created", "updated", "summary"];
 const statuses = new Set(["active", "approved", "archived", "completed", "current", "deferred", "draft", "superseded"]);
 /** Validate authored document identity and lifecycle independently of filesystem traversal. */
-export function documentMetadata(path: string, source: string, seen: Map<string, string>) {
+export function documentMetadata(path: string, source: string, seen: Map<string, string>, enforceDescriptions = true) {
   const errors: string[] = []; let data: Record<string, unknown> = {};
   const normalized = source.replace(/\r\n|\r/gu, "\n");
   if (!normalized.startsWith("---\n")) errors.push(`${path}: missing YAML frontmatter`);
@@ -20,6 +20,8 @@ export function documentMetadata(path: string, source: string, seen: Map<string,
   const type = data["type"] ?? data["doc_type"];
   if (type === undefined || type === null) missing.push("type or doc_type");
   if (missing.length) errors.push(`${path}: missing frontmatter keys: ${missing.join(", ")}`);
+  for (const field of ["title", "summary"]) if (enforceDescriptions && Object.hasOwn(data, field) && (typeof data[field] !== "string" || !data[field].trim()))
+    errors.push(`${path}: ${field} must be a non-empty string`);
   const id = String(data["id"] ?? "").trim();
   if (id && seen.has(id)) errors.push(`${path}: duplicate frontmatter id ${id} also used by ${seen.get(id)}`);
   if (id) seen.set(id, path);

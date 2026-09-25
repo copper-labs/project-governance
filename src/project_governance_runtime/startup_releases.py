@@ -220,7 +220,7 @@ def discover(root: Path, current: dict, settings: dict) -> dict:
             except (KeyError, ValueError, StartupError, AttributeError):
                 cached = None
         if cached is not None:
-            return cached["result"]
+            return {**cached["result"], "discovery_fresh": False}
     answer = _discover(current, Client(current["release_base_url"], settings["discovery_seconds"]))
     write_json(path, {"key": key, "time": time.time(), "result": answer})
-    return answer
+    return {**answer, "discovery_fresh": True}

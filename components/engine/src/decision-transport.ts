@@ -45,7 +45,8 @@ export class JevDecisionClient {
   }
   get tokenPresent(): boolean { return Boolean(this.#token); }
 
-  async ask(body: string, deadlineMs: number, signal?: AbortSignal, beforeDispatch?: () => boolean, onDispatch?: () => void): Promise<TransportOutcome> {
+  async ask(body: string, deadlineMs: number, signal?: AbortSignal, beforeDispatch?: () => boolean, onDispatch?: () => void,
+    deadlineOwner: "provider" | "caller" = "provider"): Promise<TransportOutcome> {
     const started = performance.now();
     if (signal?.aborted) return { ok: false, reason: "cancelled", failureStage: "transport" };
     if (!Number.isSafeInteger(deadlineMs) || deadlineMs < 1 || deadlineMs > 30_000) return { ok: false, reason: "invalid-deadline", failureStage: "transport" };
@@ -114,12 +115,14 @@ export class JevDecisionClient {
       durableJson(this.#healthPath, { config: this.#configId, authRejected: false, retryAfter: 0, lastFailure: null });
       return { ok: true, raw };
     } catch {
-      if (locked && !signal?.aborted) {
+      // Exhausting a caller's total retrieval allowance is not evidence that the provider is unhealthy.
+      if (locked && !signal?.aborted && !(controller.signal.aborted && deadlineOwner === "caller")) {
         try { durableJson(this.#healthPath, { config: this.#configId, authRejected: false, retryAfter: this.#now() + 60_000,
           lastFailure: controller.signal.aborted ? "deadline" : "invalid-or-unavailable", failureStage }); }
         catch { /* Advisory storage cannot block baseline delivery. */ }
       }
-      return { ok: false, reason: signal?.aborted ? "cancelled" : controller.signal.aborted ? "deadline" : "invalid-or-unavailable", failureStage };
+      return { ok: false, reason: signal?.aborted ? "cancelled" : controller.signal.aborted ? "deadline" : "invalid-or-unavailable",
+        failureStage: controller.signal.aborted && deadlineOwner === "caller" ? "budget" : failureStage };
     } finally {
       signal?.removeEventListener("abort", cancel);
       if (timer) clearTimeout(timer);

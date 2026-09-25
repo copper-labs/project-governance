@@ -5,7 +5,7 @@ type: spec
 status: current
 owner: project-governance
 created: 2026-02-16
-updated: 2026-09-21
+updated: 2026-09-25
 summary: Active specifications for the package runtime, KMP surface validation, change narratives, and durable documentation.
 ---
 
@@ -18,6 +18,7 @@ summary: Active specifications for the package runtime, KMP surface validation, 
 | [Decision use cases](engine-decision-use-cases.md) | Thirteen proposed consumers spanning tests, context/output selection, workflows, devices, CI, review, release and process learning |
 | [RC3 decision experiments](engine-decision-experiments.md) | Optional attention advice, bounded read-only probes, offline history analysis and comparable baseline/shadow/live evidence |
 | [RC4 evidence, quality and category routing](engine-decision-rc4.md) | Existing evidence selection, focused quality advice, fixed models by default, simple opt-in category mappings and richer CI recommendations |
+| [RC6 prompt entry and maintained repository context](engine-rc6-linked-retrieval.md) | Automatic entry, a rebuildable SQLite index, basic source-backed relationships, bounded JEV selection with expansion and real-task qualification |
 | [Decision layer for local CI](engine-decision-local-ci.md) | Check applicability, proof reuse, focused selection, host capacity and adaptive validation across local and remote CI |
 | [Workflow and device round trip](engine-workflow-and-device-contract.md) | Approved stages, resource/recovery ownership, RN iOS simulator then real devices |
 | [Local CI and merge evidence](engine-local-ci-and-merge-contract.md) | Qualified local/VM/hosted execution, trusted publication and protected merge freshness |

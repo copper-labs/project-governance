@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { closeSync, constants, fstatSync, lstatSync, openSync, readSync, readlinkSync, realpathSync } from "node:fs";
 import { isAbsolute, join, posix, relative } from "node:path";
@@ -12,6 +12,8 @@ export interface ChangeRecord {
 export interface ChangeScope {
   kind: "project-governance-change-packet"; version: 1; scope: "all" | "changed"; mode: "all" | "staged" | "changed" | "explicit";
   base_ref: string | null; records: ChangeRecord[]; subject_digest: string | null;
+  /** An explicitly empty base, never a fallback for an invalid comparison ref. */
+  unborn?: true;
 }
 const hash = (bytes: Buffer | string) => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 
@@ -22,6 +24,44 @@ function git(root: string, args: string[], maxBuffer = 32 * 1024 * 1024): Buffer
 }
 function decode(bytes: Buffer): string { return new TextDecoder("utf-8", { fatal: true }).decode(bytes); }
 function gitText(root: string, args: string[]): string { return decode(git(root, args)).trim(); }
+
+/** A symbolic HEAD with an absent branch is the only valid missing-first-commit state. */
+function unbornHead(root: string): boolean {
+  const options = { cwd: root, timeout: 5000, encoding: "utf8" as const, env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" } };
+  const ref = spawnSync("git", ["symbolic-ref", "-q", "HEAD"], options);
+  return ref.status === 0 && /^refs\/heads\/[^\s]+$/u.test(ref.stdout.trim()) &&
+    spawnSync("git", ["show-ref", "--verify", "--quiet", ref.stdout.trim()], options).status === 1;
+}
+
+function unbornScope(root: string, staged: boolean, paths: string[]): ChangeScope {
+  const snapshot = (): ChangeRecord[] => {
+    const names = decode(git(root, ["ls-files", "--cached", ...(!staged ? ["--others", "--exclude-standard"] : []), "-z"]))
+      .split("\0").filter(Boolean).map(safeSubjectPath);
+    const selected = [...new Set(names)].filter(path => !paths.length || paths.includes(path)).sort();
+    if (selected.length > 4096) throw new Error("First-commit inventory exceeds capture bound; configure .gitignore or use a narrower staged scope");
+    let remaining = 8 * 1024 * 1024;
+    return selected.flatMap(path => {
+      let after: SubjectSource | null;
+      let captured: Buffer | undefined;
+      if (staged) after = entry(root, "index", path);
+      else {
+        try { const current = worktreeBytes(root, path, remaining); captured = current.bytes; after = { kind: "worktree", path, identity: hash(current.bytes), file_type: current.type }; }
+        catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return []; throw error; }
+      }
+      if (!after) throw new Error("First-commit source unavailable");
+      const bytes = captured ?? readSubjectSource(root, after, remaining);
+      remaining -= bytes.length;
+      if (remaining < 0) throw new Error("First-commit source exceeds capture bound");
+      const count = bytes.length ? bytes.toString("utf8").split("\n").length - Number(bytes.at(-1) === 10) : 0;
+      return [{ status: "added" as const, path, previous_path: null, before: null, after,
+        changed_ranges: count ? [{ start: 1, end: count }] : [] }];
+    });
+  };
+  const records = snapshot();
+  if (canonical(records) !== canonical(snapshot()) || !unbornHead(root)) throw new Error("First-commit subject changed while resolving");
+  return { kind: "project-governance-change-packet", version: 1, scope: "changed", mode: staged ? "staged" : paths.length ? "explicit" : "changed",
+    base_ref: null, unborn: true, records, subject_digest: subjectDigest(records) };
+}
 
 export function safeSubjectPath(value: string): string {
   if (!value || value.includes("\0") || Buffer.byteLength(value) > 4096 || isAbsolute(value) || value.split("/").includes("..") || posix.normalize(value) !== value || value === ".") throw new Error("unsafe repository-relative subject path");
@@ -103,7 +143,12 @@ export function resolveChangeScope(root: string, options: { staged?: boolean; al
   const paths = [...new Set((options.paths ?? []).map(safeSubjectPath))].sort();
   const configured = options.baseRef || process.env["GOVERNANCE_BASE_REF"]?.trim();
   if (!options.staged && paths.length && !configured) throw new Error("explicit changed paths require a comparison base");
-  const head = gitText(root, ["rev-parse", "--verify", "HEAD^{commit}"]);
+  let head: string;
+  try { head = gitText(root, ["rev-parse", "--verify", "HEAD^{commit}"]); }
+  catch (error) {
+    if (!unbornHead(root) || (!options.staged && configured && configured !== "HEAD")) throw error;
+    return unbornScope(root, options.staged ?? false, paths);
+  }
   const base = options.staged ? head : gitText(root, ["merge-base", head, gitText(root, ["rev-parse", "--verify", "--end-of-options", `${configured || "@{upstream}"}^{commit}`])]);
   const diff = options.staged ? ["--cached", base] : [base, ...(paths.length ? ["--", ...paths.map(p => `:(literal)${p}`)] : [])];
   const snapshot = (): ChangeRecord[] => {
@@ -165,14 +210,37 @@ export class ValidationSubject {
   readonly root: string;
   readonly #scope: ChangeScope;
   readonly #overlay = new Map<string, SubjectSource | null>();
-  constructor(root: string, scope: ChangeScope) {
+  readonly #workingTree: boolean;
+  readonly #projectionUnverified = new Set<string>();
+  #baseSources: Map<string, SubjectSource> | null | undefined;
+
+  /** One immutable tree query supplies path/type/blob metadata for the whole retrieval pass. */
+  private baseSources(): Map<string, SubjectSource> | null {
+    if (this.#baseSources !== undefined) return this.#baseSources;
+    const sources = new Map<string, SubjectSource>();
+    try { if (!this.#scope.unborn) for (const line of decode(git(this.root, ["ls-tree", "-r", "-z", this.#scope.base_ref!])).split("\0").filter(Boolean)) {
+      const tab = line.indexOf("\t"), metadata = line.slice(0, tab).split(" "), path = safeSubjectPath(line.slice(tab + 1));
+      if (tab < 0 || metadata.length !== 3) throw new Error("Malformed base tree metadata");
+      if (metadata[1] !== "blob") continue;
+      sources.set(path, { kind: "git", path, ref: this.#scope.base_ref!, identity: metadata[2]!, file_type: fileType(metadata[0]!) });
+    } } catch {
+      // A broad retrieval optimization must not disable the established narrow comparison path.
+      this.#baseSources = null; return null;
+    }
+    this.#baseSources = sources; return sources;
+  }
+  constructor(root: string, scope: ChangeScope, options: { workingTree?: boolean } = {}) {
     this.root = realpathSync(root); this.#scope = structuredClone(scope);
+    this.#workingTree = options.workingTree === true && scope.mode !== "staged";
     if (scope.kind !== "project-governance-change-packet" || scope.version !== 1) throw new Error("unsupported validation subject");
     if (scope.scope === "all") {
       if (scope.mode !== "all" || scope.base_ref !== null || scope.subject_digest !== null || scope.records.length) throw new Error("inconsistent all-mode subject");
       return;
     }
-    if (!scope.base_ref || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(scope.base_ref) || scope.subject_digest !== subjectDigest(scope.records)) throw new Error("invalid content-bound subject identity");
+    const emptyBase = scope.unborn === true && scope.base_ref === null && scope.records.every(record =>
+      record.status === "added" && record.previous_path === null && record.before === null && record.after !== null);
+    if ((!emptyBase && (!scope.base_ref || scope.unborn || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(scope.base_ref))) ||
+        scope.subject_digest !== subjectDigest(scope.records)) throw new Error("invalid content-bound subject identity");
     for (const record of this.#scope.records) {
       safeSubjectPath(record.path);
       if (record.previous_path) this.#overlay.set(safeSubjectPath(record.previous_path), null);
@@ -192,14 +260,126 @@ export class ValidationSubject {
       }
     }
     if (this.#overlay.has(path)) return structuredClone(this.#overlay.get(path)!);
-    return entry(this.root, "git", path, this.#scope.base_ref!);
+    if (this.#scope.unborn) return null;
+    return structuredClone(this.baseSources()?.get(path) ?? entry(this.root, "git", path, this.#scope.base_ref!));
   }
 
   read(path: string, limit = 16 * 1024 * 1024): Buffer {
+    if (this.#projectionUnverified.has(path)) {
+      const current = worktreeBytes(this.root, path, limit);
+      if (current.type !== "regular") throw new Error("working source is not regular");
+      this.#overlay.set(path, { kind: "worktree", path, identity: hash(current.bytes), file_type: "regular" });
+      this.#projectionUnverified.delete(path);
+      return current.bytes;
+    }
     const source = this.source(path);
     if (!source) throw new Error(`subject path is absent: ${path}`);
     if (source.file_type !== "regular") throw new Error(`subject path is not a regular file: ${path}`);
+    if (this.#workingTree && source.kind !== "worktree") {
+      const current = worktreeBytes(this.root, path, limit);
+      const id = createHash(source.identity.length === 64 ? "sha256" : "sha1")
+        .update(`blob ${current.bytes.length}\0`).update(current.bytes).digest("hex");
+      if (current.type !== "regular" || id !== source.identity) {
+        this.projectionSources([path]);
+        if (this.#projectionUnverified.has(path)) return this.read(path, limit);
+        throw new Error("working source changed after capture");
+      }
+      return current.bytes;
+    }
     return readSubjectSource(this.root, source, limit);
+  }
+
+  /** Cache observation is separate from delivery. Untrusted Git flags/filters require literal bytes. */
+  projectionSources(paths: string[]): { view: string; subject: string | null; sources: Map<string, { key: string; freshness: string }> } {
+    const sources = new Map<string, { key: string; freshness: string }>();
+    const uncertain = new Set<string>();
+    let verified = true;
+    if (this.#workingTree) try {
+      for (const line of decode(git(this.root, ["ls-files", "-v", "-z"])).split("\0").filter(Boolean))
+        if (line[0] !== "H") uncertain.add(line.slice(2));
+      const attrs = decode(execFileSync("git", ["check-attr", "-z", "--stdin", "filter", "text", "eol", "working-tree-encoding"], {
+        cwd: this.root, input: paths.join("\0") + "\0", timeout: 1000, maxBuffer: 32 * 1024 * 1024,
+        env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" }, stdio: ["pipe", "pipe", "pipe"],
+      })).split("\0");
+      // text=auto/autocrlf alone does not change an LF checkout. Git reports actual index/worktree EOLs.
+      for (let i = 0; i + 2 < attrs.length; i += 3) if (["filter", "working-tree-encoding"].includes(attrs[i + 1]!) &&
+        !["unspecified", "unset"].includes(attrs[i + 2]!)) uncertain.add(attrs[i]!);
+      for (const line of decode(git(this.root, ["ls-files", "--eol", "-z"])).split("\0").filter(Boolean)) {
+        const tab = line.indexOf("\t"), match = /^i\/(\S*)\s+w\/(\S*)/u.exec(line.slice(0, tab));
+        if (tab < 0 || !match) throw new Error("Unverified EOL observation");
+        if (match[1] !== match[2]) uncertain.add(line.slice(tab + 1));
+      }
+    } catch { verified = false; }
+    for (const path of paths) {
+      try {
+        if (this.#workingTree && (!verified || uncertain.has(path)) || this.#scope.scope === "all") {
+          // Capture is deferred to readBatch, under its shared deadline/byte limits. No eager crawl.
+          this.#projectionUnverified.add(path);
+          sources.set(path, { key: "unverified", freshness: "unverified" });
+          continue;
+        }
+        const source = this.source(path);
+        if (source?.file_type === "regular") sources.set(path, { key: `${source.kind === "worktree" ? "bytes" : "blob"}:${source.identity}`,
+          freshness: source.kind === "worktree" ? "captured-bytes" : this.#scope.mode === "staged" ? "captured-index-blob" : "git-observed-clean" });
+      } catch { /* An unverified path remains visible, but cannot reuse a source fact. */ }
+    }
+    return { view: this.#scope.mode === "staged" ? "staged" : "worktree", subject: this.#scope.subject_digest, sources };
+  }
+
+  /** Bulk immutable reads for a disposable source index; every omitted description keeps its path. */
+  readBatch(paths: string[], perFile = 256 * 1024, totalLimit = 32 * 1024 * 1024, deadlineAt = performance.now() + 5000): Map<string, Buffer | string> {
+    if (!Number.isSafeInteger(perFile) || perFile < 1 || perFile > 1024 * 1024 ||
+      !Number.isSafeInteger(totalLimit) || totalLimit < perFile || totalLimit > 32 * 1024 * 1024) throw new Error("Invalid batch source limits");
+    const results = new Map<string, Buffer | string>(), blobs = new Map<string, string[]>();
+    let remaining = totalLimit;
+    for (const path of [...new Set(paths)]) {
+      try {
+        if (performance.now() >= deadlineAt) { results.set(path, "index-deadline"); continue; }
+        if (this.#projectionUnverified.has(path)) {
+          const bytes = this.read(path, Math.min(perFile, remaining));
+          remaining -= bytes.length; results.set(path, bytes); continue;
+        }
+        const source = this.source(path);
+        if (source?.file_type !== "regular") { results.set(path, "source-not-regular"); continue; }
+        if (source.kind === "worktree") {
+          const bytes = readSubjectSource(this.root, source, Math.min(perFile, remaining));
+          remaining -= bytes.length; results.set(path, bytes);
+        } else {
+          if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(source.identity)) throw new Error("Invalid blob identity");
+          blobs.set(source.identity, [...(blobs.get(source.identity) ?? []), path]);
+        }
+      } catch { results.set(path, "source-unavailable-or-over-limit"); }
+    }
+    if (!blobs.size) return results;
+    const batch = (args: string[], input: string, maxBuffer: number) => execFileSync("git", args, {
+      cwd: this.root, input, maxBuffer, timeout: Math.max(1, Math.min(1000, Math.floor(deadlineAt - performance.now()))), stdio: ["pipe", "pipe", "pipe"],
+      env: { ...process.env, GIT_OPTIONAL_LOCKS: "0", GIT_NO_REPLACE_OBJECTS: "1" },
+    });
+    try {
+      const info = decode(batch(["cat-file", "--batch-check=%(objectname) %(objecttype) %(objectsize)"], [...blobs.keys()].join("\n") + "\n", 16 * 1024 * 1024));
+      const selected: Array<{ id: string; size: number }> = [];
+      for (const line of info.trim().split("\n")) {
+        const [id, type, sizeText] = line.split(" "), size = Number(sizeText);
+        if (!id || !blobs.has(id)) throw new Error("Invalid batch identity");
+        if (type !== "blob" || !Number.isSafeInteger(size) || size < 0 || size > perFile || size > remaining) {
+          for (const path of blobs.get(id)!) results.set(path, "source-unavailable-or-over-limit");
+        } else { selected.push({ id, size }); remaining -= size; }
+      }
+      if (selected.length) {
+        const bytes = batch(["cat-file", "--batch"], selected.map(item => item.id).join("\n") + "\n", totalLimit + selected.length * 128);
+        let offset = 0;
+        for (const { id, size } of selected) {
+          const end = bytes.indexOf(10, offset);
+          if (end < 0 || bytes.subarray(offset, end).toString() !== `${id} blob ${size}` || bytes[end + size + 1] !== 10) throw new Error("Invalid batch source framing");
+          const body = bytes.subarray(end + 1, end + size + 1);
+          for (const path of blobs.get(id)!) results.set(path, body);
+          offset = end + size + 2;
+        }
+        if (offset !== bytes.length) throw new Error("Unexpected batch source bytes");
+      }
+    } catch { for (const paths of blobs.values()) for (const path of paths) results.set(path, "batch-source-unavailable"); }
+    for (const paths of blobs.values()) for (const path of paths) if (!results.has(path)) results.set(path, "batch-source-unavailable");
+    return results;
   }
 
   /**
@@ -208,12 +388,12 @@ export class ValidationSubject {
    */
   hunks(path: string, context = 3, limit = 256 * 1024): string {
     safeSubjectPath(path);
-    if (this.#scope.scope === "all" || !this.#scope.base_ref) throw new Error("diff capture requires a compared subject");
+    if (this.#scope.scope === "all" || (!this.#scope.base_ref && !this.#scope.unborn)) throw new Error("diff capture requires a compared subject");
     if (!Number.isSafeInteger(context) || context < 0 || context > 16) throw new Error("invalid diff context");
     const captured = this.source(path) ? this.read(path, limit) : null;
     const diff = this.#scope.mode === "staged" ? ["--cached", this.#scope.base_ref] : [this.#scope.base_ref];
-    const bytes = git(this.root, ["-c", "core.quotePath=false", "diff", `--unified=${context}`, "--no-color", "--no-ext-diff",
-      "--no-textconv", "-M", ...diff, "--", `:(literal)${path}`], limit);
+    const bytes = this.#scope.unborn ? Buffer.alloc(0) : git(this.root, ["-c", "core.quotePath=false", "diff", `--unified=${context}`, "--no-color", "--no-ext-diff",
+      "--no-textconv", "-M", ...diff as string[], "--", `:(literal)${path}`], limit);
     if (bytes.length > limit) throw new Error("captured diff exceeds read budget");
     if (captured) this.read(path, limit);
     if (!bytes.length && captured && this.#scope.records.some(record => record.path === path && !record.before)) {
@@ -230,7 +410,9 @@ export class ValidationSubject {
     const included = (path: string) => !scopes || scopes.some(scope => path === scope || path.startsWith(scope + "/"));
     const args = this.#scope.scope === "all" ? ["ls-files", "--cached", "--others", "--exclude-standard", "-z"] : ["ls-tree", "-r", "--name-only", "-z", this.#scope.base_ref!];
     if (scopes) args.push("--", ...scopes.map(path => `:(literal)${path}`));
-    const paths = new Set(decode(git(this.root, args)).split("\0").filter(Boolean).map(safeSubjectPath));
+    const sources = this.#scope.scope === "all" ? null : this.baseSources();
+    const paths = new Set(sources ? [...sources.keys()].filter(included)
+      : decode(git(this.root, args)).split("\0").filter(Boolean).map(safeSubjectPath));
     for (const [path, source] of this.#overlay) if (included(path)) { if (source) paths.add(path); else paths.delete(path); }
     return [...paths].sort();
   }

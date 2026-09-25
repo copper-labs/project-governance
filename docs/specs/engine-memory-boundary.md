@@ -5,16 +5,24 @@ type: spec
 status: draft
 owner: project-governance
 created: 2026-09-20
-updated: 2026-09-20
-summary: Design the Mnemos integration contract now while deferring dependency adoption and critical-store changes.
+updated: 2026-09-25
+summary: Keep prompt-time project-history retrieval provider-neutral while deferring mandatory Mnemos adoption and critical-store changes.
 ---
 
-# Memory boundary: design now, adopt later
+# Memory boundary: early retrieval, optional provider adoption
 
-The operator explicitly requested Mnemos needs be considered now and adoption occur later. This
-contract owns that design boundary. It does not install Mnemos, activate learning, replace SQLite,
-or claim exact SDK compatibility. The [transition plan](../exec-plans/active/2026-09-20-unified-development-engine.md)
-separates contract fixtures from later exact-package qualification.
+This contract owns the provider boundary for project-history retrieval. The
+[RC6 prompt-time retrieval contract](engine-rc6-linked-retrieval.md) tests bounded historical
+candidate lookup before the main agent reads task-specific source. Existing SQLite/file owners
+can serve that lookup first; a project with a useful governed graph may qualify Mnemos behind the
+same port. The port does not install Mnemos, activate learning, replace SQLite, or claim exact SDK
+compatibility. The [transition plan](../exec-plans/active/2026-09-20-unified-development-engine.md)
+separates contract fixtures from exact-package qualification.
+
+The accepted RC6 current-source index is a disposable per-worktree SQLite projection, separate from
+this optional history-provider port and the critical task database. It caches source facts and
+basic declared/parsed links; it does not adopt Mnemos, build a historical prose corpus or turn an
+index into a new authority. Its scope and freshness rules are owned by the RC6 contract.
 
 ## Responsibilities
 
@@ -23,10 +31,10 @@ acceptance and recovery. SQLite plus retained artifacts remain their operational
 Memory providers expose bounded useful context and preserve provenance. An unavailable provider
 cannot block build/test execution or turn an old procedure into an authorized operation.
 
-Define the engine-facing port independently of Mnemos-specific objects. Map it to the public TS
-package root in a later adapter. Do not expose internal graph queries, provider tables, storage handles,
-or private SDK types to engine modules. Language alignment is an integration convenience, not a
-shared-database or platform-parity guarantee.
+Define the engine-facing port independently of Mnemos-specific objects. A qualified adapter maps
+it to the public TS package root when a project elects that provider. Do not expose internal graph
+queries, provider tables, storage handles, or private SDK types to engine modules. Language
+alignment is an integration convenience, not a shared-database or platform-parity guarantee.
 
 ## Design obligations before the first core schema freezes
 
@@ -53,8 +61,10 @@ a generic status field. Unknown response shapes fail to the ordinary context pat
 - `capabilities` reports which projection, lookup, provenance, freshness and cancellation behaviors exist.
 - `project` ingests a bounded batch of eligible versioned facts with stable event IDs and returns an
   acknowledgment/watermark. Replays deduplicate; missing sequence ranges cannot imply complete history.
-- `retrieve` accepts a bound scope/purpose and budgets, returning candidate refs, reasons, provenance,
-  freshness and omissions. The engine fetches/revalidates authoritative bytes itself.
+- `retrieve` accepts a bounded submitted-prompt purpose, a bound task where available, explicit
+  repository/worktree scope and budgets, returning candidate refs, reasons, provenance, freshness
+  and omissions. The engine fetches/revalidates authoritative bytes itself. A follow-up prompt
+  needs the existing task context; prompt text alone is not a complete scope.
 - `withdraw` propagates revocation/supersession/deletion markers for the affected scope and revisions.
 - `close` ends owned sessions/resources; cancellation must not imply that a prior projection committed.
 
@@ -90,16 +100,19 @@ Memory similarity cannot establish source freshness, complete dependencies, pass
 identity, permission or acceptance. Task code and retrieved text remain evidence rather than runtime
 instructions. Do not combine discovery confidence with proof applicability.
 
-## Deferred adoption and proof
+## Optional adoption and proof
 
 Now: specify schemas/ports, capture identity/provenance fields, and plan fake-provider cases for stale
 results, lag, duplication, omission, withdrawal, scope mismatch, cancellation and unavailability.
-No package dependency or network call is required for this contract work or the first device lanes.
+RC6 may exercise the port at prompt time through existing local owners without adding a package
+dependency or network call. A project-owned populated graph is an optional comparison source;
+its presence and coverage must be verified, not inferred from SDK capability.
 
-Later: qualify the exact TS package artifact, its runtime/storage/platform behavior and public API
-mapping. The inspected SDK source docs use structural objects, Promises, AbortSignal and AsyncIterable;
-its brief/explanation projection has explicit limits. Do not assume full graph, explanation or byte
-projection parity from TS declarations alone. Keep adapter capability gaps visible.
+If Mnemos is selected: qualify the exact TS package artifact, its runtime/storage/platform behavior,
+project corpus and public API mapping before using it for prompt-time lookup. The inspected SDK
+source docs use structural objects, Promises, AbortSignal and AsyncIterable; its brief/explanation
+projection has explicit limits. Do not assume full graph, explanation or byte projection parity from
+TS declarations alone. Keep adapter capability gaps visible.
 
 Compare the first concrete retrieval use case against direct search/local SQL with the same allowed
 inputs. Adopt only if accepted outcomes, retrieval quality or preparation cost improve without scope,

@@ -1,8 +1,9 @@
 import type {Readable} from "node:stream";
 
 /** Native hook payloads are small. Bound both bytes and waiting for a host to close its pipe. */
-export async function startupInput(input:Readable=process.stdin,timeoutMs=3000):Promise<unknown> {
+export async function startupInput(input:Readable=process.stdin,timeoutMs=3000,maximumBytes=65536):Promise<unknown> {
  if(!Number.isFinite(timeoutMs) || timeoutMs<=0)throw new Error("Invalid startup input deadline");
+ if(!Number.isSafeInteger(maximumBytes) || maximumBytes<1 || maximumBytes>262144)throw new Error("Invalid startup input size limit");
  return new Promise((resolve,reject)=>{
   const chunks:Buffer[]=[];let bytes=0;
   const finish=(error?:Error)=>{
@@ -14,7 +15,7 @@ export async function startupInput(input:Readable=process.stdin,timeoutMs=3000):
   };
   const data=(chunk:Buffer|string)=>{
    const value=Buffer.isBuffer(chunk)?chunk:Buffer.from(chunk);bytes+=value.length;
-   if(bytes>65536){finish(new Error("Startup event input exceeds limit"));return;}
+   if(bytes>maximumBytes){finish(new Error("Startup event input exceeds limit"));return;}
    chunks.push(value);
   };
   const end=()=>finish();

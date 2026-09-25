@@ -39,6 +39,17 @@ summary: Routes developers and agents to the repository's canonical technical do
 Start with the reader job you need to complete. Add a guide only when it provides a tested journey;
 keep exact behavior in one canonical reference.
 
+When behavior changes, update its purpose, public contract and important constraints beside the
+owning code or reference. Give each module one useful overview and link its code, tests and guides
+in the capability catalog. Avoid repeating a module description in every file. Run the installed
+comment and documentation checks for changed work; unsupported language coverage remains advisory.
+
+Backfill older gaps when touching the area or resolving a repeated context miss. Inspect the current
+source and existing module guide before adding prose. Context doctor reports observed overview gaps
+with source digests; these are review candidates, not proof that documentation is missing or wrong.
+An untouched legacy gap is not a new blocker for unrelated work. Do not generate a bulk prose mirror
+of the repository or promote an index description into policy.
+
 ## For Humans
 
 The capability catalog begins empty. As capabilities are documented, link their shortest useful

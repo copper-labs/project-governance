@@ -14,7 +14,7 @@ export function startupPolicy(profile: unknown) {
       throw new Error(`Invalid startup ${key}`);
     return selected;
   };
-  return {policy,cache_seconds:budget("cache_seconds",43200,604800),
+  return {policy,cache_seconds:budget("cache_seconds",86400,604800),
     discovery_seconds:budget("discovery_seconds",5,60),install_seconds:budget("install_seconds",180,3600)};
 }
 

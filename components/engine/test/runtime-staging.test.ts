@@ -522,7 +522,7 @@ test("inactive installation verifies identity and preserves a failed-generation 
     writeFileSync(cliPlanPath,JSON.stringify(cliPlan));
     const cliRegistryPath=join(cliLegacy,"installation.sqlite"),cliOperation=join(root,"cli-legacy-operation");
     writeFileSync(cliRequestPath,JSON.stringify({mode:"update",workspace:cliLegacy,registry:cliRegistryPath,archive,lock,
-      expectedRevision:0,inputs:cliPlan.inputs,hostPlan:cliPlan.hostPlan,startupReceipts:join(root,"migrated-startup.sqlite")}));
+      expectedRevision:0,inputs:cliPlan.inputs,hostPlan:cliPlan.hostPlan,startupReceipts:join(cliLegacy,"startup.sqlite")}));
     const legacyArguments=[fileURLToPath(cli),"update","--request-file",cliRequestPath,"--project-plan",cliPlanPath,"--operation-directory",cliOperation];
     await assert.rejects(runtimeOperationCommand("update",legacyArguments.slice(2).concat("--request-digest","stale")),/changed during handoff/);
     assert.equal(existsSync(cliOperation),false);
@@ -533,6 +533,9 @@ test("inactive installation verifies identity and preserves a failed-generation 
       assert.equal(existsSync(cliOperation),false);
       assert.equal(existsSync(cliRegistryPath),false);
     }
+    writeFileSync(cliRequestPath,validRequest);
+    writeFileSync(cliRequestPath,JSON.stringify({...JSON.parse(validRequest),startupReceipts:join(root,"shared-receipts.sqlite")}));
+    await assert.rejects(runtimeOperationCommand("update",legacyArguments.slice(2)),/next to this worktree/);
     writeFileSync(cliRequestPath,validRequest);
     const cliUpdate=JSON.parse(execFileSync(process.execPath,legacyArguments,{encoding:"utf8",timeout:15000}));
     assert.equal(cliUpdate.state.maintenance,null);
@@ -568,7 +571,10 @@ test("inactive installation verifies identity and preserves a failed-generation 
     assert.equal(initialized.state.maintenance,null);
     assert.equal(JSON.parse(readFileSync(join(initWorkspace,"config/governance/runtime.lock.yaml"),"utf8")).schema_version,2);
     assert.match(readFileSync(join(initWorkspace,"AGENTS.md"),"utf8"),/governance/);
-    assert.equal(readFileSync(join(initWorkspace,"config/governance/profile.yaml"),"utf8"),"schema_version: 1\nproject_extensions: []\n");
+    assert.match(readFileSync(join(initWorkspace,"config/governance/profile.yaml"),"utf8"),/default_route: project/);
+    const installedHooks=JSON.parse(readFileSync(join(initWorkspace,".codex/hooks.json"),"utf8"));
+    assert.equal(installedHooks.hooks.UserPromptSubmit.length,1);
+    assert.match(installedHooks.hooks.UserPromptSubmit[0].hooks[0].command,/startup observe --provider codex --event-stdin/);
     assert.equal(readFileSync(join(initWorkspace,"config/governance/facts.lock.yaml"),"utf8"),"schema_version: 1\nfacts: {}\n");
     assert.equal(readFileSync(join(initWorkspace,".governance/.gitignore"),"utf8"),"*\n!.gitignore\n");
     for(const hook of ["commit-msg","pre-commit","pre-push","pre-pr"]) {
@@ -578,14 +584,14 @@ test("inactive installation verifies identity and preserves a failed-generation 
     }
     assert.deepEqual(JSON.parse(execFileSync(process.execPath,initArgs,{encoding:"utf8",timeout:15000})),initialized);
     const startupInput={provider:"codex",event:{session_id:"init-session",hook_event_name:"SessionStart",source:"startup"},
-      workspace:initWorkspace,registry:join(initWorkspace,"installation.sqlite"),receipts:join(root,"startup-receipts.sqlite")};
+      workspace:initWorkspace,registry:join(initWorkspace,"installation.sqlite"),receipts:join(initWorkspace,"startup.sqlite")};
     const noNetwork={fetch:(async()=>{throw new Error("Manual policy must not fetch");}) as typeof fetch,environment:{}};
     const startupEventFile=join(root,"startup-event.json");writeFileSync(startupEventFile,JSON.stringify(startupInput.event));
     const startupArgs=[fileURLToPath(cli),"runtime-run","--registry",startupInput.registry,"--workspace",initWorkspace,"--","startup","observe",
       "--provider","codex","--event-stdin","--receipts",startupInput.receipts];
-    const observed=JSON.parse(execFileSync(process.execPath,startupArgs,{input:JSON.stringify(startupInput.event),encoding:"utf8",timeout:10000}));
+    const observed=JSON.parse(execFileSync(process.execPath,startupArgs,{cwd:initWorkspace,input:JSON.stringify(startupInput.event),encoding:"utf8",timeout:10000}));
     assert.throws(()=>execFileSync(process.execPath,[...startupArgs,"--event-file",startupEventFile],
-      {input:JSON.stringify(startupInput.event),encoding:"utf8",timeout:10000,stdio:["pipe","pipe","pipe"]}),/"status":"failed"/);
+      {cwd:initWorkspace,input:JSON.stringify(startupInput.event),encoding:"utf8",timeout:10000,stdio:["pipe","pipe","pipe"]}),/"status":"failed"/);
     assert.deepEqual(observed,{});
     const replayed=await observeStartup(startupInput,noNetwork);
     assert.equal(replayed.discover,false);
@@ -600,10 +606,12 @@ test("inactive installation verifies identity and preserves a failed-generation 
     const startupProfile=join(initWorkspace,"config/governance/profile.yaml"),originalProfile=readFileSync(startupProfile);
     writeFileSync(startupProfile,"schema_version: 1\nruntime_updates:\n  policy: compatible\n");
     const failingStartup={...startupInput,event:{...startupInput.event,session_id:"unsupported-local-release"}};
-    await assert.rejects(observeStartup(failingStartup,noNetwork),/GitHub release owner/);
-    const failedReplay=await observeStartup(failingStartup,noNetwork);
-    assert.equal("result" in failedReplay && failedReplay.result?.status,"discovery-failed");
-    assert.equal(failedReplay.discover,false);
+    const localRelease=await observeStartup(failingStartup,noNetwork);
+    assert.equal("result" in localRelease && localRelease.result?.status,"manual");
+    assert.equal("result" in localRelease && localRelease.result?.reason,"unsupported-distribution");
+    const localReplay=await observeStartup(failingStartup,noNetwork);
+    assert.equal("result" in localReplay && localReplay.result?.status,"manual");
+    assert.equal(localReplay.discover,false);
     writeFileSync(startupProfile,originalProfile);
     const startupRegistry=new RuntimeGenerations(startupInput.registry);
     try{

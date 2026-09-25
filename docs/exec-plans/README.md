@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-02-16
-updated: 2026-09-21
+updated: 2026-09-25
 summary: Active and completed execution plans for the current source repository.
 ---
 
@@ -15,6 +15,10 @@ Active plans are short-lived work records. Completed plans retain concise source
 Git remains the implementation history and recovery mechanism.
 
 ## Active
+
+- [RC6 maintained context](active/2026-09-23-rc6-linked-retrieval.md) owns automatic prompt entry,
+  the local SQLite index, basic relationships, bounded JEV selection/expansion and real-task release
+  qualification. Its expanded slices remain distinct from the earlier transient-index candidate.
 
 - [Decision-layer delivery, release and pilot measurement](active/2026-09-21-major-adoption-and-measurement.md)
   is the finalized delivery order and progress checklist after explicit-preview closeout: implement useful JEV consumers,

@@ -91,3 +91,33 @@ test("validation graph reads immutable base plus selected overlay instead of unr
     assert.throws(() => new ValidationSubject(f.root, { ...scope, subject_digest: "invented" }), /identity/);
   } finally { f.close(); }
 });
+
+test("whole-tree metadata failure preserves narrow reads and directory rejection", () => {
+  const f = repository(), oldPath = process.env.PATH;
+  try {
+    mkdirSync(join(f.root, "nested")); writeFileSync(join(f.root, "nested/item.ts"), "export const value=1;\n");
+    f.git("add", "."); f.git("commit", "-qm", "nested fixture");
+    const subject = new ValidationSubject(f.root, resolveChangeScope(f.root, { baseRef: "HEAD" }));
+    const actualGit = execFileSync("which", ["git"], { encoding: "utf8" }).trim();
+    const bin = join(f.root, "fake-bin"); mkdirSync(bin);
+    writeFileSync(join(bin, "git"), `#!${process.execPath}\nconst {execFileSync}=require('node:child_process');\nconst args=process.argv.slice(2);\nif(args[0]==='ls-tree'&&args[1]==='-r'&&args[2]==='-z')process.exit(1);\nexecFileSync(${JSON.stringify(actualGit)},args,{stdio:'inherit'});\n`, { mode: 0o755 });
+    process.env.PATH = `${bin}:${oldPath}`;
+    assert.equal(subject.read("code.ts").toString(), "const value = 1;\n");
+    assert.deepEqual(subject.paths(["nested"]), ["nested/item.ts"]);
+    assert.throws(() => subject.source("nested"), /not a blob/);
+  } finally { process.env.PATH = oldPath; f.close(); }
+});
+
+test("bulk source descriptions use captured staged bytes and retain per-file exclusions", () => {
+  const f = repository();
+  try {
+    writeFileSync(join(f.root, "code.ts"), "export function stagedSymbol() {}\n"); f.git("add", "code.ts");
+    const subject = new ValidationSubject(f.root, resolveChangeScope(f.root, { staged: true }));
+    writeFileSync(join(f.root, "code.ts"), "export function unrelatedDirtySymbol() {}\n"); f.git("add", "code.ts");
+    const batch = subject.readBatch(["code.ts", "rename.txt", "missing.ts"]);
+    assert.equal(batch.get("code.ts")?.toString(), "export function stagedSymbol() {}\n");
+    assert.equal(batch.get("rename.txt")?.toString(), "retained content\n");
+    assert.equal(batch.get("missing.ts"), "source-not-regular");
+    assert.equal(subject.readBatch(["code.ts"], 1).get("code.ts"), "source-unavailable-or-over-limit");
+  } finally { f.close(); }
+});

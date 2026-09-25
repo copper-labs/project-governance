@@ -6,7 +6,7 @@ import { performance } from "node:perf_hooks";
 import { digest, durableJson, object } from "./core.ts";
 import { matchesPackPath } from "./planning.ts";
 import { DECISION_CONSUMERS, DECISION_QUESTIONS } from "./decision-catalog.ts";
-import { reserveDecisionCall, type BudgetScope, type BudgetReservation } from "./decision-budget.ts";
+import { reserveDecisionCall, closeDecisionScope, contextBudgetScope, contextFamilyScope, type BudgetScope, type BudgetReservation } from "./decision-budget.ts";
 import { JevDecisionClient, type TransportOptions } from "./decision-transport.ts";
 import { resolveConsumerMode, type DecisionSettings } from "./decision-settings.ts";
 import {
@@ -30,6 +30,14 @@ export interface DecisionAsk {
   questions: QuestionInstance[];
   /** Repository-relative source paths transmitted in this request, checked against the profile scope. */
   sourcePaths?: string[];
+  metadataPaths?: string[];
+  evidenceLayout?: "shared-v1";
+  /** Isolate frequent prompt retrieval from check-time decision budgets without changing task identity. */
+  budgetPartition?: "context-selection";
+  budgetInvocationId?: string;
+  budgetFamily?: boolean;
+  /** Monotonic deadline shared by all batches in one retrieval. */
+  deadlineAt?: number;
   /** Legacy context evaluation preserves its explicitly approved source/synthetic data class. */
   legacyDataClass?: "source" | "diagnostic" | "synthetic";
   eligibilityDigest?: string | null;
@@ -52,7 +60,7 @@ export interface DecisionOutcome {
   model: string | null; latencyMs: number; usage: { inputTokens: number | null; outputTokens: number | null };
   failureStage?: DecisionFailureStage;
   coverage: DecisionCoverage;
-  budget: { state: BudgetReservation["state"] | "not-required"; reservationId: string | null; calls: number | null; bytes: number | null; limits: { maxCalls: number; maxRequestBytes: number } };
+  budget: { state: BudgetReservation["state"] | "not-required"; reservationId: string | null; calls: number | null; bytes: number | null; limits: { maxCalls: number; maxRequestBytes: number }; partition?: "context-selection"; invocationId?: string };
   tokenEstimate: number | null;
   receiptId: string | null;
 }
@@ -84,23 +92,29 @@ export class DecisionRuntime {
   }
 
   /** Doctor and callers can read the resolved disposition without preparing evidence or calling out. */
-  eligibility(consumerId: DecisionConsumerId) {
+  eligibility(consumerId: DecisionConsumerId, question?: "context.metadata-relevance/1") {
     const resolved = resolveConsumerMode(this.settings, consumerId);
     const consumer = DECISION_CONSUMERS[consumerId];
     const reasons: string[] = [];
     if (this.settings.mode === "off") reasons.push("global-off");
     if (this.settings.consumers[consumerId].mode === "off") reasons.push("consumer-off");
     if (!this.#client.tokenPresent) reasons.push("missing-token");
-    if (!this.settings.legacy.allowedDataClasses.includes(consumer.dataClass)) reasons.push("data-sharing-disabled");
+    const dataClass = consumerId === "DL03" && question === "context.metadata-relevance/1" ? "metadata" : consumer.dataClass;
+    if (!this.settings.legacy.allowedDataClasses.includes(dataClass)) reasons.push("data-sharing-disabled");
     return { ...resolved, consumer, reasons, providerUse: reasons.length ? "disabled" as const : "eligible" as const };
   }
 
   #eventKey(ask: DecisionAsk): string {
-    return digest({ workspace: ask.scope?.workspace ?? null, taskId: ask.scope?.taskId ?? null,
-      taskRevision: ask.scope?.taskRevision ?? null, consumers: [...new Set([ask.consumerId, ...(ask.participants ?? [])])].sort(),
-      eventId: ask.eventId }).slice(7, 39);
+    return digest({ workspace: ask.scope?.workspace ?? null, taskId: ask.budgetFamily ? null : ask.scope?.taskId ?? null,
+      taskRevision: ask.budgetFamily ? null : ask.scope?.taskRevision ?? null, consumers: [...new Set([ask.consumerId, ...(ask.participants ?? [])])].sort(),
+      eventId: ask.eventId, ...(ask.budgetPartition ? { budgetPartition: ask.budgetPartition, budgetInvocationId: ask.budgetInvocationId } : {}) }).slice(7, 39);
   }
   #receiptPath(key: string): string { return join(this.stateRoot, RECEIPT_COLLECTION, `${key}.json`); }
+
+  /** Close after all batches settle; retained reservations still prevent duplicate charging. */
+  closeContextInvocation(scope: BudgetScope, invocationId: string): boolean {
+    return closeDecisionScope(this.stateRoot, contextBudgetScope(scope, invocationId));
+  }
 
   #retained(key: string): DecisionOutcome | null {
     try {
@@ -122,7 +136,7 @@ export class DecisionRuntime {
     try { if (ask.scope) ask = { ...ask, scope: { ...ask.scope, workspace: realpathSync(ask.scope.workspace) } }; }
     catch { ask = { ...ask, scope: null }; }
     const started = performance.now();
-    const resolved = this.eligibility(ask.consumerId);
+    const resolved = this.eligibility(ask.consumerId, ask.evidenceLayout === "shared-v1" ? "context.metadata-relevance/1" : undefined);
     const consumer = resolved.consumer;
     const requestId = randomUUID();
     const key = this.#eventKey(ask);
@@ -156,11 +170,18 @@ export class DecisionRuntime {
     if (!ask.questions.length) return fallback("no-enabled-questions");
     if (ask.legacyDataClass !== undefined && (participants.length !== 1 || participants[0] !== "DL03" ||
       ask.questions.some(question => question.definitionId !== "legacy.context-rank/1"))) return fallback("data-sharing-disabled");
-    const dataClass = (id: DecisionConsumerId) => ask.legacyDataClass ?? DECISION_CONSUMERS[id].dataClass;
+    const metadata = ask.evidenceLayout === "shared-v1";
+    if (metadata && (participants.length !== 1 || ask.consumerId !== "DL03" || ask.legacyDataClass !== undefined ||
+      ask.questions.some(question => question.definitionId !== "context.metadata-relevance/1"))) return fallback("data-sharing-disabled");
+    const dataClass = (id: DecisionConsumerId) => metadata ? "metadata" : ask.legacyDataClass ?? DECISION_CONSUMERS[id].dataClass;
     if (participants.some(id => !this.settings.legacy.allowedDataClasses.includes(dataClass(id)))) return fallback("data-sharing-disabled");
-    if (participants.some(id => dataClass(id) === "source") && (!(ask.sourcePaths?.length) || ask.sourcePaths.some(path =>
+    if (metadata && ask.sourcePaths?.length && (!this.settings.legacy.allowedDataClasses.includes("source") ||
+      ask.sourcePaths.some(path => !ask.metadataPaths?.includes(path)))) return fallback("source-scope-disabled");
+    if ((participants.some(id => dataClass(id) === "source") || metadata && ask.sourcePaths?.length) && (!(ask.sourcePaths?.length) || ask.sourcePaths.some(path =>
       path.startsWith("/") || path.includes("\\") || path.split("/").some(part => part === ".." || part === ".") ||
       !matchesPackPath(path, this.settings.legacy.allowedSourcePaths ?? [])))) return fallback("source-scope-disabled");
+    if (metadata && (!ask.metadataPaths?.length || ask.metadataPaths.some(path => path.startsWith("/") || /[\x00-\x1f\\]/u.test(path) ||
+      path.split("/").some(part => part === ".." || part === ".") || !matchesPackPath(path, this.settings.allowedMetadataPaths ?? [])))) return fallback("metadata-scope-disabled");
     if (ask.questions.some(question => !participants.includes(question.consumerId) ||
       !this.settings.questionIds[question.consumerId].includes(question.definitionId))) return fallback("question-disabled");
     // Effects form explicit capability sets, not a permission ladder. A question's metadata alone
@@ -175,6 +196,9 @@ export class DecisionRuntime {
         if (entry === "workflow-diagnose") return true;
         return effect !== "advise" || (resolved.effect !== "advise" && !(entry === "workflow-observe" && resolved.effect === "choose-read"));
       })) return fallback("entry-effect-incompatible");
+    if (ask.budgetFamily && !ask.budgetPartition || ask.budgetPartition && (ask.budgetPartition !== "context-selection" || !metadata || !/^[a-f0-9]{64}$/u.test(ask.budgetInvocationId ?? "")) ||
+      ask.budgetInvocationId && !ask.budgetPartition) return fallback("budget-partition-incompatible");
+    if (ask.deadlineAt !== undefined && !Number.isFinite(ask.deadlineAt)) return fallback("invalid-deadline");
     if (!this.#client.tokenPresent) return fallback("missing-token");
     if (!ask.scope) return fallback("scope-unavailable");
 
@@ -185,17 +209,24 @@ export class DecisionRuntime {
     const identity = requestIdentity(request);
     // The reservation identity is the consumer-group event key, so one event cannot be spent twice.
     let admittedReservation: BudgetReservation | undefined;
-    const remainingDeadline = Math.floor(this.settings.legacy.deadlineMs - (performance.now() - started));
+    // A metadata batch must get a genuine provider timeout before the larger retrieval allowance.
+    const providerDeadline = metadata ? Math.min(this.settings.legacy.deadlineMs, 1000) : this.settings.legacy.deadlineMs;
+    const callRemaining = providerDeadline - (performance.now() - started);
+    const invocationRemaining = (ask.deadlineAt ?? Infinity) - performance.now();
+    const remainingDeadline = Math.floor(Math.min(callRemaining, invocationRemaining));
     if (remainingDeadline < 1) return fallback("deadline", { requestIdentity: identity });
     const transport = await this.#client.ask(body, remainingDeadline, this.#options.signal, () => {
-      admittedReservation = reserveDecisionCall(this.stateRoot, ask.scope!, key, requestBytes, this.settings.budget,
-        { busyTimeoutMs: Math.max(0, Math.min(1000, this.#options.busyTimeoutMs ?? 250, Math.floor(this.settings.legacy.deadlineMs - (performance.now() - started)))) });
+      const budgetScope = ask.budgetFamily ? contextFamilyScope(ask.scope!.workspace, ask.budgetInvocationId!)
+        : ask.budgetPartition ? contextBudgetScope(ask.scope!, ask.budgetInvocationId!) : ask.scope!;
+      admittedReservation = reserveDecisionCall(this.stateRoot, budgetScope, key, requestBytes, this.settings.budget,
+        { ...(ask.budgetFamily ? { familyId: ask.budgetInvocationId! } : {}), busyTimeoutMs: Math.max(0, Math.min(1000, this.#options.busyTimeoutMs ?? 250, Math.floor(this.settings.legacy.deadlineMs - (performance.now() - started)))) });
       return admittedReservation.state === "reserved";
-    }, () => { base.providerCalled = true; });
+    }, () => { base.providerCalled = true; }, invocationRemaining <= callRemaining ? "caller" : "provider");
     const reservation = admittedReservation;
     if (!reservation) return fallback(transport.ok ? "admission-unavailable" : transport.reason,
       { requestIdentity: identity, failureStage: transport.ok ? "budget" : transport.failureStage });
-    const budget = { state: reservation.state, reservationId: reservation.reservationId, calls: reservation.calls, bytes: reservation.bytes, limits: base.budget.limits };
+    const budget = { state: reservation.state, reservationId: reservation.reservationId, calls: reservation.calls, bytes: reservation.bytes, limits: base.budget.limits,
+      ...(ask.budgetPartition ? { partition: ask.budgetPartition, invocationId: ask.budgetInvocationId } : {}) };
     if (reservation.state === "duplicate") {
       const retained = this.#retained(key);
       return retained && retained.requestIdentity === identity ? { ...retained, requestId,

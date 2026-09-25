@@ -97,15 +97,16 @@ dispositions:
     error handling without separating a domain responsibility.
 - finding: quality.large-function
   path: components/engine/src/context-route-command.ts
-  symbol: contextRouteCommand
+  symbol: capturedContextRoute
   disposition: cohesion-accepted
   owner: project-governance-maintainers
-  reviewer: Codex focused cohesion review; final Opus review remains pending
-  approved_on: '2026-09-20'
+  reviewer: Codex source reconciliation and Claude Opus 5.5 medium maintainability review
+  approved_on: '2026-09-25'
   responsibility: Assemble one routed context packet from a captured subject and retain its source-bound receipt.
-  rationale: Required routing, optional advice and the final stale-source check share one captured subject.
-    The function delegates routing, materialization and ranking, then revalidates every captured input before
-    delivery; keeping that sequence visible preserves the mandatory-context boundary.
+  rationale: Required routing, family admission, optional advice and the final stale-source refusal share
+    one captured subject and paid-allowance lifetime. Source reads now enter one revalidation set; candidate
+    capture, provider selection and bounded receipt previews have separate owners. Keeping the remaining
+    sequence visible preserves the mandatory-context and one-charge boundaries.
 - finding: quality.large-function
   path: components/engine/src/decisions.ts
   symbol: JevDecisionAdapter.decide

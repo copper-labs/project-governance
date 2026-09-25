@@ -22,6 +22,8 @@ export interface DecisionSettings {
   questionIds: Record<DecisionConsumerId, string[]>;
   configDigest: string;
   modelRouting: ModelRoutingSettings;
+  /** Path metadata plus bounded task purpose may be disclosed; no source bodies. */
+  allowedMetadataPaths?: string[];
 }
 
 export const DEFAULT_DECISION_BUDGET: DecisionBudgetLimits = { maxCalls: 16, maxRequestBytes: 131_072 };
@@ -92,11 +94,16 @@ export function profileDecisionSettings(profile: unknown): DecisionSettings {
     return [id, [...questions]];
   })) as Record<DecisionConsumerId, string[]>;
   const modelRouting = modelRoutingSettings(root.continuity === undefined ? undefined : object(root.continuity).model_routing);
-  const resolved: Omit<DecisionSettings, "configDigest"> = { mode, legacy, consumers, questionIds, budget, modelRouting, migration: { notes } };
+  const metadata = settings.allowed_metadata_paths ?? [];
+  if (!Array.isArray(metadata) || metadata.length > 256 || metadata.some(path => typeof path !== "string" || !path || path.length > 512 ||
+      path.startsWith("/") || /[\x00-\x1f\\]/u.test(path) || path.split("/").some((part: string) => part === ".." || part === ".")))
+    throw new Error("Invalid metadata disclosure paths");
+  const allowedMetadataPaths = [...new Set(metadata as string[])];
+  const resolved: Omit<DecisionSettings, "configDigest"> = { mode, legacy, consumers, questionIds, budget, modelRouting, allowedMetadataPaths, migration: { notes } };
   return { ...resolved, configDigest: digest({ mode, model: legacy.model, revision: legacy.revision,
     allowedDataClasses: legacy.allowedDataClasses, allowedSourcePaths: legacy.allowedSourcePaths ?? [],
     deadlineMs: legacy.deadlineMs, evidenceBytes: legacy.evidenceBytes, maxCandidates: legacy.maxCandidates,
-    consumers, questionIds, budget, modelRouting }) };
+    consumers, questionIds, budget, modelRouting, allowedMetadataPaths }) };
 }
 
 export function loadProfileDecisionSettings(root: string): DecisionSettings {

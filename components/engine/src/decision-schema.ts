@@ -40,6 +40,8 @@ export interface QuestionInstance {
 }
 export interface DecisionRequest2 {
   schemaVersion: typeof DECISION_SCHEMA_VERSION; requestId: string;
+  /** Explicit versioned layout; old question-local payloads retain their exact identity. */
+  evidenceLayout?: "shared-v1";
   /** Bind caller capability into request reuse without transmitting it as model authority. */
   entryKind?: string;
   /** Accounting owner of the request. `consumers` lists every participant in a compatible batch. */
@@ -75,6 +77,8 @@ export function decisionConsumerId(value: unknown): DecisionConsumerId {
 /** Structural validation of a prepared request; callers cannot invent questions, IDs or budgets. */
 export function validateDecisionRequest(request: DecisionRequest2, definitions: Record<string, QuestionDefinition>): void {
   if (request.schemaVersion !== DECISION_SCHEMA_VERSION) throw new Error("Unsupported decision schema version");
+  if (request.evidenceLayout !== undefined && (request.evidenceLayout !== "shared-v1" || request.consumerId !== "DL03" ||
+      request.questions.some(question => question.definitionId !== "context.metadata-relevance/1"))) throw new Error("Unsupported shared evidence layout");
   text(request.requestId, "decision request id", 64);
   decisionConsumerId(request.consumerId);
   if (!Array.isArray(request.consumers) || !request.consumers.length || request.consumers.length > DECISION_CONSUMER_IDS.length ||
@@ -139,7 +143,9 @@ export function decisionPayload(request: DecisionRequest2, definitions: Record<s
       return { provenance: item.provenance, trust: item.trust, ...(item.range ? { range: item.range } : {}), evidence: item.text };
     });
     // The API accepts structured instructions; arbitrary sibling evidence fields are not its contract.
-    const base = { instructions: { question: definition.instructions, evidence } };
+    const base = { instructions: request.evidenceLayout === "shared-v1"
+      ? { question: definition.instructions, evidenceIds: question.evidenceIds }
+      : { question: definition.instructions, evidence } };
     if (definition.shape === "choice") {
       const criteria: Record<string, { evidence: string; provenance?: string; trust?: string }> = {};
       for (const candidate of question.candidates!) criteria[candidate.id] = { evidence: candidate.description, provenance: "supplied", trust: "untrusted" };
@@ -151,7 +157,8 @@ export function decisionPayload(request: DecisionRequest2, definitions: Record<s
       questions[question.name] = { ...base, type: "score", criteria: [...definition.levels!] };
     }
   }
-  return { model, state: { consumer: request.consumerId, consumers: [...request.consumers].sort(), consumerVersion: request.consumerVersion,
+  return { model, state: { ...(request.evidenceLayout === "shared-v1" ? { layout: "shared-v1", evidence: request.evidence } : {}),
+    consumer: request.consumerId, consumers: [...request.consumers].sort(), consumerVersion: request.consumerVersion,
     coverage: { captured: request.coverage.captured, omitted: request.coverage.omitted.length,
       unavailable: request.coverage.unavailable.length, truncated: request.coverage.truncated } }, questions };
 }

@@ -19,7 +19,7 @@ export async function verifyTaskContextEntry({ repo, temporary, run, write, git,
     const rootScoped = run(['context-route']);
     assert.equal(rootScoped.ready, true);
     assert.equal(rootScoped.routingPaths.mode, 'bound-task-empty-scope');
-    assert.equal(rootScoped.selection.candidateCount, 0);
+    assert.ok(rootScoped.selection.candidateCount > 0);
     const created = run(['harness', 'task', 'create', '--outcome', 'Repair the regression without weakening assertions', '--acceptance', 'Preserve required proof', '--scope', 'src']);
     const task = created.task;
     assert.ok(task.taskId);

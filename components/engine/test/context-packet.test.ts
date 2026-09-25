@@ -4,9 +4,15 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildContextPacket } from "../src/context-packet.ts";
+import { contextExcerpt } from "../src/context-excerpts.ts";
 import { DEFAULT_DECISIONS, JevDecisionAdapter } from "../src/decisions.ts";
 
 const candidate = (id: string) => ({ id, sourceDigest: "sha256:fixture", excerpt: id.repeat(30) });
+test("unmatched declaration names do not displace a relevant body window", () => {
+  const input = { id: "source", sourceDigest: "fixture", excerpt: "function first() {}\n" + "unrelated line\n".repeat(80) + "renew expired session\n" + "unrelated line\n".repeat(80) };
+  const excerpt = contextExcerpt(input, "renew expired session", 128, [{ name: "first", start: 1, end: 1 }]);
+  assert.match(excerpt.excerpt, /renew expired session/); assert.ok(excerpt.sourceRange!.firstLine > 1);
+});
 test("baseline ranks full captured meaning independently of delivery excerpt limits", async () => {
   const input = { taskRevision: "whole-source", purpose: "alpha bravo charlie", required: [], maximumBytes: 4000,
     optional: [{ id: "a", sourceDigest: "first", excerpt: "alpha bravo\n" },

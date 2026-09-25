@@ -8,14 +8,14 @@ import { backupRuntimeState } from "../src/runtime-backup.ts";
 import { hostInstructionBackupScope } from "../src/host-instruction-backup.ts";
 import { verifyHostInstructionBackup } from "../src/host-instruction-backup-check.ts";
 import { installHostInstructions } from "../src/host-instruction-installation.ts";
-import { LEGACY_STARTUP_BLOCK } from "../src/host-instruction-merge.ts";
+import { PREVIOUS_LEGACY_STARTUP_BLOCK } from "../src/host-instruction-merge.ts";
 import { COMPILED_HOST_BLOCK } from "../src/provider-guidance.ts";
 
 test("host migration verifies backed originals, partial application and authored drift", async () => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "host-backed-"))), registryPath = join(root, "registry.sqlite");
   const generations = new RuntimeGenerations(registryPath);
   try {
-    writeFileSync(join(root, "AGENTS.md"), LEGACY_STARTUP_BLOCK+"\nAuthored guidance\n");
+    writeFileSync(join(root, "AGENTS.md"), PREVIOUS_LEGACY_STARTUP_BLOCK+"\nAuthored guidance\n");
     const scope = hostInstructionBackupScope(root, COMPILED_HOST_BLOCK), maintenance = generations.beginMaintenance("fixture", 0), backup = join(root, "backup");
     await backupRuntimeState(registryPath, maintenance.token, maintenance.owner, scope.inputs, backup);
     assert.equal(verifyHostInstructionBackup(scope.plan, COMPILED_HOST_BLOCK, backup).complete, false);

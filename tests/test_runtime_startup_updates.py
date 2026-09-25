@@ -15,11 +15,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from project_governance_runtime.installation import LOCK_PATH
 from project_governance_runtime.runtime_access import installation_root, runtime_reader
-from project_governance_runtime.startup import handle_event
+from project_governance_runtime.startup import handle_event, hook_output
 from project_governance_runtime.startup_git import assert_unchanged, snapshot
 from project_governance_runtime.startup_installation import active_environment
-from project_governance_runtime.startup_releases import _discover, eligible, version
-from project_governance_runtime.startup_state import StartupError, digest, exclusive, git, read_json, state_root, task_path, write_json
+from project_governance_runtime.startup_releases import _discover, discover, eligible, version
+from project_governance_runtime.startup_state import StartupError, digest, exclusive, git, policy, read_json, state_root, task_path, write_json
 from project_governance_runtime.startup_transaction import apply, recover
 
 
@@ -89,6 +89,40 @@ class StartupBoundaryTests(unittest.TestCase):
             discover.assert_not_called()
             self.assertFalse((root / ".governance").exists())
 
+    def test_routine_hook_events_are_quiet_and_cached_candidates_do_not_repeat(self):
+        start = {"hook_event_name": "SessionStart"}
+        prompt = {"hook_event_name": "UserPromptSubmit"}
+        candidate = {"status": "available", "reason": "fixture", "task_id": "a" * 64,
+                     "discovery_fresh": True}
+        self.assertIn("Startup receipt", json.dumps(hook_output(start, candidate)))
+        self.assertEqual(hook_output(start, {**candidate, "discovery_fresh": False}), {})
+        self.assertEqual(hook_output(start, {**candidate, "status": "current"}), {})
+        self.assertEqual(hook_output(prompt, candidate), {})
+        self.assertEqual(hook_output(prompt, {**candidate, "status": "approval-required"}), {})
+        self.assertIn("refresh current guidance", json.dumps(hook_output(prompt,
+            {"status": "deferred", "reason": "refresh current guidance", "refresh_context": True})))
+
+    def test_default_daily_release_cache_marks_replay_without_network(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            (root / "config/governance").mkdir(parents=True)
+            (root / "config/governance/profile.yaml").write_text("runtime_updates:\n  policy: compatible\n")
+            settings = policy(root)
+            self.assertEqual(settings["cache_seconds"], 86400)
+            answer = {"status": "current", "reason": "fixture"}
+            with patch("project_governance_runtime.startup_releases.Client"), patch(
+                    "project_governance_runtime.startup_releases._discover", return_value=answer) as lookup:
+                current = {"version": "2.5.0", "release_base_url": "https://github.com/example/governance/releases/download"}
+                self.assertIs(discover(root, current, settings)["discovery_fresh"], True)
+                self.assertIs(discover(root, current, settings)["discovery_fresh"], False)
+                self.assertEqual(lookup.call_count, 1)
+                cache = state_root(root) / "releases.json"
+                saved = read_json(cache)
+                saved["time"] -= 86401
+                write_json(cache, saved)
+                self.assertIs(discover(root, current, settings)["discovery_fresh"], True)
+                self.assertEqual(lookup.call_count, 2)
+
     def test_continuations_and_duplicate_startup_make_no_new_discovery(self):
         with tempfile.TemporaryDirectory() as directory:
             f = Adopter(Path(directory).resolve())
@@ -99,7 +133,9 @@ class StartupBoundaryTests(unittest.TestCase):
                 discover.assert_not_called()
                 event = {"hook_event_name": "SessionStart", "session_id": "fresh", "source": "startup"}
                 first = handle_event(f.root, "codex", event)
-                self.assertEqual(handle_event(f.root, "codex", event), first)
+                repeat = handle_event(f.root, "codex", event)
+                self.assertEqual(repeat["status"], first["status"])
+                self.assertIs(repeat["discovery_fresh"], False)
                 self.assertEqual(discover.call_count, 1)
 
     def test_unapproved_policy_and_unsupported_provider_do_not_discover(self):

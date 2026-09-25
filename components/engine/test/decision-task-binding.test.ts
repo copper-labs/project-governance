@@ -85,26 +85,35 @@ test("normal commands resolve the existing session task without writes, mixing s
   } finally { f.cleanup(); }
 });
 
-test("root and revoked scopes preserve changed-path requirements without sharing unrelated changes", async () => {
+test("root and revoked scopes preserve requirements and local retrieval without hosted sharing", async () => {
   const f = fixture();
   try {
     f.bind(["."]);
     f.write("docs/new.md", "UNRELATED WORK");
+    const profile = JSON.parse(readFileSync(join(f.root, "config/governance/profile.yaml"), "utf8"));
+    delete profile.continuity.decisions.allowed_source_paths;
+    f.write("config/governance/profile.yaml", JSON.stringify(profile));
     let calls = 0;
-    const provider: DecisionProvider = { async decide() { calls++; throw new Error("must not call"); } };
-    const root = await contextRouteCommand([], f.root, assets, provider);
+    const previousFetch = globalThis.fetch;
+    globalThis.fetch = async () => { calls++; throw new Error("must not call"); };
+    process.env.JEV_TOKEN = "fixture-only";
+    let root, revoked;
+    try {
+    root = await contextRouteCommand([], f.root, assets);
     assert.equal(root.ready, true);
     assert.equal(root.routingPaths.mode, "bound-task-empty-scope");
     assert.ok(root.entries.some(item => item.path === "docs-rules.md"));
-    assert.equal(root.selection.candidateCount, 0);
+    assert.ok(root.selection.candidateCount > 0);
+    assert.ok(root.optional?.entries.some(item => item.id === "docs/new.md"));
     const task = f.bind(["docs"]), store = new Store(defaultDbPath(f.root));
     try {
       store.reviseTask(task.taskId, [], { expectedVersion: task.version, revoke: [0], authorityRef: "operator-qualified" });
       store.bind(task.taskId, "session-one", store.workspace(workContext(f.root).locator, f.root), f.root);
     } finally { store.close(); }
-    const revoked = await contextRouteCommand([], f.root, assets, provider);
+    revoked = await contextRouteCommand([], f.root, assets);
     assert.equal(revoked.routingPaths.mode, "bound-task-empty-scope");
-    assert.equal(revoked.selection.candidateCount, 0); assert.equal(calls, 0);
+    assert.ok(revoked.selection.candidateCount > 0); assert.equal(calls, 0);
+    } finally { globalThis.fetch = previousFetch; }
     process.env.HARNESS_SESSION = "unbound";
     await assert.rejects(() => contextRouteCommand([], f.root, assets), /session-unbound.*create or resume/);
   } finally { f.cleanup(); }

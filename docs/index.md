@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-07-05
-updated: 2026-09-21
+updated: 2026-09-25
 summary: Entry point for the reusable, package-based project governance runtime.
 ---
 
@@ -102,3 +102,19 @@ It is part of this governance product and wheel; policy and process supervision 
 owners. See the [process map](../components/harness/docs/architecture/development-flow.md).
 
 The [ordinary task context contract](specs/engine-task-context-entry.md) and [corrective implementation plan](exec-plans/active/2026-09-22-task-context-entry.md) close the gap between enabled decisions and normal task use.
+The [RC6 prompt retrieval contract](specs/engine-rc6-linked-retrieval.md) and its
+[implementation plan](exec-plans/active/2026-09-23-rc6-linked-retrieval.md) define automatic entry,
+a maintained SQLite repository index, basic source-backed relationships, bounded JEV selection with
+expansion and ordinary-task qualification. The earlier transient-index candidate is the comparison
+baseline; the expanded implementation is complete and release sign-off is in progress. The
+[configuration guide](guides/rc6-prompt-context.md) separates local retrieval, hosted disclosure,
+host trust and measured use.
+The [repository-index research](research/2026-09-25-repository-index-harness-practices.md) compares
+current harness practices and explains the bounded first iteration accepted for RC6; its wider
+research alternatives remain outside the release scope.
+The [RC6 design review](reviews/2026-09-25-rc6-index-design-reconciliation.md) records the Opus 5.5
+medium reconciliation and worktree/database boundaries. The
+[accepted simplifications](reviews/2026-09-25-rc6-index-simplification.md) reduce implementation
+overhead while retaining the feature scope. The
+[source-control and Codex workflow guide](developer/guides/source-control-and-worktrees.md) explains
+worktree ownership, reviewed integration, coordinated upgrades and cleanup.

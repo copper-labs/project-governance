@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-08-21
-updated: 2026-09-22
+updated: 2026-09-25
 summary: Routes evaluators, operators, contributors, and agents through the shortest useful Project Governance documentation journeys.
 ---
 
@@ -31,6 +31,13 @@ Use [Change The Runtime Safely](guides/change-the-runtime.md) to find the owning
 focused proof, cross one directly affected seam, and finish with the source checkout's governed
 sign-off. Use the [Validation Strategy](../governance/validation-strategy.md) as the canonical
 reference for that proof boundary.
+
+## Work Across Branches And Codex Chats
+
+Use [Work Safely Across Git Worktrees and Codex Chats](guides/source-control-and-worktrees.md)
+for task ownership, separate implementation checkouts, reviewed integration, coordinated governance
+adoption, shared build/device resources and cleanup. It distinguishes operating practices from
+runtime enforcement and current behavior from the expanded RC6 qualification still to be completed.
 
 ## Agent Entry
 

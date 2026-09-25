@@ -1,4 +1,5 @@
 import { verifyDecisionExperiments } from "./verify-decision-experiments.mjs";
+import { verifyRc6Prompt } from "./verify-rc6-prompt.mjs";
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
@@ -40,7 +41,8 @@ try {
   assert.deepEqual(readFileSync(join(pkg, "package.json")), beforeStaging, "Staging must preserve the installed parent package");
   const pilot = await verifyDecisionPilot(pkg);
   const experiments = await verifyDecisionExperiments(pkg);
-  console.log(JSON.stringify({ staging, decisionPilot: pilot, experiments, hostApi: 'passed', version: manifest.version, installedCommand: 'passed', scope: 'offline installation and inactive staging, public host API and all eight decision consumers with fixture inference; not full semantic qualification; no live device or benefit claim' }));
+  const prompt = await verifyRc6Prompt(pkg, archive);
+  console.log(JSON.stringify({ staging, prompt, decisionPilot: pilot, experiments, hostApi: 'passed', version: manifest.version, installedCommand: 'passed', scope: 'offline installation and inactive staging, public host API and decision consumers with fixture inference; not full semantic qualification; no live device or benefit claim' }));
 } finally { rmSync(root, { recursive: true, force: true }); }
 
 

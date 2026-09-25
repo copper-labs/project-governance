@@ -5,7 +5,7 @@ type: spec
 status: current
 owner: project-governance
 created: 2026-09-06
-updated: 2026-09-06
+updated: 2026-09-23
 summary: Define once-authorized compatible runtime adoption early in top-level tasks without disturbing existing implementation or unrelated work.
 ---
 
@@ -70,6 +70,12 @@ Metadata caching reduces startup requests. It never caches a worktree-safety jud
 owns explicit discovery and installation budgets. Discovery failure leaves the current runtime
 usable. Children and continuations perform no network discovery. No retry loop, scheduler, or
 additional model call belongs in this operation.
+
+The default metadata lifetime is 24 hours. A cached actionable result remains available in the
+task receipt but does not repeat a native startup notice; the next successful fresh discovery may
+show one again. A repository may deliberately configure a different `cache_seconds`. Prerelease
+locks and non-GitHub archives do not enter automatic release discovery; they require deliberate
+adoption and should not generate a routine startup notice.
 
 Compiled preparation persists one installation deadline. Download, staging, activation, commit and
 readback consume the remaining allowance; reopening preparation does not renew it. Check the deadline
@@ -180,7 +186,9 @@ an automatic update. The initial compatibility component performs no network acc
 
 The compiled preview exposes `startup hooks` for a read-only configuration proposal and
 `startup install-hooks` for explicit project-local installation, using the launcher's workspace and
-registry scope plus `--receipts <absolute-path>`. Installation preserves authored handlers and file
+registry scope plus `--receipts <registry-directory>/startup.sqlite`. The tracked handler resolves
+the current Git worktree; its ignored launcher resolves that tree's registry and default receipt
+store. Installation preserves authored handlers and file
 permissions, refuses conflicting or legacy startup handlers, and leaves an already-current file
 unchanged. Installation does not enable compatible updates or edit user-level host configuration.
 
@@ -214,8 +222,9 @@ responses. Oversized snapshots are not persisted; failures never publish a parti
 contains neither credentials nor archive bytes nor worktree/activation judgments. Preparation still
 verifies candidate identity and package bytes independently.
 
-During compiled host-instruction migration, only the exact shipped wheel startup block is replaced
-with the packaged `startup-help` route. Customized or malformed startup sections require deliberate
+During compiled host-instruction migration, only recognized exact shipped startup blocks are replaced
+with the packaged conditional `startup-help` route. Routine tasks do not run `startup-help` or inspect
+the governance version just because they started. Customized or malformed startup sections require deliberate
 reconciliation. The migration backup preserves the original and verifies original or fully intended
 content during recovery; surrounding authored guidance remains unchanged. This instruction transition
 does not migrate legacy executable hooks, enable updates or establish native host trust.

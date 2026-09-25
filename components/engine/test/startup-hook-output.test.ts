@@ -14,6 +14,7 @@ test("native hook output emits bounded actionable context only on initial discov
  for(const status of ["manual","current","discovery-failed"])
   assert.deepEqual(startupHookOutput({hook_event_name:"SessionStart"},{...receipt,result:{status}}),{});
  assert.deepEqual(startupHookOutput({hook_event_name:"SessionStart"},{...receipt,discovery:undefined}),{});
+ assert.deepEqual(startupHookOutput({hook_event_name:"SessionStart"},{...receipt,result:{status:"available",discoveryFresh:false}}),{});
  assert.match(startupHookOutput({hook_event_name:"SessionStart"},{...receipt,result:{status:"approval-required"}}).hookSpecificOutput!.additionalContext,/do not apply it automatically/);
 });
 test("generated SessionEnd hook respects native three-second limit",()=>{

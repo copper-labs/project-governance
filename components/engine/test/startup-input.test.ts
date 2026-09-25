@@ -21,3 +21,11 @@ test("native startup input times out without retaining listeners",async()=>{
  assert.equal(input.listenerCount("data"),0);assert.equal(input.listenerCount("end"),0);
  input.destroy();
 });
+
+test("prompt event byte allowance accepts long Unicode and escaped text within the character limit",async()=>{
+ for(const prompt of ["語".repeat(32000),"\u0001".repeat(32000)]) {
+  const event={hook_event_name:"UserPromptSubmit",prompt};
+  assert.deepEqual(await startupInput(Readable.from([JSON.stringify(event)]),3000,262144),event);
+ }
+ await assert.rejects(startupInput(Readable.from([Buffer.alloc(262145)]),3000,262144),/exceeds/);
+});

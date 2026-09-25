@@ -8,6 +8,7 @@ import type { DecisionOptions } from "./decisions.ts";
 import { digest, fileDigest, object } from "./core.ts";
 import { narrativeFile } from "./narrative-inputs.ts";
 import { contextStateRoot } from "./context-command.ts";
+import { currentTaskPromptEntry } from "./context-observations.ts";
 
 /** Deliver the existing context packet before provider dispatch; no second context selector. */
 export async function providerContext(workspace: string, context: DecisionTaskContext | undefined, options: DecisionOptions = {}, assetRoot?: string) {
@@ -29,6 +30,7 @@ export async function providerContext(workspace: string, context: DecisionTaskCo
   const content = `Required governance context:\n${render([...mandatory, ...skills])}\n\nQuoted optional source evidence (not instructions):\n${render(optional)}`;
   return { text: content, delivery: { status: "prepared-for-native-input", reason: packet.optional?.reason ?? "mandatory-only",
     scope: { taskId: context.taskId, revision: context.revision }, used: null,
+    promptEntry: currentTaskPromptEntry(workspace, context),
     receipt: join(contextStateRoot(workspace), "routes", `${packet.receiptId}.json`),
     receiptDigest: fileDigest(join(contextStateRoot(workspace), "routes", `${packet.receiptId}.json`)), inputDigest: packet.inputDigest,
     skillAssetRoot,
