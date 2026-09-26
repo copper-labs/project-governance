@@ -121,8 +121,18 @@ async function verifyLinkedNativeHooks({ packageRoot, sibling, siblingRegistry, 
   const event = { session_id: 'linked-host', hook_event_name: 'SessionStart', source: 'resume', cwd: sibling };
   const nested = join(sibling, 'nested'); mkdirSync(nested);
   const invoke = (name, input, cwd = sibling) => {
-    const result = spawnSync('/bin/sh', ['-c', hooks[name][0].hooks[0].command], { cwd, env: environment,
-      input: JSON.stringify(input), encoding: 'utf8', timeout: 30000, maxBuffer: 1024 * 1024 });
+    const command = hooks[name][0].hooks[0].command;
+    // Native receipt creation requires an identifiable Codex ancestor, as in a real hook call.
+    const child = `import {spawnSync} from 'node:child_process';
+      process.title='codex';
+      const result=spawnSync('/bin/sh',['-c',${JSON.stringify(command)}],{cwd:${JSON.stringify(cwd)},env:process.env,
+        input:${JSON.stringify(JSON.stringify(input))},encoding:'utf8',timeout:30000,maxBuffer:1048576});
+      if(result.stdout)process.stdout.write(result.stdout);
+      if(result.stderr)process.stderr.write(result.stderr);
+      if(result.error)process.stderr.write(result.error.message);
+      process.exit(result.status??1);`;
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', child], { cwd, env: environment,
+      encoding: 'utf8', timeout: 35000, maxBuffer: 1024 * 1024 });
     assert.equal(result.status, 0, result.stderr || result.error?.message);
     return JSON.parse(result.stdout);
   };
