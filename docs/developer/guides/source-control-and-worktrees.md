@@ -154,6 +154,7 @@ An upgrade in one tree must not switch another tree's active job to a different 
 | Version pin, profile and managed instructions/hooks | Tracked source distributed through Git |
 | Installed runtime selection and active runtime readers | Owned by each worktree |
 | Native startup receipts | `startup.sqlite` beside each worktree's installation registry |
+| Codex project hook definitions in linked worktrees | Loaded from the main checkout by the host; coordinate changes across active trees |
 | Default task/history database | Shared by linked worktrees under the Git common directory; task/session/workspace bindings remain distinct |
 | Maintained RC6 source index | Disposable per-worktree cache; never merge or copy its database |
 
@@ -165,6 +166,20 @@ and [hook-path configuration](https://git-scm.com/docs/git-config#Documentation/
 The tracked Codex hook resolves its current Git root, then calls that tree's ignored launcher. If
 an older managed hook still names one checkout by absolute path, reconcile it at the cutover seam;
 do not carry it into a linked worktree or share its receipt database.
+
+Codex's hook **definition source** is different from the command's execution root. For linked
+worktrees the host loads the main checkout's definitions, even if the linked `.codex/hooks.json`
+was updated. RC8 reports this source through `doctor --capability context` and the migration plan.
+A stale main-checkout hook must be repaired through that checkout's backed installation first,
+with affected active agents paused at a seam. Then reconcile each active tree's own runtime.
+No extra branch is required, and an installer in one tree never implicitly edits its siblings.
+See the [RC8 contract](../../specs/engine-rc8-hook-sources.md).
+
+After changing the shared definitions, review their normal host trust and inspect native hook
+discovery from each active worktree. Confirm the selected source, command and timeout, then a
+normal prompt receipt. A correct local file or successful `doctor` is not proof of host execution.
+Restarting an old conversation cannot repair a stale shared source on disk. Reconcile inactive
+older trees before reopening them; do not assume a compatible hook implies a compatible runtime.
 
 If a merge brings a new pin, resolve the installation footprint, drain that destination's readers,
 manually reconcile its installation, and verify tracked managed files match the resolved merge

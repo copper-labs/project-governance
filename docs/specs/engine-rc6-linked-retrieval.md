@@ -13,6 +13,8 @@ summary: Automatic prompt entry, a rebuildable SQLite repository index, source-b
 
 The [RC7 reliability amendment](engine-rc7-prompt-reliability.md) supersedes this contract's
 timing and same-turn task-transition behavior. The retrieval and index boundaries below remain.
+The [RC8 reliability amendment](engine-rc8-hook-sources.md) supersedes the native 24,000-byte cap
+with the reviewed route envelope and corrects shared hook discovery and bounded source preparation.
 
 The accepted RC6 boundary is **automatic prompt entry, a maintained repository index, basic
 relationships, bounded JEV selection with expansion, and evidence from real development tasks**.

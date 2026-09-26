@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-09-25
-updated: 2026-09-25
+updated: 2026-09-26
 summary: Enable prompt delivery and optional metadata selection, then inspect actual usage without inferring savings.
 ---
 
@@ -33,6 +33,14 @@ its ignored launcher supplies the worktree-specific registry. An explicit `start
 installation request is accepted only when it equals this default. Authored hook settings are
 preserved or require deliberate reconciliation. Updates keep existing handlers; if an update must
 install or reconcile hooks, supply the default `startupReceipts` in its backed installation request.
+
+For linked Git worktrees, Codex loads project hook definitions from the main checkout. Updating
+only the linked hook file cannot repair an obsolete definition there. RC8's
+[shared-source contract](../specs/engine-rc8-hook-sources.md) adds `promptHookSource` to context
+doctor and a read-only source dependency to migration plans. A missing or conflicting main source
+blocks a linked installation before mutation; repair the main checkout through its backed
+installer at a coordinated seam, then finish each active worktree's own installation. The
+definition is shared; runtime selection and startup receipts remain local to each tree.
 
 The host must trust the project and the exact hooks. Installation cannot grant that trust or enable
 a host feature prohibited by managed policy. `doctor --capability context` reports configuration and
@@ -79,12 +87,28 @@ absence is proved. An unproved process or runtime identity leaves the prompt lif
 and requires inspection; it never silently grants update authority.
 
 The managed prompt handler sets `additionalContextLimit: 0` because governance already limits its
-packet to 24,000 bytes. Without that setting, Codex can replace a large packet with a preview, hiding
+packet. RC8 uses an explicitly declared route total for native delivery, including framing
+and skills. Profiles without an explicit total retain the 24,000-byte native limit; RC6/RC7 imposed
+that limit even when the profile declared more. Without that host setting, Codex can replace a large packet with a preview, hiding
 required material. Doctor reports this configuration gap. Reconcile an exact older managed handler
 through the backed installation and review its changed hash in the host; customized handlers still
 need deliberate reconciliation. See [Codex's hook-output contract](https://learn.chatgpt.com/docs/hooks#large-hook-output).
 
+RC8 context doctor checks required bytes for declared routes, pairs of owners and the combined
+path owners. Its report names overflows and remaining bytes, missing guidance and any inspection
+bound reached. Unchecked larger owner subsets produce a partial-readiness finding, even when sampled
+combinations fit. Task-dependent skills and the actual route are still checked at use.
+Review an overflowing route's requirements and budget; keep mandatory meaning intact. Move only
+reviewed background references to expansion. Enlarging the envelope is an explicit profile choice,
+not permission to claim smaller model inputs or savings.
+
 ## Inspect and refresh the source index
+
+RC8 batches changed-file metadata capture and avoids whole-tree line-ending scans of unrelated
+assets. Index freshness observation leaves time for extraction within the existing allowance.
+Receipts show source capture plus index identity, freshness, cache, extraction and publication time.
+Repeated bounded refreshes should extract or reuse facts while keeping every eligible path visible;
+a partial index is not a claim that unexamined files are irrelevant.
 
 The index is a disposable SQLite projection under the external context state root for this
 worktree. It stores bounded literal source facts, ranges and links with their resolution status,

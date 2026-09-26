@@ -2,6 +2,7 @@ import { object, text } from "./core.ts";
 import { matchesPackPath } from "./planning.ts";
 import { safeSubjectPath } from "./change-subject.ts";
 import { contextBudget } from "./checkers/context-router.ts";
+import { promptPacketLimit } from "./prompt-context-budget.ts";
 
 function list(value: unknown): string[] {
   if (value === undefined) return [];
@@ -16,6 +17,26 @@ function integer(value: unknown, fallback: number): number {
 function termMatches(task: string, term: string): boolean {
   const escaped = term.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`(?<![A-Za-z0-9_-])${escaped}(?![A-Za-z0-9_-])`, "u").test(task.toLowerCase());
+}
+
+/** One owner calculation serves live routing and passive multi-route budget inspection. */
+export function contextOwnerRequirements(router: Record<string, unknown>, owners: Record<string, unknown>[]) {
+  const budgetOwners = owners.length ? owners : [{}];
+  const budgets = budgetOwners.map(owner => contextBudget(owner.token_budget));
+  const budget = Object.fromEntries(Object.keys(budgets[0]!).map(key => [key,
+    Math.max(...budgets.map(value => value[key as keyof typeof value])),
+  ])) as (typeof budgets)[number];
+  // Combine each owner's actual native limit; an implicit total cannot borrow another owner's opt-in.
+  const nativePacketBytes = Math.max(...budgets.map((value, index) => promptPacketLimit(value,
+    Object.hasOwn(object(budgetOwners[index]!.token_budget ?? {}), "total_context_tokens") ? value.total_context_tokens * 4 : undefined)));
+  const primary = [...new Set([...list(router.default_context), ...owners.flatMap(owner => list(owner.primary_context))])].map(safeSubjectPath);
+  const active = [...new Set(owners.flatMap(owner => list(owner.active_plan_context)))].map(safeSubjectPath).filter(path => !primary.includes(path));
+  const expansion = [...new Set(owners.flatMap(owner => list(owner.expansion_context)))].map(safeSubjectPath).filter(path => !primary.includes(path) && !active.includes(path));
+  return { primary, active, expansion, budget,
+    budgetAuthority: { mode: "largest-owner-envelope", routes: owners.map(owner => owner.id ?? "default"),
+      nativePacketBytes },
+    skills: [...new Set([...list(router.default_skills), ...owners.flatMap(owner => list(owner.skills))])],
+    routeSkills: [...new Set(owners.flatMap(owner => list(owner.skills)))], validations: [...new Set(owners.flatMap(owner => list(owner.validations)))] };
 }
 
 /** Policy routing is deterministic; optional model ranking cannot select or weaken required context. */
@@ -55,18 +76,8 @@ export function routeContext(raw: unknown, task: string, changedPaths: string[])
   // Every path owner remains mandatory, even outside the optional secondary display limit.
   const owners = [...new Set([route, ...pathOwners.map(item => item.route)])];
   // Mixed work gets the largest declared envelope, never a sum or a route-name-dependent cap.
-  const budgets = owners.map(owner => contextBudget(owner.token_budget));
-  const budget = Object.fromEntries(Object.keys(budgets[0]!).map(key => [key,
-    Math.max(...budgets.map(value => value[key as keyof typeof value])),
-  ])) as (typeof budgets)[number];
-  const primary = [...new Set([...list(router.default_context), ...owners.flatMap(owner => list(owner.primary_context))])].map(safeSubjectPath);
-  const active = [...new Set(owners.flatMap(owner => list(owner.active_plan_context)))].map(safeSubjectPath).filter(path => !primary.includes(path));
-  const expansion = [...new Set(owners.flatMap(owner => list(owner.expansion_context)))].map(safeSubjectPath).filter(path => !primary.includes(path) && !active.includes(path));
   return { outcome, selected: selected ? { id: selected.id, score: selected.score, reasons: selected.reasons } : null,
     secondary: scores.slice(1).filter(item => selected && item.score > 0 && selected.score - item.score <= threshold).slice(0, secondaryLimit).map(({ id, score, reasons }) => ({ id, score, reasons })),
-    matchedPathRoutes: pathOwners.map(item => item.id), primary, active, expansion, budget,
-    budgetAuthority: { mode: "largest-owner-envelope", routes: owners.map(owner => owner.id ?? "default") },
-    skills: [...new Set([...list(router.default_skills), ...owners.flatMap(owner => list(owner.skills))])],
-    routeSkills: [...new Set(owners.flatMap(owner => list(owner.skills)))], validations: [...new Set(owners.flatMap(owner => list(owner.validations)))],
+    matchedPathRoutes: pathOwners.map(item => item.id), ...contextOwnerRequirements(router, owners),
     ready: false, remaining: "Required files and skills must be materialized and verified before this route is ready." };
 }

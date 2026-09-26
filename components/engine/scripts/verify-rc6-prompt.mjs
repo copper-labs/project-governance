@@ -114,8 +114,11 @@ function startupReceiptFingerprint(directory) {
 /** The tracked hook must execute in the sibling, then leave the primary's store untouched. */
 async function verifyLinkedNativeHooks({ packageRoot, sibling, siblingRegistry, temporary, environment }) {
   const { contextDoctor } = await import(pathToFileURL(join(packageRoot, 'dist/engine/src/context-doctor.js')).href);
-  assert.equal(contextDoctor(sibling).promptHook, 'configured');
-  const hooks = JSON.parse(readFileSync(join(sibling, '.codex/hooks.json'), 'utf8')).hooks;
+  const report = contextDoctor(sibling);
+  assert.equal(report.promptHook, 'configured');
+  assert.equal(report.promptHookSource.shared, true);
+  // Match Codex's definition source, rather than accidentally testing only the linked copy.
+  const hooks = JSON.parse(readFileSync(report.promptHookSource.path, 'utf8')).hooks;
   const siblingReceipts = join(dirname(siblingRegistry), 'startup.sqlite'),primaryBefore=startupReceiptFingerprint(temporary);
   assert.equal(existsSync(siblingReceipts), false);
   const event = { session_id: 'linked-host', hook_event_name: 'SessionStart', source: 'resume', cwd: sibling };
@@ -133,7 +136,7 @@ async function verifyLinkedNativeHooks({ packageRoot, sibling, siblingRegistry, 
       process.exit(result.status??1);`;
     const result = spawnSync(process.execPath, ['--input-type=module', '-e', child], { cwd, env: environment,
       encoding: 'utf8', timeout: 35000, maxBuffer: 1024 * 1024 });
-    assert.equal(result.status, 0, result.stderr || result.error?.message);
+    assert.equal(result.status, 0, result.stderr || result.stdout || result.error?.message);
     return JSON.parse(result.stdout);
   };
   invoke('SessionStart', event, nested);
@@ -174,6 +177,17 @@ async function verifyWorktreeCutover({ packageRoot, archive, temporary, workspac
   const integrationBranch = git(workspace, 'branch', '--show-current');
   const sibling = join(temporary, 'linked-worktree'), siblingRegistry = join(sibling, '.governance/installation.sqlite');
   git(workspace, 'worktree', 'add', '-q', '-b', 'fixture-feature', sibling, 'HEAD');
+  const sharedPath = join(workspace, '.codex/hooks.json'), sharedBytes = readFileSync(sharedPath, 'utf8');
+  const obsolete = JSON.parse(sharedBytes);
+  for (const groups of Object.values(obsolete.hooks)) for (const group of groups) for (const handler of group.hooks)
+    if (handler.command?.includes('startup observe')) handler.command = 'python3 "$(git rev-parse --show-toplevel)/tools/governance-startup.py" codex';
+  writeFileSync(sharedPath, JSON.stringify(obsolete));
+  try {
+    await assert.rejects(install('init', sibling, siblingRegistry, lock, 'shared-source-rejected', true), /Shared Codex hook source/);
+    assert.equal(existsSync(siblingRegistry), false, 'Shared-source failure precedes runtime mutation');
+    assert.equal(existsSync(join(temporary, 'shared-source-rejected-operation')), false);
+    assert.equal(readFileSync(sharedPath, 'utf8'), JSON.stringify(obsolete), 'A sibling cannot repair the main checkout implicitly');
+  } finally { writeFileSync(sharedPath, sharedBytes); }
   await install('init', sibling, siblingRegistry, lock, 'linked-init', true);
   assert.equal(runtimeDoctor(sibling, siblingRegistry).status, 'passed');
   await verifyLinkedNativeHooks({packageRoot,sibling,siblingRegistry,temporary,environment});
@@ -252,6 +266,28 @@ function verifyTaskSwitch({ invoke, launcher, workspace, environment, session, c
   assert.equal(refreshed.metadata.reason, 'answered');
   assert.equal(readFileSync(calls, 'utf8').trim().split('\n').length, 2);
   delete environment.HARNESS_SESSION;
+}
+
+/** A reviewed larger envelope must survive the installed hook, replay and doctor. */
+function verifyNativeEnvelope({ invoke, hooks, workspace, launcher, event }) {
+  const path = join(workspace, 'config/governance/profile.yaml'), before = readFileSync(path);
+  const policy = join(workspace, 'required-policy.md');
+  const turn = { ...event, session_id: 'large-packet-host', turn_id: 'large-packet-turn' };
+  try {
+    writeFileSync(policy, 'Required current guidance.\n'.repeat(1200));
+    writeFileSync(path, JSON.stringify({ context_router: { default_route: 'project', default_context: ['required-policy.md'], routes: [{ id: 'project',
+      token_budget: { primary_context_tokens: 9000, total_context_tokens: 14000 } }] } }));
+    const output = invoke('/bin/sh', ['-c', hooks.hooks.UserPromptSubmit[0].hooks[0].command], JSON.stringify(turn));
+    const text = output.hookSpecificOutput.additionalContext;
+    assert.ok(Buffer.byteLength(text) > 24000 && Buffer.byteLength(text) <= 56000);
+    assert.ok(text.includes(readFileSync(policy, 'utf8')));
+    assert.deepEqual(invoke('/bin/sh', ['-c', hooks.hooks.UserPromptSubmit[0].hooks[0].command], JSON.stringify(turn)), output);
+    const doctor = invoke(launcher, ['doctor', '--capability', 'context']);
+    assert.ok(doctor.budgets.routes.every(route => route.status === 'fits'));
+  } finally {
+    invoke('/bin/sh', ['-c', hooks.hooks.SessionEnd[0].hooks[0].command], JSON.stringify({ ...turn, hook_event_name: 'SessionEnd' }));
+    writeFileSync(path, before); rmSync(policy, { force: true });
+  }
 }
 
 export async function verifyRc6Prompt(packageRoot, archive) {
@@ -336,6 +372,8 @@ export async function verifyRc6Prompt(packageRoot, archive) {
     // session before the integration tree changes its pin.
     invoke('/bin/sh', ['-c', hooks.hooks.SessionEnd[0].hooks[0].command],
       JSON.stringify({ ...event, hook_event_name: 'SessionEnd' }));
+    assert.equal(readers().length, 0);
+    verifyNativeEnvelope({ invoke, hooks, workspace, launcher, event });
     assert.equal(readers().length, 0);
     const failedLifecycle = invoke(process.execPath, [cli, 'startup', 'observe', '--provider', 'codex', '--event-stdin', '--workspace', workspace,
       '--registry', join(temporary, 'absent-registry.sqlite'), '--receipts', join(temporary, 'receipt.sqlite')], JSON.stringify(event));

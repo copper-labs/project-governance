@@ -53,7 +53,10 @@ function pendingSourceOrder(pending: string[], previous: ReturnType<ProjectionSt
 export function maintainContextProjection(subject: ValidationSubject, paths: string[], stateRoot: string, options: ProjectionOptions = {}) {
   const started = performance.now(), deadlineAt = options.deadlineAt ?? started + 1500, byteLimit = Math.min(options.byteLimit ?? 32 * 1024 * 1024, 32 * 1024 * 1024);
   const inventory = [...new Set(paths.filter(localContextPath))].sort(), locator = projectionIdentity(subject.root), extractor = options.extractor ?? SOURCE_EXTRACTOR;
-  const observation = subject.projectionSources(inventory);
+  const identified = performance.now();
+  // Freshness cannot consume the entire extraction allowance on a large normalized checkout.
+  const observation = subject.projectionSources(inventory, identified + Math.max(0, Math.min(500, (deadlineAt - identified) / 2)));
+  const observed = performance.now();
   const entries = new Map<string, { text: string; sourceDigest: string }>(), facts = new Map<string, SourceFacts>(), byPath = new Map<string, SourceFacts>();
   const files: ProjectionFile[] = [], unavailable: Array<{ path: string; reason: string }> = [];
   let store: ProjectionStore | undefined, cache = "unverified-identity", previous: ReturnType<ProjectionStore["snapshot"]> | undefined;
@@ -61,6 +64,7 @@ export function maintainContextProjection(subject: ValidationSubject, paths: str
   try {
     if (locator) { store = new ProjectionStore(stateRoot, subject.root, locator, options.rebuild); previous = store.snapshot(observation.view); cache = "available"; }
   } catch (error) { cache = error instanceof Error && /index-/.test(error.message) ? error.message : "index-unavailable"; store?.close(); store = undefined; }
+  const opened = performance.now();
   try {
   const pending: string[] = [];
   const priorKeys = new Map<string, SourceFacts>();
@@ -98,6 +102,7 @@ export function maintainContextProjection(subject: ValidationSubject, paths: str
       if (observation.sources.get(path)?.freshness === "unverified") observation.sources.set(path, { key: `bytes:${fact.digest}`, freshness: "captured-bytes" });
     }
   }
+  const extractedAt = performance.now();
   let factBytes = 0;
   const retainedFacts = new Set<string>(), factLimit = Math.min(options.factByteLimit ?? 16 * 1024 * 1024, 16 * 1024 * 1024);
   for (const [path, fact] of byPath) {
@@ -145,6 +150,8 @@ export function maintainContextProjection(subject: ValidationSubject, paths: str
     status: { cache, published, locatorVerified: locator !== null, view: observation.view, extractor, inventoryCount: inventory.length,
       extractedCount: extracted, reusedCount: reused, describedCount: entries.size, pendingCount: inventory.length - byPath.size,
       complete, reverseCoverage: complete && [...byPath.values()].every(f => ["syntax", "markdown"].includes(f.coverage)) && links.every(link => link.resolved !== null) ? "complete-supported-syntax" : "partial",
-      catalogCoverage, capturedBytes, elapsedMs: performance.now() - started, fts: store?.fts ?? false } };
+      catalogCoverage, capturedBytes, elapsedMs: performance.now() - started, fts: store?.fts ?? false,
+      timing: { identityMs: identified - started, freshnessMs: observed - identified, cacheMs: opened - observed,
+        extractionMs: extractedAt - opened, publicationAndLinksMs: performance.now() - extractedAt } } };
   } finally { store?.close(); }
 }

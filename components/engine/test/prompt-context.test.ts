@@ -9,6 +9,7 @@ import { contextStateRoot } from "../src/context-command.ts";
 import { PROJECT_DEFAULTS } from "../src/runtime-project-defaults.ts";
 import { Store } from "../../harness/src/store/store.ts";
 import { defaultDbPath, workContext } from "../../harness/src/store/location.ts";
+import { contextBudget } from "../src/checkers/context-router.ts";
 
 test("raw prompt delivers source before a task exists, then a follow-up reuses the exact host binding", async () => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "prompt-context-"))), old = process.env.XDG_STATE_HOME;
@@ -68,12 +69,12 @@ test("raw prompt delivers source before a task exists, then a follow-up reuses t
 
 test("oversized required context is a blocker, never silently truncated guidance", () => {
   const packet = { receiptId: "route", ready: true, entries: [{ path: "policy.md", content: "A".repeat(25000), sourceDigest: "digest" }],
-    route: { primary: ["policy.md"], active: [] }, skills: { entries: [] }, blockers: [], optional: null } as any;
+    route: { primary: ["policy.md"], active: [], budget: contextBudget({ total_context_tokens: 6000 }) }, skills: { entries: [] }, blockers: [], optional: null } as any;
   const output = renderPromptContext(packet, { state: "unavailable", candidates: [], inspected: 0, omissions: [] }, "entry");
   assert.equal(output.status, "blocked"); assert.match(output.text, /prompt-required-byte-budget/);
   assert.ok(Buffer.byteLength(output.text) < 1000); assert.deepEqual(output.delivered, []);
-  packet.entries[0].content = "A".repeat(22400);
-  const bounded = renderPromptContext(packet, { state: "ready", candidates: [{ summary: "B".repeat(2000) }] as any, inspected: 1, omissions: [] }, "entry");
+  packet.entries[0].content = "A".repeat(21400);
+  const bounded = renderPromptContext(packet, { state: "ready", candidates: [{ summary: "B".repeat(3000) }] as any, inspected: 1, omissions: [] }, "entry");
   assert.equal(bounded.status, "prepared"); assert.ok(Buffer.byteLength(bounded.text) <= 24000);
   assert.equal("historyDelivered" in bounded && bounded.historyDelivered, false);
   packet.entries[0].content = "required";
@@ -86,4 +87,78 @@ test("oversized required context is a blocker, never silently truncated guidance
   packet.metadata.coverage = { attempted: true, complete: true, answeredCount: 10, mode: "shadow", applied: false };
   const shadow = renderPromptContext(packet, { state: "ready", candidates: [], inspected: 0, omissions: [] }, "entry");
   assert.match(shadow.text, /Shadow JEV assessment/); assert.match(shadow.text, /Results were not applied/);
+});
+
+test("native delivery honors the declared envelope above the old cap, with required skills intact", () => {
+  const packet = { receiptId: "route", ready: true, entries: [{ path: "policy.md", content: "A".repeat(28_000), sourceDigest: "digest" }],
+    route: { primary: ["policy.md"], active: [], budget: contextBudget({ primary_context_tokens: 8000, total_context_tokens: 12000 }), budgetAuthority: { nativePacketBytes: 48000 } },
+    skills: { entries: [{ path: "required/SKILL.md", content: "Required skill".repeat(500), sourceDigest: "skill-digest" }] }, blockers: [], optional: null } as any;
+  const history = { state: "unavailable" as const, candidates: [], inspected: 0, omissions: [] };
+  const result = renderPromptContext(packet, history, "entry");
+  assert.equal(result.status, "prepared"); assert.ok(Buffer.byteLength(result.text) > 24000); assert.ok(Buffer.byteLength(result.text) <= 48000);
+  assert.ok(result.text.includes(packet.entries[0].content)); assert.ok(result.text.includes(packet.skills.entries[0].content));
+  packet.route.budget.total_context_tokens = 8000;
+  packet.route.budgetAuthority.nativePacketBytes = 32000;
+  assert.equal(renderPromptContext(packet, history, "entry").status, "blocked");
+  packet.route.budget = contextBudget(undefined); packet.route.budgetAuthority.nativePacketBytes = 24000;
+  packet.skills.entries = [];
+  assert.equal(renderPromptContext(packet, history, "entry").status, "blocked", "An undeclared budget retains the 24 KB native limit");
+});
+
+test("mixed native owners retain their individual limits through delivery and replay", async () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "prompt-mixed-envelope-"))), old = process.env.XDG_STATE_HOME;
+  process.env.XDG_STATE_HOME = join(root, "state");
+  const assets = resolve("src/project_governance_runtime/assets/skills");
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: root, stdio: "pipe" });
+    mkdirSync(join(root, "config/governance"), { recursive: true }); mkdirSync(join(root, "src"));
+    writeFileSync(join(root, "config/governance/facts.lock.yaml"), PROJECT_DEFAULTS["config/governance/facts.lock.yaml"]!);
+    writeFileSync(join(root, "src/code.ts"), "export const enabled=true;\n");
+    for (const [total, bytes, expected] of [[5000, 19000, 24000], [8000, 26000, 32000], [14000, 31000, 56000]] as const) {
+      writeFileSync(join(root, "config/governance/profile.yaml"), JSON.stringify({ context_router: { default_context: ["AGENTS.md"], routes: [
+        { id: "intent", match: { product_terms: ["review", "project"] }, token_budget: { primary_context_tokens: total, total_context_tokens: total } },
+        { id: "source", match: { path_globs: ["src/**"] } },
+      ] } }));
+      writeFileSync(join(root, "AGENTS.md"), "x".repeat(bytes));
+      const event = { hook_event_name: "UserPromptSubmit", session_id: "host", turn_id: String(total), cwd: root, prompt: "Review project" };
+      const first = await promptContext("codex", event, root, { environment: {}, assetRoot: assets });
+      const output = (first as any).hookSpecificOutput.additionalContext;
+      assert.ok(output.includes("x".repeat(bytes)), "Mandatory guidance must arrive intact");
+      assert.ok(Buffer.byteLength(output) <= expected);
+      const folder = join(contextStateRoot(root), "prompt-entries");
+      const entry = readdirSync(folder).map(file => JSON.parse(readFileSync(join(folder, file), "utf8"))).find(item => item.turn === String(total));
+      assert.equal(entry.packetLimitBytes, expected);
+      assert.deepEqual(await promptContext("codex", event, root, { environment: {}, assetRoot: assets }), first);
+    }
+  } finally {
+    if (old === undefined) delete process.env.XDG_STATE_HOME; else process.env.XDG_STATE_HOME = old;
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("large native packets replay within their captured profile envelope and refuse changed configuration", async () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "prompt-envelope-"))), old = process.env.XDG_STATE_HOME;
+  process.env.XDG_STATE_HOME = join(root, "state");
+  const assets = resolve("src/project_governance_runtime/assets/skills");
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: root, stdio: "pipe" });
+    mkdirSync(join(root, "config/governance"), { recursive: true });
+    writeFileSync(join(root, "config/governance/facts.lock.yaml"), PROJECT_DEFAULTS["config/governance/facts.lock.yaml"]!);
+    const profile = { context_router: { default_route: "project", default_context: ["AGENTS.md"], routes: [{ id: "project",
+      token_budget: { primary_context_tokens: 9000, total_context_tokens: 14000 } }] } };
+    writeFileSync(join(root, "config/governance/profile.yaml"), JSON.stringify(profile));
+    writeFileSync(join(root, "AGENTS.md"), "Required current guidance.\n".repeat(1200));
+    const event = { hook_event_name: "UserPromptSubmit", session_id: "host", turn_id: "turn", cwd: root, prompt: "Review the current project" };
+    const first = await promptContext("codex", event, root, { environment: {}, assetRoot: assets });
+    const text = (first as any).hookSpecificOutput.additionalContext;
+    assert.ok(Buffer.byteLength(text) > 24000); assert.ok(Buffer.byteLength(text) <= 56000);
+    assert.deepEqual(await promptContext("codex", event, root, { environment: {}, assetRoot: assets }), first);
+    profile.context_router.routes[0]!.token_budget.total_context_tokens = 10000;
+    writeFileSync(join(root, "config/governance/profile.yaml"), JSON.stringify(profile));
+    const stale = await promptContext("codex", event, root, { environment: {}, assetRoot: assets });
+    assert.match((stale as any).hookSpecificOutput.additionalContext, /incomplete or stale/);
+  } finally {
+    if (old === undefined) delete process.env.XDG_STATE_HOME; else process.env.XDG_STATE_HOME = old;
+    rmSync(root, { recursive: true, force: true });
+  }
 });

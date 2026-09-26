@@ -13,6 +13,7 @@ import { completePreparedRuntimeOperation } from "./runtime-operation-completion
 import { legacyMigrationInvocation } from "./legacy-migration-launch.ts";
 import { readCurrentMigrationPlan } from "./runtime-migration-plan.ts";
 import { MAX_BACKUP_INPUTS } from "./runtime-backup.ts";
+import { assertSharedStartupHookSource } from "./startup-hook-source.ts";
 
 /** Explicit local transition command; no package publication or implicit remote artifact selection. */
 export async function runtimeOperationCommand(command: "init" | "update" | "repair", args: string[],
@@ -55,6 +56,8 @@ export async function runtimeOperationCommand(command: "init" | "update" | "repa
   }
   if(workspace!==request.workspace||resolve(request.registry)!==request.registry||realpathSync(request.archive)!==request.archive)
     throw new Error("Installation request paths must be canonical");
+  // Shared hooks execute before the new runtime. Refuse an incomplete cutover before backup or activation.
+  assertSharedStartupHookSource(workspace);
   if(command==="update" && !request.startupReceipts)assertPortableStartupCutover(workspace,request.registry);
   const savedPath=join(directory,"operation.json");
   const saved=existsSync(savedPath)?JSON.parse(narrativeFile(directory,savedPath)):null;

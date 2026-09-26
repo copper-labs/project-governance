@@ -181,7 +181,9 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
     revision = text(values.revision ?? binding.context?.revision ?? options.family?.revision, "task revision");
   if (values.staged && values["base-ref"]) throw new Error("Staged context cannot select another base");
   root = realpathSync(root);
+  const captureStarted = performance.now();
   const scope = resolveChangeScope(root, values.staged ? { staged: true } : { baseRef: values["base-ref"] ?? "HEAD" });
+  timing.sourceCaptureMs = performance.now() - captureStarted;
   const subject = new ValidationSubject(root, scope, { workingTree: !values.staged });
   const configDigests: Record<string, string> = {};
   const capturedSubjectPaths = new Set<string>();
@@ -349,6 +351,7 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
       throw new ContextRouteError("entry-task-changed", "The task changed while preparing context; refresh against the current binding.");
   }
   const identity = { revision, taskDigest: digest(task), configDigests, routingPaths, route: route.selected?.id ?? null,
+    contextBudget: route.budget, contextBudgetAuthority: route.budgetAuthority,
     source: { mode: scope.mode, base: scope.base_ref, changes: scope.subject_digest },
     context: packet.entries.map(({ content, ...entry }) => entry),
     skills: packet.skills?.entries.map(({ content, reasons, ...entry }) => entry) ?? [],
@@ -370,7 +373,7 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
     transitionId: options.family.transitionId ?? null,
     nextStep: options.family.step < 2 ? options.family.step + 1 : null, sharedAllowance: true, originalReadsAvailable: true } : null;
   const receipt = { version: 1, receiptId, createdAt: new Date().toISOString(), ...identity, selection, expansion,
-    timing: timing.snapshot(metadata?.providerCallMs ?? 0, metadata?.sourceIndex.elapsedMs ?? 0),
+    timing: timing.snapshot(metadata?.providerCallMs ?? 0, projection.status.elapsedMs),
     projection: projectionReceiptPreview(projection, admittedPaths),
     inputDigest: digest(identity), ready: packet.ready && !staleSources.length, blockers: packet.blockers,
     omissions: packet.omissions, skillOmissions: packet.skills?.omissions ?? [],

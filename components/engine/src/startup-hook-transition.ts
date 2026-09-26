@@ -7,9 +7,11 @@ import {narrativeFile} from "./narrative-inputs.ts";
 import {planStartupHookMigration} from "./startup-hook-migration.ts";
 import {RuntimeGenerations} from "./runtime-generations.ts";
 import {startupHooks} from "./startup-hooks.ts";
+import {assertSharedStartupHookSource} from "./startup-hook-source.ts";
 
 /** Bind old and intended bytes to the same backup used by runtime activation. */
 export function backedStartupHookTransition(workspace:string,backupDirectory:string,receipts?:string) {
+ assertSharedStartupHookSource(workspace);
  const root=realpathSync(workspace),path=join(root,".codex/hooks.json"),backup=inspectRuntimeBackup(backupDirectory);
  const record=backup.records.find(value=>value.source===path);
  if(!record) {
@@ -71,6 +73,7 @@ export function applyBackedStartupHooks(registry:string,workspace:string,backupD
 
 /** A lock-only completion cannot leave an executable legacy observer in any backed provider settings. */
 export function assertNoLegacyStartupHooks(workspace:string) {
+ assertSharedStartupHookSource(workspace);
  const root=realpathSync(workspace);
  const legacyCommand=(value:unknown,depth=0):boolean=>{
   if(depth>32)throw new Error("Native hook configuration nesting exceeds limit");

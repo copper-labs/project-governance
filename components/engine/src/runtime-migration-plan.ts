@@ -9,6 +9,7 @@ import { worktreeBytes } from "./change-subject.ts";
 import { narrativeFile } from "./narrative-inputs.ts";
 import { digest, object, text } from "./core.ts";
 import { MAX_BACKUP_INPUTS, type BackupInput } from "./runtime-backup.ts";
+import { inspectStartupHookSource } from "./startup-hook-source.ts";
 
 /** Discover declared project files only; external stores and live owners require separate inventory. */
 export function runtimeMigrationPlan(workspace: string) {
@@ -73,7 +74,7 @@ export function runtimeMigrationPlan(workspace: string) {
   });
   const plan = { version: 1, kind: "runtime-migration-project-files", workspace, inputs, sources,
     hostPlan: host.plan, hostPlanDigest: host.planDigest, runtimeEntrypoints,
-    continuity: continuityMigrationInventory(workspace),
+    continuity: continuityMigrationInventory(workspace), codexHookSource: inspectStartupHookSource(workspace),
     scope: "declared-project-files-only", unresolvedInventory: ["external-runtime-stores-and-artifacts", "legacy-live-owners", "effective-shared-git-hooks", "native-hook-trust-and-legacy-handler-transition", "installed-launcher-and-runtime"] };
   return { ...plan, planDigest: digest(plan) };
 }

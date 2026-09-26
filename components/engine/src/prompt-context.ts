@@ -15,8 +15,8 @@ import { workContext } from "../../harness/src/store/location.ts";
 import { narrativeFile } from "./narrative-inputs.ts";
 import { validateProviderContext } from "./provider-context.ts";
 import { openContextFamily } from "./decision-budget.ts";
+import { LEGACY_PROMPT_BYTES, PROMPT_FRAMING_RESERVE, promptPacketLimit, requiredPromptText } from "./prompt-context-budget.ts";
 
-const MAX_PACKET_BYTES = 24_000;
 type Route = Awaited<ReturnType<typeof contextRouteCommand>>;
 
 /** A duplicate turn may return only the previously validated packet; it never spends again. */
@@ -26,8 +26,16 @@ function replayPreparedPrompt(root: string, entryId: string, packetPath: string,
   if (historical && (historical.taskId !== current?.taskId || historical.revision !== current?.revision))
     throw new ContextRouteError("entry-task-changed", "Task changed; refresh context through the normal route");
   const packet = object(JSON.parse(narrativeFile(contextStateRoot(root), packetPath)));
+  if (digest(packet.validation) !== prior.replayValidationDigest) throw new Error("Prior prompt validation differs");
+  let packetLimit = LEGACY_PROMPT_BYTES;
+  if (prior.status === "prepared") {
+    const validation = object(packet.validation);
+    if (typeof validation.receipt !== "string" || fileDigest(validation.receipt) !== validation.receiptDigest) throw new Error("Prior prompt receipt differs");
+    const receipt = object(JSON.parse(narrativeFile(contextStateRoot(root), validation.receipt)));
+    if (receipt.contextBudget !== undefined) packetLimit = promptPacketLimit(receipt.contextBudget, object(receipt.contextBudgetAuthority ?? {}).nativePacketBytes);
+  }
   if (packet.version !== 1 || packet.entryId !== entryId || typeof packet.text !== "string" ||
-      Buffer.byteLength(packet.text) > MAX_PACKET_BYTES || digest(packet.text) !== prior.packetDigest ||
+      Buffer.byteLength(packet.text) > packetLimit || digest(packet.text) !== prior.packetDigest ||
       digest(packet.validation) !== prior.replayValidationDigest || prior.worktreeLocator !== worktreeLocator)
     throw new Error("Prior prompt packet differs");
   if (prior.status === "prepared") {
@@ -48,12 +56,9 @@ function refusePromptEntry(root: string, provider: string, event: Record<string,
 
 /** Deterministic presentation keeps required guidance intact and labels optional source as evidence. */
 export function renderPromptContext(packet: Route, history: ReturnType<typeof readContextHistory>, entryId: string) {
-  const header = `Governance prompt context. Entry ${entryId}; route ${packet.receiptId}.\n`;
-  const required = [...packet.entries.map(item => ({ path: item.path, digest: item.sourceDigest, text: item.content })),
-    ...(packet.skills?.entries ?? []).map(item => ({ path: item.path, digest: item.sourceDigest, text: item.content }))];
-  const text = (items: typeof required) => items.map(item => `${JSON.stringify({ path: item.path, digest: item.digest })}\n${item.text}`).join("\n\n");
-  const requiredText = `${header}Required current guidance:\n${text(required)}\n`;
-  if (!packet.ready || Buffer.byteLength(requiredText) > MAX_PACKET_BYTES - 1024) return {
+  const limit = promptPacketLimit(packet.route.budget, packet.route.budgetAuthority?.nativePacketBytes);
+  const { header, text: requiredText } = requiredPromptText(packet.entries, packet.skills?.entries ?? [], entryId, packet.receiptId);
+  if (!packet.ready || Buffer.byteLength(requiredText) > limit - PROMPT_FRAMING_RESERVE) return {
     status: "blocked" as const, delivered: [] as string[], text: `${header}Required context could not be delivered intact. Inspect the context-route receipt and its required originals before changes. ${JSON.stringify({ blockers: packet.blockers,
       required: [...packet.route.primary, ...packet.route.active], reason: packet.ready ? "prompt-required-byte-budget" : "required-context-unavailable" })}`.slice(0, 8000),
   };
@@ -65,14 +70,14 @@ export function renderPromptContext(packet: Route, history: ReturnType<typeof re
   const delivered: string[] = [];
   for (const item of packet.optional?.entries ?? []) {
     const block = JSON.stringify({ path: item.id, digest: item.sourceDigest, range: item.sourceRange ?? null, excerpt: item.excerpt }) + "\n";
-    if (Buffer.byteLength(content + block) > MAX_PACKET_BYTES - 2300) continue;
+    if (Buffer.byteLength(content + block) > limit - PROMPT_FRAMING_RESERVE) continue;
     content += block; delivered.push(item.id);
   }
   // Cached hook output must not persist the raw operator prompt in an expansion command.
   const expansion = packet.expansion?.nextStep ? `\nContinue with project-governance context-route --entry ${entryId} --expansion ${packet.expansion.nextStep}; supply --task with the current or clarified request. Add --optional-path <path> for an original, or --links <path> for one-hop declared links. The same allowance is shared.\n` : "";
   const footer = expansion + "\nUse this packet before task-specific reads. Expand originals when necessary. Bind or resume the continuity task when intent and scope are clear; a provisional entry is not task acceptance. If binding reports refresh-required, run context-route --task <current request> before more task-specific reads. It refreshes the packet within this turn's shared allowance.\n";
   const historyBlock = "\nHistorical background only; current files and policy remain authoritative. Expand a task with harness task show --task <id>.\n" + JSON.stringify(history.candidates) + "\n";
-  const historyDelivered = history.candidates.length > 0 && Buffer.byteLength(content + historyBlock + footer) <= MAX_PACKET_BYTES;
+  const historyDelivered = history.candidates.length > 0 && Buffer.byteLength(content + historyBlock + footer) <= limit;
   if (historyDelivered) content += historyBlock;
   content += footer;
   return { status: "prepared" as const, text: content, delivered, historyDelivered };
@@ -140,7 +145,7 @@ async function preparePromptContext(provider: string, eventValue: unknown, works
   const purpose = `${prompt}${binding.context ? `\nBound task intent (the current prompt may refine it):\n${decisionTaskPurpose(binding.context)}` : ""}`;
   const routedPurpose = purpose.slice(0, 16000);
   const operationStartedAt = performance.now();
-  let receipt: Record<string, unknown>, output: string, validation: Record<string, unknown> | null = null;
+  let receipt: Record<string, unknown>, output: string, validation: Record<string, unknown> | null = null, packetLimit = LEGACY_PROMPT_BYTES;
   try {
     const history = readContextHistory(root, routedPurpose, binding.context?.taskId);
     const packet = await contextRouteCommand([`--task=${routedPurpose}`, `--revision=${binding.context?.revision ?? "provisional"}`], root,
@@ -148,6 +153,7 @@ async function preparePromptContext(provider: string, eventValue: unknown, works
         historyHints: history.candidates.flatMap(item => item.sourceHints), promptEntry: true, retrievalEvent: entryId,
         family: { id: entryId, step: 0, scope, revision: binding.context ? `task:${scope.taskId}@${scope.taskRevision}` : scope.taskRevision, identity: familyIdentity },
         localOnly: reservation === "unavailable", operationStartedAt }, binding.context ?? undefined);
+    packetLimit = promptPacketLimit(packet.route.budget, packet.route.budgetAuthority.nativePacketBytes);
     const rendered = renderPromptContext(packet, history, entryId);
     output = rendered.text;
     if (rendered.status === "prepared" && packet.receiptPersisted) {
@@ -160,7 +166,8 @@ async function preparePromptContext(provider: string, eventValue: unknown, works
       deliveredSources: rendered.delivered, requiredSources: packet.entries.map(item => ({ path: item.path, digest: item.sourceDigest })),
       history: { ...history, candidates: history.candidates.map(({ summary: _text, ...reference }) => reference) },
       historyDelivered: "historyDelivered" in rendered ? rendered.historyDelivered : false,
-      packetDigest: digest(output), packetBytes: Buffer.byteLength(output), decisions: packet.metadata?.decisions.map(item => item.receiptId) ?? [],
+      packetDigest: digest(output), packetBytes: Buffer.byteLength(output), packetLimitBytes: packetLimit,
+      decisions: packet.metadata?.decisions.map(item => item.receiptId) ?? [],
       selectionReason: reservation === "unavailable" ? "unreserved-prompt-local-only" : packet.metadata?.reason ?? packet.selection.reason, catalogCount: packet.metadata?.catalog.eligibleCount ?? null,
       assessedCount: packet.metadata?.assessedCount ?? 0, coverage: packet.metadata?.coverage ?? null, sourceIndex: packet.metadata?.sourceIndex ?? null,
       originalExpansions: null, nativeUsage: null, acceptedOutcome: "unknown" };
@@ -169,7 +176,7 @@ async function preparePromptContext(provider: string, eventValue: unknown, works
     receipt = { status: "failed", reason: error instanceof ContextRouteError ? error.code : "prompt-context-unavailable",
       routeFailureReceipt: error instanceof ContextRouteError ? error.receiptPath : null };
   }
-  if (Buffer.byteLength(output) > MAX_PACKET_BYTES) {
+  if (Buffer.byteLength(output) > packetLimit) {
     output = `Governance prompt entry ${entryId} could not be delivered within its byte limit. Inspect context doctor and the required originals before task-specific work.`;
     validation = null; receipt = { status: "blocked", reason: "prompt-packet-byte-budget", packetDigest: digest(output), packetBytes: Buffer.byteLength(output) };
   }

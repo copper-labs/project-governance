@@ -6,6 +6,7 @@ export const CONTEXT_HOOK_SECONDS = 15;
 export class ContextTiming {
   readonly started: number;
   readonly deadline: number;
+  sourceCaptureMs = 0;
   #selectionStart: number | null = null;
   #selectionEnd: number | null = null;
   #limitReason: "operation-deadline" | "selection-deadline" | "provider-deadline" | "caller-cancelled" | null = null;
@@ -32,7 +33,7 @@ export class ContextTiming {
   snapshot(providerCallMs = 0, indexMs = 0) {
     const end = this.now(), selectionStart = this.#selectionStart ?? end, selectionEnd = this.#selectionEnd ?? end;
     return { version: 1, preparationMs: Math.max(0, selectionStart - this.started),
-      indexMs, selectionMs: Math.max(0, selectionEnd - selectionStart), providerCallMs,
+      sourceCaptureMs: this.sourceCaptureMs, indexMs, selectionMs: Math.max(0, selectionEnd - selectionStart), providerCallMs,
       deliveryMs: Math.max(0, end - selectionEnd), totalMs: Math.max(0, end - this.started),
       operationBudgetMs: CONTEXT_OPERATION_MS, selectionBudgetMs: CONTEXT_SELECTION_MS,
       operationOverrunMs: Math.max(0, end - this.deadline), limitReason: this.#limitReason };

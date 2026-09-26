@@ -20,8 +20,11 @@ test("pre-cancelled calls do not touch transport or health state", async t => {
 });
 
 test("deadline bounds a transport that ignores cancellation", { timeout: 2000 }, async t => {
-  const { client, path } = fixture(t, () => new Promise(() => {}));
-  const result = await client.ask("{}", 20);
+  let calls = 0;
+  const { client, path } = fixture(t, () => { calls++; return new Promise(() => {}); });
+  // Leave room for health-file admission when parallel suites are sharing the host.
+  const result = await client.ask("{}", 500);
+  assert.equal(calls, 1, "Exercise a dispatched transport deadline, not pre-dispatch budget exhaustion");
   assert.equal(result.ok, false);
   if (!result.ok) assert.equal(result.reason, "deadline");
   assert.equal(existsSync(`${path}.lock`), false);

@@ -64,6 +64,9 @@ export function runtimeDoctor(workspace: string, registry: string) {
     const instructions = planHostInstructions(workspace, COMPILED_HOST_BLOCK);
     if (instructions.writes.length) add("installation.host-instructions-drift", "Managed agent instructions are missing or differ from this runtime; run host-instructions --dry-run, then apply the reviewed --plan-digest.");
   } catch { add("installation.host-instructions-unavailable", "Managed agent instructions could not be inspected safely; reconcile their ownership and markers."); }
+  const context = contextDoctor(workspace);
+  for (const finding of context.findings.filter(value => ["context.shared-hook-source", "context.hook-source-unavailable"].includes(value.id)))
+    add(finding.id, finding.message);
   return { version: 1, scope: "compiled-installation", status: findings.length ? "failed" : "passed", selection, findings,
-    context: contextDoctor(workspace), execution_readback: "not-performed", active_readers: "reported-without-releasing", mutations: "none" };
+    context, execution_readback: "not-performed", active_readers: "reported-without-releasing", mutations: "none" };
 }

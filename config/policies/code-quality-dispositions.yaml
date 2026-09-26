@@ -2,6 +2,30 @@ version: 2
 owner: project-governance-maintainers
 dispositions:
 - finding: quality.large-function
+  path: components/engine/src/context-projection.ts
+  symbol: maintainContextProjection
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex RC8 source cohesion review and Claude Opus 5.5 medium focused recheck
+  approved_on: '2026-09-26'
+  responsibility: Publish one source-index generation with verified freshness and bounded extraction.
+  rationale: Observation, retained facts and publication share one captured view and store lifetime.
+    Freshness observation, extraction, catalog links and storage already have separate owners.
+    Splitting the remaining generation fold by length would distribute its freshness and cleanup
+    boundary without separating another responsibility.
+- finding: quality.large-function
+  path: components/engine/src/prompt-context.ts
+  symbol: preparePromptContext
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex RC8 source cohesion review and Claude Opus 5.5 medium focused recheck
+  approved_on: '2026-09-26'
+  responsibility: Prepare and retain one host prompt packet under a single turn reservation.
+  rationale: Entry identity, task binding, replay and delivery share the same reservation and paid
+    allowance. Rendering, replay validation, routing and observation storage have separate owners.
+    Keeping the remaining admission-to-publication sequence together makes duplicate-spend and
+    stale-task refusal visible without a second mutable turn protocol.
+- finding: quality.large-function
   path: components/engine/src/decision-outcomes.ts
   symbol: decisionOutcomeReport
   disposition: cohesion-accepted

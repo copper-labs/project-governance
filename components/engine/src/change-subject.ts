@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { closeSync, constants, fstatSync, lstatSync, openSync, readSync, readlinkSync, realpathSync } from "node:fs";
 import { isAbsolute, join, posix, relative } from "node:path";
 import { canonical } from "./core.ts";
+import { workingSourceUncertainty } from "./context-source-observation.ts";
 
 export interface SubjectSource { kind: "git" | "index" | "worktree"; path: string; ref?: string; identity: string; file_type: "regular" | "symlink" }
 export interface ChangeRecord {
@@ -39,11 +40,12 @@ function unbornScope(root: string, staged: boolean, paths: string[]): ChangeScop
       .split("\0").filter(Boolean).map(safeSubjectPath);
     const selected = [...new Set(names)].filter(path => !paths.length || paths.includes(path)).sort();
     if (selected.length > 4096) throw new Error("First-commit inventory exceeds capture bound; configure .gitignore or use a narrower staged scope");
+    const stagedEntry = staged ? entries(root, "index", selected) : null;
     let remaining = 8 * 1024 * 1024;
     return selected.flatMap(path => {
       let after: SubjectSource | null;
       let captured: Buffer | undefined;
-      if (staged) after = entry(root, "index", path);
+      if (staged) after = stagedEntry!(path);
       else {
         try { const current = worktreeBytes(root, path, remaining); captured = current.bytes; after = { kind: "worktree", path, identity: hash(current.bytes), file_type: current.type }; }
         catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return []; throw error; }
@@ -114,6 +116,29 @@ function entry(root: string, kind: "git" | "index", path: string, ref?: string):
   return { kind, path, ...(ref ? { ref } : {}), identity: metadata[kind === "git" ? 2 : 1]!, file_type: fileType(metadata[0]!) };
 }
 
+/** Scoped batches avoid one metadata process per change without scanning unrelated paths. */
+function entries(root: string, kind: "git" | "index", paths: string[], ref?: string): (path: string) => SubjectSource | null {
+  const rows = new Map<string, string[] | null>();
+  const selected = [...new Set(paths.map(safeSubjectPath))];
+  // Unrelated filenames and whole-tree size cannot invalidate a narrow change capture.
+  for (let offset = 0; offset < selected.length;) {
+    const batch: string[] = []; let bytes = 0;
+    while (offset < selected.length && bytes < 16_000) { const path = selected[offset++]!; batch.push(`:(literal)${path}`); bytes += Buffer.byteLength(path) + 32; }
+    for (const line of decode(git(root, [...(kind === "git" ? ["ls-tree", "-z", ref!] : ["ls-files", "--stage", "-z"]), "--", ...batch])).split("\0").filter(Boolean)) {
+      const tab = line.indexOf("\t"), metadata = line.slice(0, tab).split(" "), path = safeSubjectPath(line.slice(tab + 1));
+      if (tab < 0 || metadata.length !== 3) throw new Error("Malformed bulk source metadata");
+      rows.set(path, rows.has(path) || kind === "index" && metadata[2] !== "0" ? null : metadata);
+    }
+  }
+  return path => {
+    if (!rows.has(path)) return null;
+    const metadata = rows.get(path);
+    if (!metadata) throw new Error("ambiguous or unresolved subject entry");
+    if (kind === "git" && metadata[1] !== "blob") throw new Error("subject entry is not a blob");
+    return { kind, path, ...(ref ? { ref } : {}), identity: metadata[kind === "git" ? 2 : 1]!, file_type: fileType(metadata[0]!) };
+  };
+}
+
 /** Captured object IDs survive later index changes; live inputs must still match their captured digest. */
 export function readSubjectSource(root: string, source: SubjectSource, limit = 16 * 1024 * 1024): Buffer {
   safeSubjectPath(source.path);
@@ -160,12 +185,13 @@ export function resolveChangeScope(root: string, options: { staged?: boolean; al
       if (["U", "X", "B"].includes(code!)) throw new Error("unresolved Git change status");
       records.set(path, { status: previous ? "renamed" : code === "A" ? "added" : code === "D" ? "deleted" : "modified", path, previous_path: previous, before: null, after: null, changed_ranges: [] });
     }
+    const extras = options.staged ? [] : paths.length ? paths : decode(git(root, ["ls-files", "--others", "--exclude-standard", "-z"])).split("\0").filter(Boolean).map(safeSubjectPath);
+    const beforeEntry = entries(root, "git", [...records.values()].filter(record => record.status !== "added").map(record => record.previous_path ?? record.path).concat(extras), base);
     if (!options.staged) {
-      const extras = paths.length ? paths : decode(git(root, ["ls-files", "--others", "--exclude-standard", "-z"])).split("\0").filter(Boolean).map(safeSubjectPath);
       for (const path of extras) if (!records.has(path)) {
         let present = false;
         try { const stat = lstatSync(join(root, path)); present = stat.isFile() || stat.isSymbolicLink(); } catch { /* Deleted input. */ }
-        const before = entry(root, "git", path, base);
+        const before = beforeEntry(path);
         if (!present && !before) continue;
         records.set(path, { status: present ? before ? "modified" : "added" : "deleted", path, previous_path: null, before: null, after: null, changed_ranges: [] });
       }
@@ -181,14 +207,15 @@ export function resolveChangeScope(root: string, options: { staged?: boolean; al
       const count = Number(match[2] ?? 1), start = Math.max(Number(match[1]), 1);
       if (count) records.get(current)?.changed_ranges.push({ start, end: start + count - 1 });
     }
+    const afterEntry = options.staged ? entries(root, "index", [...records.values()].filter(record => record.status !== "deleted").map(record => record.path)) : null;
     for (const record of records.values()) {
       if (record.status !== "added") {
-        record.before = entry(root, "git", record.previous_path ?? record.path, base);
+        record.before = beforeEntry(record.previous_path ?? record.path);
         if (!record.before) throw new Error("comparison before-image unavailable");
       }
       if (record.status !== "deleted") {
         if (options.staged) {
-          record.after = entry(root, "index", record.path);
+          record.after = afterEntry!(record.path);
           if (!record.after) throw new Error("comparison index image unavailable");
         } else {
           const current = worktreeBytes(root, record.path);
@@ -290,29 +317,12 @@ export class ValidationSubject {
   }
 
   /** Cache observation is separate from delivery. Untrusted Git flags/filters require literal bytes. */
-  projectionSources(paths: string[]): { view: string; subject: string | null; sources: Map<string, { key: string; freshness: string }> } {
+  projectionSources(paths: string[], deadlineAt = performance.now() + 500): { view: string; subject: string | null; sources: Map<string, { key: string; freshness: string }> } {
     const sources = new Map<string, { key: string; freshness: string }>();
-    const uncertain = new Set<string>();
-    let verified = true;
-    if (this.#workingTree) try {
-      for (const line of decode(git(this.root, ["ls-files", "-v", "-z"])).split("\0").filter(Boolean))
-        if (line[0] !== "H") uncertain.add(line.slice(2));
-      const attrs = decode(execFileSync("git", ["check-attr", "-z", "--stdin", "filter", "text", "eol", "working-tree-encoding"], {
-        cwd: this.root, input: paths.join("\0") + "\0", timeout: 1000, maxBuffer: 32 * 1024 * 1024,
-        env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" }, stdio: ["pipe", "pipe", "pipe"],
-      })).split("\0");
-      // text=auto/autocrlf alone does not change an LF checkout. Git reports actual index/worktree EOLs.
-      for (let i = 0; i + 2 < attrs.length; i += 3) if (["filter", "working-tree-encoding"].includes(attrs[i + 1]!) &&
-        !["unspecified", "unset"].includes(attrs[i + 2]!)) uncertain.add(attrs[i]!);
-      for (const line of decode(git(this.root, ["ls-files", "--eol", "-z"])).split("\0").filter(Boolean)) {
-        const tab = line.indexOf("\t"), match = /^i\/(\S*)\s+w\/(\S*)/u.exec(line.slice(0, tab));
-        if (tab < 0 || !match) throw new Error("Unverified EOL observation");
-        if (match[1] !== match[2]) uncertain.add(line.slice(tab + 1));
-      }
-    } catch { verified = false; }
+    const uncertain = this.#workingTree ? workingSourceUncertainty(this.root, paths.filter(path => !this.#overlay.has(path)), deadlineAt) : new Set<string>();
     for (const path of paths) {
       try {
-        if (this.#workingTree && (!verified || uncertain.has(path)) || this.#scope.scope === "all") {
+        if (uncertain.has(path) || this.#scope.scope === "all") {
           // Capture is deferred to readBatch, under its shared deadline/byte limits. No eager crawl.
           this.#projectionUnverified.add(path);
           sources.set(path, { key: "unverified", freshness: "unverified" });

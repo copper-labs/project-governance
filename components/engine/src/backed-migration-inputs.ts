@@ -3,6 +3,7 @@ import { narrativeFile } from "./narrative-inputs.ts";
 import { digest, object, text } from "./core.ts";
 import { inspectRuntimeBackup } from "./runtime-backup-inspection.ts";
 import { MAX_BACKUP_INPUTS, type BackupInput } from "./runtime-backup.ts";
+import { inspectStartupHookSource } from "./startup-hook-source.ts";
 
 /** Resume from backed source identities, since successful transition writes change the live plan. */
 export function backedMigrationInputs(path: string, backupDirectory: string, workspace: string): BackupInput[] {
@@ -12,6 +13,10 @@ export function backedMigrationInputs(path: string, backupDirectory: string, wor
       planDigest!==digest(plan) || !Array.isArray(plan.inputs) || !Array.isArray(plan.sources) ||
       !plan.inputs.length || plan.inputs.length>MAX_BACKUP_INPUTS || plan.inputs.length!==plan.sources.length)
     throw new Error("Invalid backed migration plan");
+  const source = plan.codexHookSource;
+  if (source && typeof source === "object" && "shared" in source && source.shared === true &&
+      digest(source) !== digest(inspectStartupHookSource(workspace)))
+    throw new Error("Shared Codex hook source changed since the migration plan; reconcile before resuming");
   const backup=inspectRuntimeBackup(backupDirectory),sources=plan.sources;
   const inputs=plan.inputs.map((raw,index)=>{
     const input=object(raw),source=object(sources[index]);

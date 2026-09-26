@@ -112,6 +112,12 @@ host trust and measured use.
 The [RC7 reliability amendment](specs/engine-rc7-prompt-reliability.md) and its
 [delivery plan](exec-plans/active/2026-09-25-rc7-prompt-reliability.md) separate retrieval timing
 and refresh context after explicit task changes while preserving history and spending.
+The [RC8 hook and context repair](specs/engine-rc8-hook-sources.md) and its
+[delivery plan](exec-plans/active/2026-09-25-rc8-hook-sources.md) account for Codex loading linked
+worktree hook definitions from the main checkout, remove expensive repository preparation and
+check required-context budgets across routes. The
+[computer-use research](research/2026-09-25-jev-computer-use.md) evaluates optional JEV action
+selection without declaring another executor part of the release.
 The [repository-index research](research/2026-09-25-repository-index-harness-practices.md) compares
 current harness practices and explains the bounded first iteration accepted for RC6; its wider
 research alternatives remain outside the release scope.

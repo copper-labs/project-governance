@@ -3,9 +3,11 @@ import {randomUUID} from "node:crypto";
 import {join} from "node:path";
 import {narrativeFile} from "./narrative-inputs.ts";
 import {startupHooks} from "./startup-hooks.ts";
+import {assertSharedStartupHookSource} from "./startup-hook-source.ts";
 
 /** Installs project observers only; host trust and update policy retain their own authority. */
 export function installStartupHooks(workspace:string,receipts:string) {
+ assertSharedStartupHookSource(workspace);
  const root=realpathSync(workspace),directory=join(root,".codex"),path=join(directory,"hooks.json");
  const inspect=()=>{
   const parent=lstatSync(directory,{throwIfNoEntry:false});
@@ -32,7 +34,7 @@ export function installStartupHooks(workspace:string,receipts:string) {
  }
  const after=inspect();
  if(after.text===null || JSON.stringify(JSON.parse(after.text))!==JSON.stringify(plan.configuration))throw new Error("Startup hook installation readback failed");
- return {provider:plan.provider,path,changed:!current,authority:"project-observers-installed" as const,
+ return {provider:plan.provider,path,changed:!current,source:assertSharedStartupHookSource(workspace),authority:"project-observers-installed" as const,
   hostRequirements:["Ensure features.hooks is not disabled in Codex","Trust the project in Codex; managed policy may prohibit project hooks","Review and trust the exact hook definitions using /hooks in Codex"],
   updatePolicyChanged:false};
 }

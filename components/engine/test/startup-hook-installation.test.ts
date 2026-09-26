@@ -12,8 +12,9 @@ test("explicit startup installation preserves authored hooks, mode and repeat by
   const path=join(root,".codex/hooks.json"),scope={workspace:root,registry:join(root,"registry.sqlite")},receipts=join(root,"startup.sqlite");
   const original={hooks:{SessionStart:[{hooks:[{type:"command",command:"authored",timeout:2}]}]},custom:true};
   writeFileSync(path,JSON.stringify(original),{mode:0o640});
-  const result=await startupCommand(["install-hooks","--receipts",receipts],scope) as {changed:boolean;updatePolicyChanged:boolean};
+  const result=await startupCommand(["install-hooks","--receipts",receipts],scope) as {changed:boolean;updatePolicyChanged:boolean;source:{status:string}};
   assert.equal(result.changed,true);assert.equal(result.updatePolicyChanged,false);
+  assert.equal(result.source.status,"current");
   const bytes=readFileSync(path,"utf8"),after=JSON.parse(bytes);
   assert.deepEqual(after.hooks.SessionStart[0],original.hooks.SessionStart[0]);assert.equal(after.custom,true);
   assert.equal(statSync(path).mode&0o777,0o640);

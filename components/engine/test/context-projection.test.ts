@@ -205,3 +205,41 @@ test("uncertain source reads rotate through pending paths and reuse byte-verifie
   f.write("0.ts", "export const changed=2;\n");
   const changed = f.run(); assert.equal(changed.status.extractedCount, 1); assert.match(changed.entries.get("0.ts")!.text, /changed/);
 });
+
+test("large inventory refresh makes durable progress without scanning unrelated assets", t => {
+  const f = fixture(t), oldTrace = process.env.GIT_TRACE_PERFORMANCE, trace = join(f.base, "git-trace.log");
+  f.git("config", "core.autocrlf", "false");
+  f.write(".gitattributes", "*.ts text=auto\n");
+  for (let i = 0; i < 2400; i++) f.write(`src/item-${i}.ts`, `/** Item ${i}. */\nexport const item${i} = 1;\n`);
+  writeFileSync(join(f.root, "unrelated.bin"), Buffer.alloc(8 * 1024 * 1024));
+  f.git("add", "."); f.git("-c", "user.name=Fixture", "-c", "user.email=f@example.invalid", "commit", "-qm", "large source tree");
+  process.env.GIT_TRACE_PERFORMANCE = trace;
+  try {
+    const cold = f.run({ byteLimit: 16000 }), warm = f.run({ byteLimit: 16000 });
+    assert.equal(cold.status.inventoryCount, 2400); assert.ok(cold.status.extractedCount > 0); assert.ok(cold.status.pendingCount > 0);
+    assert.equal(warm.status.inventoryCount, 2400); assert.ok(warm.status.reusedCount > 0); assert.ok(warm.status.pendingCount < cold.status.pendingCount);
+    const eol = readFileSync(trace, "utf8").split("\n").filter(line => line.includes("git command:") && line.includes("--eol"));
+    assert.ok(eol.length > 0); assert.ok(eol.every(line => line.includes(" -z -- ") && !line.includes("unrelated.bin")));
+    assert.ok(cold.status.timing.freshnessMs >= 0); assert.ok(warm.status.timing.extractionMs >= 0);
+  } finally { if (oldTrace === undefined) delete process.env.GIT_TRACE_PERFORMANCE; else process.env.GIT_TRACE_PERFORMANCE = oldTrace; }
+});
+
+test("expired freshness observation cannot reuse stale facts and still permits later byte capture", t => {
+  const f = fixture(t); f.write("a.ts", "export const before=1;\n"); f.git("add", ".");
+  f.git("-c", "user.name=Fixture", "-c", "user.email=f@example.invalid", "commit", "-qm", "source"); f.run();
+  const subject = f.subject(); f.write("a.ts", "export const after=2;\n");
+  const observation = subject.projectionSources(["a.ts"], 0);
+  assert.equal(observation.sources.get("a.ts")?.freshness, "unverified");
+  const batch = subject.readBatch(["a.ts"]);
+  assert.match(batch.get("a.ts")!.toString(), /after/);
+});
+
+test("Git ident expansion is captured from literal checkout bytes", t => {
+  const f = fixture(t); f.write(".gitattributes", "a.ts ident\n"); f.write("a.ts", "/** $Id$ */\nexport const value=1;\n");
+  f.git("add", "."); f.git("-c", "user.name=Fixture", "-c", "user.email=f@example.invalid", "commit", "-qm", "ident source");
+  rmSync(join(f.root, "a.ts")); f.git("checkout", "--", "a.ts");
+  const source = f.subject(), observation = source.projectionSources(["a.ts"]);
+  assert.equal(observation.sources.get("a.ts")?.freshness, "unverified");
+  const projection = maintainContextProjection(source, ["a.ts"], f.state);
+  assert.equal(projection.facts.get("a.ts")?.bytes, readFileSync(join(f.root, "a.ts")).length);
+});

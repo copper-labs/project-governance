@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync, renameSync, symlinkSync, mkdirSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync, renameSync, symlinkSync, mkdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ValidationSubject, resolveChangeScope, readSubjectSource, safeSubjectPath, subjectDigest, worktreeBytes } from "../src/change-subject.ts";
@@ -119,5 +119,45 @@ test("bulk source descriptions use captured staged bytes and retain per-file exc
     assert.equal(batch.get("rename.txt")?.toString(), "retained content\n");
     assert.equal(batch.get("missing.ts"), "source-not-regular");
     assert.equal(subject.readBatch(["code.ts"], 1).get("code.ts"), "source-unavailable-or-over-limit");
+  } finally { f.close(); }
+});
+
+test("hundreds of changed and staged paths use bounded bulk Git observations", () => {
+  const f = repository(), oldTrace = process.env.GIT_TRACE_PERFORMANCE;
+  const trace = join(tmpdir(), `subject-trace-${Date.now()}.log`);
+  try {
+    for (let i = 0; i < 160; i++) writeFileSync(join(f.root, `file-${i}.ts`), `export const n=${i};\n`);
+    f.git("add", "."); f.git("commit", "-qm", "many sources");
+    for (let i = 0; i < 160; i++) writeFileSync(join(f.root, `file-${i}.ts`), `export const n=${i + 1};\n`);
+    f.git("add", "."); process.env.GIT_TRACE_PERFORMANCE = trace;
+    const working = resolveChangeScope(f.root, { baseRef: "HEAD" }), staged = resolveChangeScope(f.root, { staged: true });
+    const calls = readFileSync(trace, "utf8").split("\n").filter(line => line.includes("git command:"));
+    assert.equal(working.records.length, 160); assert.equal(staged.records.length, 160);
+    assert.ok(calls.length < 30, `Expected bulk metadata, observed ${calls.length} processes`);
+    assert.ok(calls.filter(line => /git (ls-tree|ls-files --stage)/u.test(line)).every(line => line.includes(" -- ")),
+      "Bulk lookup must be bounded by changed paths, not whole-tree metadata");
+    assert.equal(new ValidationSubject(f.root, staged).read("file-159.ts").toString(), "export const n=160;\n");
+    writeFileSync(join(f.root, "file-159.ts"), "raced\n");
+    assert.throws(() => new ValidationSubject(f.root, working).read("file-159.ts"), /changed after capture/);
+  } finally {
+    if (oldTrace === undefined) delete process.env.GIT_TRACE_PERFORMANCE; else process.env.GIT_TRACE_PERFORMANCE = oldTrace;
+    rmSync(trace, { force: true }); f.close();
+  }
+});
+
+test("an unrelated non-UTF8 tracked filename cannot break narrow change capture", () => {
+  const f = repository();
+  try {
+    // Git permits names that the host filesystem cannot materialize (including macOS).
+    const blob = execFileSync("git", ["hash-object", "-w", "--stdin"], { cwd: f.root, input: "unrelated content\n", encoding: "utf8" }).trim();
+    const row = Buffer.concat([Buffer.from(`100644 ${blob}\tunrelated-`), Buffer.from([0xff]), Buffer.from(".txt\0")]);
+    execFileSync("git", ["update-index", "-z", "--index-info"], { cwd: f.root, input: row });
+    f.git("commit", "-qm", "unusual fixture path");
+    writeFileSync(join(f.root, "code.ts"), "const changed=2;\n"); f.git("add", "code.ts");
+    for (const options of [{ staged: true }, { baseRef: "HEAD", paths: ["code.ts"] }]) {
+      const scope = resolveChangeScope(f.root, options);
+      assert.equal(scope.records.length, 1); assert.equal(scope.records[0]!.path, "code.ts");
+      assert.equal(new ValidationSubject(f.root, scope).read("code.ts").toString(), "const changed=2;\n");
+    }
   } finally { f.close(); }
 });

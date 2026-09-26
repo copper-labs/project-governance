@@ -16,6 +16,9 @@ Git remains the implementation history and recovery mechanism.
 
 ## Active
 
+- [RC8 hook and context repair](active/2026-09-25-rc8-hook-sources.md) resolves Codex's main-checkout
+  definitions, prevents incomplete cutovers, speeds repository preparation and checks context budgets.
+
 - [RC7 prompt reliability](active/2026-09-25-rc7-prompt-reliability.md) separates preparation
   from JEV selection and refreshes context after explicit task changes without resetting spending.
 
