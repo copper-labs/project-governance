@@ -96,6 +96,23 @@ export function promptEntryTaskBinding(workspace: string, entry: ReturnType<type
   } catch { return null; }
 }
 
+const refreshId = (entryId: unknown, binding: TaskBindingReceipt) =>
+  digest({ kind: "task-refresh", entryId, taskId: binding.taskId, revision: binding.revision }).slice(7);
+const switchId = (entryId: unknown) => digest({ kind: "task-switch", entryId }).slice(7);
+
+/** A refresh permits new context for the current task; it cannot rewrite the original entry. */
+export function currentTaskRefresh(workspace: string, entry: ReturnType<typeof readPromptEntry>, binding: TaskBindingReceipt) {
+  try {
+    const id = refreshId(entry.entryId, binding);
+    const receipt = read(join(contextStateRoot(workspace), "context-observations"), `${id}.json`);
+    const target = object(receipt.binding);
+    if (receipt.version !== 1 || receipt.kind !== "task-refresh" || receipt.entryId !== entry.entryId ||
+        receipt.entryDigest !== digest(entry) || receipt.session !== entry.session || receipt.worktreeLocator !== entry.worktreeLocator ||
+        target.taskId !== binding.taskId || target.revision !== binding.revision || binding.source !== "session" || binding.status !== "bound") return null;
+    return { id, binding, originalBinding: promptEntryTaskBinding(workspace, entry) };
+  } catch { return null; }
+}
+
 /** The continuity command owns the bind. Append a link without changing the original prompt or spend. */
 export function associatePromptTask(observed: TaskBindingObservation) {
   const { workspace, session } = observed;
@@ -109,8 +126,23 @@ export function associatePromptTask(observed: TaskBindingObservation) {
     const entry = selected.entry, entryId = String(entry.entryId), existing = promptEntryTaskBinding(workspace, entry);
     if (!Number.isFinite(Date.parse(observed.requestedAt)) || Date.parse(String(entry.submittedAt)) > Date.parse(observed.requestedAt))
       return unavailable("entry-after-binding-request");
-    if (existing) return existing.taskId === binding.taskId && existing.revision === binding.revision
-      ? { status: "linked", entryId, replay: true } : unavailable("entry-already-associated");
+    if (existing) {
+      if (existing.taskId === binding.taskId && existing.revision === binding.revision &&
+          !lstatSync(join(contextStateRoot(workspace), "context-observations", `${switchId(entryId)}.json`), { throwIfNoEntry: false }))
+        return { status: "linked", entryId, replay: true };
+      if (digest(taskBindingReceipt(resolveTaskContext(workspace, { session }))) !== digest(binding)) return unavailable("current-binding-changed");
+      const directory = join(contextStateRoot(workspace), "context-observations");
+      // A mixed-task turn cannot truthfully allocate all native response tokens to either task.
+      if (existing.taskId !== binding.taskId) publishContextObservation(join(directory, `${switchId(entryId)}.json`),
+        { version: 1, kind: "task-switch", entryId, entryDigest: digest(entry), createdAt: new Date().toISOString() });
+      const id = refreshId(entryId, binding);
+      const recorded = publishContextObservation(join(directory, `${id}.json`), { version: 1, kind: "task-refresh", entryId,
+        entryDigest: digest(entry), session, worktreeLocator: entry.worktreeLocator, binding, previousBinding: existing,
+        requestedAt: observed.requestedAt, createdAt: new Date().toISOString(), provenance: "explicit-continuity-bind" });
+      if (!currentTaskRefresh(workspace, entry, binding)) return unavailable("entry-association-conflict");
+      return { status: "refresh-required", entryId, transitionId: id, replay: !recorded,
+        next: "Use context-route --task <current request>. It refreshes this entry for the current task and retains the shared allowance." };
+    }
     if (entry.provider !== "codex" || entry.scopeKind !== "provisional-session" || object(entry.binding).taskId !== null)
       return unavailable("entry-not-provisional");
     const id = digest({ kind: "task-binding", entryId }).slice(7);
@@ -188,9 +220,10 @@ export function importContextUsage(workspace: string, entryId: string, transcrip
   const taskBinding = promptEntryTaskBinding(workspace, entry);
   let recorded = 0, duplicates = 0, invalid = 0, storeProjectionFailures = 0, store: Store | undefined;
   const directory = join(contextStateRoot(workspace), "context-observations");
+  const switched = lstatSync(join(directory, `${switchId(entryId)}.json`), { throwIfNoEntry: false });
   try {
     // Never create an operational database merely to collect analytics.
-    if (taskBinding) try {
+    if (taskBinding && !switched) try {
       const path = defaultDbPath(workspace);
       if (lstatSync(path, { throwIfNoEntry: false })?.isFile()) {
         const probe = new Store(path, { readOnly: true, busyTimeoutMs: 100 }); probe.close();
@@ -230,7 +263,7 @@ export function importContextUsage(workspace: string, entryId: string, transcrip
     }
   } finally { store?.close(); }
   return { version: 1, entryId, recorded, duplicates, invalid, storeProjectionFailures,
-    storeProjection: store ? "idempotent-write-attempted" : "unavailable-or-unbound", truncated: window.truncated, readBytes: window.readBytes,
+    storeProjection: store ? "idempotent-write-attempted" : switched ? "unallocated-multiple-tasks" : "unavailable-or-unbound", truncated: window.truncated, readBytes: window.readBytes,
     coverage: "matching native response records in a bounded window; missing responses remain unknown", confirmedModelUse: null, avoidedTokens: null };
 }
 

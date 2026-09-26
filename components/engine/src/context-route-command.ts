@@ -28,9 +28,13 @@ import { contextMetadataCatalog, selectContextMetadata } from "./context-metadat
 import type { BudgetScope } from "./decision-budget.ts";
 import { openContextFamily, type ContextFamilyIdentity } from "./decision-budget.ts";
 import { maintainContextProjection } from "./context-projection.ts";
-import { expansionIdentity, beginContextSelection, finishContextSelection } from "./context-family.ts";
+import { expansionIdentity, beginContextSelection, finishContextSelection, nextContextExpansion } from "./context-family.ts";
+import { ContextTiming } from "./context-timing.ts";
+import { currentTaskRefresh, latestSessionPrompt } from "./context-observations.ts";
+import { sessionId } from "../../harness/src/store/location.ts";
 
 export interface ContextRouteOptions extends DecisionOptions {
+  operationStartedAt?: number;
   session?: string;
   workspaceCatalog?: boolean;
   provisionalScope?: BudgetScope;
@@ -40,7 +44,7 @@ export interface ContextRouteOptions extends DecisionOptions {
   retrievalEvent?: string;
   /** Storage-degraded native entry: deterministic context remains usable without paid advice or a durable receipt. */
   localOnly?: boolean;
-  family?: { id: string; step: number; scope: BudgetScope; revision: string; identity?: ContextFamilyIdentity };
+  family?: { id: string; step: number; scope: BudgetScope; revision: string; identity?: ContextFamilyIdentity; transitionId?: string | null; automaticRefresh?: boolean };
 }
 
 type MetadataSelection = Awaited<ReturnType<typeof selectContextMetadata>>;
@@ -125,14 +129,17 @@ function projectionReceiptPreview(projection: ReturnType<typeof maintainContextP
 /** Mandatory routing runs without a provider. Only captured project configuration selects requirements. */
 export async function contextRouteCommand(args: string[], root: string,
   assetRoot = fileURLToPath(new URL("../assets/skills/", import.meta.url)), suppliedProvider?: DecisionProvider, options: ContextRouteOptions = {}, taskContext?: DecisionTaskContext) {
-  try { return await capturedContextRoute(args, root, assetRoot, suppliedProvider, options, taskContext); }
+  const timing = new ContextTiming(options.operationStartedAt), controller = new AbortController();
+  const timer = setTimeout(() => controller.abort("context-operation-deadline"), Math.max(0, timing.deadline - performance.now()));
+  const signal = options.signal ? AbortSignal.any([options.signal, controller.signal]) : controller.signal;
+  try { return await capturedContextRoute(args, root, assetRoot, suppliedProvider, { ...options, signal }, timing, taskContext); }
   catch (error) {
     throw recordContextFailure(root, error);
-  }
+  } finally { clearTimeout(timer); }
 }
 
 async function capturedContextRoute(args: string[], root: string, assetRoot: string,
-  suppliedProvider: DecisionProvider | undefined, options: ContextRouteOptions, taskContext?: DecisionTaskContext) {
+  suppliedProvider: DecisionProvider | undefined, options: ContextRouteOptions, timing: ContextTiming, taskContext?: DecisionTaskContext) {
   const { values } = parseArgs({ args, strict: true, allowPositionals: false, options: {
     task: { type: "string" }, revision: { type: "string" }, staged: { type: "boolean" },
     "decision-task": { type: "string" },
@@ -144,12 +151,26 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
     "optional-path": { type: "string", multiple: true }, "discover-path": { type: "string", multiple: true },
     entry: { type: "string" }, expansion: { type: "string" }, links: { type: "string", multiple: true },
   } });
+  let automaticRefresh = false;
+  // A deliberate bind can refresh the same turn through the ordinary command, without retry diagnosis.
+  if (!values.entry && !options.family && !values.staged && !values["decision-task"] && !values["decision-context"] && !taskContext) {
+    const session = sessionId(options.session);
+    if (session) {
+      const latest = latestSessionPrompt(root, session).entry;
+      const current = taskBindingReceipt(resolveTaskContext(root, { session }));
+      if (latest && currentTaskRefresh(root, latest, current)) {
+        automaticRefresh = true;
+        values.entry = String(latest.entryId);
+        values.expansion = String(nextContextExpansion(root, values.entry));
+      }
+    }
+  }
   if (values.entry || values.expansion) {
-    if (!values.entry || !["1", "2"].includes(values.expansion ?? "") || options.family || values.staged)
+    if (!values.entry || !["1", "2"].includes(values.expansion ?? "") || options.family || values.staged || values["decision-task"] || values["decision-context"] || taskContext)
       throw new Error("Use context-route --entry <entry-id> --expansion 1|2 with the current purpose and optional paths or links");
     const selected = expansionIdentity(root, values.entry, options.session);
     options = { ...options, session: selected.session, promptEntry: true, workspaceCatalog: true,
-      family: { id: values.entry, step: Number(values.expansion), scope: selected.scope, revision: selected.revision } };
+      family: { id: values.entry, step: Number(values.expansion), scope: selected.scope, revision: selected.revision, transitionId: selected.transitionId, automaticRefresh } };
   }
   const binding = resolveTaskContext(root, { ...(taskContext ? { context: taskContext } : {}),
     ...(values["decision-context"] ? { path: values["decision-context"] } : {}),
@@ -230,7 +251,6 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
   const candidateInventory = allCandidatePaths;
   const requestedOriginals = [...(values["optional-path"] ?? []), ...(values.links ?? [])].map(safeSubjectPath);
   const catalog = contextMetadataCatalog(candidateInventory, task, [...pathScopes, ...requestedOriginals], scope.records.map(record => record.path), mandatoryPaths, options.historyHints);
-  const selectionDeadline = performance.now() + 3500;
   const projection = maintainContextProjection(subject, catalog.candidates.map(item => item.path), contextStateRoot(root),
     { purpose: task, exact: [...pathScopes, ...(values.links ?? []).map(safeSubjectPath)], deadlineAt: performance.now() + 1000 });
   const priorities = new Map(projection.priority.map((path, index) => [path, index]));
@@ -238,6 +258,8 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
     (priorities.get(a.path) ?? Infinity) - (priorities.get(b.path) ?? Infinity) || b.matches - a.matches || a.path.localeCompare(b.path));
   const familyRequest = digest({ purpose: task, revision: options.family?.revision ?? revision, configDigests,
     source: scope.subject_digest, originals: requestedOriginals });
+  if (options.family?.automaticRefresh) options.family.step = nextContextExpansion(root, options.family.id, familyRequest);
+  if (performance.now() >= timing.deadline) options = { ...options, signal: AbortSignal.abort("context-operation-deadline") };
   const metadataRuntime = new DecisionRuntime(settings, contextStateRoot(root), options);
   const inactiveSelection = !!options.family &&
     (!settings.questionIds.DL03.includes("context.metadata-relevance/1") || !settings.legacy.allowedDataClasses.includes("metadata") ||
@@ -248,11 +270,14 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
   if (admission && !admission.paid && !admission.replay) options = { ...options, localOnly: true };
   let failureCursor: Parameters<typeof finishContextSelection>[4] = { version: 1, generation: projection.generation, batches: [] };
   try {
+  const selectionDeadline = timing.beginSelection();
   const metadata = packet.ready && !options.localOnly ? await selectContextMetadata(subject, catalog, task,
     metadataRuntime, options.family?.scope ?? decisionScope, scope.subject_digest ?? digest(configDigests),
     options.family?.id ?? options.retrievalEvent ?? randomUUID(), options.signal, selectionDeadline, projection,
     options.family ? { id: options.family.id, revision: options.family.revision,
       ...(admission?.previous ? { previous: admission.previous } : {}), replayOnly: admission?.replay ?? false } : undefined) : null;
+  timing.endSelection(metadata?.reason, options.signal,
+    metadata?.reason === "deadline" && metadata.decisions.at(-1)?.failureStage === "budget");
   failureCursor = metadata?.cursor ?? failureCursor;
   const automatic = automaticContextCandidates(subject, candidateInventory, mandatoryPaths,
     ["**"], settings.legacy.maxCandidates,
@@ -318,6 +343,11 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
     } catch { staleSources.push(path); }
   }
   const receiptId = randomUUID();
+  if (options.family && options.family.step > 0) {
+    const final = expansionIdentity(root, options.family.id, options.session);
+    if (digest(final.scope) !== digest(options.family.scope) || final.revision !== options.family.revision)
+      throw new ContextRouteError("entry-task-changed", "The task changed while preparing context; refresh against the current binding.");
+  }
   const identity = { revision, taskDigest: digest(task), configDigests, routingPaths, route: route.selected?.id ?? null,
     source: { mode: scope.mode, base: scope.base_ref, changes: scope.subject_digest },
     context: packet.entries.map(({ content, ...entry }) => entry),
@@ -337,8 +367,10 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
   const familyCompleted = options.family && admission?.paid ? finishContextSelection(root, options.family.id, options.family.step, familyRequest,
     metadata?.cursor ?? { version: 1, generation: projection.generation, batches: [] }) : null;
   const expansion = options.family ? { entry: options.family.id, step: options.family.step, status: admission?.status ?? "local-only", completed: familyCompleted,
+    transitionId: options.family.transitionId ?? null,
     nextStep: options.family.step < 2 ? options.family.step + 1 : null, sharedAllowance: true, originalReadsAvailable: true } : null;
   const receipt = { version: 1, receiptId, createdAt: new Date().toISOString(), ...identity, selection, expansion,
+    timing: timing.snapshot(metadata?.providerCallMs ?? 0, metadata?.sourceIndex.elapsedMs ?? 0),
     projection: projectionReceiptPreview(projection, admittedPaths),
     inputDigest: digest(identity), ready: packet.ready && !staleSources.length, blockers: packet.blockers,
     omissions: packet.omissions, skillOmissions: packet.skills?.omissions ?? [],
@@ -359,6 +391,7 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
       ...(metadata?.decisions.map(item => item.receiptId) ?? [])].filter((id): id is string => typeof id === "string") });
   if (staleSources.length) throw new Error("Context sources changed while preparing the routed packet");
   return { ...packet, route, routingPaths, receiptId, receiptPersisted, inputDigest: receipt.inputDigest, revision, source: identity.source,
+    timing: receipt.timing,
     projection: receipt.projection,
     expansion: expansion ? { ...expansion, argv: expansion.nextStep ? ["project-governance", "context-route", "--entry", expansion.entry,
       "--expansion", String(expansion.nextStep), "--task", task, "--revision", revision] : null } : null,

@@ -11,6 +11,9 @@ summary: Automatic prompt entry, a rebuildable SQLite repository index, source-b
 
 # RC6 prompt entry and maintained repository context
 
+The [RC7 reliability amendment](engine-rc7-prompt-reliability.md) supersedes this contract's
+timing and same-turn task-transition behavior. The retrieval and index boundaries below remain.
+
 The accepted RC6 boundary is **automatic prompt entry, a maintained repository index, basic
 relationships, bounded JEV selection with expansion, and evidence from real development tasks**.
 The operator accepted this expansion on September 25. The earlier transient-index candidate is a

@@ -39,6 +39,7 @@ export function recordContextFailure(root: string, error: unknown): ContextRoute
 
 export const CONTEXT_ROUTE_HELP = `context-route [--task <purpose> --revision <revision>] [--decision-task <id>]
   Uses the current session's bound task when available. --task is prose, not a task ID.
+  After refresh-required, the normal command joins the current turn and its shared allowance.
   --changed-path <path>   Repeatable routing scope (file or directory).
   --optional-path <path>  Repeatable local excerpt input; does not grant hosted disclosure.
   --entry <id> --expansion <1|2>  Continue the current native prompt with its shared allowance.

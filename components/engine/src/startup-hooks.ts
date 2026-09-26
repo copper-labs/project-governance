@@ -1,6 +1,7 @@
 import {isAbsolute,join} from "node:path";
+import {CONTEXT_HOOK_SECONDS} from "./context-timing.ts";
 
-const events={SessionStart:90,SubagentStart:90,SessionEnd:3,UserPromptSubmit:10} as const;
+const events={SessionStart:90,SubagentStart:90,SessionEnd:3,UserPromptSubmit:CONTEXT_HOOK_SECONDS} as const;
 export const MANAGED_CODEX_STARTUP_COMMAND='root="$(git rev-parse --show-toplevel)" && "$root/.governance/runtime/bin/project-governance" startup observe --provider codex --event-stdin';
 const record=(value:unknown):value is Record<string,unknown>=>Boolean(value && typeof value==="object" && !Array.isArray(value));
 
@@ -27,7 +28,8 @@ export function startupHooks(configuration:unknown,workspace:string,receipts:str
     if(handler.command.includes("startup observe") && handler.command.includes("project-governance")) {
      const timeout=events[name as keyof typeof events];
      const completePrompt=name==="UserPromptSubmit" && handler.additionalContextLimit===0;
-     if(!timeout || handler.command!==command || handler.type!=="command" || handler.timeout!==timeout ||
+     const previousPromptTimeout=name==="UserPromptSubmit" && handler.timeout===10;
+     if(!timeout || handler.command!==command || handler.type!=="command" || handler.timeout!==timeout && !previousPromptTimeout ||
        Object.keys(handler).length!==(completePrompt?4:3) ||
        (handler.additionalContextLimit!==undefined && !completePrompt) || Object.keys(group).length!==1)
       throw new Error("Existing startup hook differs; reconcile its configuration deliberately");
@@ -41,7 +43,7 @@ export function startupHooks(configuration:unknown,workspace:string,receipts:str
   const existing=groups.flatMap(group=>group.hooks).filter(handler=>handler.command===command);
   if(existing.length>1)throw new Error("Duplicate startup hook handlers require reconciliation");
   if(!existing.length)groups.push({hooks:[{type:"command",command,timeout,...(name==="UserPromptSubmit"?{additionalContextLimit:0}:{})}]});
-  else if(name==="UserPromptSubmit") existing[0]!.additionalContextLimit=0;
+  else if(name==="UserPromptSubmit") { existing[0]!.additionalContextLimit=0; existing[0]!.timeout=timeout; }
  }
  return {provider:"codex" as const,path:join(workspace,".codex/hooks.json"),configuration:result,
   content:JSON.stringify(result,null,2)+"\n",authority:"proposal-only" as const};

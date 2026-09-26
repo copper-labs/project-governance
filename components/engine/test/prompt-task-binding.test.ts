@@ -73,17 +73,20 @@ test("another task cannot retarget an associated entry or its native usage", asy
   try {
     await promptContext("codex", f.event, f.root, { environment: {}, assetRoot: assets });
     const first = f.run("task", "create", "--outcome", "First task");
+    const id = f.entryId(), transcript = join(f.base, "usage.jsonl");
+    const usageRecord = (response: string) => JSON.stringify({ type: "token_usage_record", payload: { thread_id: f.event.session_id,
+      root_turn_id: f.event.turn_id, response_id: response, usage: { input_tokens: 15, output_tokens: 3 } } }) + "\n";
+    writeFileSync(transcript, usageRecord("response-one"));
+    assert.equal(importContextUsage(f.root, id, transcript).recorded, 1);
     const second = f.run("task", "create", "--outcome", "Different task");
-    assert.equal(second.contextEntry.reason, "entry-already-associated");
-    const id = f.entryId();
+    assert.equal(second.contextEntry.status, "refresh-required");
     assert.equal(promptEntryTaskBinding(f.root, readPromptEntry(f.root, id))?.taskId, first.task.taskId);
     const provider = await providerContext(f.root, resolveTaskContext(f.root).context!, {}, assets);
     assert.equal("promptEntry" in provider.delivery && provider.delivery.promptEntry, null);
-    const transcript = join(f.base, "usage.jsonl");
-    writeFileSync(transcript, JSON.stringify({ type: "token_usage_record", payload: { thread_id: f.event.session_id,
-      root_turn_id: f.event.turn_id, response_id: "response-one", usage: { input_tokens: 15, output_tokens: 3 } } }) + "\n");
-    assert.equal(importContextUsage(f.root, id, transcript).recorded, 1);
-    assert.equal(importContextUsage(f.root, id, transcript).duplicates, 1);
+    writeFileSync(transcript, usageRecord("response-one") + usageRecord("response-two"));
+    const imported = importContextUsage(f.root, id, transcript);
+    assert.equal(imported.recorded, 1); assert.equal(imported.storeProjection, "unallocated-multiple-tasks");
+    assert.equal(importContextUsage(f.root, id, transcript).duplicates, 2);
     const store = new Store(defaultDbPath(f.root), { readOnly: true });
     try { assert.equal(store.usageTotals(first.task.taskId).inputTokens, 15); assert.notEqual(store.usageTotals(second.task.taskId).inputTokens, 15); }
     finally { store.close(); }

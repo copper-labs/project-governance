@@ -16,6 +16,9 @@ Git remains the implementation history and recovery mechanism.
 
 ## Active
 
+- [RC7 prompt reliability](active/2026-09-25-rc7-prompt-reliability.md) separates preparation
+  from JEV selection and refreshes context after explicit task changes without resetting spending.
+
 - [RC6 maintained context](active/2026-09-23-rc6-linked-retrieval.md) owns automatic prompt entry,
   the local SQLite index, basic relationships, bounded JEV selection/expansion and real-task release
   qualification. Its expanded slices remain distinct from the earlier transient-index candidate.

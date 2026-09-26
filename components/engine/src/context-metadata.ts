@@ -107,7 +107,7 @@ export async function selectContextMetadata(subject: ValidationSubject, catalog:
       if (outcome.delivered && interpretNoul(outcome.answers[`file-${i}`]).value === "positive") positive.add(path);
     });
   };
-  let replayedBatches = 0, invalidatedBatches = 0, firstBatchMs: number | null = null, budgetFinalized: boolean | null = null;
+  let replayedBatches = 0, invalidatedBatches = 0, providerCallMs = 0, firstBatchMs: number | null = null, budgetFinalized: boolean | null = null;
   for (const batch of family?.previous?.batches ?? []) {
     if (batch.paths.every(path => permitted.has(path)) && batch.signature === signature(batch.paths) &&
         runtime.eligibility("DL03", "context.metadata-relevance/1").providerUse === "eligible") {
@@ -139,6 +139,7 @@ export async function selectContextMetadata(subject: ValidationSubject, catalog:
         budgetPartition: "context-selection", budgetInvocationId: invocationId, ...(family ? { budgetFamily: true } : {}), deadlineAt,
         coverage: coverageFor(batch), questions: batch.map((path, i) => ({ name: `file-${i}`, definitionId: "context.metadata-relevance/1", consumerId: "DL03", evidenceIds: ["purpose", path] })),
         policyDigest: runtime.settings.configDigest });
+      if (outcome.providerCalled && !outcome.reason.startsWith("repeated-")) providerCallMs += outcome.latencyMs;
       apply(batch, outcome); reason = outcome.reason;
       if (outcome.providerCalled) { cursor.batches.push({ paths: batch, signature: batchSignature, outcome });
         priorityAssessed += batch.filter(path => prioritySet.has(path)).length; generalAssessed += batch.filter(path => !prioritySet.has(path)).length; }
@@ -159,5 +160,5 @@ export async function selectContextMetadata(subject: ValidationSubject, catalog:
   return { version: 3, catalog, order, reason, assessed: [...assessed], metadataPermittedCount: assessable.length, coverage, cursor,
     invocationId, budgetFinalized, excluded, decisions, delivered: positive.size > 0, sourceBodiesTransmitted: described.size > 0, rawSourceFilesTransmitted: false,
     sourceIndex: sourceIndexObservation(projection, described.size, baseline.length, descriptionOmissions),
-    firstBatchMs, elapsedMs: performance.now() - started };
+    firstBatchMs, providerCallMs, elapsedMs: performance.now() - started };
 }

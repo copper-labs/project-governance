@@ -17,6 +17,8 @@ const readCommands = new Set(["resource-status", "runtime-inspect-legacy", "runt
 const writeCommands = new Set([...COMMAND_RECOVERY_COMMANDS, "harness", "workflow-diagnose", "workflow-resume-cleanup", "workflow-recover-observation", "workflow-reconcile-cleanup", "provider-status", "provider-wait", "hooks", "hook", "plan", "context-route", "context-packet", "context-evaluate", "check-cancel", "workflow-cancel", "check", "workflow-submit", "workflow-status", "workflow-wait", "provider-resume-cleanup", "provider-recover", "provider-deliver", "provider-submit", "provider-follow-up", "provider-cancel", "provider-reconcile", "resource-maintenance", "host-instructions"]);
 
 export function managedCommandEffect(command: string): "read" | "write" | null {
+  if (["--help", "-h", "help"].includes(command)) return "read";
+  if (command === "context-index") return "write";
   return writeCommands.has(command) ? "write" : readCommands.has(command) ? "read" : null;
 }
 

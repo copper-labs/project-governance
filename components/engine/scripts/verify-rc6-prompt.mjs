@@ -237,6 +237,23 @@ async function verifyWorktreeCutover({ packageRoot, archive, temporary, workspac
 }
 
 /** Qualify the installed launcher and stdin protocol in an unborn disposable repository. */
+/** Check task transitions through the installed launcher without disturbing later lifecycle proof. */
+function verifyTaskSwitch({ invoke, launcher, workspace, environment, session, calls }) {
+  environment.HARNESS_SESSION = session;
+  const first = invoke(launcher, ['harness', 'task', 'create', '--outcome', 'First app task', '--scope', workspace]);
+  assert.equal(first.contextEntry.status, 'linked');
+  const second = invoke(launcher, ['harness', 'task', 'create', '--outcome', 'Repair app launch', '--scope', workspace]);
+  assert.equal(second.contextEntry.status, 'refresh-required');
+  const refreshed = invoke(launcher, ['context-route', '--task', 'Repair app launch']);
+  assert.equal(refreshed.selection.binding.taskId, second.task.taskId);
+  assert.equal(refreshed.expansion.entry, first.contextEntry.entryId);
+  assert.ok(refreshed.expansion.transitionId);
+  assert.equal(refreshed.timing.operationBudgetMs, 10000);
+  assert.equal(refreshed.metadata.reason, 'answered');
+  assert.equal(readFileSync(calls, 'utf8').trim().split('\n').length, 2);
+  delete environment.HARNESS_SESSION;
+}
+
 export async function verifyRc6Prompt(packageRoot, archive) {
   const temporary = realpathSync(mkdtempSync(join(tmpdir(), 'rc6-installed-prompt-'))), workspace = join(temporary, 'repo');
   mkdirSync(workspace);
@@ -266,11 +283,16 @@ export async function verifyRc6Prompt(packageRoot, archive) {
     assert.equal(hooks.hooks.UserPromptSubmit.length, 1);
     const handler = hooks.hooks.UserPromptSubmit[0].hooks[0];
     assert.equal(handler.additionalContextLimit, 0);
+    assert.equal(handler.timeout, 15);
     const event = { session_id: 'installed-host', turn_id: 'turn-one', hook_event_name: 'UserPromptSubmit', cwd: workspace, prompt: 'Fix the app launch.' };
     const output = invoke('/bin/sh', ['-c', handler.command], JSON.stringify(event));
     assert.equal(output.hookSpecificOutput.hookEventName, 'UserPromptSubmit');
     assert.match(output.hookSpecificOutput.additionalContext, /app.ts/);
     const launcher = join(workspace, '.governance/runtime/bin/project-governance');
+    const help = spawnSync(launcher, ['--help'], { cwd: workspace, env: environment, encoding: 'utf8', timeout: 5000 });
+    assert.equal(help.status, 0, help.stderr);
+    assert.match(help.stdout, /context-route/);
+    assert.equal(invoke(launcher, ['context-index', 'status']).status, 'present');
     const wrongReceipts = join(temporary, 'wrong-startup.sqlite');
     const refusedStore = spawnSync(launcher, ['startup', 'observe', '--provider', 'codex', '--event-stdin', '--receipts', wrongReceipts],
       { cwd: workspace, env: environment, input: JSON.stringify(event), encoding: 'utf8', timeout: 5000 });
@@ -299,6 +321,7 @@ export async function verifyRc6Prompt(packageRoot, archive) {
     const active = invoke('/bin/sh', ['-c', handler.command], JSON.stringify({ ...event, turn_id: 'turn-two', prompt: '- Repair app.ts' }));
     assert.match(active.hookSpecificOutput.additionalContext, /app.ts/);
     assert.equal(readFileSync(calls, 'utf8').trim().split('\n').length, 1);
+    verifyTaskSwitch({ invoke, launcher, workspace, environment, session: event.session_id, calls });
     const observed = invoke(launcher, ['telemetry', 'context', 'status']).documentation;
     assert.equal(observed.status, 'observed-subset');
     const appGap = observed.candidates.find(item => item.path === 'app.ts');

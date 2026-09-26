@@ -213,7 +213,7 @@ function main(argv: string[], options: ContinuityCommandOptions = {}): void {
                     store.bind(task.taskId, who, workspaceId, root);
                 return changed;
             });
-            return emit({ ok: true, task: revised });
+            return emit({ ok: true, task: revised, ...bindingObservation() });
         }
         if (group === "resume") {
             const task = needTask();

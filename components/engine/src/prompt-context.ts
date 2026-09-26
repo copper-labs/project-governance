@@ -10,7 +10,7 @@ import { decisionTaskPurpose } from "./decision-task-context.ts";
 import { readContextHistory } from "./context-history.ts";
 import { recordEntryExposure } from "./decision-episodes.ts";
 import { ContextRouteError, recordContextFailure } from "./context-route-errors.ts";
-import { indexPromptEntry, publishContextObservation, readPromptEntry } from "./context-observations.ts";
+import { indexPromptEntry, publishContextObservation, readPromptEntry, promptEntryTaskBinding } from "./context-observations.ts";
 import { workContext } from "../../harness/src/store/location.ts";
 import { narrativeFile } from "./narrative-inputs.ts";
 import { validateProviderContext } from "./provider-context.ts";
@@ -22,6 +22,9 @@ type Route = Awaited<ReturnType<typeof contextRouteCommand>>;
 /** A duplicate turn may return only the previously validated packet; it never spends again. */
 function replayPreparedPrompt(root: string, entryId: string, packetPath: string, worktreeLocator: string, assetRoot: string) {
   const prior = readPromptEntry(root, entryId);
+  const historical = promptEntryTaskBinding(root, prior), current = resolveTaskContext(root, { session: String(prior.session) }).context;
+  if (historical && (historical.taskId !== current?.taskId || historical.revision !== current?.revision))
+    throw new ContextRouteError("entry-task-changed", "Task changed; refresh context through the normal route");
   const packet = object(JSON.parse(narrativeFile(contextStateRoot(root), packetPath)));
   if (packet.version !== 1 || packet.entryId !== entryId || typeof packet.text !== "string" ||
       Buffer.byteLength(packet.text) > MAX_PACKET_BYTES || digest(packet.text) !== prior.packetDigest ||
@@ -67,7 +70,7 @@ export function renderPromptContext(packet: Route, history: ReturnType<typeof re
   }
   // Cached hook output must not persist the raw operator prompt in an expansion command.
   const expansion = packet.expansion?.nextStep ? `\nContinue with project-governance context-route --entry ${entryId} --expansion ${packet.expansion.nextStep}; supply --task with the current or clarified request. Add --optional-path <path> for an original, or --links <path> for one-hop declared links. The same allowance is shared.\n` : "";
-  const footer = expansion + "\nUse this packet before task-specific reads. Expand originals when necessary. Bind or resume the continuity task when intent and scope are clear; a provisional entry is not task acceptance.\n";
+  const footer = expansion + "\nUse this packet before task-specific reads. Expand originals when necessary. Bind or resume the continuity task when intent and scope are clear; a provisional entry is not task acceptance. If binding reports refresh-required, run context-route --task <current request> before more task-specific reads. It refreshes the packet within this turn's shared allowance.\n";
   const historyBlock = "\nHistorical background only; current files and policy remain authoritative. Expand a task with harness task show --task <id>.\n" + JSON.stringify(history.candidates) + "\n";
   const historyDelivered = history.candidates.length > 0 && Buffer.byteLength(content + historyBlock + footer) <= MAX_PACKET_BYTES;
   if (historyDelivered) content += historyBlock;
@@ -123,8 +126,10 @@ async function preparePromptContext(provider: string, eventValue: unknown, works
     let text: string;
     try {
       text = replayPreparedPrompt(root, entryId, packetPath, worktreeLocator, assetRoot);
-    } catch {
-      text = `Governance prompt entry ${entryId} already has a preparation reservation. Its current packet is unavailable, incomplete or stale. No selection was repeated. Inspect context doctor and current required originals; use a new operator turn for fresh preparation.`;
+    } catch (error) {
+      text = error instanceof ContextRouteError && error.code === "entry-task-changed"
+        ? `Governance prompt entry ${entryId} belongs to the previous task. No selection was repeated. Run context-route --task <current request> before task-specific reads to refresh within this turn's shared allowance.`
+        : `Governance prompt entry ${entryId} already has a preparation reservation. Its current packet is unavailable, incomplete or stale. No selection was repeated. Inspect context doctor and current required originals; use a new operator turn for fresh preparation.`;
     }
     return { hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext: text } };
   }
@@ -134,15 +139,15 @@ async function preparePromptContext(provider: string, eventValue: unknown, works
   const prompt = event.prompt as string;
   const purpose = `${prompt}${binding.context ? `\nBound task intent (the current prompt may refine it):\n${decisionTaskPurpose(binding.context)}` : ""}`;
   const routedPurpose = purpose.slice(0, 16000);
-  const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 3500);
+  const operationStartedAt = performance.now();
   let receipt: Record<string, unknown>, output: string, validation: Record<string, unknown> | null = null;
   try {
     const history = readContextHistory(root, routedPurpose, binding.context?.taskId);
     const packet = await contextRouteCommand([`--task=${routedPurpose}`, `--revision=${binding.context?.revision ?? "provisional"}`], root,
       options.assetRoot, undefined, { session, workspaceCatalog: true, provisionalScope: scope, maximumOptionalBytes: 8000,
         historyHints: history.candidates.flatMap(item => item.sourceHints), promptEntry: true, retrievalEvent: entryId,
-        family: { id: entryId, step: 0, scope, revision: scope.taskRevision, identity: familyIdentity },
-        localOnly: reservation === "unavailable", signal: controller.signal }, binding.context ?? undefined);
+        family: { id: entryId, step: 0, scope, revision: binding.context ? `task:${scope.taskId}@${scope.taskRevision}` : scope.taskRevision, identity: familyIdentity },
+        localOnly: reservation === "unavailable", operationStartedAt }, binding.context ?? undefined);
     const rendered = renderPromptContext(packet, history, entryId);
     output = rendered.text;
     if (rendered.status === "prepared" && packet.receiptPersisted) {
@@ -151,7 +156,7 @@ async function preparePromptContext(provider: string, eventValue: unknown, works
         inputDigest: packet.inputDigest, contentDigest: digest(output), deliveredBytes: Buffer.byteLength(output),
         skillAssetRoot: assetRoot };
     }
-    receipt = { status: rendered.status, routeReceiptId: packet.receiptId, routeInputDigest: packet.inputDigest,
+    receipt = { status: rendered.status, routeReceiptId: packet.receiptId, routeInputDigest: packet.inputDigest, timing: packet.timing,
       deliveredSources: rendered.delivered, requiredSources: packet.entries.map(item => ({ path: item.path, digest: item.sourceDigest })),
       history: { ...history, candidates: history.candidates.map(({ summary: _text, ...reference }) => reference) },
       historyDelivered: "historyDelivered" in rendered ? rendered.historyDelivered : false,
@@ -163,7 +168,7 @@ async function preparePromptContext(provider: string, eventValue: unknown, works
     output = `Governance prompt context is unavailable. ${error instanceof ContextRouteError ? error.message : "Inspect context-route and the project profile before task-specific reads."} Entry ${entryId}.`;
     receipt = { status: "failed", reason: error instanceof ContextRouteError ? error.code : "prompt-context-unavailable",
       routeFailureReceipt: error instanceof ContextRouteError ? error.receiptPath : null };
-  } finally { clearTimeout(timer); }
+  }
   if (Buffer.byteLength(output) > MAX_PACKET_BYTES) {
     output = `Governance prompt entry ${entryId} could not be delivered within its byte limit. Inspect context doctor and the required originals before task-specific work.`;
     validation = null; receipt = { status: "blocked", reason: "prompt-packet-byte-budget", packetDigest: digest(output), packetBytes: Buffer.byteLength(output) };

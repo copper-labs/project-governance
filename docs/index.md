@@ -109,6 +109,9 @@ expansion and ordinary-task qualification. The earlier transient-index candidate
 baseline; the expanded implementation is complete and release sign-off is in progress. The
 [configuration guide](guides/rc6-prompt-context.md) separates local retrieval, hosted disclosure,
 host trust and measured use.
+The [RC7 reliability amendment](specs/engine-rc7-prompt-reliability.md) and its
+[delivery plan](exec-plans/active/2026-09-25-rc7-prompt-reliability.md) separate retrieval timing
+and refresh context after explicit task changes while preserving history and spending.
 The [repository-index research](research/2026-09-25-repository-index-harness-practices.md) compares
 current harness practices and explains the bounded first iteration accepted for RC6; its wider
 research alternatives remain outside the release scope.
