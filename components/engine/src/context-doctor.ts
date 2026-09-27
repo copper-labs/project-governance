@@ -57,9 +57,18 @@ export function contextDoctor(workspace: string) {
     if (!hookSource) findings.push({ id: "context.hook-source-unavailable", message: "Cannot establish Codex's project hook source from Git worktree identity; inspect it before claiming prompt readiness." });
   }
   if (hook !== "configured") findings.push({ id: "context.prompt-hook-unavailable", message: "Use startup hooks/install-hooks with startup.sqlite next to this worktree's registry, reconcile existing handlers, then trust the exact definitions in the host." });
+  const projection = projectionStatus(contextStateRoot(workspace), workspace);
+  const projectOverview = ["README.md", "CHARTER.md"].filter(path => {
+    try { return narrativeFile(workspace, path).trim().length > 0; } catch { return false; }
+  });
+  const indexObservation = projection.status === "present" && "generations" in projection
+    ? projection.generations.some(generation => Number(generation.paths) > 0) ? "populated-snapshot" : "empty-snapshot"
+    : "not-observed";
   return { version: 1, capability: "context", status: findings.length ? "needs-attention" : "configured", findings, metadata, requiredGuidance,
     budgets: budgets ? { routes: budgets.routes, coverage: budgets.coverage } : null,
     localRetrieval: "provider-independent", promptHook: hook, promptHookSource: hookSource, hostTrust: "not-observable", beforeFirstRead: "requires-installed-host-evidence",
-    projection: projectionStatus(contextStateRoot(workspace), workspace),
+    projection, repositoryContext: { indexObservation, overviewFiles: projectOverview, purposeQuality: "not-established",
+      next: projectOverview.length ? "Confirm the overview describes current purpose and authoritative guidance; improve touched or repeatedly missed areas."
+        : "For a new project, write a short purpose and point to its authoritative guidance. An empty index is not itself a runtime failure." },
     documentation: documentationReadiness(workspace), observations: contextObservationStatus(workspace), network: "not-attempted", mutations: "none" };
 }

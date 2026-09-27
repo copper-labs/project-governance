@@ -74,7 +74,7 @@ export function profileDecisionSettings(profile: unknown): DecisionSettings {
   }
   if (legacyContext && !Object.hasOwn(declared, "DL03")) {
     consumers.DL03 = { mode: legacy.mode, effect: "advise", effectSource: "default" };
-    notes.push("Legacy provider-health.json suppression is not carried into the shared health epoch; the first eligible request rechecks provider health. Existing files are retained.");
+    notes.push("Legacy JSON provider health is retained as history; RC9 uses the user-local SQLite provider pool. Existing receipts and task allowances remain active.");
     notes.push(`Migrated allowed_questions:${LEGACY_CONTEXT_QUESTION} into consumers.DL03.mode=${legacy.mode} with the existing data, source and request limits.`);
   }
   for (const question of legacy.allowedQuestions) {

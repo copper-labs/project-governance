@@ -7,7 +7,7 @@ import { digest, durableJson, object } from "./core.ts";
 import { matchesPackPath } from "./planning.ts";
 import { DECISION_CONSUMERS, DECISION_QUESTIONS } from "./decision-catalog.ts";
 import { reserveDecisionCall, closeDecisionScope, contextBudgetScope, contextFamilyScope, type BudgetScope, type BudgetReservation } from "./decision-budget.ts";
-import { JevDecisionClient, type TransportOptions } from "./decision-transport.ts";
+import { JevDecisionClient, decisionCancellationReason, type TransportOptions, type TransportTiming } from "./decision-transport.ts";
 import { resolveConsumerMode, type DecisionSettings } from "./decision-settings.ts";
 import {
   decisionNativeUsage, parseDecisionEnvelope, requestIdentity,
@@ -31,13 +31,14 @@ export interface DecisionAsk {
   /** Repository-relative source paths transmitted in this request, checked against the profile scope. */
   sourcePaths?: string[];
   metadataPaths?: string[];
-  evidenceLayout?: "shared-v1";
+  evidenceLayout?: "shared-v1" | "per-question-v1";
   /** Isolate frequent prompt retrieval from check-time decision budgets without changing task identity. */
   budgetPartition?: "context-selection";
   budgetInvocationId?: string;
   budgetFamily?: boolean;
   /** Monotonic deadline shared by all batches in one retrieval. */
   deadlineAt?: number;
+  signal?: AbortSignal;
   /** Legacy context evaluation preserves its explicitly approved source/synthetic data class. */
   legacyDataClass?: "source" | "diagnostic" | "synthetic";
   eligibilityDigest?: string | null;
@@ -62,6 +63,7 @@ export interface DecisionOutcome {
   coverage: DecisionCoverage;
   budget: { state: BudgetReservation["state"] | "not-required"; reservationId: string | null; calls: number | null; bytes: number | null; limits: { maxCalls: number; maxRequestBytes: number }; partition?: "context-selection"; invocationId?: string };
   tokenEstimate: number | null;
+  transport?: TransportTiming;
   receiptId: string | null;
 }
 
@@ -87,8 +89,7 @@ export class DecisionRuntime {
   readonly #options: DecisionRuntimeOptions;
   constructor(settings: DecisionSettings, stateRoot: string, options: DecisionRuntimeOptions = {}) {
     this.settings = settings; this.stateRoot = stateRoot; this.#options = options;
-    const healthEpoch = digest({ provider: "jev", model: settings.legacy.model, revision: settings.legacy.revision });
-    this.#client = options.client ?? new JevDecisionClient(healthEpoch, join(stateRoot, "decision-provider-health.json"), options);
+    this.#client = options.client ?? new JevDecisionClient({ ...options, healthScope: digest({ stateRoot, config: settings.configDigest }) });
   }
 
   /** Doctor and callers can read the resolved disposition without preparing evidence or calling out. */
@@ -136,7 +137,9 @@ export class DecisionRuntime {
     try { if (ask.scope) ask = { ...ask, scope: { ...ask.scope, workspace: realpathSync(ask.scope.workspace) } }; }
     catch { ask = { ...ask, scope: null }; }
     const started = performance.now();
-    const resolved = this.eligibility(ask.consumerId, ask.evidenceLayout === "shared-v1" ? "context.metadata-relevance/1" : undefined);
+    const signals = [this.#options.signal, ask.signal].filter((signal): signal is AbortSignal => signal !== undefined);
+    const signal = signals.length ? AbortSignal.any(signals) : undefined;
+    const resolved = this.eligibility(ask.consumerId, ask.evidenceLayout ? "context.metadata-relevance/1" : undefined);
     const consumer = resolved.consumer;
     const requestId = randomUUID();
     const key = this.#eventKey(ask);
@@ -162,7 +165,7 @@ export class DecisionRuntime {
       outcome.receiptId = existsSync(this.#receiptPath(key)) ? null : this.#record(key, outcome);
       return outcome;
     };
-    if (this.#options.signal?.aborted) return fallback("cancelled");
+    if (signal?.aborted) return fallback(decisionCancellationReason(signal));
     if (this.settings.mode === "off") return fallback("global-off");
     // Enabling one feature can never enable another: every batch participant is checked independently.
     if (participants.some(id => this.settings.consumers[id].mode === "off")) return fallback("consumer-off");
@@ -170,7 +173,7 @@ export class DecisionRuntime {
     if (!ask.questions.length) return fallback("no-enabled-questions");
     if (ask.legacyDataClass !== undefined && (participants.length !== 1 || participants[0] !== "DL03" ||
       ask.questions.some(question => question.definitionId !== "legacy.context-rank/1"))) return fallback("data-sharing-disabled");
-    const metadata = ask.evidenceLayout === "shared-v1";
+    const metadata = ask.evidenceLayout !== undefined;
     if (metadata && (participants.length !== 1 || ask.consumerId !== "DL03" || ask.legacyDataClass !== undefined ||
       ask.questions.some(question => question.definitionId !== "context.metadata-relevance/1"))) return fallback("data-sharing-disabled");
     const dataClass = (id: DecisionConsumerId) => metadata ? "metadata" : ask.legacyDataClass ?? DECISION_CONSUMERS[id].dataClass;
@@ -207,24 +210,29 @@ export class DecisionRuntime {
     const { request, body, payloadDigestValue, requestBytes } = preparation;
 
     const identity = requestIdentity(request);
+    const retained = this.#retained(key);
+    // Replaying a paid event needs neither a provider slot nor another budget reservation.
+    if (retained?.requestIdentity === identity && ["reserved", "duplicate"].includes(retained.budget.state))
+      return { ...retained, requestId, reason: Object.keys(retained.answers).length ? "repeated-observation" : `repeated-${retained.reason}`,
+        receiptId: key, latencyMs: performance.now() - started };
     // The reservation identity is the consumer-group event key, so one event cannot be spent twice.
     let admittedReservation: BudgetReservation | undefined;
     // A metadata batch must get a genuine provider timeout before the larger retrieval allowance.
     const providerDeadline = metadata ? Math.min(this.settings.legacy.deadlineMs, 1000) : this.settings.legacy.deadlineMs;
-    const callRemaining = providerDeadline - (performance.now() - started);
-    const invocationRemaining = (ask.deadlineAt ?? Infinity) - performance.now();
-    const remainingDeadline = Math.floor(Math.min(callRemaining, invocationRemaining));
-    if (remainingDeadline < 1) return fallback("deadline", { requestIdentity: identity });
-    const transport = await this.#client.ask(body, remainingDeadline, this.#options.signal, () => {
+    const deadlineAt = ask.deadlineAt ?? started + this.settings.legacy.deadlineMs;
+    if (performance.now() >= deadlineAt) return fallback("deadline", { requestIdentity: identity });
+    const transport = await this.#client.ask(body, providerDeadline, signal, () => {
       const budgetScope = ask.budgetFamily ? contextFamilyScope(ask.scope!.workspace, ask.budgetInvocationId!)
         : ask.budgetPartition ? contextBudgetScope(ask.scope!, ask.budgetInvocationId!) : ask.scope!;
       admittedReservation = reserveDecisionCall(this.stateRoot, budgetScope, key, requestBytes, this.settings.budget,
-        { ...(ask.budgetFamily ? { familyId: ask.budgetInvocationId! } : {}), busyTimeoutMs: Math.max(0, Math.min(1000, this.#options.busyTimeoutMs ?? 250, Math.floor(this.settings.legacy.deadlineMs - (performance.now() - started)))) });
+        { ...(ask.budgetFamily ? { familyId: ask.budgetInvocationId! } : {}), busyTimeoutMs: Math.max(0, Math.min(1000, this.#options.busyTimeoutMs ?? 250, Math.floor(deadlineAt - performance.now()))) });
       return admittedReservation.state === "reserved";
-    }, () => { base.providerCalled = true; }, invocationRemaining <= callRemaining ? "caller" : "provider");
+    }, () => { base.providerCalled = true; }, "provider", ask.deadlineAt);
+    base.transport = transport.timing;
     const reservation = admittedReservation;
     if (!reservation) return fallback(transport.ok ? "admission-unavailable" : transport.reason,
-      { requestIdentity: identity, failureStage: transport.ok ? "budget" : transport.failureStage });
+      { requestIdentity: identity, payloadDigest: payloadDigestValue, tokenEstimate: request.budget.tokenEstimate,
+        failureStage: transport.ok ? "budget" : transport.failureStage });
     const budget = { state: reservation.state, reservationId: reservation.reservationId, calls: reservation.calls, bytes: reservation.bytes, limits: base.budget.limits,
       ...(ask.budgetPartition ? { partition: ask.budgetPartition, invocationId: ask.budgetInvocationId } : {}) };
     if (reservation.state === "duplicate") {
@@ -243,7 +251,7 @@ export class DecisionRuntime {
       const envelope = parseDecisionEnvelope(transport.raw, request, DECISION_QUESTIONS, this.settings.legacy.model, payloadDigestValue);
       answers = envelope.answers; usage = envelope.usage; model = envelope.model;
     } catch { return fallback("invalid-or-unavailable", { ...prepared, usage: decisionNativeUsage(transport.raw), failureStage: "answer-validation" }); }
-    if (this.#options.signal?.aborted) return fallback("cancelled", { ...prepared, usage });
+    if (signal?.aborted) return fallback(decisionCancellationReason(signal), { ...prepared, usage });
     const usable = Object.values(answers).some(answer => answer.status === "answered");
     const outcome: DecisionOutcome = { ...base, ...prepared, answers, usage, model,
       method: resolved.mode === "auto" && usable ? "jev" : "baseline", delivered: resolved.mode === "auto" && usable,

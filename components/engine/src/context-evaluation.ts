@@ -33,7 +33,7 @@ export async function evaluateContext(cases: ContextEvaluationCase[], provider: 
     seen.add(entry.id);
     if (!Array.isArray(entry.usefulOptionalIds) || new Set(entry.usefulOptionalIds).size !== entry.usefulOptionalIds.length) throw new Error("invalid gold IDs");
     for (const id of entry.usefulOptionalIds) {
-      text(id, "gold id", 128);
+      text(id, "gold id", 4096);
       if (entry.request.required.some(candidate => candidate.id === id)) throw new Error("gold IDs must describe optional context");
     }
     if (entry.usefulSpans !== undefined) {
@@ -45,7 +45,7 @@ export async function evaluateContext(cases: ContextEvaluationCase[], provider: 
         text(span.sourceDigest, "gold source digest");
         const key = digest(span); if (spans.has(key)) throw new Error("Duplicate useful evidence span"); spans.add(key);
         const source = entry.request.optional.find(candidate => candidate.id === span.candidateId);
-        if (source && (source.sourceDigest !== span.sourceDigest || span.lastLine > (source.sourceRange?.totalLines ?? (source.excerpt.match(/[^\n]*\n|[^\n]+$/gu) ?? []).length)))
+        if (source && (source.sourceDigest !== span.sourceDigest || span.lastLine > (source.sourceRange?.totalLines ?? source.sourceRanges?.[0]?.totalLines ?? (source.excerpt.match(/[^\n]*\n|[^\n]+$/gu) ?? []).length)))
           throw new Error("Useful evidence source identity or line range mismatch");
       }
     }
@@ -71,7 +71,8 @@ export async function evaluateContext(cases: ContextEvaluationCase[], provider: 
       const hits = entry.usefulOptionalIds.filter(id => selected.has(id));
       const evidenceHits = entry.usefulSpans?.filter(span => packet.entries.some(candidate =>
         candidate.id === span.candidateId && candidate.sourceDigest === span.sourceDigest &&
-        (!candidate.sourceRange || (candidate.sourceRange.firstLine <= span.firstLine && candidate.sourceRange.lastLine >= span.lastLine)))).length;
+        ((!candidate.sourceRange && !candidate.sourceRanges) || (candidate.sourceRanges ?? [candidate.sourceRange!]).some(range =>
+          range.firstLine <= span.firstLine && range.lastLine >= span.lastLine)))).length;
       return { usefulEvidenceSelected: evidenceHits ?? null,
         usefulEvidenceMissed: evidenceHits === undefined ? null : entry.usefulSpans!.length - evidenceHits, usefulSelected: hits.length, usefulMissedBySelection: entry.usefulOptionalIds.filter(id => available.has(id) && !selected.has(id)),
         recall: entry.usefulOptionalIds.length ? hits.length / entry.usefulOptionalIds.length : null, deliveredBytes: packet.bytes };

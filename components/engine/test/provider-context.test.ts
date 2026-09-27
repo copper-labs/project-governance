@@ -75,6 +75,17 @@ test("bound provider context selects before native input and retains mandatory r
     assert.equal(calls, 2, "classifier excerpts can be smaller than delivered excerpts");
     assert.equal(largeReceipt.relevanceAdvice.assessed.length, 12);
     assert.ok(largeReceipt.relevanceAdvice.coverage.truncated);
+    const sections = "# Launch\n" + "Launch evidence.\n".repeat(180) + "# Cleanup\n" + "Cleanup ownership.\n".repeat(180);
+    writeFileSync(join(root, "src/sections.md"), sections);
+    delete process.env.JEV_TOKEN;
+    const multi = await providerContext(root, { ...task, revision: "multi-range", requirement: "Fix launch and cleanup",
+      sourcePaths: ["src/sections.md"] }, {}, assets);
+    const ranged = (multi.delivery as any).sources.find((source: any) => source.path === "src/sections.md");
+    assert.equal(ranged.range, null);
+    assert.equal(ranged.ranges.length, 2, "provider input retains both original ranges rather than implying a whole file");
+    assert.ok(ranged.ranges.every((range: any) => range.complete === false && range.excerptDigest.startsWith("sha256:")));
+    validateProviderContext(root, multi.delivery, multi.text);
+    process.env.JEV_TOKEN = "fixture-only";
     writeFileSync(join(root, "config/governance/profile.yaml"), JSON.stringify(profile));
     assert.equal((await providerContext(root, undefined)).delivery.reason, "task-context-unavailable");
     const file = join(root, "context.json"); writeFileSync(file, JSON.stringify(task));

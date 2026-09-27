@@ -37,7 +37,7 @@ function fuse(baseline: string[], scores: Map<string, number>): string[] {
  * candidate keeps its lexical position, and no usable answer falls back to the lexical order entirely.
  */
 export async function contextAdvice(runtime: DecisionRuntime, candidates: Candidate[],
-  scope: BudgetScope | null, options: { purpose: string; eventId: string; policyDigest: string; environment: string; revision: string; subjectDigest: string; excerptBytes: number }): Promise<ContextAdvice> {
+  scope: BudgetScope | null, options: { purpose: string; eventId: string; policyDigest: string; environment: string; revision: string; subjectDigest: string; excerptBytes: number; deadlineAt?: number }): Promise<ContextAdvice> {
   const eligibility = runtime.eligibility("DL03");
   const request = { version: 1 as const, kind: "rank_optional_context" as const, taskRevision: options.revision,
     purpose: options.purpose, candidates, dataClass: "source" as const };
@@ -90,7 +90,7 @@ export async function contextAdvice(runtime: DecisionRuntime, candidates: Candid
   const outcome = await runtime.ask({ consumerId: "DL03", eventId: `${options.eventId}:DL03`, scope,
     subject: { digest: options.subjectDigest, revision: options.revision, environment: options.environment },
     evidence, coverage, questions, sourcePaths: [...index.values()],
-    eligibilityDigest: null, policyDigest: options.policyDigest });
+    eligibilityDigest: null, policyDigest: options.policyDigest, ...(options.deadlineAt === undefined ? {} : { deadlineAt: options.deadlineAt }) });
   const decision = { consumerId: outcome.consumerId, requestId: outcome.requestId, receiptId: outcome.receiptId,
     method: outcome.method, reason: outcome.reason, delivered: outcome.delivered, providerCalled: outcome.providerCalled, model: outcome.model,
     usage: outcome.usage, latencyMs: outcome.latencyMs, budget: outcome.budget, scopeState: outcome.scopeState };

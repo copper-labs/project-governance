@@ -3,7 +3,7 @@ import { isAbsolute, relative } from "node:path";
 import { Store } from "../../harness/src/store/store.ts";
 import { defaultDbPath, workContext } from "../../harness/src/store/location.ts";
 import { digest } from "./core.ts";
-import { contextTerms } from "./context-metadata.ts";
+import { contextTerms } from "./context-terms.ts";
 
 export interface HistoryCandidate {
   id: string; kind: "task"; revision: string; observedAt: string; sourceDigest: string;

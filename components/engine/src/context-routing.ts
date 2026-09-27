@@ -3,6 +3,7 @@ import { matchesPackPath } from "./planning.ts";
 import { safeSubjectPath } from "./change-subject.ts";
 import { contextBudget } from "./checkers/context-router.ts";
 import { promptPacketLimit } from "./prompt-context-budget.ts";
+import { CONTEXT_PROMPT_LIMIT } from "./context-limits.ts";
 
 function list(value: unknown): string[] {
   if (value === undefined) return [];
@@ -41,7 +42,7 @@ export function contextOwnerRequirements(router: Record<string, unknown>, owners
 
 /** Policy routing is deterministic; optional model ranking cannot select or weaken required context. */
 export function routeContext(raw: unknown, task: string, changedPaths: string[]) {
-  text(task, "context task");
+  text(task, "context task", CONTEXT_PROMPT_LIMIT);
   const paths = [...new Set(changedPaths.map(safeSubjectPath))];
   const router = object(raw, "context router"), scoring = object(router.scoring ?? {}), weights = object(scoring.weights ?? {});
   const pathWeight = integer(weights.changed_path, 100), productWeight = integer(weights.product_term, 80), termWeight = integer(weights.prompt_term, 20);

@@ -2,6 +2,30 @@ version: 2
 owner: project-governance-maintainers
 dispositions:
 - finding: quality.large-function
+  path: components/engine/src/context-metadata.ts
+  symbol: selectContextMetadata
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex reconciliation and Claude Opus 5.5 medium focused cohesion review
+  approved_on: '2026-09-27'
+  responsibility: Select optional metadata under one queue, cursor, deadline and paid invocation lifetime.
+  rationale: Concurrent workers share remaining queues, batch identities, stop state and retained answers.
+    The final join settles all owned handlers before closing the invocation. Moving the packing loop
+    would move its mutable inputs without creating a separate responsibility; request preparation,
+    source extraction and provider admission already have independent owners.
+- finding: quality.large-function
+  path: components/engine/src/decision-transport.ts
+  symbol: JevDecisionClient.ask
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex reconciliation and Claude Opus 5.5 medium focused cohesion review
+  approved_on: '2026-09-27'
+  responsibility: Own one provider admission lease and bounded HTTP attempt through response and cleanup.
+  rationale: Admission revalidation precedes paid reservation, and one cancellation lifetime distinguishes
+    provider faults from local coordination failures. Response accounting and lease release share one
+    cleanup allowance. Keeping this sequence together makes the no-call and no-double-spend boundaries
+    visible; the SQLite pool and wire schema already have separate owners.
+- finding: quality.large-function
   path: components/engine/src/context-projection.ts
   symbol: maintainContextProjection
   disposition: cohesion-accepted

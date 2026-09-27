@@ -79,3 +79,37 @@ test("wire excludes local identity and coverage text; additive noul metadata is 
   const parsed = parseDecisionEnvelope(raw, request, definitions, "jev-1.13.0", "payload");
   assert.equal(parsed.answers["yes"]?.status, "answered");
 });
+
+test("only the registered metadata group can use 256 questions", async () => {
+  const { validateDecisionRequest } = await import("../src/decision-schema.ts");
+  const { DECISION_QUESTIONS } = await import("../src/decision-catalog.ts");
+  const metadata = structuredClone(request);
+  metadata.budget.maxQuestions = 256;
+  metadata.questions = Array.from({ length: 256 }, (_, i) => ({ name: `file-${i}`, definitionId: "context.metadata-relevance/1", consumerId: "DL03", evidenceIds: ["e"] }));
+  validateDecisionRequest(metadata, DECISION_QUESTIONS);
+  metadata.questions.push({ ...metadata.questions[0]!, name: "file-256" });
+  assert.throws(() => validateDecisionRequest(metadata, DECISION_QUESTIONS), /budget/);
+  const ordinary = structuredClone(request); ordinary.budget.maxQuestions = 65;
+  ordinary.questions = Array.from({ length: 65 }, (_, i) => ({ name: `q-${i}`, definitionId: "fixture.noul/1", consumerId: "DL03", evidenceIds: ["e"] }));
+  assert.throws(() => validateDecisionRequest(ordinary, { "fixture.noul/1": { ...definitions.noul!, id: "fixture.noul/1" } }), /budget/);
+});
+
+test("provider total-input and state-plus-largest-question limits are enforced separately", async () => {
+  const { prepareDecisionRequest } = await import("../src/decision-request-preparation.ts");
+  const { profileDecisionSettings } = await import("../src/decision-settings.ts");
+  const settings = profileDecisionSettings({ continuity: { decisions: { mode: "auto", evidence_bytes: 32768,
+    budget: { max_calls: 10, max_request_bytes: 131072 }, allowed_data_classes: ["metadata"] } } });
+  const ask: any = { ...request, evidenceLayout: "shared-v1", evidence: [{ ...request.evidence[0]!, id: "purpose", text: "p" },
+    { ...request.evidence[0]!, text: "x".repeat(32000) }],
+    questions: [{ name: "file-0", definitionId: "context.metadata-relevance/1", consumerId: "DL03", evidenceIds: ["purpose", "e"] }] };
+  const tooMuchState = prepareDecisionRequest(ask, settings, ["DL03"], "state-limit");
+  assert.equal(tooMuchState.ok, false);
+  if (!tooMuchState.ok) { assert.equal(tooMuchState.reason, "input-budget"); assert.ok(tooMuchState.tokenEstimate! < 64000); }
+  ask.evidence[1].text = "x".repeat(25000); ask.evidenceLayout = "per-question-v1";
+  ask.questions.push({ ...ask.questions[0], name: "file-1" });
+  assert.equal(prepareDecisionRequest(ask, settings, ["DL03"], "within-both").ok, true);
+  ask.questions.push({ ...ask.questions[0], name: "file-2" });
+  const tooMuchTotal = prepareDecisionRequest(ask, settings, ["DL03"], "total-limit");
+  assert.equal(tooMuchTotal.ok, false);
+  if (!tooMuchTotal.ok) { assert.equal(tooMuchTotal.reason, "input-budget"); assert.ok(tooMuchTotal.tokenEstimate! > 64000); }
+});

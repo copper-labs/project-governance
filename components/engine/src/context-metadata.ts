@@ -2,15 +2,17 @@ import { digest } from "./core.ts";
 import { matchesPackPath } from "./planning.ts";
 import { localContextPath } from "./context-path-policy.ts";
 import type { ValidationSubject } from "./change-subject.ts";
-import { interpretNoul, type DecisionOutcome, type DecisionRuntime } from "./decision-runtime.ts";
+import { interpretNoul, type DecisionAsk, type DecisionOutcome, type DecisionRuntime } from "./decision-runtime.ts";
 import type { BudgetScope } from "./decision-budget.ts";
-import type { EvidenceItem } from "./decision-schema.ts";
+import { METADATA_MAX_QUESTIONS, type EvidenceItem } from "./decision-schema.ts";
+import { CONTEXT_SELECTION_MS } from "./context-timing.ts";
+import { prepareDecisionRequest } from "./decision-request-preparation.ts";
+import { PROVIDER_CONCURRENCY } from "./decision-admission.ts";
 import { DECISION_QUESTIONS } from "./decision-catalog.ts";
 import { maintainContextProjection } from "./context-projection.ts";
 
-const BATCH_SIZE = 63;
-const STOP = new Set("the and for with from this that these those into about have has had are was were will would should could please fix update change continue task bound intent current".split(" "));
-export const contextTerms = (value: string) => new Set((value.replace(/([a-z])([A-Z])/gu, "$1 $2").toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? []).filter(term => !STOP.has(term)));
+const BATCH_SIZE = METADATA_MAX_QUESTIONS;
+import { contextTerms } from "./context-terms.ts";
 
 export interface MetadataCursor { version: 1; generation: string; batches: Array<{ paths: string[]; signature: string; outcome: DecisionOutcome }> }
 export interface MetadataFamily { id: string; revision: string; previous?: MetadataCursor; replayOnly?: boolean }
@@ -64,8 +66,10 @@ export function contextMetadataCatalog(paths: string[], purpose: string, exact: 
 /** Full permitted inventory stays independent of lexical hits; family replay binds the whole batch. */
 export async function selectContextMetadata(subject: ValidationSubject, catalog: ReturnType<typeof contextMetadataCatalog>,
   purpose: string, runtime: DecisionRuntime, scope: BudgetScope | null, subjectDigest: string,
-  eventId: string, signal?: AbortSignal, deadlineAt = performance.now() + 3500, projection?: ReturnType<typeof maintainContextProjection>, family?: MetadataFamily) {
+  eventId: string, signal?: AbortSignal, deadlineAt = performance.now() + CONTEXT_SELECTION_MS, projection?: ReturnType<typeof maintainContextProjection>, family?: MetadataFamily, evaluation: { concurrency?: number; layout?: "shared-v1" | "per-question-v1" } = {}) {
   const started = performance.now(), baseline = catalog.candidates.map(item => item.path), decisions: DecisionOutcome[] = [];
+  const layout = evaluation.layout ?? "shared-v1", concurrency = evaluation.concurrency ?? PROVIDER_CONCURRENCY;
+  if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > PROVIDER_CONCURRENCY) throw new Error("invalid metadata concurrency");
   const enabled = runtime.settings.questionIds.DL03.includes("context.metadata-relevance/1");
   const assessable: string[] = [], excluded: Array<{ path: string; reason: string }> = [];
   let notPermitted = 0;
@@ -79,7 +83,7 @@ export async function selectContextMetadata(subject: ValidationSubject, catalog:
   const detailAllowed = enabled && runtime.settings.mode !== "off" && runtime.settings.consumers.DL03.mode !== "off" &&
     !runtime.eligibility("DL03").reasons.includes("missing-token") && runtime.settings.legacy.allowedDataClasses.includes("metadata") && runtime.settings.legacy.allowedDataClasses.includes("source");
   const descriptionOmissions: string[] = [], unfittable: string[] = [];
-  const positive = new Set<string>(), assessed = new Set<string>(), answered = new Set<string>(), described = new Set<string>(), visited = new Set<string>();
+  const positive = new Map<string, number>(), assessed = new Set<string>(), answered = new Set<string>(), described = new Set<string>(), visited = new Set<string>();
   const permitted = new Set(assessable), itemByPath = new Map<string, EvidenceItem>();
   const purposeItem: EvidenceItem = { id: "purpose", text: purpose, sourceDigest: digest(purpose), provenance: "supplied", trust: "untrusted" };
   const purposeBytes = Buffer.byteLength(purpose), limit = runtime.settings.legacy.evidenceBytes;
@@ -95,19 +99,20 @@ export async function selectContextMetadata(subject: ValidationSubject, catalog:
     itemByPath.set(path, item);
   }
   const coverageFor = (paths: string[]) => ({ captured: paths.length, omitted: [], unavailable: excluded.slice(0, 64).map(item => item.path), truncated: assessable.length !== paths.length,
-    limits: ["complete-inventory-batched", "maximum-63-questions-per-batch", paths.some(path => itemByPath.get(path)?.text !== path) ? "approved-source-descriptions" : "paths-only"] });
+    limits: ["complete-inventory-batched", `maximum-${METADATA_MAX_QUESTIONS}-questions-per-batch`, paths.some(path => itemByPath.get(path)?.text !== path) ? "approved-source-descriptions" : "paths-only"] });
   const signature = (paths: string[]) => digest({ paths, evidence: [purposeItem, ...paths.map(path => itemByPath.get(path))],
-    coverage: coverageFor(paths), configuration: runtime.settings.configDigest, revision: family?.revision ?? scope?.taskRevision ?? "unbound", question: definition });
+    layout, coverage: coverageFor(paths), configuration: runtime.settings.configDigest, revision: family?.revision ?? scope?.taskRevision ?? "unbound", question: definition });
   const cursor: MetadataCursor = { version: 1, generation: projection.generation, batches: [] };
   const apply = (paths: string[], outcome: DecisionOutcome) => {
     decisions.push(outcome);
     if (outcome.providerCalled) for (const path of paths) { assessed.add(path); visited.add(path); if (itemByPath.get(path)?.text !== path) described.add(path); }
     paths.forEach((path, i) => {
       if (outcome.answers[`file-${i}`]?.status === "answered") answered.add(path);
-      if (outcome.delivered && interpretNoul(outcome.answers[`file-${i}`]).value === "positive") positive.add(path);
+      const answer = outcome.answers[`file-${i}`];
+      if (outcome.delivered && answer?.status === "answered" && answer.shape === "noul" && interpretNoul(answer).value === "positive") positive.set(path, answer.probability);
     });
   };
-  let replayedBatches = 0, invalidatedBatches = 0, providerCallMs = 0, firstBatchMs: number | null = null, budgetFinalized: boolean | null = null;
+  let replayedBatches = 0, invalidatedBatches = 0, providerCallMs = 0, httpTotalMs = 0, admissionTotalMs = 0, packingMs = 0, peakConcurrency = 0, firstBatchMs: number | null = null, budgetFinalized: boolean | null = null;
   for (const batch of family?.previous?.batches ?? []) {
     if (batch.paths.every(path => permitted.has(path)) && batch.signature === signature(batch.paths) &&
         runtime.eligibility("DL03", "context.metadata-relevance/1").providerUse === "eligible") {
@@ -120,45 +125,103 @@ export async function selectContextMetadata(subject: ValidationSubject, catalog:
     .map(path => ({ path, hash: digest({ eventId: family?.id ?? eventId, path }) })).sort((a, b) => a.hash.localeCompare(b.hash)).map(item => item.path);
   let priorityAssessed = 0, generalAssessed = 0;
   let reason = enabled ? assessable.length ? "not-attempted" : "metadata-scope-disabled" : "metadata-question-disabled";
-  try {
-    while (enabled && !family?.replayOnly && (priorities.length || general.length)) {
-      if (signal?.aborted || performance.now() >= deadlineAt) { reason = "cancelled"; break; }
-      if (purposeBytes >= limit || baseWire >= wireLimit) { reason = "input-budget"; break; }
-      const previous = decisions.at(-1)?.budget;
-      if (previous?.state === "reserved" && previous.calls! >= previous.limits.maxCalls) { reason = "budget-exhausted"; break; }
+  const controller = new AbortController(), cancel = () => controller.abort(signal?.reason);
+  if (signal?.aborted) cancel(); else signal?.addEventListener("abort", cancel, { once: true });
+  const cutoff = setTimeout(() => controller.abort("context-selection-deadline"), Math.max(0, deadlineAt - performance.now()));
+  const completed: Array<{ paths: string[]; signature: string; outcome: DecisionOutcome }> = [];
+  let nextBatch = 0, active = 0, stop = false;
+  const askFor = (batch: string[]): DecisionAsk => {
+    const batchSignature = signature(batch), sourcePaths = batch.filter(path => itemByPath.get(path)!.text !== path);
+    return { consumerId: "DL03", eventId: digest({ invocationId, batchSignature }), scope,
+      subject: { digest: family ? batchSignature : subjectDigest, revision: family?.revision ?? scope?.taskRevision ?? "unbound", environment: "context-metadata" },
+      evidenceLayout: layout, metadataPaths: batch, ...(sourcePaths.length ? { sourcePaths } : {}),
+      evidence: [purposeItem, ...batch.map(path => itemByPath.get(path)!)],
+      budgetPartition: "context-selection", budgetInvocationId: invocationId, ...(family ? { budgetFamily: true } : {}), deadlineAt, signal: controller.signal,
+      coverage: coverageFor(batch), questions: batch.map((path, i) => ({ name: `file-${i}`, definitionId: "context.metadata-relevance/1", consumerId: "DL03", evidenceIds: ["purpose", path] })),
+      policyDigest: runtime.settings.configDigest };
+  };
+  const fits = (batch: string[]) => prepareDecisionRequest({ ...askFor(batch),
+    scope: scope ?? { workspace: subject.root, taskId: "unbound", taskRevision: "unbound" } }, runtime.settings, ["DL03"], "packing").ok;
+  const requeue = (paths: string[]) => {
+    priorities.unshift(...paths.filter(path => prioritySet.has(path)));
+    general.unshift(...paths.filter(path => !prioritySet.has(path)));
+  };
+  const worker = async () => {
+    while (enabled && !family?.replayOnly && !stop && (priorities.length || general.length)) {
+      if (controller.signal.aborted || performance.now() >= deadlineAt) { stop = true; break; }
+      if (purposeBytes >= limit || baseWire >= wireLimit) { reason = "input-budget"; stop = true; break; }
+      const packingStart = performance.now();
       const packed = packMetadataBatch(priorities, general, itemByPath,
         { purposeBytes, evidenceBytes: limit, baseWire, wireBytes: wireLimit, itemWire });
-      const batch = packed.batch;
+      let batch = packed.batch;
       unfittable.push(...packed.unfittable);
-      if (!batch.length) { reason = "input-budget"; break; }
+      // The fast estimate only proposes a batch. Actual serialization owns every bound.
+      if (batch.length && !fits(batch)) {
+        let low = 0, high = batch.length - 1;
+        while (low < high) {
+          const middle = Math.ceil((low + high) / 2);
+          if (fits(batch.slice(0, middle))) low = middle; else high = middle - 1;
+        }
+        if (low) { requeue(batch.slice(low)); batch = batch.slice(0, low); }
+        else {
+          const path = batch[0]!, item = itemByPath.get(path)!;
+          // Downgrade only an individually unrepresentable description, never to hit a count target.
+          if (item.text !== path) {
+            itemByPath.set(path, { ...item, text: path, sourceDigest: digest(path) }); descriptionOmissions.push(path);
+          }
+          if (fits([path])) { requeue(batch.slice(1)); batch = [path]; }
+          else { unfittable.push(path); requeue(batch.slice(1)); batch = []; }
+        }
+      }
+      packingMs += performance.now() - packingStart;
+      if (!batch.length) { reason = "input-budget"; continue; }
+      if (controller.signal.aborted || performance.now() >= deadlineAt) { requeue(batch); stop = true; break; }
       firstBatchMs ??= performance.now() - started;
-      const evidence = [purposeItem, ...batch.map(path => itemByPath.get(path)!)], sourcePaths = batch.filter(path => itemByPath.get(path)!.text !== path), batchSignature = signature(batch);
-      const outcome = await runtime.ask({ consumerId: "DL03", eventId: digest({ invocationId, batchSignature }), scope,
-        subject: { digest: family ? batchSignature : subjectDigest, revision: family?.revision ?? scope?.taskRevision ?? "unbound", environment: "context-metadata" },
-        evidenceLayout: "shared-v1", metadataPaths: batch, ...(sourcePaths.length ? { sourcePaths } : {}), evidence,
-        budgetPartition: "context-selection", budgetInvocationId: invocationId, ...(family ? { budgetFamily: true } : {}), deadlineAt,
-        coverage: coverageFor(batch), questions: batch.map((path, i) => ({ name: `file-${i}`, definitionId: "context.metadata-relevance/1", consumerId: "DL03", evidenceIds: ["purpose", path] })),
-        policyDigest: runtime.settings.configDigest });
-      if (outcome.providerCalled && !outcome.reason.startsWith("repeated-")) providerCallMs += outcome.latencyMs;
-      apply(batch, outcome); reason = outcome.reason;
-      if (outcome.providerCalled) { cursor.batches.push({ paths: batch, signature: batchSignature, outcome });
-        priorityAssessed += batch.filter(path => prioritySet.has(path)).length; generalAssessed += batch.filter(path => !prioritySet.has(path)).length; }
-      if (!outcome.delivered && outcome.reason !== "shadow" && outcome.reason !== "repeated-observation") break;
+      const index = nextBatch++;
+      active++; peakConcurrency = Math.max(peakConcurrency, active);
+      let outcome: DecisionOutcome;
+      try { outcome = await runtime.ask(askFor(batch)); } catch (error) { stop = true; throw error; } finally { active--; }
+      completed[index] = { paths: batch, signature: signature(batch), outcome };
+      if (outcome.providerCalled && !outcome.reason.startsWith("repeated-")) {
+        providerCallMs += outcome.latencyMs;
+        httpTotalMs += outcome.transport?.httpMs ?? 0; admissionTotalMs += outcome.transport?.admissionMs ?? 0;
+      }
+      if (!outcome.delivered && !["shadow", "repeated-observation", "no-usable-answers"].includes(outcome.reason) && outcome.failureStage !== "answer-validation") stop = true;
     }
+  };
+  try {
+    // Promise.allSettled owns all local handlers even when one sibling unexpectedly rejects.
+    const settled = await Promise.allSettled(Array.from({ length: concurrency }, worker));
+    for (const batch of completed) {
+      if (!batch) continue;
+      apply(batch.paths, batch.outcome);
+      if (batch.outcome.providerCalled) {
+        cursor.batches.push(batch);
+        priorityAssessed += batch.paths.filter(path => prioritySet.has(path)).length;
+        generalAssessed += batch.paths.filter(path => !prioritySet.has(path)).length;
+      }
+    }
+    const failure = completed.find(batch => batch && !batch.outcome.delivered && !["shadow", "repeated-observation"].includes(batch.outcome.reason));
+    reason = signal?.aborted ? "cancelled" : performance.now() >= deadlineAt ? "deadline"
+      : settled.some(item => item.status === "rejected") ? "selection-unavailable"
+      : failure?.outcome.reason ?? completed.at(-1)?.outcome.reason ?? reason;
   } finally {
+    clearTimeout(cutoff); signal?.removeEventListener("abort", cancel);
     if (!family && scope && decisions.some(item => ["reserved", "duplicate"].includes(item.budget.state))) budgetFinalized = runtime.closeContextInvocation(scope, invocationId);
   }
   if (!priorities.length && !general.length && reason === "not-attempted" && replayedBatches) reason = "exact-batch-replay";
   if (unfittable.length && answered.size < assessable.length && ["answered", "shadow", "repeated-observation"].includes(reason)) reason = "input-budget";
   const pinned = new Set(catalog.candidates.filter(item => item.pinned).map(item => item.path));
-  const order = [...baseline.filter(path => pinned.has(path)), ...baseline.filter(path => !pinned.has(path) && positive.has(path)), ...baseline.filter(path => !pinned.has(path) && !positive.has(path))];
+  const relevant = baseline.filter(path => !pinned.has(path) && positive.has(path))
+    .sort((a, b) => positive.get(b)! - positive.get(a)! || a.localeCompare(b));
+  const order = [...baseline.filter(path => pinned.has(path)), ...relevant, ...baseline.filter(path => !pinned.has(path) && !positive.has(path))];
   const coverage = { eligibleCount: baseline.length, permittedCount: assessable.length, submittedCount: assessed.size, answeredCount: answered.size,
     unassessedCount: assessable.length - answered.size, notPermittedCount: notPermitted, unavailableCount: excluded.length,
-    unfittableCount: unfittable.length, complete: answered.size === baseline.length, reason, attempted: assessed.size > 0,
+    unfittableCount: unfittable.length, complete: answered.size === assessable.length && assessable.length > 0, inventoryComplete: answered.size === baseline.length, reason, attempted: assessed.size > 0,
     applied: decisions.some(item => item.delivered), mode: decisions[0]?.mode ?? "off", traversalStart: parseInt(digest({ eventId }).slice(7, 15), 16),
     priorityAssessed, generalAssessed, replayedBatches, invalidatedBatches };
   return { version: 3, catalog, order, reason, assessed: [...assessed], metadataPermittedCount: assessable.length, coverage, cursor,
     invocationId, budgetFinalized, excluded, decisions, delivered: positive.size > 0, sourceBodiesTransmitted: described.size > 0, rawSourceFilesTransmitted: false,
     sourceIndex: sourceIndexObservation(projection, described.size, baseline.length, descriptionOmissions),
-    firstBatchMs, providerCallMs, elapsedMs: performance.now() - started };
+    firstBatchMs, providerCallMs, httpTotalMs, admissionTotalMs, packingMs, peakConcurrency, evidenceLayout: layout, elapsedMs: performance.now() - started };
 }

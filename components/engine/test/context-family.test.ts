@@ -83,7 +83,7 @@ test("unchanged complete batches replay; edits invalidate the whole affected bat
   const settings = profileDecisionSettings({ continuity: { decisions: { mode: "auto", allowed_data_classes: ["source", "metadata"], allowed_metadata_paths: ["src/**"], allowed_source_paths: ["src/**"],
     budget: { max_calls: 32, max_request_bytes: 1048576 }, consumers: { DL03: { mode: "auto", questions: ["context.metadata-relevance/1"] } } } } });
   let calls = 0;
-  const runtime = new DecisionRuntime(settings, root, { token: "fixture", fetch: async (_url, init) => { calls++; const wire = JSON.parse(String(init?.body));
+  const runtime = new DecisionRuntime(settings, root, { coordinationRoot: root, token: "fixture", fetch: async (_url, init) => { calls++; const wire = JSON.parse(String(init?.body));
     return Response.json({ model: "jev-1.13.0", answers: Object.fromEntries(Object.keys(wire.questions).map(name => [name, { type: "noul", noul: 0.9 }])) }); } });
   const catalog = contextMetadataCatalog(paths, "mechanism", [], [], new Set());
   const first = await selectContextMetadata(subject, catalog, "mechanism", runtime, scope, digest("subject"), family, undefined, performance.now() + 5000, undefined, { id: family, revision: "provisional" });

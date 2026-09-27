@@ -262,7 +262,7 @@ function verifyTaskSwitch({ invoke, launcher, workspace, environment, session, c
   assert.equal(refreshed.selection.binding.taskId, second.task.taskId);
   assert.equal(refreshed.expansion.entry, first.contextEntry.entryId);
   assert.ok(refreshed.expansion.transitionId);
-  assert.equal(refreshed.timing.operationBudgetMs, 10000);
+  assert.equal(refreshed.timing.operationBudgetMs, 15000);
   assert.equal(refreshed.metadata.reason, 'answered');
   assert.equal(readFileSync(calls, 'utf8').trim().split('\n').length, 2);
   delete environment.HARNESS_SESSION;
@@ -319,7 +319,7 @@ export async function verifyRc6Prompt(packageRoot, archive) {
     assert.equal(hooks.hooks.UserPromptSubmit.length, 1);
     const handler = hooks.hooks.UserPromptSubmit[0].hooks[0];
     assert.equal(handler.additionalContextLimit, 0);
-    assert.equal(handler.timeout, 15);
+    assert.equal(handler.timeout, 20);
     const event = { session_id: 'installed-host', turn_id: 'turn-one', hook_event_name: 'UserPromptSubmit', cwd: workspace, prompt: 'Fix the app launch.' };
     const output = invoke('/bin/sh', ['-c', handler.command], JSON.stringify(event));
     assert.equal(output.hookSpecificOutput.hookEventName, 'UserPromptSubmit');

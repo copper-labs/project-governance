@@ -145,11 +145,16 @@ export function maintainContextProjection(subject: ValidationSubject, paths: str
   for (const link of links) if (link.resolved) { if (seeds.has(link.source)) related.add(link.resolved); if (seeds.has(link.resolved)) related.add(link.source); }
   for (const link of catalogLinks) if (seeds.has(link.source)) related.add(link.resolved);
   const documentation = documentationObservation(byPath);
+  const quality = { descriptorCount: entries.size, pathOnlyCount: inventory.length - entries.size,
+    withoutAuthoredOverviewCount: [...byPath.values()].filter(fact => fact.descriptor && !fact.overviewObserved).length,
+    partialSyntaxCount: [...byPath.values()].filter(fact => fact.coverage === "syntax-partial").length,
+    unavailableExtractionCount: [...byPath.values()].filter(fact => fact.coverage === "unavailable").length,
+    accuracy: "not-established", inventory: inventory.length ? "populated" : "empty" };
   return { entries, unavailable, capturedBytes, documentation, facts: byPath, links, catalogLinks,
     priority: [...new Set([...exact, ...symbols, ...search, ...related])], generation,
     status: { cache, published, locatorVerified: locator !== null, view: observation.view, extractor, inventoryCount: inventory.length,
       extractedCount: extracted, reusedCount: reused, describedCount: entries.size, pendingCount: inventory.length - byPath.size,
-      complete, reverseCoverage: complete && [...byPath.values()].every(f => ["syntax", "markdown"].includes(f.coverage)) && links.every(link => link.resolved !== null) ? "complete-supported-syntax" : "partial",
+      complete, quality, reverseCoverage: complete && [...byPath.values()].every(f => ["syntax", "markdown"].includes(f.coverage)) && links.every(link => link.resolved !== null) ? "complete-supported-syntax" : "partial",
       catalogCoverage, capturedBytes, elapsedMs: performance.now() - started, fts: store?.fts ?? false,
       timing: { identityMs: identified - started, freshnessMs: observed - identified, cacheMs: opened - observed,
         extractionMs: extractedAt - opened, publicationAndLinksMs: performance.now() - extractedAt } } };

@@ -12,7 +12,7 @@ test("partial relevance answers reorder only assessed slots", async t => {
   const root = mkdtempSync(join(tmpdir(), "context-advice-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const settings = profileDecisionSettings({ continuity: { decisions: { mode: "auto", allowed_data_classes: ["source"], allowed_source_paths: ["src/**"], consumers: { DL03: { mode: "auto" } } } } });
-  const runtime = new DecisionRuntime(settings, root, { token: "test-only", fetch: async () => Response.json({
+  const runtime = new DecisionRuntime(settings, root, { coordinationRoot: root, token: "test-only", fetch: async () => Response.json({
     model: settings.legacy.model, answers: { q1: { type: "noul", noul: 0.1 }, q3: { type: "noul", noul: 0.9 } },
   }) });
   const candidates = ["a", "b", "c"].map(name => ({ id: `src/${name}.ts`, excerpt: "same content", sourceDigest: digest("same content") }));
@@ -30,7 +30,7 @@ test("partial relevance answers reorder only assessed slots", async t => {
     });
   assert.equal(full.delivered, true, "full-sized excerpts must leave room for the wire envelope");
   let sentQuestions = 0;
-  const boundedRuntime = new DecisionRuntime(settings, root, { token: "test-only", fetch: async (_url, init) => {
+  const boundedRuntime = new DecisionRuntime(settings, root, { coordinationRoot: root, token: "test-only", fetch: async (_url, init) => {
     const payload = JSON.parse(String(init?.body));
     sentQuestions = Object.keys(payload.questions).length;
     return Response.json({ model: settings.legacy.model, answers: Object.fromEntries(Object.keys(payload.questions).map(key => [key, { type: "noul", noul: 0.8 }])) });
@@ -65,7 +65,7 @@ test("expanded relevance stays within the evidence-item ceiling at max_candidate
     evidence_bytes: 32768, allowed_data_classes: ["source"], allowed_source_paths: ["src/**"],
     consumers: { DL03: { mode: "auto" } } } } });
   let calls = 0;
-  const runtime = new DecisionRuntime(settings, root, { token: "fixture", fetch: async (_url, init) => {
+  const runtime = new DecisionRuntime(settings, root, { coordinationRoot: root, token: "fixture", fetch: async (_url, init) => {
     calls++;
     const wire = JSON.parse(String(init?.body));
     assert.equal(Object.keys(wire.questions).length, 63);
@@ -83,4 +83,33 @@ test("expanded relevance stays within the evidence-item ceiling at max_candidate
   assert.equal(result.assessed.length, 63);
   assert.deepEqual(result.coverage.omitted, ["src/63.ts"]);
   assert.equal(calls, 1);
+});
+
+test("source relevance shares an explicit caller cutoff while ordinary calls retain their HTTP clock", async t => {
+  const root = mkdtempSync(join(tmpdir(), "context-advice-clock-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const settings = profileDecisionSettings({ continuity: { decisions: { mode: "auto", deadline_ms: 150,
+    allowed_data_classes: ["source"], allowed_source_paths: ["src/**"], consumers: { DL03: { mode: "auto" } } } } });
+  let calls = 0;
+  const runtime = new DecisionRuntime(settings, root, { coordinationRoot: root, token: "fixture", fetch: async () => {
+    calls++; return new Promise(() => {});
+  } });
+  const outcomes: Awaited<ReturnType<DecisionRuntime["ask"]>>[] = [], ask = runtime.ask.bind(runtime);
+  t.mock.method(runtime, "ask", async (...args: Parameters<DecisionRuntime["ask"]>) => {
+    const outcome = await ask(...args); outcomes.push(outcome); return outcome;
+  });
+  const scope = { workspace: root, taskId: "task", taskRevision: "1" };
+  const candidates = [{ id: "src/a.ts", excerpt: "source", sourceDigest: digest("source") }];
+  const run = (eventId: string, deadlineAt?: number) => contextAdvice(runtime, candidates, scope, {
+    purpose: "find source", eventId, policyDigest: digest("policy"), environment: "test", revision: "1",
+    subjectDigest: digest("subject"), excerptBytes: 2048, ...(deadlineAt === undefined ? {} : { deadlineAt }),
+  });
+  await run("caller-cutoff", performance.now() + 50);
+  assert.equal(outcomes.at(-1)?.failureStage, "budget");
+  const provider = await run("provider-cutoff");
+  assert.equal(calls, 2, "a caller cutoff does not suppress the next ordinary call");
+  assert.equal(provider.decision?.reason, "deadline");
+  assert.equal(outcomes.at(-1)?.failureStage, "transport");
+  assert.equal((await run("provider-suppressed")).decision?.reason, "cooldown");
+  assert.equal(calls, 2);
 });

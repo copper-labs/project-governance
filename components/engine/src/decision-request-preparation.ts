@@ -1,6 +1,6 @@
 import { canonical, digest } from "./core.ts";
 import { DECISION_CONSUMERS, DECISION_QUESTIONS } from "./decision-catalog.ts";
-import { DECISION_SCHEMA_VERSION, decisionPayload, estimateTokens, validateDecisionRequest, type DecisionConsumerId, type DecisionRequest2 } from "./decision-schema.ts";
+import { DECISION_SCHEMA_VERSION, decisionPayload, estimateTokens, validateDecisionRequest, METADATA_MAX_QUESTIONS, metadataQuestionGroup, type DecisionConsumerId, type DecisionRequest2 } from "./decision-schema.ts";
 import type { DecisionAsk } from "./decision-runtime.ts";
 import type { DecisionSettings } from "./decision-settings.ts";
 
@@ -13,7 +13,7 @@ export function prepareDecisionRequest(ask: DecisionAsk, settings: DecisionSetti
       scope: { workspace: ask.scope!.workspace, taskId: ask.scope!.taskId, taskRevision: ask.scope!.taskRevision, ...(ask.runId ? { runId: ask.runId } : {}) },
       subject: ask.subject, evidence: ask.evidence, coverage: ask.coverage, questions: ask.questions,
       eligibilityDigest: ask.eligibilityDigest ?? null, policyDigest: ask.policyDigest, configDigest: settings.configDigest,
-      budget: { deadlineMs: settings.legacy.deadlineMs, maxQuestions: 64,
+      budget: { deadlineMs: settings.legacy.deadlineMs, maxQuestions: metadataQuestionGroup(ask.consumerId, ask.questions) ? METADATA_MAX_QUESTIONS : 64,
         maxRequestBytes: Math.min(settings.budget.maxRequestBytes, 65_536), maxCandidates: participants.every(id => id === "DL03") ? Math.max(2, settings.legacy.maxCandidates + 1) : 65,
         tokenEstimate: 0, tokenMethod: "UTF-8 bytes upper estimate" },
     };
@@ -28,6 +28,8 @@ export function prepareDecisionRequest(ask: DecisionAsk, settings: DecisionSetti
       payloadDigestValue = digest(payload);
       // The documented product limits stay separate from our own byte bound.
       if (request.budget.tokenEstimate > 64_000) return { ok: false as const, reason: "input-budget", tokenEstimate: request.budget.tokenEstimate };
+      if (estimateTokens(payload.state) + Math.max(...Object.values(payload.questions).map(estimateTokens)) > 32_000)
+        return { ok: false as const, reason: "input-budget", tokenEstimate: request.budget.tokenEstimate };
       if (requestBytes > request.budget.maxRequestBytes) return { ok: false as const, reason: "input-budget", tokenEstimate: request.budget.tokenEstimate };
     } catch { return { ok: false as const, reason: "preparation-invalid", tokenEstimate: null }; }
 

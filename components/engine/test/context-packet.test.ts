@@ -27,9 +27,7 @@ test("baseline ranks full captured meaning independently of delivery excerpt lim
 test("provider-free context preserves required evidence and bounds optional reading", async () => {
   const directory = mkdtempSync(join(tmpdir(), "context-packet-"));
   try {
-    const provider = new JevDecisionAdapter(DEFAULT_DECISIONS, join(directory, "health"), {
-      fetch: async () => { throw new Error("network must not run"); },
-    });
+    const provider = new JevDecisionAdapter(DEFAULT_DECISIONS, join(directory, "health"), { coordinationRoot: (join(directory, "health")) + ".coordination", fetch: async () => { throw new Error("network must not run"); } });
     const packet = await buildContextPacket({ taskRevision: "1", purpose: "find bug", required: [candidate("rules")],
       optional: [candidate("a"), candidate("b")], maximumBytes: 350 }, provider);
     assert.deepEqual(packet.entries.map(entry => entry.id), ["rules", "a"]);
@@ -68,16 +66,13 @@ test("undeliverable and blank sources do not suppress legacy advice for useful e
   try {
     const provider = new JevDecisionAdapter({ ...DEFAULT_DECISIONS, mode: "auto",
       allowedQuestions: ["rank_optional_context"], allowedDataClasses: ["source"],
-      allowedSourcePaths: ["single-line", "blank", "good"] }, join(directory, "health"), {
-      scope: { workspace: directory, taskId: "task", taskRevision: "1" }, token: "fixture",
-      fetch: async () => {
+      allowedSourcePaths: ["single-line", "blank", "good"] }, join(directory, "health"), { coordinationRoot: (join(directory, "health")) + ".coordination", scope: { workspace: directory, taskId: "task", taskRevision: "1" }, token: "fixture", fetch: async () => {
         calls++;
         return new Response(JSON.stringify({ model: DEFAULT_DECISIONS.model,
           answers: { suggestion: { type: "choice", choice: "good", confidence: 0.9,
             probabilities: { good: 0.9, unknown: 0.1 } } },
           usage: { input_tokens: 20, output_tokens: 2 } }));
-      },
-    });
+      } });
     const packet = await buildContextPacket({ taskRevision: "1", purpose: "find useful source",
       required: [], maximumBytes: 5000, optionalExcerptBytes: 2048,
       optional: [{ id: "single-line", sourceDigest: "long", excerpt: "x".repeat(3000) },
@@ -103,11 +98,9 @@ test("auto advice changes optional selection while shadow preserves baseline del
   try {
     for (const mode of ["auto", "shadow"] as const) {
       const provider = new JevDecisionAdapter({ ...DEFAULT_DECISIONS, mode,
-        allowedQuestions: ["rank_optional_context"], allowedDataClasses: ["source"], allowedSourcePaths: ["a", "b"] }, join(directory, mode), {
-        scope: { workspace: directory, taskId: mode, taskRevision: "1" }, token: "fixture", fetch: async () => new Response(JSON.stringify({ model: DEFAULT_DECISIONS.model,
+        allowedQuestions: ["rank_optional_context"], allowedDataClasses: ["source"], allowedSourcePaths: ["a", "b"] }, join(directory, mode), { coordinationRoot: (join(directory, mode)) + ".coordination", scope: { workspace: directory, taskId: mode, taskRevision: "1" }, token: "fixture", fetch: async () => new Response(JSON.stringify({ model: DEFAULT_DECISIONS.model,
           answers: { suggestion: { type: "choice", choice: "b", confidence: 0.9,
-            probabilities: { a: 0.05, b: 0.9, unknown: 0.05 } } }, usage: { input_tokens: 100, output_tokens: 10 } })),
-      });
+            probabilities: { a: 0.05, b: 0.9, unknown: 0.05 } } }, usage: { input_tokens: 100, output_tokens: 10 } })) });
       const packet = await buildContextPacket({ taskRevision: "1", purpose: "find bug", required: [candidate("rules")],
         optional: [candidate("a"), candidate("b")], maximumBytes: 350 }, provider);
       assert.deepEqual(packet.entries.map(entry => entry.id), ["rules", mode === "auto" ? "b" : "a"]);
@@ -121,7 +114,7 @@ test("auto advice changes optional selection while shadow preserves baseline del
 test("stale identity, omitted IDs, and invented IDs cannot alter packet selection", async () => {
   const directory = mkdtempSync(join(tmpdir(), "context-invalid-"));
   try {
-    const baseline = new JevDecisionAdapter(DEFAULT_DECISIONS, join(directory, "health"));
+    const baseline = new JevDecisionAdapter(DEFAULT_DECISIONS, join(directory, "health"), { coordinationRoot: (join(directory, "health")) + ".coordination" });
     for (const mutation of ["stale", "omitted", "invented"]) {
       const provider = { decide: async (request: Parameters<typeof baseline.decide>[0]) => {
         const result = await baseline.decide(request);
@@ -142,7 +135,7 @@ test("stale identity, omitted IDs, and invented IDs cannot alter packet selectio
 test("disabled assistance, provider exceptions and invalid advice share one lexical fallback", async () => {
   const directory = mkdtempSync(join(tmpdir(), "context-fallback-parity-"));
   try {
-    const offline = new JevDecisionAdapter(DEFAULT_DECISIONS, join(directory, "health"), { token: "" });
+    const offline = new JevDecisionAdapter(DEFAULT_DECISIONS, join(directory, "health"), { coordinationRoot: (join(directory, "health")) + ".coordination", token: "" });
     const input = { taskRevision: "fallback-parity", purpose: "recover interrupted maintenance", required: [], maximumBytes: 110,
       optional: [{ id: "styles", sourceDigest: "first", excerpt: "visual typography" },
         { id: "runtime", sourceDigest: "second", excerpt: "recover interrupted maintenance" }] };

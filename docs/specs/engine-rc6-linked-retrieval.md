@@ -5,7 +5,7 @@ type: spec
 status: active
 owner: project-governance
 created: 2026-09-23
-updated: 2026-09-25
+updated: 2026-09-27
 summary: Automatic prompt entry, a rebuildable SQLite repository index, source-backed relationships, bounded JEV selection with expansion and real-task qualification.
 ---
 
@@ -15,6 +15,9 @@ The [RC7 reliability amendment](engine-rc7-prompt-reliability.md) supersedes thi
 timing and same-turn task-transition behavior. The retrieval and index boundaries below remain.
 The [RC8 reliability amendment](engine-rc8-hook-sources.md) supersedes the native 24,000-byte cap
 with the reviewed route envelope and corrects shared hook discovery and bounded source preparation.
+The accepted [RC9 parallel selection amendment](engine-rc9-parallel-context.md) replaces the
+63-question packing ceiling, serialized dispatch and earlier timing limits for the next release.
+Its implementation is pending; the existing index, permissions and task-family boundaries remain.
 
 The accepted RC6 boundary is **automatic prompt entry, a maintained repository index, basic
 relationships, bounded JEV selection with expansion, and evidence from real development tasks**.

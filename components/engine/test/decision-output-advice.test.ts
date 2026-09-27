@@ -13,7 +13,7 @@ test("output advice preserves ambiguous failures, multi-block stacks, incomplete
   const root = mkdtempSync(join(tmpdir(), "output-advice-")); t.after(() => rmSync(root, { recursive: true, force: true }));
   let calls = 0;
   const settings = profileDecisionSettings({ continuity: { decisions: { mode: "auto", allowed_data_classes: ["diagnostic"], consumers: { DL13: { mode: "auto" } } } } });
-  const runtime = new DecisionRuntime(settings, root, { token: "fixture", fetch: async () => { calls++; throw new Error("provider unavailable"); } });
+  const runtime = new DecisionRuntime(settings, root, { coordinationRoot: root, token: "fixture", fetch: async () => { calls++; throw new Error("provider unavailable"); } });
   const receipt: CommandReceipt = { version: 1, requestDigest: digest("request"), state: "failed", exitCode: 1, signal: null, cleanup: "confirmed", startedAt: "start", endedAt: "end", durationMs: 1, reason: "failed", log: join(root, "absent.log"), logBytes: 0 };
   const scope = { workspace: root, taskId: "task", taskRevision: "1" };
   const options = { task: "Inspect result", eventId: "fixture", policyDigest: digest("policy"), environment: "test", revision: "1" };

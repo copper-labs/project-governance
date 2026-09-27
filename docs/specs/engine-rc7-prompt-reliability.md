@@ -5,7 +5,7 @@ type: spec
 status: current
 owner: project-governance
 created: 2026-09-25
-updated: 2026-09-25
+updated: 2026-09-27
 summary: Give semantic selection its own clock and refresh context after explicit task changes without resetting spending or history.
 ---
 
@@ -14,6 +14,11 @@ summary: Give semantic selection its own clock and refresh context after explici
 This amendment owns the timing and task-transition corrections to the
 [RC6 retrieval contract](engine-rc6-linked-retrieval.md). Other retrieval, disclosure, execution and
 fixed-model boundaries remain with that contract.
+
+The [RC9 parallel selection contract](engine-rc9-parallel-context.md) replaces this document's
+timing limits for RC9 with a 15-second total retrieval envelope and 20-second managed hook.
+That implementation is pending. The timing below describes RC7/RC8, and the task-transition,
+history and spending rules continue into RC9.
 
 ## Time belongs to the phase that consumes it
 

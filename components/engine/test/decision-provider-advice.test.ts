@@ -142,7 +142,7 @@ test("supported narrow completion advice introduces no correction or acceptance 
   const { profileDecisionSettings } = await import("../src/decision-settings.ts");
   const root = realpathSync(mkdtempSync(join(tmpdir(), "supported-claim-"))); t.after(() => rmSync(root, { recursive: true, force: true }));
   const settings = profileDecisionSettings({ continuity: { decisions: { mode: "auto", allowed_data_classes: ["diagnostic"], consumers: { DL09: { mode: "auto" } } } } });
-  const runtime = new DecisionRuntime(settings, root, { token: "fixture", fetch: async (_url, init) => {
+  const runtime = new DecisionRuntime(settings, root, { coordinationRoot: root, token: "fixture", fetch: async (_url, init) => {
     const payload = JSON.parse(String(init?.body));
     return Response.json({ model: settings.legacy.model, answers: Object.fromEntries(Object.entries(payload.questions).map(([name, question]) => {
       const choice = name === "scope" ? "within-evidence" : "supported", keys = Object.keys((question as any).criteria);

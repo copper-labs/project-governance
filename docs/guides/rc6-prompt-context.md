@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-09-25
-updated: 2026-09-26
+updated: 2026-09-27
 summary: Enable prompt delivery and optional metadata selection, then inspect actual usage without inferring savings.
 ---
 
@@ -170,8 +170,9 @@ The example opts into both. Omit source approval for paths-only mode; it is weak
 filenames. Full raw files and historical prose are not sent by this index consumer. Existing DL03 profiles do not acquire the new question
 or metadata permission merely by upgrading. Keep unrelated enabled consumer settings when merging.
 
-The catalog keeps the complete eligible inventory. JEV visits it in batches of up to 63
-questions through the existing serialized provider-health owner.
+The catalog keeps the complete eligible inventory. Through RC8, JEV visits it in batches of up to
+63 questions through the serialized provider-health owner. The accepted RC9 changes are described
+in [the next-release section below](#rc9-planned-selection-changes); they are not active in RC8.
 Request bytes can reduce a batch size, never the inventory. No keyword or task-scope shortlist decides
 which files exist for JEV. Current required guidance stays code-owned. The maintained SQLite index
 reuses unchanged source facts and searches literal descriptions, symbols and source-backed links.
@@ -194,9 +195,10 @@ A newer root turn, the completed second expansion, or 15 minutes closes the fami
 Missing-token or off-mode entry uses local fallback without allocating paid-family accounting.
 This allowance cannot spend review/CI capacity or the ordinary active-scope pool.
 Both pools retain the shared 8 MiB budget-store safety limit. Inspect actual coverage and budget
-receipts before changing these limits. The 3.5-second overall provider deadline applies to prompt,
-CLI and provider-context selection and may leave large
-inventories partly assessed; synchronous source work is size-bounded, not a hard timing guarantee.
+receipts before changing these limits. In RC7/RC8, selection starts its separate 3.5-second allowance
+after preparation, within a 10-second total operation. This applies to prompt, CLI and provider-context
+selection and may leave large inventories partly assessed; synchronous source work is size-bounded,
+not a hard timing guarantee.
 Each metadata call has at most one second or the stricter profile timeout. Reaching the overall
 retrieval cutoff does not trigger provider cooldown; a provider's own timeout still does.
 The native prompt entry runs only the enabled index question. Legacy body-ranking and workflow
@@ -205,6 +207,27 @@ advice remain on their existing deliberate command paths. No provider is require
 The adapter adds bound intent to short follow-ups. It does not invent acceptance criteria, reopen a
 closed task, or use the last task from another session. The operator/agent still deliberately creates
 or resumes the continuity task when intent and scope are clear. Checks retain that same binding.
+
+## RC9 planned selection changes
+
+The accepted [RC9 specification](../specs/engine-rc9-parallel-context.md) and
+[implementation plan](../exec-plans/active/2026-09-27-rc9-parallel-context.md) replace the separate
+3.5-second selection cutoff with one 15-second total retrieval budget. Preparation and waiting
+count toward it, with the last 500 ms reserved for delivery/cleanup. Managed prompt hooks allow
+20 seconds so the host can start and return the bounded operation.
+
+JEV will receive fuller metadata batches where existing byte limits permit them, with at most
+four requests in flight through one local pool shared across worktrees. Rate pacing and brief
+admission transactions replace the network-long lock. Existing profile disclosure and task/family
+spending limits remain; installing RC9 will not authorize more source sharing or model delegation.
+RC9 also repairs multiline/lifecycle metadata, supported path coverage, complete current-prompt
+handling, optional relevance ordering and useful section delivery. Frozen scenarios from three
+different repository shapes will compare RC8, provider-free RC9 and live-JEV RC9. Sharing exclusions
+remain visible, and expected answers stay outside the provider input. A smaller packet is useful
+only when it still delivers the evidence needed for the task.
+The implementation and live comparison are pending. Do not change an RC8 timeout alone and call
+that the parallel selection repair. Coordinated adoption must include the effective shared hook
+source, each selected worktree's launcher and ordinary prompt receipts.
 
 ## Continue a native prompt entry
 

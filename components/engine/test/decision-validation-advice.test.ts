@@ -21,7 +21,7 @@ test("CI v2 uses declared scenario meaning while preserving required plan and ho
   const settings = profileDecisionSettings({ continuity: { decisions: { mode: "auto", allowed_data_classes: ["source"], allowed_source_paths: ["src/**", "config/validation/packs/**"],
     consumers: { DL07: { mode: "auto", questions: ["validation.scenario-relevance/2", "validation.coverage-gap/2"] } } } } });
   let calls = 0;
-  const runtime = new DecisionRuntime(settings, root, { token: "fixture", fetch: async (_url, init) => {
+  const runtime = new DecisionRuntime(settings, root, { coordinationRoot: root, token: "fixture", fetch: async (_url, init) => {
     calls++;
     const payload = JSON.parse(String(init?.body));
     assert.match(JSON.stringify(payload.questions), /Exercise application launch/);

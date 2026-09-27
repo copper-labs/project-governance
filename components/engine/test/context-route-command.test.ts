@@ -494,7 +494,7 @@ test("priority preview shows related discoveries outside the initial task scope"
   assert.ok(result.paths.includes("README.md"));
   assert.equal(result.priorityPreview.find(item => item.path === "README.md")?.disposition, "discovered");
   const saturated = automaticContextCandidates(subject, ["src/feature/a.ts"], new Set(), ["**"], 1, priority);
-  assert.ok(saturated.priorityPreview.some(item => item.disposition === "discovery-over-cap"));
+  assert.equal(saturated.discovery, null, "A full source allocation must not scan for results it cannot deliver");
 });
 
 test("priority preview reserves room for seeds after many excluded paths", () => {

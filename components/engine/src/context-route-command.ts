@@ -29,7 +29,8 @@ import type { BudgetScope } from "./decision-budget.ts";
 import { openContextFamily, type ContextFamilyIdentity } from "./decision-budget.ts";
 import { maintainContextProjection } from "./context-projection.ts";
 import { expansionIdentity, beginContextSelection, finishContextSelection, nextContextExpansion } from "./context-family.ts";
-import { ContextTiming } from "./context-timing.ts";
+import { ContextTiming, CONTEXT_DELIVERY_RESERVE_MS } from "./context-timing.ts";
+import { CONTEXT_PATH_LIMIT, CONTEXT_PROMPT_LIMIT } from "./context-limits.ts";
 import { currentTaskRefresh, latestSessionPrompt } from "./context-observations.ts";
 import { sessionId } from "../../harness/src/store/location.ts";
 
@@ -57,7 +58,7 @@ function readOptionalCandidates(subject: ValidationSubject, paths: string[], exp
   const candidates: Candidate[] = [];
   for (const path of paths) {
     try {
-      if (path.length > 128 || subject.source(path)?.file_type !== "regular") throw new Error("Optional source unavailable");
+      if (Buffer.byteLength(path) > CONTEXT_PATH_LIMIT || subject.source(path)?.file_type !== "regular") throw new Error("Optional source unavailable");
       const bytes = readCaptured(path, 1024 * 1024);
       if (bytes.includes(0)) throw new Error("Binary optional source");
       candidates.push({ id: path, excerpt: new TextDecoder("utf-8", { fatal: true }).decode(bytes),
@@ -74,7 +75,7 @@ function readOptionalCandidates(subject: ValidationSubject, paths: string[], exp
 function routedDecisionProvider(input: { supplied: DecisionProvider | undefined; options: ContextRouteOptions; settings: ContextSettings;
   metadata: MetadataSelection | null; profile: Record<string, unknown>; root: string; scope: CapturedScope;
   decisionScope: BudgetScope | null; configDigests: Record<string, string>; task: string; revision: string;
-  onAdvice: (advice: ContextAdvice) => void }): DecisionProvider {
+  onAdvice: (advice: ContextAdvice) => void; deadlineAt: number }): DecisionProvider {
   const { supplied, options, settings, metadata, profile, root, scope, decisionScope, configDigests, task, revision, onAdvice } = input;
   if (supplied) return supplied;
   if ((options.promptEntry || settings.questionIds.DL03.includes("context.metadata-relevance/1")) && metadata) return {
@@ -94,7 +95,7 @@ function routedDecisionProvider(input: { supplied: DecisionProvider | undefined;
         purpose: task, eventId: digest({ revision, purpose: task, source: scope.subject_digest,
           candidates: request.candidates, policyDigest }),
         policyDigest, environment: scope.mode, revision, subjectDigest: scope.subject_digest ?? digest(configDigests),
-        excerptBytes: settings.legacy.evidenceBytes,
+        excerptBytes: settings.legacy.evidenceBytes, deadlineAt: input.deadlineAt,
       });
       onAdvice(advice);
       const decision = advice.decision;
@@ -116,8 +117,8 @@ function metadataReceiptPreview(metadata: MetadataSelection | null) {
     catalogDigest: digest(metadata.catalog.candidates), order: metadata.order.slice(0, 64), assessed: metadata.assessed.slice(0, 64),
     assessedCount: metadata.assessed.length, excluded: metadata.excluded.slice(0, 64),
     sourceIndex: { ...metadata.sourceIndex, descriptionOmissions: metadata.sourceIndex.descriptionOmissions.slice(0, 64) },
-    decisions: metadata.decisions.map(({ receiptId, reason, mode, delivered, providerCalled, model, latencyMs, usage }) =>
-      ({ receiptId, reason, mode, delivered, providerCalled, model, latencyMs, usage })) };
+    decisions: metadata.decisions.map(({ receiptId, reason, mode, delivered, providerCalled, model, latencyMs, usage, transport, tokenEstimate }) =>
+      ({ receiptId, reason, mode, delivered, providerCalled, model, latencyMs, usage, ...(transport ? { transport } : {}), tokenEstimate })) };
 }
 
 function projectionReceiptPreview(projection: ReturnType<typeof maintainContextProjection>, admitted: Set<string>) {
@@ -177,7 +178,7 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
     ...(values["decision-task"] ? { taskId: values["decision-task"] } : {}), ...(values.revision ? { revision: values.revision } : {}),
     ...(options.session ? { session: options.session } : {}) });
   if (!binding.context && (!values.task || !values.revision && !options.family)) throw new Error(`Task context unavailable (${binding.status}); create or resume this session's harness task, or supply explicit --task and --revision.`);
-  const task = text(values.task ?? (binding.context ? decisionTaskPurpose(binding.context) : undefined), "task", 16000),
+  const task = text(values.task ?? (binding.context ? decisionTaskPurpose(binding.context) : undefined), "task", CONTEXT_PROMPT_LIMIT),
     revision = text(values.revision ?? binding.context?.revision ?? options.family?.revision, "task revision");
   if (values.staged && values["base-ref"]) throw new Error("Staged context cannot select another base");
   root = realpathSync(root);
@@ -279,7 +280,7 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
     options.family ? { id: options.family.id, revision: options.family.revision,
       ...(admission?.previous ? { previous: admission.previous } : {}), replayOnly: admission?.replay ?? false } : undefined) : null;
   timing.endSelection(metadata?.reason, options.signal,
-    metadata?.reason === "deadline" && metadata.decisions.at(-1)?.failureStage === "budget");
+    metadata?.reason === "deadline" && metadata.decisions.some(decision => decision.failureStage === "budget"));
   failureCursor = metadata?.cursor ?? failureCursor;
   const automatic = automaticContextCandidates(subject, candidateInventory, mandatoryPaths,
     ["**"], settings.legacy.maxCandidates,
@@ -309,7 +310,8 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
     options.maximumOptionalBytes ?? Infinity));
   let relevanceAdvice: ContextAdvice | null = null;
   const provider = routedDecisionProvider({ supplied: suppliedProvider, options, settings, metadata, profile, root, scope,
-    decisionScope, configDigests, task, revision, onAdvice: advice => { relevanceAdvice = advice; } });
+    decisionScope, configDigests, task, revision, deadlineAt: timing.deadline - CONTEXT_DELIVERY_RESERVE_MS,
+    onAdvice: advice => { relevanceAdvice = advice; } });
   // Invalid mandatory context prevents any optional provider call or source transmission.
   const optional = packet.ready && candidates.length && optionalBudget >= 2 ? await buildContextPacket({
     taskRevision: revision, purpose: task, required: [], optional: candidates, maximumBytes: optionalBudget,
@@ -361,7 +363,7 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
     reason: !packet.ready ? "required-context-unavailable" : !candidates.length ? automatic.excludedCount ? "no-permitted-candidates" : "no-optional-candidates"
       : optionalBudget < 2 ? "optional-budget-empty" : optional?.reason ?? "selection-unavailable",
     optionalDelivery: optional ? optional.entries.length ? "delivered" : "none" : "not-attempted",
-    optionalClippedPaths: optional?.entries.filter(entry => entry.sourceRange).map(entry => entry.id) ?? [],
+    optionalClippedPaths: optional?.entries.filter(entry => entry.sourceRange || entry.sourceRanges).map(entry => entry.id) ?? [],
     optionalOmissionReasons: optional?.omissionReasons ?? {},
     automatic: { ...automatic, prefilter: "delivery after complete-inventory JEV assessment or explicit partial/fallback; source capture remains bounded" } };
   // Full decisions already have individual receipts. A normal command returns bounded previews,

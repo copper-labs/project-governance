@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-02-16
-updated: 2026-09-25
+updated: 2026-09-27
 summary: Active and completed execution plans for the current source repository.
 ---
 
@@ -15,6 +15,11 @@ Active plans are short-lived work records. Completed plans retain concise source
 Git remains the implementation history and recovery mechanism.
 
 ## Active
+
+- [RC9 context quality and parallel selection](active/2026-09-27-rc9-parallel-context.md) owns the
+  next release: metadata/prompt/passage repairs, real-repository evaluation, fuller batches, bounded
+  parallel dispatch, shared local pacing and a 15-second retrieval budget. The first source-grounded
+  case pack is prepared; implementation, comparison execution and qualification are pending.
 
 - [RC8 hook and context repair](active/2026-09-25-rc8-hook-sources.md) resolves Codex's main-checkout
   definitions, prevents incomplete cutovers, speeds repository preparation and checks context budgets.

@@ -40,7 +40,7 @@ test("metadata batch packing keeps general coverage and skips items that cannot 
 test("unbound context has a serializable identity and preserves local fallback", async t => {
   const root = mkdtempSync(join(tmpdir(), "context-unbound-")); t.after(() => rmSync(root, { recursive: true, force: true }));
   const catalog = contextMetadataCatalog(["src/a.ts"], "repair", [], [], new Set());
-  const runtime = new DecisionRuntime(settings(), root, { token: "", fetch: async () => { throw new Error("must remain local"); } });
+  const runtime = new DecisionRuntime(settings(), root, { coordinationRoot: root, token: "", fetch: async () => { throw new Error("must remain local"); } });
   const result = await selectContextMetadata(subject, catalog, "repair", runtime, null, digest("source"), "unbound");
   assert.deepEqual(result.order, ["src/a.ts"]); assert.ok(result.decisions.every(item => !item.providerCalled));
 });
@@ -51,11 +51,11 @@ test("shared metadata reaches a late file, preserves pinned paths and reuses pai
   const catalog = contextMetadataCatalog([...paths, ".env", "secret.key", "node_modules/foo.js"], "where is the mechanism", [paths[0]!], [], new Set());
   assert.equal(catalog.candidates.length, 100); assert.equal(catalog.excludedCount, 3);
   let calls = 0;
-  const runtime = new DecisionRuntime(settings(), root, { token: "fixture", fetch: async (_url, init) => {
+  const runtime = new DecisionRuntime(settings(), root, { coordinationRoot: root, token: "fixture", fetch: async (_url, init) => {
     calls++; const wire = JSON.parse(String(init?.body));
     assert.equal(wire.state.layout, "shared-v1");
     assert.equal(wire.state.evidence.filter((item: any) => item.id === "purpose").length, 1);
-    assert.ok(Object.keys(wire.questions).length <= 63);
+    assert.ok(Object.keys(wire.questions).length <= 256);
     assert.equal(JSON.stringify(wire).split("where is the mechanism").length - 1, 1);
     return Response.json({ model: "jev-1.13.0", answers: Object.fromEntries(Object.entries(wire.questions).map(([name, raw]) =>
       [name, { type: "noul", noul: (raw as any).instructions.evidenceIds.includes("src/099.ts") ? 0.95 : 0.5 }])) });
@@ -74,7 +74,7 @@ test("prompt budgets cannot consume check-time allowance and historical hints ca
   const catalog = contextMetadataCatalog(["src/old.ts", "src/parser.ts"], "Fix the parser", [], [], new Set(), ["src/old.ts"]);
   assert.equal(catalog.candidates[0]?.path, "src/parser.ts");
   let calls = 0;
-  const runtime = new DecisionRuntime(settings({ budget: { max_calls: 1, max_request_bytes: 16384 } }), root, { token: "fixture", fetch: async () => {
+  const runtime = new DecisionRuntime(settings({ budget: { max_calls: 1, max_request_bytes: 16384 } }), root, { coordinationRoot: root, token: "fixture", fetch: async () => {
     calls++; return Response.json({ model: "jev-1.13.0", answers: { "file-0": { type: "noul", noul: 0.9 }, "file-1": { type: "noul", noul: 0.1 } } });
   } });
   const scope = { workspace: root, taskId: "task", taskRevision: "1" };
@@ -96,15 +96,15 @@ test("metadata permission, uncertainty, deadline and budgets all retain the loca
     { workspace: root, taskId: "task", taskRevision: "1" }, digest("subject"), id);
   let calls = 0;
   const fetcher: typeof fetch = async () => { calls++; return Response.json({ model: "jev-1.13.0", answers: { "file-0": { type: "noul", noul: 0.5 }, "file-1": { type: "noul", noul: 5 } } }); };
-  const denied = await run(new DecisionRuntime(settings({ allowed_data_classes: ["source"], allowed_source_paths: ["**"] }), root, { token: "fixture", fetch: fetcher }), "denied");
+  const denied = await run(new DecisionRuntime(settings({ allowed_data_classes: ["source"], allowed_source_paths: ["**"] }), root, { coordinationRoot: root, token: "fixture", fetch: fetcher }), "denied");
   assert.equal(denied.reason, "data-sharing-disabled"); assert.equal(calls, 0);
-  const noToken = await run(new DecisionRuntime(settings(), root, { token: "", fetch: fetcher }), "no-token");
+  const noToken = await run(new DecisionRuntime(settings(), root, { coordinationRoot: root, token: "", fetch: fetcher }), "no-token");
   assert.equal(noToken.reason, "missing-token"); assert.equal(calls, 0);
-  const unclear = await run(new DecisionRuntime(settings(), root, { token: "fixture", fetch: fetcher }), "unclear");
+  const unclear = await run(new DecisionRuntime(settings(), root, { coordinationRoot: root, token: "fixture", fetch: fetcher }), "unclear");
   assert.deepEqual(unclear.order, ["src/a.ts", "src/b.ts"]); assert.equal(unclear.delivered, false);
-  const small = await run(new DecisionRuntime(settings({ budget: { max_calls: 1, max_request_bytes: 1024 } }), root, { token: "fixture", fetch: fetcher }), "budget");
+  const small = await run(new DecisionRuntime(settings({ budget: { max_calls: 1, max_request_bytes: 1024 } }), root, { coordinationRoot: root, token: "fixture", fetch: fetcher }), "budget");
   assert.ok(["input-budget", "budget-exhausted"].includes(small.reason));
-  const timed = await run(new DecisionRuntime(settings({ deadline_ms: 500 }), join(root, "timeout"), { token: "fixture", fetch: async () => new Promise(() => {}) }), "timeout");
+  const timed = await run(new DecisionRuntime(settings({ deadline_ms: 500 }), join(root, "timeout"), { coordinationRoot: join(root, "timeout"), token: "fixture", fetch: async () => new Promise(() => {}) }), "timeout");
   assert.deepEqual(timed.order, ["src/a.ts", "src/b.ts"]); assert.equal(timed.delivered, false);
   assert.ok(timed.decisions[0]?.providerCalled);
 });
@@ -120,7 +120,7 @@ test("every eligible item beyond the old cutoff reaches JEV, including a mislead
   const seen = new Set<string>(); let descriptions = 0;
   const configured = settings({ allowed_data_classes: ["metadata", "source"], allowed_source_paths: ["src/zzz/**"],
     budget: { max_calls: 32, max_request_bytes: 1024 * 1024 } });
-  const runtime = new DecisionRuntime(configured, root, { token: "fixture", fetch: async (_url, init) => {
+  const runtime = new DecisionRuntime(configured, root, { coordinationRoot: root, token: "fixture", fetch: async (_url, init) => {
     const wire = JSON.parse(String(init?.body));
     const answers = Object.fromEntries(Object.entries(wire.questions).map(([name, raw]) => {
       const path = (raw as any).instructions.evidenceIds[1]; seen.add(path);
@@ -145,15 +145,16 @@ test("budget and deadline limits expose incomplete coverage without deleting una
   const fetcher: typeof fetch = async (_url, init) => { calls++; const wire = JSON.parse(String(init?.body));
     return Response.json({ model: "jev-1.13.0", answers: Object.fromEntries(Object.keys(wire.questions).map(name => [name, { type: "noul", noul: 0.8 }])) }); };
   const scope = { workspace: root, taskId: "task", taskRevision: "1" };
-  const partial = await selectContextMetadata(subject, catalog, "find mechanism", new DecisionRuntime(settings({ budget: { max_calls: 1, max_request_bytes: 131072 } }), root, { token: "fixture", fetch: fetcher }), scope, digest("subject"), "partial");
+  const partial = await selectContextMetadata(subject, catalog, "find mechanism", new DecisionRuntime(settings({ budget: { max_calls: 1, max_request_bytes: 131072 } }), root, { coordinationRoot: root, token: "fixture", fetch: fetcher }), scope, digest("subject"), "partial");
   assert.equal(calls, 1); assert.equal(partial.reason, "budget-exhausted");
   assert.equal(partial.coverage.complete, false); assert.ok(partial.coverage.unassessedCount > 126);
   assert.equal(partial.order.length, paths.length);
   const signal = AbortSignal.abort();
-  const stopped = await selectContextMetadata(subject, catalog, "find mechanism", new DecisionRuntime(settings(), root, { token: "fixture", fetch: fetcher, signal }), scope, digest("subject"), "stopped", signal);
+  const stopped = await selectContextMetadata(subject, catalog, "find mechanism", new DecisionRuntime(settings(), root, { coordinationRoot: root, token: "fixture", fetch: fetcher, signal }), scope, digest("subject"), "stopped", signal);
   assert.equal(calls, 1); assert.equal(stopped.coverage.unassessedCount, paths.length); assert.equal(stopped.reason, "cancelled");
-  const restricted = await selectContextMetadata(subject, catalog, "find mechanism", new DecisionRuntime(settings({ allowed_metadata_paths: ["src/0.ts"] }), root, { token: "fixture", fetch: fetcher }), scope, digest("subject"), "restricted");
-  assert.equal(restricted.coverage.notPermittedCount, 199); assert.equal(restricted.coverage.complete, false);
+  const restricted = await selectContextMetadata(subject, catalog, "find mechanism", new DecisionRuntime(settings({ allowed_metadata_paths: ["src/0.ts"] }), root, { coordinationRoot: root, token: "fixture", fetch: fetcher }), scope, digest("subject"), "restricted");
+  assert.equal(restricted.coverage.notPermittedCount, 199); assert.equal(restricted.coverage.complete, true);
+  assert.equal(restricted.coverage.inventoryComplete, false);
 });
 
 test("literal source index handles headings and symbols without fabricating meaning for unknown text", () => {
@@ -169,7 +170,7 @@ test("retrieval closes its scope after each invocation and remains available aft
   const root = mkdtempSync(join(tmpdir(), "context-scope-lifecycle-")); t.after(() => rmSync(root, { recursive: true, force: true }));
   const catalog = contextMetadataCatalog(["src/a.ts"], "find", [], [], new Set());
   let calls = 0;
-  const runtime = new DecisionRuntime(settings({ budget: { max_calls: 1, max_request_bytes: 8192 } }), root, { token: "fixture", fetch: async () => {
+  const runtime = new DecisionRuntime(settings({ budget: { max_calls: 1, max_request_bytes: 8192 } }), root, { coordinationRoot: root, token: "fixture", fetch: async () => {
     calls++; return Response.json({ model: "jev-1.13.0", answers: { "file-0": { type: "noul", noul: 0.9 } } });
   } });
   for (let i = 0; i < 513; i++) {
@@ -189,7 +190,7 @@ test("a bounded index supplies visited metadata windows, rotates across turns an
       Array.from({ length: 12 }, (_, i) => `export function meaningfulDeclarationNameForThisModule${i}() {}`).join('\n'))]));
   } });
   const runtime = new DecisionRuntime(settings({ allowed_data_classes: ["metadata", "source"], allowed_source_paths: ["src/**"],
-    evidence_bytes: 16384, budget: { max_calls: 1, max_request_bytes: 131072 } }), root, { token: "fixture", fetch: async (_url, init) => {
+    evidence_bytes: 16384, budget: { max_calls: 1, max_request_bytes: 131072 } }), root, { coordinationRoot: root, token: "fixture", fetch: async (_url, init) => {
     const wire = JSON.parse(String(init?.body));
     return Response.json({ model: "jev-1.13.0", answers: Object.fromEntries(Object.entries(wire.questions).map(([name, q]) => {
       seen.add((q as any).instructions.evidenceIds[1]); return [name, { type: "noul", noul: 0.8 }];
@@ -214,7 +215,7 @@ test("unfittable items do not stop later batches and large wire descriptions fal
   const fetcher: typeof fetch = async (_url, init) => { const wire = JSON.parse(String(init?.body)); seen += Object.keys(wire.questions).length;
     return Response.json({ model: "jev-1.13.0", answers: Object.fromEntries(Object.keys(wire.questions).map(name => [name, { type: "noul", noul: 0.9 }])) }); };
   const result = await selectContextMetadata(subject, contextMetadataCatalog(paths, "find", [], [], new Set()), "find",
-    new DecisionRuntime(settings({ evidence_bytes: 32, budget: { max_calls: 100, max_request_bytes: 1048576 } }), root, { token: "fixture", fetch: fetcher }),
+    new DecisionRuntime(settings({ evidence_bytes: 32, budget: { max_calls: 100, max_request_bytes: 1048576 } }), root, { coordinationRoot: root, token: "fixture", fetch: fetcher }),
     { workspace: root, taskId: "small-evidence", taskRevision: "1" }, digest("source"), "turn");
   assert.equal(seen, 150); assert.equal(result.coverage.unfittableCount, 1); assert.equal(result.reason, "input-budget");
   const path = "src/description.md", text = '---\nsummary: ' + 'detail '.repeat(100) + '\n---\n' +
@@ -222,7 +223,7 @@ test("unfittable items do not stop later batches and large wire descriptions fal
     Array.from({ length: 12 }, (_, i) => 'export function ' + 'Identifier'.repeat(7) + i + '() {}').join('\n');
   const indexed = syntheticSubject({ source: () => ({ file_type: "regular" }), readBatch: () => new Map([[path, Buffer.from(text)]]) });
   const fallback = await selectContextMetadata(indexed, contextMetadataCatalog([path], "find", [], [], new Set()), "find",
-    new DecisionRuntime(settings({ allowed_data_classes: ["metadata", "source"], allowed_source_paths: ["src/**"], budget: { max_calls: 1, max_request_bytes: 3000 } }), root, { token: "fixture", fetch: async (_url, init) => {
+    new DecisionRuntime(settings({ allowed_data_classes: ["metadata", "source"], allowed_source_paths: ["src/**"], budget: { max_calls: 1, max_request_bytes: 3000 } }), root, { coordinationRoot: root, token: "fixture", fetch: async (_url, init) => {
       const wire = JSON.parse(String(init?.body)); assert.equal(wire.state.evidence[1].text, path); return Response.json({ model: "jev-1.13.0", answers: { "file-0": { type: "noul", noul: 0.9 } } });
     } }), { workspace: root, taskId: "wire-fallback", taskRevision: "1" }, digest("source"), "wire");
   assert.equal(fallback.coverage.complete, true); assert.deepEqual(fallback.sourceIndex.descriptionOmissions, [path]);
@@ -233,12 +234,12 @@ test("every metadata caller has one overall deadline even without a prompt hook 
   const paths = Array.from({ length: 150 }, (_, i) => `src/${i}.ts`), scope = { workspace: root, taskId: "cli", taskRevision: "1" };
   const started = performance.now();
   const result = await selectContextMetadata(subject, contextMetadataCatalog(paths, "find", [], [], new Set()), "find",
-    new DecisionRuntime(settings({ deadline_ms: 1000 }), root, { token: "fixture", fetch: async () => new Promise(() => {}) }),
+    new DecisionRuntime(settings({ deadline_ms: 1000 }), root, { coordinationRoot: root, token: "fixture", fetch: async () => new Promise(() => {}) }),
     scope, digest("source"), "cli", undefined, started + 50);
   assert.ok(performance.now() - started < 500); assert.equal(result.reason, "deadline");
   assert.equal(readDecisionBudget(root, scope), null); assert.equal(result.budgetFinalized, true);
   const next = await selectContextMetadata(subject, contextMetadataCatalog(["src/0.ts"], "find", [], [], new Set()), "find",
-    new DecisionRuntime(settings(), root, { token: "fixture", fetch: async () => Response.json({ model: "jev-1.13.0", answers: { "file-0": { type: "noul", noul: 0.9 } } }) }),
+    new DecisionRuntime(settings(), root, { coordinationRoot: root, token: "fixture", fetch: async () => Response.json({ model: "jev-1.13.0", answers: { "file-0": { type: "noul", noul: 0.9 } } }) }),
     scope, digest("source"), "next-turn");
   assert.equal(next.reason, "answered", "A normal retrieval cutoff must not put the provider into cooldown");
 });
@@ -247,7 +248,7 @@ test("metadata provider timeouts remain effective with a longer configured deadl
   const root = mkdtempSync(join(tmpdir(), "context-provider-timeout-")); t.after(() => rmSync(root, { recursive: true, force: true }));
   const catalog = contextMetadataCatalog(["src/0.ts"], "find", [], [], new Set()), scope = { workspace: root, taskId: "task", taskRevision: "1" };
   let calls = 0;
-  const runtime = new DecisionRuntime(settings({ deadline_ms: 5000 }), root, { token: "fixture", fetch: async () => { calls++; return new Promise(() => {}); } });
+  const runtime = new DecisionRuntime(settings({ deadline_ms: 5000 }), root, { coordinationRoot: root, token: "fixture", fetch: async () => { calls++; return new Promise(() => {}); } });
   const first = await selectContextMetadata(subject, catalog, "find", runtime, scope, digest("source"), "first");
   assert.equal(first.reason, "deadline"); assert.equal(first.decisions[0]?.failureStage, "transport");
   const next = await selectContextMetadata(subject, catalog, "find", runtime, scope, digest("source"), "second");

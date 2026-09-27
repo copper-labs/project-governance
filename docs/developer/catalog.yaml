@@ -22,9 +22,10 @@ capabilities:
       - configure automatic prompt delivery and bounded metadata selection
       - diagnose missing routes and link actual host usage to context receipts
       - understand the accepted maintained-index and expansion design and its qualification limits
+      - implement the accepted RC9 context quality, parallel selection and shared admission contract
     symbols: [project-governance telemetry context, project-governance doctor --capability context]
     reference: docs/specs/engine-rc6-linked-retrieval.md
-    guides: [docs/guides/rc6-prompt-context.md]
+    guides: [docs/guides/rc6-prompt-context.md, docs/exec-plans/active/2026-09-27-rc9-parallel-context.md]
     sources:
       - components/engine/src/prompt-context.ts
       - components/engine/src/context-route-command.ts
@@ -34,6 +35,10 @@ capabilities:
       - components/engine/src/context-observations.ts
       - components/engine/src/context-doctor.ts
       - components/engine/src/context-documentation.ts
+      - components/engine/src/context-timing.ts
+      - components/engine/src/decision-transport.ts
+      - components/engine/src/decision-request-preparation.ts
+      - components/engine/src/decision-budget.ts
   - id: test-execution
     title: Run necessary tests with bounded supervision cost
     aliases: [external-test-batch]

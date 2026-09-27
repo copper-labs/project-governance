@@ -149,6 +149,7 @@ function decisionPilotTelemetry(root: string, options: { limit: number; since: n
   const consumers: Record<string, { observations: number; delivered: number; questions: number }> = {};
   const reasons: Record<string, number> = {};
   const transport = { called: 0, notCalled: 0, unknown: 0 };
+  const timing = { samples: 0, unknown: 0, admissionMs: 0, httpMs: 0, rateWaitMs: 0, slotWaitMs: 0, coordinationWaitMs: 0, requestBytes: 0, peakConcurrency: 0 };
   const tokens = { input_samples: 0, output_samples: 0, input_total: 0, output_total: 0 };
   const seen = new Set<string>();
   let readBytes = 0, truncated = false;
@@ -184,6 +185,14 @@ function decisionPilotTelemetry(root: string, options: { limit: number; since: n
         }
         counts.matched++;
         transport[outcome.providerCalled === true ? "called" : outcome.providerCalled === false ? "notCalled" : "unknown"]++;
+        const fields = ["admissionMs", "httpMs", "rateWaitMs", "slotWaitMs", "coordinationWaitMs", "requestBytes"] as const;
+        const detail = outcome.transport && typeof outcome.transport === "object" ? object(outcome.transport) : null;
+        if (detail && fields.every(key => typeof detail[key] === "number" && Number.isFinite(detail[key]) && Number(detail[key]) >= 0) &&
+            Number.isSafeInteger(detail.activeConcurrency) && Number(detail.activeConcurrency) >= 0 && Number(detail.activeConcurrency) <= 4) {
+          timing.samples++;
+          for (const key of fields) timing[key] += Number(detail[key]);
+          timing.peakConcurrency = Math.max(timing.peakConcurrency, Number(detail.activeConcurrency));
+        } else timing.unknown++;
         reasons[outcome.reason] = (reasons[outcome.reason] ?? 0) + 1;
         for (const id of outcome.consumers as string[]) {
           const totals = consumers[id] ??= { observations: 0, delivered: 0, questions: 0 };
@@ -196,7 +205,7 @@ function decisionPilotTelemetry(root: string, options: { limit: number; since: n
     }
   } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") counts.invalid++; }
   finally { entries?.closeSync(); }
-  return { counts, consumers, reasons, transport, tokens: { ...tokens,
+  return { counts, consumers, reasons, transport, timing: { ...timing, accounting: "sum of per-call durations; not elapsed task time" }, tokens: { ...tokens,
     input_total: tokens.input_samples ? tokens.input_total : null, output_total: tokens.output_samples ? tokens.output_total : null },
     usage_allocation: "native usage counted once per reservation; question counts shown per consumer", truncated, read_bytes: readBytes,
     outcomes: "not-joined", avoided_llm_tokens: null, benefit_claim: "not-evaluated" };

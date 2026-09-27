@@ -1,4 +1,4 @@
-import { decisionProviderHealthPath } from "../src/decision-transport.ts";
+import { providerDatabasePath } from "../src/decision-admission.ts";
 import { canonical, digest } from "../src/core.ts";
 import { buildContextPacket } from "../src/context-packet.ts";
 import { test } from "node:test";
@@ -27,7 +27,7 @@ test("off, absent token and unapproved data make zero network calls", async () =
   const transport: typeof fetch = async () => { calls++; return response(); };
   try {
     for (const [settings, token, reason] of [[DEFAULT_DECISIONS, "test", "off"], [config, "", "missing-token"], [{ ...config, allowedDataClasses: [] }, "test", "data-sharing-disabled"]] as const) {
-      const result = await new JevDecisionAdapter(settings as DecisionConfig, f.path, { token, fetch: transport }).decide(request);
+      const result = await new JevDecisionAdapter(settings as DecisionConfig, f.path, { coordinationRoot: (f.path) + ".coordination", token, fetch: transport }).decide(request);
       assert.equal(result.baselineVersion, "lexical-context-1");
       assert.equal(result.reason, reason); assert.deepEqual(result.delivered, ["b", "a"]);
     }
@@ -45,10 +45,10 @@ test("live-shaped advice ranks supplied IDs and records native usage; shadow pre
     } }, usage: { input_tokens: 200, output_tokens: 20 } }));
   };
   try {
-    const live = await new JevDecisionAdapter(config, f.path, { token: "synthetic-test", fetch: transport }).decide(request);
+    const live = await new JevDecisionAdapter(config, f.path, { coordinationRoot: (f.path) + ".coordination", token: "synthetic-test", fetch: transport }).decide(request);
     assert.deepEqual(live.delivered, ["a", "b"]); assert.equal(live.method, "jev");
     assert.deepEqual(live.usage, { inputTokens: 200, outputTokens: 20 });
-    const shadow = await new JevDecisionAdapter({ ...config, mode: "shadow" }, f.path, { token: "synthetic-test", fetch: transport }).decide(request);
+    const shadow = await new JevDecisionAdapter({ ...config, mode: "shadow" }, f.path, { coordinationRoot: (f.path) + ".coordination", token: "synthetic-test", fetch: transport }).decide(request);
     assert.deepEqual(shadow.delivered, ["b", "a"]); assert.deepEqual(shadow.suggested, ["a", "b"]);
     assert.equal(shadow.reason, "shadow"); assert.equal(calls, 2);
   } finally { f.close(); }
@@ -67,7 +67,7 @@ test("abstention and low confidence preserve baseline and usage without suppress
       } }, usage: { input_tokens: 77, output_tokens: 8 } }));
     };
     try {
-      const adapter = new JevDecisionAdapter(config, f.path, { token: "synthetic-test", fetch: transport });
+      const adapter = new JevDecisionAdapter(config, f.path, { coordinationRoot: (f.path) + ".coordination", token: "synthetic-test", fetch: transport });
       const result = await adapter.decide(request);
       assert.equal(result.reason, "abstention");
       assert.equal(result.method, "baseline");
@@ -80,16 +80,16 @@ test("abstention and low confidence preserve baseline and usage without suppress
   }
 });
 
-test("authentication rejection suppresses subsequent invocations until explicit config revision", async () => {
+test("authentication rejection survives configuration changes until credentials change", async () => {
   const f = temporary(); let calls = 0;
   const transport: typeof fetch = async () => { calls++; return new Response("{}", { status: 401 }); };
   try {
     const options = { token: "synthetic-test", fetch: transport };
-    assert.equal((await new JevDecisionAdapter(config, f.path, options).decide(request)).reason, "authentication-rejected");
-    assert.equal((await new JevDecisionAdapter(config, f.path, options).decide(request)).reason, "authentication-disabled");
+    assert.equal((await new JevDecisionAdapter(config, f.path, { coordinationRoot: (f.path) + ".coordination", ...options }).decide(request)).reason, "authentication-rejected");
+    assert.equal((await new JevDecisionAdapter(config, f.path, { coordinationRoot: (f.path) + ".coordination", ...options }).decide(request)).reason, "authentication-disabled");
     assert.equal(calls, 1);
-    await new JevDecisionAdapter({ ...config, revision: "2" }, f.path, options).decide(request);
-    assert.equal(calls, 2);
+    await new JevDecisionAdapter({ ...config, revision: "2" }, f.path, { coordinationRoot: (f.path) + ".coordination", ...options }).decide(request);
+    assert.equal(calls, 1);
   } finally { f.close(); }
 });
 
@@ -98,10 +98,10 @@ test("transient failure has one call and a shared cooldown", async () => {
   const transport: typeof fetch = async () => { calls++; return new Response("{}", { status: 429 }); };
   try {
     const options = { token: "synthetic-test", fetch: transport, now: () => now };
-    assert.equal((await new JevDecisionAdapter(config, f.path, options).decide(request)).reason, "provider-error");
-    assert.equal((await new JevDecisionAdapter(config, f.path, options).decide(request)).reason, "cooldown");
+    assert.equal((await new JevDecisionAdapter(config, f.path, { coordinationRoot: (f.path) + ".coordination", ...options }).decide(request)).reason, "provider-error");
+    assert.equal((await new JevDecisionAdapter(config, f.path, { coordinationRoot: (f.path) + ".coordination", ...options }).decide(request)).reason, "cooldown");
     assert.equal(calls, 1); now += 60_001;
-    await new JevDecisionAdapter(config, f.path, options).decide(request); assert.equal(calls, 2);
+    await new JevDecisionAdapter(config, f.path, { coordinationRoot: (f.path) + ".coordination", ...options }).decide(request); assert.equal(calls, 2);
   } finally { f.close(); }
 });
 
@@ -109,23 +109,23 @@ test("invented IDs fail to baseline without losing reported billable usage", asy
   const f = temporary();
   const transport: typeof fetch = async () => new Response(JSON.stringify({ model: "jev-1.13.0", answers: { suggestion: { type: "choice", choice: "injected", confidence: 1, probabilities: { injected: 1 } } }, usage: { input_tokens: 77, output_tokens: 8 } }));
   try {
-    const result = await new JevDecisionAdapter(config, f.path, { token: "synthetic-test", fetch: transport }).decide(request);
+    const result = await new JevDecisionAdapter(config, f.path, { coordinationRoot: (f.path) + ".coordination", token: "synthetic-test", fetch: transport }).decide(request);
     assert.equal(result.reason, "invalid-or-unavailable"); assert.deepEqual(result.delivered, ["b", "a"]);
     assert.equal(result.usage.inputTokens, 77);
   } finally { f.close(); }
 });
 
-test("transport is aborted at deadline and concurrent requests immediately use baseline", async () => {
+test("transport aborts at deadline while duplicate events never dispatch twice", async () => {
   const f = temporary(); let calls = 0, aborted = false;
   const transport: typeof fetch = async (_url, init) => {
     calls++;
     return new Promise((_resolve, reject) => init!.signal!.addEventListener("abort", () => { aborted = true; reject(new Error("aborted")); }, { once: true }));
   };
   try {
-    const adapter = new JevDecisionAdapter({ ...config, deadlineMs: 30 }, f.path, { token: "synthetic-test", fetch: transport });
+    const adapter = new JevDecisionAdapter({ ...config, deadlineMs: 30 }, f.path, { coordinationRoot: (f.path) + ".coordination", token: "synthetic-test", fetch: transport });
     const first = adapter.decide(request);
     const second = await adapter.decide(request);
-    assert.equal(second.reason, "provider-busy-or-health-unavailable");
+    assert.equal(second.reason, "repeated-observation-unavailable");
     assert.equal((await first).reason, "deadline"); assert.equal(aborted, true); assert.equal(calls, 1);
   } finally { f.close(); }
 });
@@ -137,12 +137,12 @@ test("source class approval also requires explicit matching source paths before 
   try {
     for (const allowedSourcePaths of [undefined, []]) {
       const settings = { ...config, allowedDataClasses: ["source" as const], ...(allowedSourcePaths ? { allowedSourcePaths } : {}) };
-      const result = await new JevDecisionAdapter(settings, f.path, { token: "fixture", fetch: transport }).decide(sourceRequest);
+      const result = await new JevDecisionAdapter(settings, f.path, { coordinationRoot: (f.path) + ".coordination", token: "fixture", fetch: transport }).decide(sourceRequest);
       assert.equal(result.reason, "source-scope-disabled");
     }
     assert.equal(calls, 0);
     const partial = await new JevDecisionAdapter({ ...config, allowedDataClasses: ["source"], allowedSourcePaths: ["a"] }, f.path,
-      { token: "fixture", fetch: async (_url, init) => {
+      { coordinationRoot: (f.path) + ".coordination", token: "fixture", fetch: async (_url, init) => {
         calls++;
         const wire = JSON.parse(String(init?.body));
         assert.ok(!String(init?.body).includes("State transitions"), "Unapproved source text cannot reach the provider");
@@ -158,7 +158,7 @@ test("source class approval also requires explicit matching source paths before 
     assert.match(partialReceipt.outcome.coverage.limits[0], /outside approved classifier scope/);
     assert.equal(calls, 1);
     const result = await new JevDecisionAdapter({ ...config, allowedDataClasses: ["source"], allowedSourcePaths: ["a", "b"] }, f.path,
-      { token: "fixture", fetch: transport }).decide(sourceRequest);
+      { coordinationRoot: (f.path) + ".coordination", token: "fixture", fetch: transport }).decide(sourceRequest);
     assert.equal(result.method, "jev"); assert.equal(calls, 2);
   } finally { f.close(); }
 });
@@ -199,7 +199,7 @@ test("a candidate above the model count cap keeps bounded JEV advice active", as
   try {
     const result = await new JevDecisionAdapter({ ...config, allowedDataClasses: ["source"],
       allowedSourcePaths: ["docs/**"], maxCandidates: 16 }, f.path,
-    { token: "fixture", fetch: async (_url, init) => {
+    { coordinationRoot: (f.path) + ".coordination", token: "fixture", fetch: async (_url, init) => {
       calls++;
       const wire = JSON.parse(String(init?.body));
       const keys = Object.keys(wire.questions.suggestion.criteria);
@@ -228,7 +228,7 @@ test("the maximum configured candidate count reserves the purpose evidence slot"
   try {
     const result = await new JevDecisionAdapter({ ...config, allowedDataClasses: ["source"],
       allowedSourcePaths: ["docs/**"], maxCandidates: 64, evidenceBytes: 32768 }, f.path,
-    { token: "fixture", fetch: async (_url, init) => {
+    { coordinationRoot: (f.path) + ".coordination", token: "fixture", fetch: async (_url, init) => {
       calls++;
       const wire = JSON.parse(String(init?.body));
       const keys = Object.keys(wire.questions.suggestion.criteria);
@@ -252,7 +252,7 @@ test("an oversized direct request preserves baseline without incomplete omission
   try {
     const candidates = Array.from({ length: 257 }, (_, index) => ({ id: `source-${index}`,
       sourceDigest: `digest-${index}`, excerpt: "Reference\n" }));
-    const result = await new JevDecisionAdapter(config, f.path, { token: "fixture", fetch: async () => {
+    const result = await new JevDecisionAdapter(config, f.path, { coordinationRoot: (f.path) + ".coordination", token: "fixture", fetch: async () => {
       calls++; throw new Error("Unexpected provider call");
     } }).decide({ ...request, candidates });
     assert.equal(result.reason, "input-budget");
@@ -270,7 +270,7 @@ test("indivisible approved evidence does not disable JEV for its peer", async ()
   try {
     const result = await new JevDecisionAdapter({ ...config, allowedDataClasses: ["source"],
       allowedSourcePaths: ["src/*.ts"], evidenceBytes: 600 }, f.path,
-    { token: "fixture", fetch: async (_url, init) => {
+    { coordinationRoot: (f.path) + ".coordination", token: "fixture", fetch: async (_url, init) => {
       calls++;
       const wire = JSON.parse(String(init?.body));
       assert.deepEqual(Object.keys(wire.questions.suggestion.criteria), ["src/good.ts", "unknown"]);
@@ -298,7 +298,7 @@ test("unapproved baseline slots can crowd out approved advice under a tight pack
   ] };
   try {
     const adapter = new JevDecisionAdapter({ ...config, allowedDataClasses: ["source"],
-      allowedSourcePaths: ["src/*.ts"] }, f.path, { token: "fixture", fetch: async (_url, init) => {
+      allowedSourcePaths: ["src/*.ts"] }, f.path, { coordinationRoot: (f.path) + ".coordination", token: "fixture", fetch: async (_url, init) => {
       calls++;
       const keys = Object.keys(JSON.parse(String(init?.body)).questions.suggestion.criteria);
       assert.deepEqual(keys, ["src/a.ts", "src/b.ts", "unknown"]);
@@ -321,7 +321,7 @@ test("unapproved baseline slots can crowd out approved advice under a tight pack
 test("offline lexical context fallback keeps ties stable and leaves other question ordering intact", async () => {
   const f = temporary();
   try {
-    const adapter = new JevDecisionAdapter(DEFAULT_DECISIONS, f.path, { token: "", fetch: async () => { throw new Error("Unexpected network"); } });
+    const adapter = new JevDecisionAdapter(DEFAULT_DECISIONS, f.path, { coordinationRoot: (f.path) + ".coordination", token: "", fetch: async () => { throw new Error("Unexpected network"); } });
     const tied = await adapter.decide({ ...request, purpose: "unmatched phrase" });
     assert.deepEqual(tied.delivered, ["a", "b"]);
     const diagnostic = await adapter.decide({ ...request, kind: "rank_diagnostics" });
@@ -340,7 +340,7 @@ test("provider failures expose bounded stages without copying transport secrets"
   for (const [stage, transport] of transports) {
     const f = temporary();
     try {
-      const result = await new JevDecisionAdapter(config, f.path, { token: "fixture", fetch: transport }).decide(request);
+      const result = await new JevDecisionAdapter(config, f.path, { coordinationRoot: (f.path) + ".coordination", token: "fixture", fetch: transport }).decide(request);
       assert.equal(result.failureStage, stage);
       assert.equal(result.reason, "invalid-or-unavailable");
       assert.deepEqual(result.delivered, ["b", "a"]);
@@ -351,6 +351,7 @@ test("provider failures expose bounded stages without copying transport secrets"
 
 test("caller cancellation returns baseline, aborts transport and does not create outage cooldown", async () => {
   const f = temporary(); let calls = 0, aborted = false;
+  let began!: () => void; const started = new Promise<void>(resolve => { began = resolve; });
   let late: ((response: Response) => void) | undefined;
   const transport: typeof fetch = async (_url, init) => {
     calls++;
@@ -358,15 +359,16 @@ test("caller cancellation returns baseline, aborts transport and does not create
     return new Promise((resolve, reject) => {
       late = resolve;
       init!.signal!.addEventListener("abort", () => { aborted = true; reject(new Error("cancelled")); }, { once: true });
+      began();
     });
   };
   try {
-    const adapter = new JevDecisionAdapter(config, f.path, { token: "fixture", fetch: transport });
+    const adapter = new JevDecisionAdapter(config, f.path, { coordinationRoot: (f.path) + ".coordination", token: "fixture", fetch: transport });
     const before = new AbortController(); before.abort();
     assert.equal((await adapter.decide(request, { signal: before.signal })).reason, "cancelled");
     assert.equal(calls, 0);
     const active = new AbortController();
-    const pending = adapter.decide(request, { signal: active.signal }); active.abort();
+    const pending = adapter.decide(request, { signal: active.signal }); await started; active.abort();
     const cancelled = await pending;
     assert.equal(aborted, true); assert.equal(cancelled.reason, "cancelled"); assert.equal(cancelled.failureStage, undefined);
     assert.equal(cancelled.method, "baseline"); assert.equal(cancelled.suggested, null);
@@ -387,7 +389,7 @@ test("separate processes share rate-limit suppression without retaining credenti
       const config = ${JSON.stringify(config)};
       let calls = 0;
       const result = await new JevDecisionAdapter(config, process.argv[1], {
-        token: "never-persist-this-test-token", now: () => 1000, scope: { workspace: ${JSON.stringify(dirname(f.path))}, taskId: String(process.pid), taskRevision: "task@1" },
+        coordinationRoot: process.argv[1] + ".coordination", token: "never-persist-this-test-token", now: () => 1000, scope: { workspace: ${JSON.stringify(dirname(f.path))}, taskId: String(process.pid), taskRevision: "task@1" },
         fetch: async () => { calls++; return new Response("{}", { status: 429 }); }
       }).decide(${JSON.stringify(request)});
       console.log(JSON.stringify({ reason: result.reason, calls }));
@@ -399,7 +401,7 @@ test("separate processes share rate-limit suppression without retaining credenti
     };
     assert.deepEqual(invoke(), { reason: "provider-error", calls: 1 });
     assert.deepEqual(invoke(), { reason: "cooldown", calls: 0 });
-    assert.ok(!readFileSync(decisionProviderHealthPath(join(dirname(f.path), "decision-provider-health.json"), digest({ provider: "jev", model: config.model, revision: config.revision })), "utf8").includes("never-persist-this-test-token"));
+    assert.ok(!readFileSync(providerDatabasePath(f.path + ".coordination"), "utf8").includes("never-persist-this-test-token"));
   } finally { f.close(); }
 });
 
@@ -407,16 +409,16 @@ test("legacy callers need explicit scope, share the new budget and reuse the sam
   const f = temporary(); let calls = 0;
   try {
     const fetcher: typeof fetch = async () => { calls++; return response(); };
-    const absent = new SharedAdapter(config, f.path, { token: "fixture", fetch: fetcher });
+    const absent = new SharedAdapter(config, f.path, { coordinationRoot: f.path + ".coordination", token: "fixture", fetch: fetcher });
     assert.equal((await absent.decide(request)).reason, "scope-unavailable"); assert.equal(calls, 0);
     const { legacyDecisionSettings } = await import("../src/decision-settings.ts");
     const { DecisionRuntime } = await import("../src/decision-runtime.ts");
     const settings = legacyDecisionSettings(config); settings.budget.maxCalls = 1;
     const scope = { workspace: dirname(f.path), taskId: "shared-task", taskRevision: request.taskRevision };
-    const adapter = new SharedAdapter(config, f.path, { token: "fixture", fetch: fetcher, scope, settings });
+    const adapter = new SharedAdapter(config, f.path, { coordinationRoot: f.path + ".coordination", token: "fixture", fetch: fetcher, scope, settings });
     assert.equal((await adapter.decide(request)).method, "jev");
     assert.equal((await adapter.decide(request)).method, "jev"); assert.equal(calls, 1);
-    const runtime = new DecisionRuntime(settings, dirname(f.path), { token: "fixture", fetch: fetcher });
+    const runtime = new DecisionRuntime(settings, dirname(f.path), { coordinationRoot: dirname(f.path), token: "fixture", fetch: fetcher });
     const next = await runtime.ask({ consumerId: "DL03", eventId: "separate-new-runtime-event", scope,
       subject: { digest: digest("evidence"), revision: scope.taskRevision, environment: "test" },
       evidence: [{ id: "a", text: "example", sourceDigest: digest("example"), provenance: "captured", trust: "untrusted" }],

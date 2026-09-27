@@ -1,4 +1,5 @@
 import { lexicalContextOrder } from "./context-ranking.ts";
+import { CONTEXT_PATH_LIMIT, CONTEXT_PROMPT_LIMIT } from "./context-limits.ts";
 import { dirname } from "node:path";
 import { DecisionRuntime } from "./decision-runtime.ts";
 import { legacyDecisionSettings, type DecisionSettings } from "./decision-settings.ts";
@@ -9,7 +10,8 @@ import { matchesPackPath } from "./planning.ts";
 import { boundDecisionEvidence, type ExcerptCoverage } from "./decision-excerpts.ts";
 
 export type DecisionKind = "rank_optional_context" | "rank_diagnostics" | "advise_intent";
-export interface Candidate { id: string; sourceDigest: string; excerpt: string; sourceRange?: { firstLine: number; lastLine: number; totalLines: number; excerptDigest: string; complete: false } }
+export interface SourceRange { firstLine: number; lastLine: number; totalLines: number; excerptDigest: string; complete: false }
+export interface Candidate { id: string; sourceDigest: string; excerpt: string; sourceRange?: SourceRange; sourceRanges?: SourceRange[] }
 export interface DecisionRequest {
   version: 1; kind: DecisionKind; taskRevision: string; purpose: string;
   candidates: Candidate[]; dataClass: "source" | "diagnostic" | "synthetic";
@@ -52,7 +54,7 @@ export function validateDecisionConfig(config: DecisionConfig): void {
       !Number.isFinite(config.minimumConfidence) || config.minimumConfidence < 0 || config.minimumConfidence > 1) throw new Error("invalid decision bounds");
 }
 
-export interface LegacyDecisionOptions { token?: string; fetch?: typeof fetch; now?: () => number; scope?: BudgetScope | null; settings?: DecisionSettings }
+export interface LegacyDecisionOptions { token?: string; fetch?: typeof fetch; now?: () => number; coordinationRoot?: string; scope?: BudgetScope | null; settings?: DecisionSettings }
 
 /** One bounded HTTP call; health is advisory and cannot touch the critical execution transaction. */
 export class JevDecisionAdapter implements DecisionProvider {
@@ -69,10 +71,10 @@ export class JevDecisionAdapter implements DecisionProvider {
     const started = performance.now();
     request = structuredClone(request);
     if (request.version !== 1 || !KINDS.includes(request.kind)) throw new Error("unsupported decision request");
-    text(request.taskRevision, "task revision"); text(request.purpose, "purpose");
+    text(request.taskRevision, "task revision"); text(request.purpose, "purpose", CONTEXT_PROMPT_LIMIT);
     const ids = new Set<string>();
     for (const candidate of request.candidates) {
-      text(candidate.id, "candidate id", 128); text(candidate.sourceDigest, "candidate source digest");
+      text(candidate.id, "candidate id", CONTEXT_PATH_LIMIT); text(candidate.sourceDigest, "candidate source digest");
       if (candidate.id === "unknown" || ids.has(candidate.id) || typeof candidate.excerpt !== "string") throw new Error("invalid or duplicate candidate");
       ids.add(candidate.id);
     }

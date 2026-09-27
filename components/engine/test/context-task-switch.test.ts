@@ -88,7 +88,7 @@ test("slow preparation retains selection time; expired operations return local c
   assert.equal(slow.metadata?.reason, "answered"); assert.equal(calls, 1);
   assert.ok(slow.timing.preparationMs >= 5500); assert.equal(slow.timing.limitReason, null);
   const late = await contextRouteCommand(["--task", "Second implementation"], f.root, assets, undefined,
-    { operationStartedAt: performance.now() - 11000 });
+    { operationStartedAt: performance.now() - 16000 });
   assert.equal(late.ready, true); assert.equal(late.metadata?.reason, "cancelled"); assert.equal(calls, 1);
   assert.equal(late.timing.limitReason, "operation-deadline"); assert.equal(late.timing.providerCallMs, 0);
 });

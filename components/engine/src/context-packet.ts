@@ -1,6 +1,7 @@
 import { lexicalContextOrder } from "./context-ranking.ts";
 import { contextExcerpt } from "./context-excerpts.ts";
 import { canonical, digest, text } from "./core.ts";
+import { CONTEXT_PATH_LIMIT, CONTEXT_PROMPT_LIMIT } from "./context-limits.ts";
 import type { Candidate, DecisionOptions, DecisionProvider, DecisionRequest, DecisionResult } from "./decisions.ts";
 
 export interface ContextPacketRequest {
@@ -12,9 +13,9 @@ export interface ContextPacketRequest {
 /** Ranking can reorder optional evidence; it cannot remove required context or introduce source. */
 export async function buildContextPacket(input: ContextPacketRequest, provider: DecisionProvider, options: DecisionOptions = {}) {
   input = structuredClone(input);
-  text(input.taskRevision, "task revision"); text(input.purpose, "purpose", 16000);
+  text(input.taskRevision, "task revision"); text(input.purpose, "purpose", CONTEXT_PROMPT_LIMIT);
   for (const candidate of [...input.required, ...input.optional]) {
-    text(candidate.id, "context candidate id", 128); text(candidate.sourceDigest, "context source digest");
+    text(candidate.id, "context candidate id", CONTEXT_PATH_LIMIT); text(candidate.sourceDigest, "context source digest");
     if (typeof candidate.excerpt !== "string") throw new Error("invalid context source text");
   }
   if (!Number.isSafeInteger(input.maximumBytes) || input.maximumBytes < 1) throw new Error("invalid context byte budget");
@@ -68,6 +69,7 @@ export async function buildContextPacket(input: ContextPacketRequest, provider: 
   }
   return { version: 1 as const, taskRevision: input.taskRevision, inputDigest: digest(input),
     entries: selected, omitted, omissionReasons, bytes: bytes(selected), decision, reason,
-    measurement: { excerpts: selected.filter(entry => entry.sourceRange).map(entry => ({ id: entry.id, sourceDigest: entry.sourceDigest, ...entry.sourceRange! })), availableOptionalBytes: bytes(input.optional), deliveredBytes: bytes(selected),
+    measurement: { excerpts: selected.filter(entry => entry.sourceRange || entry.sourceRanges).map(entry => ({ id: entry.id, sourceDigest: entry.sourceDigest,
+      ...entry.sourceRange, ...(entry.sourceRanges ? { ranges: entry.sourceRanges } : {}) })), availableOptionalBytes: bytes(input.optional), deliveredBytes: bytes(selected),
       tokenSavings: null, benefit: "not-evaluated" as const } };
 }

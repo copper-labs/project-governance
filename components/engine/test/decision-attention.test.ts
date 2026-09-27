@@ -47,17 +47,17 @@ test("attention only assesses a native-bound residual once and never changes del
     return Response.json({ model: payload.model, answers: { attention: { type: "choice", choice: "covered-by-active-procedure", confidence: 1,
       probabilities: Object.fromEntries(keys.map(key => [key, key === "covered-by-active-procedure" ? 1 : 0])) } } });
   }) as typeof fetch;
-  const runtime = new DecisionRuntime(settings, join(root, "state"), { token: "fixture", fetch: fetcher });
+  const runtime = new DecisionRuntime(settings, join(root, "state"), { coordinationRoot: join(root, "state"), token: "fixture", fetch: fetcher });
   assert.equal((await attentionAdvice(runtime, native, null, scope)).eligible, 0); assert.equal(calls, 0);
   const first = await attentionAdvice(runtime, native, envelope, scope);
   assert.equal(first.delivered, true); assert.equal(first.actualAvoidedTurns, null);
   assert.equal((await attentionAdvice(runtime, native, { ...envelope, procedure: "different ongoing procedure" }, scope)).unassessed, 1);
   assert.equal(calls, 1); assert.deepEqual(store.read(initial.id), native.run);
   assert.equal((await attentionAdvice(runtime, { ...native, run: { ...native.run, state: "failed" } }, envelope, scope)).reason, "protected-state");
-  const shadow = new DecisionRuntime({ ...settings, mode: "shadow" }, join(root, "shadow"), { token: "fixture", fetch: fetcher });
+  const shadow = new DecisionRuntime({ ...settings, mode: "shadow" }, join(root, "shadow"), { coordinationRoot: join(root, "shadow"), token: "fixture", fetch: fetcher });
   const projection = await attentionAdvice(shadow, native, envelope, scope);
   assert.equal(projection.delivered, false); assert.equal(projection.disposition, null); assert.equal(projection.reason, "shadow");
-  const noToken = new DecisionRuntime(settings, join(root, "off"), { token: "", fetch: fetcher });
+  const noToken = new DecisionRuntime(settings, join(root, "off"), { coordinationRoot: join(root, "off"), token: "", fetch: fetcher });
   const unavailable = await attentionAdvice(noToken, native, envelope, scope);
   assert.equal(unavailable.reason, "missing-token"); assert.equal(unavailable.unassessed, 1);
   assert.equal((await attentionAdvice(shadow, native, envelope, scope)).unassessed, 0);

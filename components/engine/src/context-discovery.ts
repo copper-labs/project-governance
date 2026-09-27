@@ -1,4 +1,5 @@
 import { posix } from "node:path";
+import { CONTEXT_PATH_LIMIT } from "./context-limits.ts";
 import { repositoryMap } from "./repository-map.ts";
 import { safeSubjectPath, type ValidationSubject } from "./change-subject.ts";
 
@@ -19,7 +20,7 @@ export function discoverContext(subject: ValidationSubject, seeds: string[], max
   const terms = new Set(seeds.flatMap(path => posix.basename(path).toLowerCase().split(/[^a-z0-9]+/u)).filter(term => term.length > 2));
   const owners = new Set(map.owners);
   const candidates = [...new Set([...direct, ...related].map(pkg => pkg.manifest).concat(map.documents, map.tests))]
-    .filter(path => !seeds.includes(path) && !owners.has(path) && path.length <= 128 && scope.some(root => contains(root, path)))
+    .filter(path => !seeds.includes(path) && !owners.has(path) && Buffer.byteLength(path) <= CONTEXT_PATH_LIMIT && scope.some(root => contains(root, path)))
     .map(path => ({ path, score: [...terms].filter(term => path.toLowerCase().includes(term)).length + (direct.some(pkg => pkg.manifest === path) ? 1 : 0) }))
     .sort((a, b) => b.score - a.score || a.path.localeCompare(b.path));
   return { paths: candidates.slice(0, maximum).map(item => item.path), omittedCount: Math.max(0, candidates.length - maximum),

@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-07-05
-updated: 2026-09-25
+updated: 2026-09-27
 summary: Entry point for the reusable, package-based project governance runtime.
 ---
 
@@ -115,7 +115,13 @@ and refresh context after explicit task changes while preserving history and spe
 The [RC8 hook and context repair](specs/engine-rc8-hook-sources.md) and its
 [delivery plan](exec-plans/active/2026-09-25-rc8-hook-sources.md) account for Codex loading linked
 worktree hook definitions from the main checkout, remove expensive repository preparation and
-check required-context budgets across routes. The
+check required-context budgets across routes. The accepted
+[RC9 context quality and parallel selection contract](specs/engine-rc9-parallel-context.md) and
+[implementation plan](exec-plans/active/2026-09-27-rc9-parallel-context.md) define metadata/prompt
+repairs, useful passage delivery, real-repository scenarios, fuller JEV batches, bounded concurrent
+requests, shared local rate admission and a 15-second total retrieval budget.
+RC9 source implementation is complete; release qualification remains open on a measured ranking
+regression. These documents do not change installed RC8 behavior. The
 [computer-use research](research/2026-09-25-jev-computer-use.md) evaluates optional JEV action
 selection without declaring another executor part of the release.
 The [repository-index research](research/2026-09-25-repository-index-harness-practices.md) compares

@@ -1,7 +1,7 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
-import { mkdtempSync, realpathSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, realpathSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir, hostname } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -25,7 +25,16 @@ function fixture(t: { after: (fn: () => void) => void }, count = 2, mode = "off"
   const root = realpathSync(mkdtempSync(join(tmpdir(), "diagnostic-"))), database = join(root, "ledger.sqlite");
   const continuity = new Store(database), store = new WorkflowStore(database), policy = defaultPolicy();
   const task = continuity.createTask("diagnose a failed test", [{ kind: "scope", provenance: "operator", body: root }]);
-  t.after(() => { store.close(); continuity.close(); rmSync(root, { recursive: true, force: true }); });
+  t.after(async () => {
+    // A terminal workflow precedes the worker/guardian's final writes. Retain their files until exit.
+    const owners = readdirSync(root, { recursive: true }).filter(path => /(?:^|\/)(?:owner|guardian)\.json$/u.test(String(path)))
+      .map(path => JSON.parse(readFileSync(join(root, String(path)), "utf8")));
+    const until = performance.now() + 5000;
+    const alive = () => owners.some(owner => processFingerprint(owner.pid) === owner.fingerprint);
+    while (alive() && performance.now() < until) await new Promise(resolve => setTimeout(resolve, 50));
+    assert.equal(alive(), false, `Retain diagnostic evidence while recorded writers are alive: ${root}`);
+    store.close(); continuity.close(); rmSync(root, { recursive: true, force: true });
+  });
   const operations = Object.fromEntries(["parent", ...Array.from({ length: count }, (_, i) => `probe-${i}`)].map(id => [id,
     { argv: [process.execPath, "-e", `console.log(${JSON.stringify(id)})`], cwd: root, effect: "read" }]));
   durableJson(join(root, "config/governance/operations.json"), { version: 1, operations });

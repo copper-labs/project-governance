@@ -13,7 +13,7 @@ test("legitimate changes produce no invented concern and unknown answers remain 
   const settings = profileDecisionSettings({ continuity: { decisions: { mode: "auto", allowed_data_classes: ["source"], allowed_source_paths: ["**"],
     consumers: { DL01: { mode: "auto" }, DL02: { mode: "auto" } } } } });
   let unknown = false;
-  const runtime = new DecisionRuntime(settings, root, { token: "fixture", fetch: async (_url, init) => {
+  const runtime = new DecisionRuntime(settings, root, { coordinationRoot: root, token: "fixture", fetch: async (_url, init) => {
     const payload = JSON.parse(String(init?.body));
     return Response.json({ model: settings.legacy.model, answers: Object.fromEntries(Object.keys(payload.questions).map((name, index) =>
       [name, unknown ? { type: "noul", noul: null } : { type: "noul", noul: index === 0 || index === 3 ? 0.95 : 0.05 }])) });
@@ -48,7 +48,7 @@ test("opted-in requirement questions share captured setup and preserve unknown a
     DL01: { mode: "auto", questions: ["test.requirement-support/1"] }, DL02: { mode: "auto", questions: ["change.requirement-support/1"] },
   } } } });
   let calls = 0;
-  const runtime = new DecisionRuntime(settings, root, { token: "fixture", fetch: async (_url, init) => {
+  const runtime = new DecisionRuntime(settings, root, { coordinationRoot: root, token: "fixture", fetch: async (_url, init) => {
     calls++;
     const payload = JSON.parse(String(init?.body));
     assert.equal(Object.keys(payload.questions).length, 2);

@@ -17,7 +17,7 @@ test("repeat reuse binds evidence and configuration, and disabled polls cannot d
     calls++;
     return Response.json({ model: settings.legacy.model, answers: { q1: { type: "noul", noul: 0.9 } } });
   };
-  const runtime = new DecisionRuntime(settings, root, { token: "test-only", fetch: fetcher });
+  const runtime = new DecisionRuntime(settings, root, { coordinationRoot: root, token: "test-only", fetch: fetcher });
   const ask: DecisionAsk = { consumerId: "DL03", eventId: "event", scope: { workspace: root, taskId: "task", taskRevision: "r1" },
     subject: { digest: digest("source"), revision: "r1", environment: "test" },
     evidence: [{ id: "source", text: "example", sourceDigest: digest("example"), provenance: "captured", trust: "untrusted" }],
@@ -28,7 +28,7 @@ test("repeat reuse binds evidence and configuration, and disabled polls cannot d
   assert.equal((await runtime.ask(ask)).reason, "repeated-observation");
   const alias = join(root, "alias"); symlinkSync(root, alias);
   assert.equal((await runtime.ask({ ...ask, scope: { ...ask.scope!, workspace: alias } })).reason, "repeated-observation");
-  const off = new DecisionRuntime({ ...settings, mode: "off" }, root, { token: "test-only", fetch: fetcher });
+  const off = new DecisionRuntime({ ...settings, mode: "off" }, root, { coordinationRoot: root, token: "test-only", fetch: fetcher });
   assert.equal((await off.ask(ask)).delivered, false);
   assert.equal((await runtime.ask(ask)).delivered, true);
   const changed = await runtime.ask({ ...ask, policyDigest: digest("new-policy") });
@@ -39,7 +39,7 @@ test("repeat reuse binds evidence and configuration, and disabled polls cannot d
   assert.equal(missingPaths.reason, "source-scope-disabled");
   assert.equal(calls, 1);
   let failures = 0;
-  const failing = new DecisionRuntime(settings, root, { token: "test-only", fetch: async () => { failures++; return new Response("unavailable", { status: 500 }); } });
+  const failing = new DecisionRuntime(settings, root, { coordinationRoot: root, token: "test-only", fetch: async () => { failures++; return new Response("unavailable", { status: 500 }); } });
   assert.equal((await failing.ask({ ...ask, eventId: "failure" })).reason, "provider-error");
   const beforeCooldown = readDecisionBudget(root, ask.scope!);
   assert.equal((await failing.ask({ ...ask, eventId: "cooldown-event" })).reason, "cooldown");
@@ -56,7 +56,7 @@ test("invalid answers never count as delivered and rejected envelopes retain nat
     coverage: { captured: 1, omitted: [], truncated: false, unavailable: [], limits: [] },
     questions: [{ name: "q", definitionId: "context.relevance/1", consumerId: "DL03", evidenceIds: ["source"] }], sourcePaths: ["src/x"], policyDigest: digest("policy") };
   for (const model of [settings.legacy.model, "wrong-model"]) {
-    const runtime = new DecisionRuntime(settings, root, { token: "test-only", fetch: async () => Response.json({ model, answers: {}, usage: { input_tokens: 77, output_tokens: 8 } }) });
+    const runtime = new DecisionRuntime(settings, root, { coordinationRoot: root, token: "test-only", fetch: async () => Response.json({ model, answers: {}, usage: { input_tokens: 77, output_tokens: 8 } }) });
     const result = await runtime.ask({ ...ask, eventId: model });
     assert.equal(result.delivered, false); assert.equal(result.method, "baseline");
     assert.deepEqual(result.usage, { inputTokens: 77, outputTokens: 8 });
@@ -72,7 +72,7 @@ test("observation capability stays advisory and incompatible entries never reach
   settings.consumers.DL05.effect = "choose-read";
   settings.consumers.DL05.effectSource = "declared";
   let calls = 0;
-  const runtime = new DecisionRuntime(settings, root, { token: "test-only", fetch: async () => {
+  const runtime = new DecisionRuntime(settings, root, { coordinationRoot: root, token: "test-only", fetch: async () => {
     calls++;
     return Response.json({ model: settings.legacy.model, answers: { probe: { type: "choice", choice: "logs", confidence: 0.9, probabilities: { logs: 0.9, unknown: 0.1 } } } });
   } });

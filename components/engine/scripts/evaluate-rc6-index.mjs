@@ -16,6 +16,7 @@ const { DecisionRuntime } = await load('decision-runtime.ts');
 const { profileDecisionSettings } = await load('decision-settings.ts');
 const { digest } = await load('core.ts');
 const { readDecisionBudget, decisionBudgetStoreStatus } = await load('decision-budget.ts');
+const { CONTEXT_SELECTION_MS } = await load('context-timing.ts');
 const root = mkdtempSync(join(tmpdir(), 'rc6-full-index-eval-'));
 try {
   const git = (...args) => execFileSync('git', args, { cwd: root, stdio: 'pipe' });
@@ -39,11 +40,12 @@ try {
       evidence_bytes: 16384, deadline_ms: 1000, budget: { max_calls: 256, max_request_bytes: 4194304 },
       consumers: { DL03: { mode: 'auto', questions: ['context.metadata-relevance/1'] } },
     } } });
-    const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 3500), start = performance.now();
+    const start = performance.now(), deadline = start + CONTEXT_SELECTION_MS;
+    const controller = new AbortController(), timeout = setTimeout(() => controller.abort('context-selection-deadline'), CONTEXT_SELECTION_MS);
     let result;
     try { result = await selectContextMetadata(subject, catalog, purpose,
       new DecisionRuntime(settings, join(root, 'state'), { token: live ? process.env.JEV_TOKEN : '', signal: controller.signal }),
-      { workspace: root, taskId, taskRevision: '1' }, scope.subject_digest ?? digest('fixture'), `${mode}-${turn}`, controller.signal); }
+      { workspace: root, taskId, taskRevision: '1' }, scope.subject_digest ?? digest('fixture'), `${mode}-${turn}`, controller.signal, deadline); }
     finally { clearTimeout(timeout); }
     for (const path of result.assessed) seen.add(path);
     results.push({ mode, turn, eligible: catalog.eligibleCount, deterministicRank: catalog.candidates.findIndex(item => item.path === expected) + 1,

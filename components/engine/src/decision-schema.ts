@@ -1,4 +1,12 @@
 import { canonical, digest, object, text } from "./core.ts";
+import { CONTEXT_PATH_LIMIT } from "./context-limits.ts";
+
+/** Only the registered independent metadata questions receive the larger group allowance. */
+export const METADATA_MAX_QUESTIONS = 256;
+export function metadataQuestionGroup(consumerId: string, questions: QuestionInstance[]): boolean {
+  return consumerId === "DL03" && Array.isArray(questions) && questions.length > 0 &&
+    questions.every(question => question.consumerId === "DL03" && question.definitionId === "context.metadata-relevance/1");
+}
 
 /** One schema owner for the expanded decision contract; every validator below derives from it. */
 export const DECISION_SCHEMA_VERSION = 2;
@@ -41,7 +49,7 @@ export interface QuestionInstance {
 export interface DecisionRequest2 {
   schemaVersion: typeof DECISION_SCHEMA_VERSION; requestId: string;
   /** Explicit versioned layout; old question-local payloads retain their exact identity. */
-  evidenceLayout?: "shared-v1";
+  evidenceLayout?: "shared-v1" | "per-question-v1";
   /** Bind caller capability into request reuse without transmitting it as model authority. */
   entryKind?: string;
   /** Accounting owner of the request. `consumers` lists every participant in a compatible batch. */
@@ -77,8 +85,8 @@ export function decisionConsumerId(value: unknown): DecisionConsumerId {
 /** Structural validation of a prepared request; callers cannot invent questions, IDs or budgets. */
 export function validateDecisionRequest(request: DecisionRequest2, definitions: Record<string, QuestionDefinition>): void {
   if (request.schemaVersion !== DECISION_SCHEMA_VERSION) throw new Error("Unsupported decision schema version");
-  if (request.evidenceLayout !== undefined && (request.evidenceLayout !== "shared-v1" || request.consumerId !== "DL03" ||
-      request.questions.some(question => question.definitionId !== "context.metadata-relevance/1"))) throw new Error("Unsupported shared evidence layout");
+  const metadata = metadataQuestionGroup(request.consumerId, request.questions);
+  if (request.evidenceLayout !== undefined && (!["shared-v1", "per-question-v1"].includes(request.evidenceLayout) || !metadata)) throw new Error("Unsupported shared evidence layout");
   text(request.requestId, "decision request id", 64);
   decisionConsumerId(request.consumerId);
   if (!Array.isArray(request.consumers) || !request.consumers.length || request.consumers.length > DECISION_CONSUMER_IDS.length ||
@@ -91,10 +99,10 @@ export function validateDecisionRequest(request: DecisionRequest2, definitions: 
   for (const key of ["digest", "revision", "environment"] as const) text(request.subject[key], `decision subject ${key}`, 256);
   for (const key of ["policyDigest", "configDigest"] as const) text(request[key], `decision ${key}`, 256);
   if (request.eligibilityDigest !== null) text(request.eligibilityDigest, "eligibility digest", 256);
-  if (!Array.isArray(request.evidence) || !request.evidence.length || request.evidence.length > 64) throw new Error("Decision evidence must be 1..64 bounded items");
+  if (!Array.isArray(request.evidence) || !request.evidence.length || request.evidence.length > (metadata ? METADATA_MAX_QUESTIONS + 1 : 64)) throw new Error("Decision evidence exceeds bounded group items");
   const evidenceIds = new Set<string>();
   for (const item of request.evidence) {
-    text(item.id, "evidence id", 128); text(item.sourceDigest, "evidence source digest", 256);
+    text(item.id, "evidence id", CONTEXT_PATH_LIMIT); text(item.sourceDigest, "evidence source digest", 256);
     if (evidenceIds.has(item.id)) throw new Error("Duplicate decision evidence id");
     if (typeof item.text !== "string") throw new Error("Decision evidence text must be a string");
     if (!["captured", "supplied", "derived"].includes(item.provenance) || !["trusted", "untrusted"].includes(item.trust)) throw new Error("Invalid decision evidence provenance or trust class");
@@ -117,7 +125,7 @@ export function validateDecisionRequest(request: DecisionRequest2, definitions: 
     if (definition.shape === "choice") {
       const supplied = question.candidates ?? [];
       if (!supplied.length || supplied.length + 1 > request.budget.maxCandidates || supplied.length + 1 > 255) throw new Error("Choice candidates exceed the declared bound");
-      const ids = new Set(supplied.map(candidate => text(candidate.id, "choice candidate id", 128)));
+      const ids = new Set(supplied.map(candidate => text(candidate.id, "choice candidate id", CONTEXT_PATH_LIMIT)));
       for (const candidate of supplied) text(candidate.description, "choice description", 4000);
       if (ids.size !== supplied.length || ids.has("unknown")) throw new Error("Choice candidates must be unique and reserve the unknown option");
       if (definition.options && (ids.size !== definition.options.length || definition.options.some(id => !ids.has(id)))) throw new Error("Choice candidates differ from the registered vocabulary");
@@ -126,7 +134,7 @@ export function validateDecisionRequest(request: DecisionRequest2, definitions: 
   }
   const budget = request.budget;
   if (!Number.isSafeInteger(budget.deadlineMs) || budget.deadlineMs < 1 || budget.deadlineMs > 30_000 ||
-      !Number.isSafeInteger(budget.maxQuestions) || budget.maxQuestions < 1 || budget.maxQuestions > 64 ||
+      !Number.isSafeInteger(budget.maxQuestions) || budget.maxQuestions < 1 || budget.maxQuestions > (metadata ? METADATA_MAX_QUESTIONS : 64) ||
       !Number.isSafeInteger(budget.maxRequestBytes) || budget.maxRequestBytes < 1 || budget.maxRequestBytes > 131_072 ||
       !Number.isSafeInteger(budget.maxCandidates) || budget.maxCandidates < 2 || budget.maxCandidates > 255 ||
       !Number.isSafeInteger(budget.tokenEstimate) || budget.tokenEstimate < 0) throw new Error("Invalid decision request budget");
@@ -145,6 +153,9 @@ export function decisionPayload(request: DecisionRequest2, definitions: Record<s
     // The API accepts structured instructions; arbitrary sibling evidence fields are not its contract.
     const base = { instructions: request.evidenceLayout === "shared-v1"
       ? { question: definition.instructions, evidenceIds: question.evidenceIds }
+      : request.evidenceLayout === "per-question-v1"
+      ? { question: definition.instructions, evidenceIds: question.evidenceIds,
+        evidence: question.evidenceIds.filter(id => id !== "purpose").map(id => byId.get(id)) }
       : { question: definition.instructions, evidence } };
     if (definition.shape === "choice") {
       const criteria: Record<string, { evidence: string; provenance?: string; trust?: string }> = {};
@@ -157,7 +168,8 @@ export function decisionPayload(request: DecisionRequest2, definitions: Record<s
       questions[question.name] = { ...base, type: "score", criteria: [...definition.levels!] };
     }
   }
-  return { model, state: { ...(request.evidenceLayout === "shared-v1" ? { layout: "shared-v1", evidence: request.evidence } : {}),
+  return { model, state: { ...(request.evidenceLayout ? { layout: request.evidenceLayout,
+      evidence: request.evidenceLayout === "shared-v1" ? request.evidence : request.evidence.filter(item => item.id === "purpose") } : {}),
     consumer: request.consumerId, consumers: [...request.consumers].sort(), consumerVersion: request.consumerVersion,
     coverage: { captured: request.coverage.captured, omitted: request.coverage.omitted.length,
       unavailable: request.coverage.unavailable.length, truncated: request.coverage.truncated } }, questions };

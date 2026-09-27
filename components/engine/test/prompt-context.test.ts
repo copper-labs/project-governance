@@ -78,10 +78,13 @@ test("oversized required context is a blocker, never silently truncated guidance
   assert.equal(bounded.status, "prepared"); assert.ok(Buffer.byteLength(bounded.text) <= 24000);
   assert.equal("historyDelivered" in bounded && bounded.historyDelivered, false);
   packet.entries[0].content = "required";
-  packet.metadata = { coverage: { attempted: true, complete: false, answeredCount: 63, eligibleCount: 500, notPermittedCount: 20, unavailableCount: 1, unassessedCount: 416, reason: "budget-exhausted" } };
+  packet.metadata = { coverage: { attempted: true, complete: false, answeredCount: 63, eligibleCount: 500, permittedCount: 479, notPermittedCount: 20, unavailableCount: 1, unassessedCount: 416, reason: "budget-exhausted" } };
   const partial = renderPromptContext(packet, { state: "ready", candidates: [], inspected: 0, omissions: [] }, "entry");
-  assert.match(partial.text, /coverage is incomplete: 63\/500/);
+  assert.match(partial.text, /coverage is incomplete: 63\/479/);
   assert.match(partial.text, /Missing matches are not proof of absence/);
+  packet.metadata.coverage = { ...packet.metadata.coverage, attempted: false, reason: "input-budget" };
+  assert.match(renderPromptContext(packet, { state: "ready", candidates: [], inspected: 0, omissions: [] }, "entry").text, /could not fit this request/);
+  packet.metadata.coverage.attempted = true;
   packet.metadata.coverage.mode = "shadow";
   assert.match(renderPromptContext(packet, { state: "ready", candidates: [], inspected: 0, omissions: [] }, "entry").text, /Shadow results were not applied/);
   packet.metadata.coverage = { attempted: true, complete: true, answeredCount: 10, mode: "shadow", applied: false };

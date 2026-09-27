@@ -5,7 +5,7 @@ type: spec
 status: draft
 owner: project-governance
 created: 2026-09-20
-updated: 2026-09-21
+updated: 2026-09-27
 summary: Proposed typed decision layer for recurring development judgments, with bounded automation, immediate fallback, and outcome-based qualification.
 ---
 
@@ -368,6 +368,12 @@ tokenizer or conservative estimator with headroom, as well as product byte limit
 estimates. Per-definition higher option limits, such as a bounded line-ID lookup, need their own
 quality/budget proof; do not raise every interactive consumer's ceiling. Recheck vendor limits when
 the pinned model changes rather than treating these numbers as permanent product policy.
+
+The accepted [RC9 parallel selection amendment](engine-rc9-parallel-context.md) replaces the
+network-long health lock with short shared provider-admission transactions and bounded concurrent
+calls. It also raises only the registered metadata group's count ceiling within the existing
+profile, wire and token bounds. Its implementation is pending. The existing task/family budget
+remains the sole paid-expenditure owner; provider pacing does not create fresh spending authority.
 
 Reuse current cancellation and cross-process health suppression. Suppress repeated auth failures,
 honor bounded cooldowns, and do not let a busy provider block the baseline. A transport deadline ends
