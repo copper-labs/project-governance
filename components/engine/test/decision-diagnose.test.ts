@@ -39,7 +39,8 @@ function fixture(t: { after: (fn: () => void) => void }, count = 2, mode = "off"
     { argv: [process.execPath, "-e", `console.log(${JSON.stringify(id)})`], cwd: root, effect: "read" }]));
   durableJson(join(root, "config/governance/operations.json"), { version: 1, operations });
   durableJson(join(root, "config/governance/profile.yaml"), { continuity: { decisions: { mode, allowed_data_classes: ["diagnostic"], consumers: { DL05: { mode, effect } } } } });
-  const rawRecipe = (id: string) => ({ version: 1, id, workspace: root, inputs: [], resources, stages: [{ id: "read", operation: id, deadlineMs: 2000 }], deadlineMs: 4000, policyRevision: policy.revision, claims: [] });
+  // These fixtures test diagnostic authority and probe count; explicit deadline cases override the manifest below.
+  const rawRecipe = (id: string) => ({ version: 1, id, workspace: root, inputs: [], resources, stages: [{ id: "read", operation: id, deadlineMs: 10000 }], deadlineMs: 15000, policyRevision: policy.revision, claims: [] });
   const grant = (id: string, operationId: string) => {
     const request = { operation: "check" as const, scope: [root], targets: [], destination: null, policyRevision: policy.revision };
     const action = authorizeAction(continuity, proposeAction(continuity, task.taskId, request), request, policy, root), recipe = resolveWorkflowRecipe(rawRecipe(id));
@@ -54,7 +55,7 @@ function fixture(t: { after: (fn: () => void) => void }, count = 2, mode = "off"
     const probeId = `probe-${i}`, binding = grant(probeId, diagnosticOperationId(id, probeId));
     return { id: probeId, description: `Inspect ${i}`, recipe: rawRecipe(probeId), binding: { actionId: binding.actionId, authorityRef: binding.authorityRef, operationId: binding.operationId } };
   });
-  const manifest = { version: 1, parentRunId: parent.id, stageId: "read", deadline: Date.now() + 20000, target: { kind: "workspace", id: root }, probes,
+  const manifest = { version: 1, parentRunId: parent.id, stageId: "read", deadline: Date.now() + 60000, target: { kind: "workspace", id: root }, probes,
     baseline: { revision: "runbook-1", probeOrder: probes.slice(0, 3).map(probe => probe.id) } };
   const options = { workersDirectory: join(root, "workers"), registryPath: join(root, "resources.sqlite"), token: "" };
   return { root, database, store, manifest, options, parent: failed, task, continuity };

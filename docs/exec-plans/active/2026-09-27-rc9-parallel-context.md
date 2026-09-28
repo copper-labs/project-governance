@@ -304,6 +304,11 @@ engine tests with bounded file concurrency, 73 continuity tests, four script tes
 clean offline installed-archive proof. Default-concurrency local macOS runs exposed short-timer
 flakiness outside the corrected process path; the affected cases passed in isolation. The full
 amd64-emulated Linux run overloaded 21 short-timer cases, so it is diagnostic rather than release
-proof. The tagged native Linux workflow, source sign-off and exact release readback remain open.
+proof. The third tagged native Linux workflow passed the legacy Python and wheel checks, then
+failed one diagnostic fixture in the default-concurrency Node suite: a child read stopped before
+the fixture reached its three-probe cap. That same case passes alone on Linux. The engine test
+runner now bounds file concurrency, and that fixture has enough execution time for the three-read
+authority claim; separate explicit deadline tests keep their short budgets. A new source sign-off,
+tagged native Linux run and exact release readback remain open.
 Keep failed development results intact. All identities, source copies, review audits and results
 remain outside this checkout. No adopter upgrade or publication has occurred.
