@@ -287,13 +287,20 @@ test("every metadata caller has one overall deadline even without a prompt hook 
   assert.equal(next.reason, "answered", "A normal retrieval cutoff must not put the provider into cooldown");
 });
 
-test("metadata provider timeouts remain effective with a longer configured deadline", async t => {
-  const root = mkdtempSync(join(tmpdir(), "context-provider-timeout-")); t.after(() => rmSync(root, { recursive: true, force: true }));
+test("metadata can use the caller's remaining allowance beyond one second without suppressing the next call", { timeout: 5000 }, async t => {
+  const root = mkdtempSync(join(tmpdir(), "context-provider-allowance-")); t.after(() => rmSync(root, { recursive: true, force: true }));
   const catalog = contextMetadataCatalog(["src/0.ts"], "find", [], [], new Set()), scope = { workspace: root, taskId: "task", taskRevision: "1" };
   let calls = 0;
-  const runtime = new DecisionRuntime(settings({ deadline_ms: 5000 }), root, { coordinationRoot: root, token: "fixture", fetch: async () => { calls++; return new Promise(() => {}); } });
-  const first = await selectContextMetadata(subject, catalog, "find", runtime, scope, digest("source"), "first");
-  assert.equal(first.reason, "deadline"); assert.equal(first.decisions[0]?.failureStage, "transport");
-  const next = await selectContextMetadata(subject, catalog, "find", runtime, scope, digest("source"), "second");
-  assert.equal(next.reason, "cooldown"); assert.equal(calls, 1);
+  const runtime = new DecisionRuntime(settings({ deadline_ms: 1000 }), root, { coordinationRoot: root, token: "fixture", fetch: async () => {
+    calls++;
+    if (calls === 1) await new Promise(resolve => setTimeout(resolve, 1150));
+    return Response.json({ model: "jev-1.13.0", answers: { "file-0": { type: "noul", noul: 0.9 } } });
+  } });
+  const first = await selectContextMetadata(subject, catalog, "find", runtime, scope, digest("source"), "first",
+    undefined, performance.now() + 3000);
+  assert.equal(first.reason, "answered"); assert.equal(first.coverage.answeredCount, 1);
+  assert.ok((first.decisions[0]?.transport?.httpMs ?? 0) > 1000);
+  const next = await selectContextMetadata(subject, catalog, "find", runtime, scope, digest("source"), "second",
+    undefined, performance.now() + 3000);
+  assert.equal(next.reason, "answered"); assert.equal(calls, 2);
 });

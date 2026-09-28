@@ -15,7 +15,7 @@ test('release refuses mismatched versions, source identity and destination', () 
 });
 
 test('RC identity is explicit and cannot become a stable automatic upgrade', () => {
- for (const tag of ['3.0.0-rc.1', '3.1.0-rc.12']) {
+ for (const tag of ['3.0.0-rc.1', '3.0.0-rc.9.1', '3.1.0-rc.12']) {
   const original = input();
   const result = releaseAssets({ ...original, tag, manifest: { ...original.manifest, version: tag }, archiveName: `organta-project-governance-${tag}.tgz` });
   assert.equal(JSON.parse(result.lockText).version, tag);

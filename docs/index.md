@@ -120,6 +120,9 @@ check required-context budgets across routes. The accepted
 [implementation plan](exec-plans/active/2026-09-27-rc9-parallel-context.md) define metadata/prompt
 repairs, useful passage delivery, real-repository scenarios, fuller JEV batches, bounded concurrent
 requests, shared local rate admission and a 30-second total retrieval budget.
+The [RC9.1 context deadline correction](specs/engine-rc9-1-context-deadlines.md) and its
+[delivery plan](exec-plans/active/2026-09-28-rc9-1-context-deadlines.md) remove RC9's redundant
+one-second JEV request cap while retaining the 30-second operation limit and fallback.
 RC9 is published as an immutable prerelease. Frozen development cases confirm a corrected ranking
 regression, while fresh cases expose remaining coverage and passage limits. Adopters remain on
 their pinned runtimes until deliberately upgraded. The

@@ -8,6 +8,7 @@ import { matchesPackPath } from "./planning.ts";
 import { DECISION_CONSUMERS, DECISION_QUESTIONS } from "./decision-catalog.ts";
 import { reserveDecisionCall, closeDecisionScope, contextBudgetScope, contextFamilyScope, type BudgetScope, type BudgetReservation } from "./decision-budget.ts";
 import { JevDecisionClient, decisionCancellationReason, type TransportOptions, type TransportTiming } from "./decision-transport.ts";
+import { CONTEXT_OPERATION_MS } from "./context-timing.ts";
 import { resolveConsumerMode, type DecisionSettings } from "./decision-settings.ts";
 import {
   decisionNativeUsage, parseDecisionEnvelope, requestIdentity,
@@ -220,9 +221,9 @@ export class DecisionRuntime {
         receiptId: key, latencyMs: performance.now() - started };
     // The reservation identity is the consumer-group event key, so one event cannot be spent twice.
     let admittedReservation: BudgetReservation | undefined;
-    // A metadata batch must get a genuine provider timeout before the larger retrieval allowance.
-    const providerDeadline = metadata || passage ? Math.min(this.settings.legacy.deadlineMs, 1000) : this.settings.legacy.deadlineMs;
-    const deadlineAt = ask.deadlineAt ?? started + this.settings.legacy.deadlineMs;
+    // Context selection has one operation deadline, including calls without an explicit caller cutoff.
+    const providerDeadline = metadata || passage ? CONTEXT_OPERATION_MS : this.settings.legacy.deadlineMs;
+    const deadlineAt = ask.deadlineAt ?? started + providerDeadline;
     if (performance.now() >= deadlineAt) return fallback("deadline", { requestIdentity: identity });
     const transport = await this.#client.ask(body, providerDeadline, signal, () => {
       const budgetScope = ask.budgetFamily ? contextFamilyScope(ask.scope!.workspace, ask.budgetInvocationId!)
