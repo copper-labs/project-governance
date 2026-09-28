@@ -291,9 +291,19 @@ exposed a startup HTTP deadline race outside the retrieval changes: the local ti
 pending call while its provider error was reported as an ordinary abort. The runtime now names that
 deadline consistently and retains the underlying error for diagnosis. A loaded local suite also
 exposed a duplicate-event test whose 30-millisecond timer could expire before its assertion; the
-test now grants one second while retaining its single-dispatch and timeout checks. The corrected
-full suite, typecheck and clean installed-archive proof pass. A narrow Claude Opus 5.5 medium review
-found no blocking deadline defect. Source sign-off, the corrected commit and tagged workflow rerun
-remain before release readback.
+test now grants one second while retaining its single-dispatch and timeout checks. That corrected
+local candidate passed its full suite, typecheck and clean installed-archive proof, and a narrow
+Claude Opus 5.5 medium review found no blocking deadline defect. The second tagged workflow then
+failed two Linux process tests before packaging. Both failures were reproduced in a Linux container:
+an artificial three-second detached-check fixture expired under CI load, and unreaped exited
+processes appeared present during cleanup. The focused correction keeps process identity available
+for fast child launch records, tests liveness separately, and treats a zombie leader with live
+threads as present. Opus 5.5 medium closed all three high/medium safety findings on the affected
+diff. The macOS and emulated Linux focused process suites pass. The final candidate passes all 680
+engine tests with bounded file concurrency, 73 continuity tests, four script tests, typecheck and
+clean offline installed-archive proof. Default-concurrency local macOS runs exposed short-timer
+flakiness outside the corrected process path; the affected cases passed in isolation. The full
+amd64-emulated Linux run overloaded 21 short-timer cases, so it is diagnostic rather than release
+proof. The tagged native Linux workflow, source sign-off and exact release readback remain open.
 Keep failed development results intact. All identities, source copies, review audits and results
 remain outside this checkout. No adopter upgrade or publication has occurred.

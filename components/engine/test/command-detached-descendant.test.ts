@@ -8,7 +8,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { commandProcesses, hasConfirmedCommandCleanup } from "../src/command-owner-recovery.ts";
-import { processFingerprint, submitCommand, waitCommand } from "../src/process-owner.ts";
+import { processLiveFingerprint, submitCommand, waitCommand } from "../src/process-owner.ts";
 const pause = () => new Promise(resolve => setTimeout(resolve, 20));
 
 for (const ending of ["worker-loss", "native-exit", "supervision-loss"] as const) test(`guardian owns an observed detached child across ${ending}`, async () => {
@@ -33,15 +33,15 @@ for (const ending of ["worker-loss", "native-exit", "supervision-loss"] as const
     if (ending === "supervision-loss") {
       await assert.rejects(restartCommandGuardian(job.directory, job.requestDigest, "test:premature"), /worker still present/);
       const guardian = JSON.parse(readFileSync(join(job.directory, "guardian.json"), "utf8"));
-      assert.equal(processFingerprint(guardian.pid), guardian.fingerprint); process.kill(guardian.pid, "SIGKILL");
-      assert.equal(processFingerprint(launch.owner.pid), launch.owner.fingerprint); process.kill(launch.owner.pid, "SIGKILL");
-      assert.equal(processFingerprint(launch.child.pid), launch.child.fingerprint); process.kill(launch.child.pid, "SIGKILL");
+      assert.equal(processLiveFingerprint(guardian.pid), guardian.fingerprint); process.kill(guardian.pid, "SIGKILL");
+      assert.equal(processLiveFingerprint(launch.owner.pid), launch.owner.fingerprint); process.kill(launch.owner.pid, "SIGKILL");
+      assert.equal(processLiveFingerprint(launch.child.pid), launch.child.fingerprint); process.kill(launch.child.pid, "SIGKILL");
       const stoppedBy = Date.now() + 3000;
-      while ([guardian, launch.owner, launch.child].some(record => processFingerprint(record.pid) === record.fingerprint) && Date.now() < stoppedBy) await pause();
-      assert.equal(processFingerprint(descendant.pid), descendant.fingerprint);
+      while ([guardian, launch.owner, launch.child].some(record => processLiveFingerprint(record.pid) === record.fingerprint) && Date.now() < stoppedBy) await pause();
+      assert.equal(processLiveFingerprint(descendant.pid), descendant.fingerprint);
       assert.equal((await restartCommandGuardian(job.directory, job.requestDigest, "test:resume-cleanup")).state, "guardian-running");
     } else if (ending === "worker-loss") {
-      assert.equal(processFingerprint(launch.owner.pid), launch.owner.fingerprint); process.kill(launch.owner.pid, "SIGKILL");
+      assert.equal(processLiveFingerprint(launch.owner.pid), launch.owner.fingerprint); process.kill(launch.owner.pid, "SIGKILL");
     } else writeFileSync(join(root, "finish"), "exit normally");
     const observed = await waitCommand(job.directory, job.requestDigest, 7000);
     assert.equal(observed.receipt?.state, "unknown");
@@ -49,20 +49,20 @@ for (const ending of ["worker-loss", "native-exit", "supervision-loss"] as const
     const recoveredBy = Date.now() + 5000;
     while (!hasConfirmedCommandCleanup(job.directory, observed.receipt!) && Date.now() < recoveredBy) await pause();
     assert.equal(hasConfirmedCommandCleanup(job.directory, observed.receipt!), true);
-    assert.notEqual(processFingerprint(descendant.pid), descendant.fingerprint);
+    assert.notEqual(processLiveFingerprint(descendant.pid), descendant.fingerprint);
     if (ending === "supervision-loss") {
       assert.equal((await restartCommandGuardian(job.directory, job.requestDigest, "test:replay")).state, "reconciled");
       assert.equal(Number(readFileSync(join(root, "descendant"), "utf8")), descendant.pid);
     }
   } finally {
     for (const record of [descendant, launch?.child, launch?.owner])
-      if (record && processFingerprint(record.pid) === record.fingerprint) process.kill(record.pid, "SIGKILL");
+      if (record && processLiveFingerprint(record.pid) === record.fingerprint) process.kill(record.pid, "SIGKILL");
     // Native cleanup can precede the guardian's final receipt/reconciliation writes.
     const path = join(root, "job", "guardian.json");
     if (existsSync(path)) {
       const guardian = JSON.parse(readFileSync(path, "utf8")), until = Date.now() + 5000;
-      while (processFingerprint(guardian.pid) === guardian.fingerprint && Date.now() < until) await pause();
-      assert.notEqual(processFingerprint(guardian.pid), guardian.fingerprint, `Retain evidence while guardian is alive: ${root}`);
+      while (processLiveFingerprint(guardian.pid) === guardian.fingerprint && Date.now() < until) await pause();
+      assert.notEqual(processLiveFingerprint(guardian.pid), guardian.fingerprint, `Retain evidence while guardian is alive: ${root}`);
     }
     rmSync(root, { recursive: true, force: true });
   }

@@ -5,15 +5,16 @@ import { join, resolve } from "node:path";
 import { digest, durableJson, object, text } from "./core.ts";
 import { narrativeFile } from "./narrative-inputs.ts";
 import { observeCommand, type CommandReceipt } from "./process-owner.ts";
+import { processHasExited } from "./process-state.ts";
 
 /** Successful full process enumeration is required; an inspection failure is not absence. */
 export function commandProcesses(): Array<{ pid: number; parent: number; group: number }> {
-  const output = execFileSync("/bin/ps", ["-axo", "pid=,ppid=,pgid="], { encoding: "utf8", timeout: 5000, maxBuffer: 8 * 1024 * 1024 });
+  const output = execFileSync("/bin/ps", ["-axo", "pid=,ppid=,pgid=,stat="], { encoding: "utf8", timeout: 5000, maxBuffer: 8 * 1024 * 1024 });
   const rows = output.trim().split("\n").map(line => {
-    const match = /^\s*(\d+)\s+(\d+)\s+(\d+)\s*$/.exec(line);
+    const match = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s*$/.exec(line);
     if (!match) throw new Error("Invalid process enumeration");
-    return { pid: Number(match[1]), parent: Number(match[2]), group: Number(match[3]) };
-  });
+    return { pid: Number(match[1]), parent: Number(match[2]), group: Number(match[3]), state: match[4]! };
+  }).filter(row => !processHasExited(row.state));
   if (!rows.some(row => row.pid === process.pid)) throw new Error("Incomplete process enumeration");
   return rows;
 }

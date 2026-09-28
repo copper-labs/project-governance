@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { cancelCommand, observeCommand, processFingerprint, submitCommand, waitCommand } from "../src/process-owner.ts";
+import { cancelCommand, observeCommand, processLiveFingerprint, submitCommand, waitCommand } from "../src/process-owner.ts";
 import { removeFinishedCommandFixture } from "./support/finished-command-fixture.ts";
 
 test("owned command preserves native failure and duplicate submission observes the same receipt", async () => {
@@ -23,6 +23,20 @@ test("owned command preserves native failure and duplicate submission observes t
     assert.match(readFileSync(result.receipt!.log, "utf8"), /native assertion failed/);
     assert.deepEqual(observeCommand(first.directory, first.requestDigest), result);
   } finally { rmSync(dir, { recursive: true }); }
+});
+
+test("a fast-exiting child keeps a recorded start identity and confirms cleanup", async () => {
+  const root = mkdtempSync(join(tmpdir(), "engine-fast-exit-"));
+  try {
+    const job = submitCommand(join(root, "job"), { id: "fast-exit", operation: {
+      argv: ["/usr/bin/true"], cwd: root, env: {}, expectedExitCodes: [0], effect: "read",
+    }, deadlineMs: 5000, outputLimit: 4096 });
+    const result = await waitCommand(job.directory, job.requestDigest, 10000);
+    const launch = JSON.parse(readFileSync(join(job.directory, "launch.json"), "utf8"));
+    assert.match(launch.child.fingerprint, /\S/);
+    assert.equal(result.receipt?.state, "succeeded");
+    assert.equal(result.receipt?.cleanup, "confirmed");
+  } finally { await removeFinishedCommandFixture(root, ["job"]); }
 });
 
 test("deadline and cancellation terminate owned process groups without reporting a passing assertion", async () => {
@@ -97,7 +111,7 @@ test("owned stdin delivers literal assignments without putting them in argv or l
     assert.equal(JSON.parse(output).bytes, Buffer.byteLength(stdin));
     assert.equal(output.includes("private assignment"), false);
     assert.throws(() => submitCommand(join(root, "oversized"), { ...request, stdin: "a".repeat(500001) }), /maximum 500 KB/);
-  } finally { rmSync(root, { recursive: true, force: true }); }
+  } finally { await removeFinishedCommandFixture(root, ["job"]); }
 });
 
 test("provider input rejection cannot be reported as a successful command", async () => {
@@ -135,7 +149,7 @@ test("worker loss refuses live-group recovery and preserves unknown outcome afte
     }
     assert.ok(child?.fingerprint); assert.ok(owner?.fingerprint);
     const guardian = JSON.parse(readFileSync(join(submitted.directory, "guardian.json"), "utf8"));
-    assert.equal(processFingerprint(guardian.pid), guardian.fingerprint);
+    assert.equal(processLiveFingerprint(guardian.pid), guardian.fingerprint);
     process.kill(guardian.pid, "SIGKILL");
     const acknowledged = JSON.parse(readFileSync(launchPath, "utf8"));
     durableJson(launchPath, { ...acknowledged, state: "intent" });
@@ -143,17 +157,17 @@ test("worker loss refuses live-group recovery and preserves unknown outcome afte
     durableJson(launchPath, { ...acknowledged, host: "other-host" });
     assert.throws(() => recoverCommandOwner(submitted.directory, submitted.requestDigest, "test:recovery"), /launch acknowledgment/);
     durableJson(launchPath, acknowledged);
-    assert.equal(processFingerprint(owner.pid), owner.fingerprint);
+    assert.equal(processLiveFingerprint(owner.pid), owner.fingerprint);
     assert.throws(() => recoverCommandOwner(submitted.directory, submitted.requestDigest, "test:recovery"), /still present/);
     process.kill(owner.pid, "SIGKILL");
     const stoppedBy = Date.now() + 3000;
-    while (processFingerprint(owner.pid) === owner.fingerprint && Date.now() < stoppedBy)
+    while (processLiveFingerprint(owner.pid) === owner.fingerprint && Date.now() < stoppedBy)
       await new Promise(resolve => setTimeout(resolve, 20));
-    assert.notEqual(processFingerprint(owner.pid), owner.fingerprint);
+    assert.notEqual(processLiveFingerprint(owner.pid), owner.fingerprint);
     assert.equal(observeCommand(submitted.directory, submitted.requestDigest).state, "unknown");
     assert.equal(existsSync(join(submitted.directory, "result.json")), false);
     assert.equal(submitCommand(submitted.directory, request).submitted, false);
-    assert.equal(processFingerprint(child.pid), child.fingerprint);
+    assert.equal(processLiveFingerprint(child.pid), child.fingerprint);
     assert.throws(() => recoverCommandOwner(submitted.directory, submitted.requestDigest, "test:recovery"), /still present/);
     assert.throws(() => registry.acquire(["fixture:owner-loss"], "other", "other"));
     process.kill(-child.pid, "SIGKILL");
@@ -182,8 +196,8 @@ test("worker loss refuses live-group recovery and preserves unknown outcome afte
   } finally {
     registry.close();
     // Only this fixture's still-matching processes can be signalled.
-    if (child && processFingerprint(child.pid) === child.fingerprint) process.kill(-child.pid, "SIGKILL");
-    if (owner && processFingerprint(owner.pid) === owner.fingerprint) process.kill(owner.pid, "SIGKILL");
+    if (child && processLiveFingerprint(child.pid) === child.fingerprint) process.kill(-child.pid, "SIGKILL");
+    if (owner && processLiveFingerprint(owner.pid) === owner.fingerprint) process.kill(owner.pid, "SIGKILL");
     rmSync(root, { recursive: true, force: true });
   }
 });
@@ -208,20 +222,20 @@ for (const graceful of [false, true]) test(`guardian cleans after owner death wi
     const readyBy = Date.now() + 3000;
     while (!existsSync(join(root, "ready")) && Date.now() < readyBy) await new Promise(resolve => setTimeout(resolve, 20));
     assert.equal(existsSync(join(root, "ready")), true);
-    assert.equal(processFingerprint(launch.owner.pid), launch.owner.fingerprint);
+    assert.equal(processLiveFingerprint(launch.owner.pid), launch.owner.fingerprint);
     process.kill(launch.owner.pid, "SIGKILL");
     const observed = await waitCommand(job.directory, job.requestDigest, 7000);
     assert.equal(observed.receipt?.state, "unknown");
     assert.equal(observed.receipt?.reason, "owner-lost");
     assert.equal(observed.receipt?.cleanup, "confirmed");
-    assert.notEqual(processFingerprint(launch.child.pid), launch.child.fingerprint);
+    assert.notEqual(processLiveFingerprint(launch.child.pid), launch.child.fingerprint);
     assert.equal(submitCommand(job.directory, request).submitted, false);
     const proof = JSON.parse(readFileSync(join(job.directory, "owner-recovery.json"), "utf8"));
     assert.equal(proof.authority, "runtime:command-guardian");
     if (graceful) assert.equal(readFileSync(join(root, "cleaned"), "utf8"), "yes");
   } finally {
-    if (launch?.child && processFingerprint(launch.child.pid) === launch.child.fingerprint) process.kill(-launch.child.pid, "SIGKILL");
-    if (launch?.owner && processFingerprint(launch.owner.pid) === launch.owner.fingerprint) process.kill(launch.owner.pid, "SIGKILL");
+    if (launch?.child && processLiveFingerprint(launch.child.pid) === launch.child.fingerprint) process.kill(-launch.child.pid, "SIGKILL");
+    if (launch?.owner && processLiveFingerprint(launch.owner.pid) === launch.owner.fingerprint) process.kill(launch.owner.pid, "SIGKILL");
     await removeFinishedCommandFixture(root, ["job"]);
   }
 });
@@ -246,21 +260,21 @@ test("guardian cleans recorded group members after their original leader exits",
     }
     assert.ok(descendant);
     launch = JSON.parse(readFileSync(join(job.directory, "launch.json"), "utf8")); assert.ok(launch);
-    assert.equal(processFingerprint(launch.child.pid), launch.child.fingerprint);
+    assert.equal(processLiveFingerprint(launch.child.pid), launch.child.fingerprint);
     process.kill(launch.child.pid, "SIGKILL");
     const leaderBy = Date.now() + 3000;
-    while (processFingerprint(launch.child.pid) === launch.child.fingerprint && Date.now() < leaderBy) await new Promise(resolve => setTimeout(resolve, 20));
-    assert.notEqual(processFingerprint(launch.child.pid), launch.child.fingerprint);
-    assert.equal(processFingerprint(descendant.pid), descendant.fingerprint);
-    assert.equal(processFingerprint(launch.owner.pid), launch.owner.fingerprint);
+    while (processLiveFingerprint(launch.child.pid) === launch.child.fingerprint && Date.now() < leaderBy) await new Promise(resolve => setTimeout(resolve, 20));
+    assert.notEqual(processLiveFingerprint(launch.child.pid), launch.child.fingerprint);
+    assert.equal(processLiveFingerprint(descendant.pid), descendant.fingerprint);
+    assert.equal(processLiveFingerprint(launch.owner.pid), launch.owner.fingerprint);
     process.kill(launch.owner.pid, "SIGKILL");
     const observed = await waitCommand(job.directory, job.requestDigest, 7000);
     assert.equal(observed.receipt?.state, "unknown");
     assert.equal(observed.receipt?.cleanup, "confirmed");
-    assert.notEqual(processFingerprint(descendant.pid), descendant.fingerprint);
+    assert.notEqual(processLiveFingerprint(descendant.pid), descendant.fingerprint);
   } finally {
     for (const record of [descendant, launch?.child, launch?.owner])
-      if (record && processFingerprint(record.pid) === record.fingerprint) process.kill(record.pid, "SIGKILL");
+      if (record && processLiveFingerprint(record.pid) === record.fingerprint) process.kill(record.pid, "SIGKILL");
     rmSync(root, { recursive: true, force: true });
   }
 });

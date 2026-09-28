@@ -1,7 +1,7 @@
 import { existsSync, constants, closeSync, fstatSync, openSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { digest, object } from "./core.ts";
-import { observeCommand, processFingerprint } from "./process-owner.ts";
+import { observeCommand, processLiveFingerprint } from "./process-owner.ts";
 import { checkRunRoot } from "./check-run.ts";
 
 export function readCheckRecord(path: string): Record<string, unknown> | null {
@@ -45,7 +45,7 @@ export function inspectCheckRun(id: string, root = checkRunRoot()) {
   }
   const owner = intent["owner"] && typeof intent["owner"] === "object" ? object(intent["owner"]) : {};
   const pid = Number(owner["pid"]), fingerprint = owner["fingerprint"];
-  const active = Number.isSafeInteger(pid) && pid > 0 && typeof fingerprint === "string" && processFingerprint(pid) === fingerprint;
+  const active = Number.isSafeInteger(pid) && pid > 0 && typeof fingerprint === "string" && processLiveFingerprint(pid) === fingerprint;
   const failure = readCheckRecord(join(directory, "failure.json"));
   if (failure && failure["id"] !== id) throw new Error("Run failure identity mismatch");
   const queued = intent["state"] === "queued" && intent["owner"] === null && !failure && !existsSync(join(directory, "worker.claim"));

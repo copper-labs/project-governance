@@ -220,7 +220,7 @@ test("commands receive execution-owned identity and a fresh artifact destination
 test("public command recovery releases workflow resources after worker and guardian loss without claiming command success", async () => {
   const { spawnSync } = await import("node:child_process");
   const { fileURLToPath } = await import("node:url");
-  const { processFingerprint } = await import("../src/process-owner.ts");
+  const { processLiveFingerprint } = await import("../src/process-owner.ts");
   const { digest } = await import("../src/core.ts");
   const f = fixture(false, ["fixture:device"], false, true);
   const commands = join(f.dir, "commands"), commandDirectory = join(commands, `${f.run.id}-0`);
@@ -241,11 +241,11 @@ test("public command recovery releases workflow resources after worker and guard
     const premature = spawnSync(process.execPath, args, { encoding: "utf8", timeout: 5000 });
     assert.equal(premature.status, 2, "live original worker refuses recovery");
     for (const record of [guardian, launch.owner]) {
-      assert.equal(processFingerprint(record.pid), record.fingerprint);
+      assert.equal(processLiveFingerprint(record.pid), record.fingerprint);
       process.kill(record.pid, "SIGKILL");
     }
     const stoppedBy = Date.now() + 3000;
-    while ([guardian, launch.owner].some(record => processFingerprint(record.pid) === record.fingerprint) && Date.now() < stoppedBy)
+    while ([guardian, launch.owner].some(record => processLiveFingerprint(record.pid) === record.fingerprint) && Date.now() < stoppedBy)
       await new Promise(resolve => setTimeout(resolve, 20));
     const recovered = spawnSync(process.execPath, args, { encoding: "utf8", timeout: 5000 });
     assert.equal(recovered.status, 0, recovered.stderr);
@@ -261,7 +261,7 @@ test("public command recovery releases workflow resources after worker and guard
     assert.equal(f.registry.inspect()[0]!.state, "released");
     assert.equal(f.registry.inspect()[0]!.observation, observation);
   } finally {
-    for (const record of records) if (processFingerprint(record.pid) === record.fingerprint) process.kill(record.pid, "SIGKILL");
+    for (const record of records) if (processLiveFingerprint(record.pid) === record.fingerprint) process.kill(record.pid, "SIGKILL");
     if (execution) await execution.catch(() => {});
     f.close();
   }

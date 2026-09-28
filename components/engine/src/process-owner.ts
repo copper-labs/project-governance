@@ -16,6 +16,7 @@ import { join, resolve } from "node:path";
 import { hostname } from "node:os";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { digest, durableJson, fileDigest, object, text } from "./core.ts";
+import { processHasExited } from "./process-state.ts";
 import type { CommandOperation } from "./workflow-types.ts";
 
 export interface CommandRequest {
@@ -52,11 +53,25 @@ export function commandEnvironment(extra: Record<string, string>): Record<string
   return { ...env, ...extra };
 }
 
-/** A process start fingerprint is checked before signalling a recorded PID. */
-export function processFingerprint(pid: number): string | null {
+/** Keep process identity even after exit so fast children have a complete launch record. */
+function processSnapshot(pid: number): { fingerprint: string; state: string } | null {
   if (!Number.isSafeInteger(pid) || pid < 2) return null;
-  try { return execFileSync("/bin/ps", ["-p", String(pid), "-o", "lstart="], { encoding: "utf8", timeout: 2000 }).trim() || null; }
+  try {
+    const output = execFileSync("/bin/ps", ["-p", String(pid), "-o", "lstart=,stat="], { encoding: "utf8", timeout: 2000 }).trim();
+    const match = /^(.*\S)\s+(\S+)$/u.exec(output);
+    return match ? { fingerprint: match[1]!, state: match[2]! } : null;
+  }
   catch { return null; }
+}
+
+export function processFingerprint(pid: number): string | null {
+  return processSnapshot(pid)?.fingerprint ?? null;
+}
+
+/** Live identity is required before treating a recorded PID as an active owner. */
+export function processLiveFingerprint(pid: number): string | null {
+  const snapshot = processSnapshot(pid);
+  return snapshot && !processHasExited(snapshot.state) ? snapshot.fingerprint : null;
 }
 
 /** Persisted submission is idempotent, including the uncertain interval before process acknowledgment. */
@@ -111,7 +126,7 @@ export function observeCommand(directory: string, requestDigest: string): Comman
   if (!existsSync(ack)) return { state: "unknown", receipt: null };
   const owner = object(JSON.parse(readFileSync(ack, "utf8")));
   if (owner["requestDigest"] !== requestDigest) throw new Error("command owner identity mismatch");
-  return { state: processFingerprint(Number(owner["pid"])) === owner["fingerprint"] ? "pending" : "unknown", receipt: null };
+  return { state: processLiveFingerprint(Number(owner["pid"])) === owner["fingerprint"] ? "pending" : "unknown", receipt: null };
 }
 
 /** Read only complete public records after a cursor; observation never restarts provider work. */
@@ -242,7 +257,14 @@ async function execute(directory: string, expectedDigest: string): Promise<void>
       throw error;
     }
   }
-  const groupAlive = () => { if (!group) return false; try { process.kill(-group, 0); return true; } catch { return false; } };
+  const groupAlive = () => {
+    if (!group) return false;
+    // Most completed groups are already absent; avoid a full process scan for those commands.
+    try { process.kill(-group, 0); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code === "ESRCH") return false; return true; }
+    try { return commandProcesses().some(row => row.group === group); }
+    catch { return true; } // Failed inspection cannot prove the group has exited.
+  };
   const signal = (value: NodeJS.Signals) => { if (group) { try { process.kill(-group, value); } catch { /* Group may have exited between observation and signal. */ } } };
   const stop = (why: string) => {
     if (requestedStop) return; requestedStop = true; reason = why; signal("SIGTERM");
@@ -330,7 +352,7 @@ async function execute(directory: string, expectedDigest: string): Promise<void>
   try {
     const recorded = recordedCommandMembers(directory, expectedDigest, group);
     const rows = commandProcesses();
-    if (!groupAlive() && !rows.some(row => recorded.pids.includes(row.pid))) cleanup = "confirmed";
+    if (!rows.some(row => row.group === group || recorded.pids.includes(row.pid))) cleanup = "confirmed";
   } catch { /* Incomplete process inventory cannot confirm cleanup. */ }
   const success = reason === "provider-completed" || (reason === "exit" && exitCode !== null && request.operation.expectedExitCodes.includes(exitCode));
   const receipt: CommandReceipt = { version: 1, requestDigest: expectedDigest,

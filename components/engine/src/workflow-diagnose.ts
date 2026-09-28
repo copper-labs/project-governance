@@ -8,7 +8,7 @@ import { narrativeFile } from "./narrative-inputs.ts";
 import { WorkflowStore } from "./workflow-store.ts";
 import { resolveDiagnosticManifest } from "./diagnostic-manifest.ts";
 import { dispatchWorkflow, observeWorkflow } from "./workflow-worker.ts";
-import { processFingerprint } from "./process-owner.ts";
+import { processFingerprint, processLiveFingerprint } from "./process-owner.ts";
 import { validateInputs } from "./workflow-types.ts";
 import { ResourceRegistry, resourceRegistryPath } from "./resources.ts";
 import { observeSimulatorCleanup } from "./simulator-cleanup.ts";
@@ -23,7 +23,7 @@ import type { DiagnosticEpisode, DiagnosticOwner } from "./diagnostic-types.ts";
 /** A failed liveness observation is not evidence that another coordinator may be replaced. */
 function ownerAlive(owner: DiagnosticOwner): boolean {
   if (owner.host !== hostname()) return true;
-  const fingerprint = processFingerprint(owner.pid);
+  const fingerprint = processLiveFingerprint(owner.pid);
   if (fingerprint) return fingerprint === owner.fingerprint;
   try { process.kill(owner.pid, 0); return true; }
   catch (error) { return (error as NodeJS.ErrnoException).code !== "ESRCH"; }

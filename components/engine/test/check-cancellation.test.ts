@@ -5,7 +5,7 @@ import { existsSync, readFileSync, mkdtempSync, mkdirSync, rmSync } from "node:f
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { processFingerprint } from "../src/process-owner.ts";
+import { processLiveFingerprint } from "../src/process-owner.ts";
 import { dispatchChecks } from "../src/check-worker.ts";
 import { inspectCheckRun } from "../src/check-status.ts";
 import { requestCheckCancellation } from "../src/check-cancellation.ts";
@@ -40,7 +40,7 @@ test("cancel stops owned native execution and prevents the next command", async 
     assert.equal(commands[0]!.command_receipt.reason, "cancelled"); assert.equal(commands[0]!.command_receipt.cleanup, "confirmed");
     // A terminal command result precedes advisory projection and reader release. Do not delete a live worker's directory.
     const intent = JSON.parse(readFileSync(join(submitted.run_directory, "run.json"), "utf8")) as { owner: { pid: number; fingerprint: string } };
-    while (processFingerprint(intent.owner.pid) === intent.owner.fingerprint && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 50));
-    assert.notEqual(processFingerprint(intent.owner.pid), intent.owner.fingerprint, "detached worker must finish before fixture cleanup");
+    while (processLiveFingerprint(intent.owner.pid) === intent.owner.fingerprint && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 50));
+    assert.notEqual(processLiveFingerprint(intent.owner.pid), intent.owner.fingerprint, "detached worker must finish before fixture cleanup");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

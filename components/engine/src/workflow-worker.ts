@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { digest, durableJson, fileDigest, object } from "./core.ts";
-import { commandEnvironment, processFingerprint } from "./process-owner.ts";
+import { commandEnvironment, processFingerprint, processLiveFingerprint } from "./process-owner.ts";
 import { ResourceRegistry } from "./resources.ts";
 import { executeWorkflow } from "./workflow-executor.ts";
 import { WorkflowStore, type WorkflowRun } from "./workflow-store.ts";
@@ -74,7 +74,7 @@ export function observeWorkflow(directory: string): WorkerObservation {
   if (!existsSync(path)) return { run, worker: "pending" };
   const ack = object(JSON.parse(readFileSync(path, "utf8")));
   if (ack["requestDigest"] !== digest(request)) throw new Error("workflow worker identity mismatch");
-  return { run, worker: processFingerprint(Number(ack["pid"])) === ack["fingerprint"] ? "alive" : "stopped" };
+  return { run, worker: processLiveFingerprint(Number(ack["pid"])) === ack["fingerprint"] ? "alive" : "stopped" };
 }
 
 async function worker(directory: string, expectedDigest: string): Promise<void> {

@@ -9,7 +9,7 @@ import { prepareCommand } from "../src/cli.ts";
 import { dispatchChecks } from "../src/check-worker.ts";
 import { inspectCheckRun } from "../src/check-status.ts";
 import { PackagedCheckerAssets } from "../src/checker-assets.ts";
-import { processFingerprint } from "../src/process-owner.ts";
+import { processLiveFingerprint } from "../src/process-owner.ts";
 
 const assets = fileURLToPath(new URL("../../../src/project_governance_runtime/", import.meta.url));
 const args = ["--stage", "pre-commit", "--staged", "--pack", "apple-dependencies"];
@@ -81,8 +81,8 @@ test("detached Apple checks preserve work-bound approval without accepting missi
         // Terminal results precede the detached reader's telemetry and release writes.
         const owner = JSON.parse(readFileSync(join(runDirectory, "run.json"), "utf8")).owner;
         const deadline = Date.now() + 5000;
-        while (processFingerprint(owner.pid) === owner.fingerprint && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 20));
-        assert.notEqual(processFingerprint(owner.pid), owner.fingerprint, `Retain evidence while reader is alive: ${directory}`);
+        while (processLiveFingerprint(owner.pid) === owner.fingerprint && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 20));
+        assert.notEqual(processLiveFingerprint(owner.pid), owner.fingerprint, `Retain evidence while reader is alive: ${directory}`);
         rmSync(directory, { recursive: true, force: true });
       }
       else t.diagnostic(`Unresolved worker evidence retained at ${directory}`);

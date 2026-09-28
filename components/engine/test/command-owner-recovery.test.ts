@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { digest, durableJson } from "../src/core.ts";
-import { processFingerprint, submitCommand, waitCommand } from "../src/process-owner.ts";
+import { processFingerprint, processLiveFingerprint, submitCommand, waitCommand } from "../src/process-owner.ts";
 import { recoverCommandOwner, hasConfirmedCommandCleanup } from "../src/command-owner-recovery.ts";
 import { reconcileCommand } from "../src/command-recovery.ts";
 
@@ -20,10 +20,10 @@ for (const reason of ["exit", "cancelled"]) test(`later cleanup proof preserves 
     const owner = JSON.parse(readFileSync(join(job.directory, "owner.json"), "utf8"));
     const guardian = JSON.parse(readFileSync(join(job.directory, "guardian.json"), "utf8"));
     const until = Date.now() + 3000;
-    while ((processFingerprint(owner.pid) === owner.fingerprint || processFingerprint(guardian.pid) === guardian.fingerprint) && Date.now() < until)
+    while ((processLiveFingerprint(owner.pid) === owner.fingerprint || processLiveFingerprint(guardian.pid) === guardian.fingerprint) && Date.now() < until)
       await new Promise(resolve => setTimeout(resolve, 20));
-    assert.notEqual(processFingerprint(owner.pid), owner.fingerprint);
-    assert.notEqual(processFingerprint(guardian.pid), guardian.fingerprint);
+    assert.notEqual(processLiveFingerprint(owner.pid), owner.fingerprint);
+    assert.notEqual(processLiveFingerprint(guardian.pid), guardian.fingerprint);
     // Seed the persisted terminal/uncertain-cleanup boundary after both fixture processes exited.
     const original = { ...completed.receipt!, reason, state: "unknown" as const, cleanup: "unknown" as const };
     const path = join(job.directory, "result.json"); durableJson(path, original);

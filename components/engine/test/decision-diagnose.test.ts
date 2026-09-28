@@ -14,7 +14,7 @@ import { recipeDigest } from "../src/workflow-types.ts";
 import { durableJson, digest, fileDigest } from "../src/core.ts";
 import { diagnoseWorkflow } from "../src/workflow-diagnose.ts";
 import { diagnosticEpisodeId, diagnosticOperationId, resolveDiagnosticManifest } from "../src/diagnostic-manifest.ts";
-import { processFingerprint } from "../src/process-owner.ts";
+import { processFingerprint, processLiveFingerprint } from "../src/process-owner.ts";
 
 const originalState = process.env.XDG_STATE_HOME;
 const testState = mkdtempSync(join(tmpdir(), "diagnostic-state-"));
@@ -30,7 +30,7 @@ function fixture(t: { after: (fn: () => void) => void }, count = 2, mode = "off"
     const owners = readdirSync(root, { recursive: true }).filter(path => /(?:^|\/)(?:owner|guardian)\.json$/u.test(String(path)))
       .map(path => JSON.parse(readFileSync(join(root, String(path)), "utf8")));
     const until = performance.now() + 5000;
-    const alive = () => owners.some(owner => processFingerprint(owner.pid) === owner.fingerprint);
+    const alive = () => owners.some(owner => processLiveFingerprint(owner.pid) === owner.fingerprint);
     while (alive() && performance.now() < until) await new Promise(resolve => setTimeout(resolve, 50));
     assert.equal(alive(), false, `Retain diagnostic evidence while recorded writers are alive: ${root}`);
     store.close(); continuity.close(); rmSync(root, { recursive: true, force: true });

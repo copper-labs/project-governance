@@ -8,7 +8,7 @@ import { narrativeFile } from "./narrative-inputs.ts";
 import { commandProcesses, recordedCommandMembers, recoverCommandOwner } from "./command-owner-recovery.ts";
 import { reconcileCommand } from "./command-recovery.ts";
 import { deliverCommandCompletion } from "./completion-delivery.ts";
-import { processFingerprint } from "./process-owner.ts";
+import { processFingerprint, processLiveFingerprint } from "./process-owner.ts";
 
 const SELF = fileURLToPath(import.meta.url);
 const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -84,7 +84,7 @@ async function guard(directory: string, requestDigest: string): Promise<void> {
     if (!members.length && !rows.some(row => row.pid === child.pid || row.group === child.processGroup)) break;
     if (!members.length) throw new Error("Guardian group has no matching recorded member; cleanup unresolved");
     for (const member of members) {
-      if (processFingerprint(member.pid) !== member.fingerprint) continue;
+      if (processLiveFingerprint(member.pid) !== member.fingerprint) continue;
       try { process.kill(member.pid, signal); }
       catch (error) { if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error; }
     }

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { processFingerprint } from "../src/process-owner.ts";
+import { processLiveFingerprint } from "../src/process-owner.ts";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { commandExecutable, runNativeCheckCommand } from "../src/native-check-command.ts";
@@ -23,9 +23,9 @@ test("native check verdicts preserve exit failure, structured output and timeout
       const path=join(root,id,name);return existsSync(path)?[JSON.parse(readFileSync(path,"utf8"))]:[];
     }));
     const deadline=Date.now()+5000;
-    while(owners.some(owner=>processFingerprint(owner.pid)===owner.fingerprint) && Date.now()<deadline)
+    while(owners.some(owner=>processLiveFingerprint(owner.pid)===owner.fingerprint) && Date.now()<deadline)
       await new Promise(resolve=>setTimeout(resolve,50));
-    assert.ok(owners.every(owner=>processFingerprint(owner.pid)!==owner.fingerprint),"Recorded writers must exit before removing test evidence");
+    assert.ok(owners.every(owner=>processLiveFingerprint(owner.pid)!==owner.fingerprint),"Recorded writers must exit before removing test evidence");
     rmSync(root, { recursive: true, force: true });
   }
 });

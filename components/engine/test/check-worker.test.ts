@@ -29,14 +29,15 @@ test("whole check sequence survives submitter exit and a duplicate worker cannot
       const root=${JSON.stringify(repo)};
       const packs=mergePacks([{source:'fixture',origin:'target',value:{id:'fixture',enforcement:'blocking',stages:['pre-commit'],commands:[{run:[process.execPath,'-e',"setTimeout(()=>{require('fs').appendFileSync('count','1');console.log(JSON.stringify({status:'passed',findings:[]}))},200)"]},{run:[process.execPath,'-e',"require('fs').appendFileSync('count','2');console.log(JSON.stringify({status:'passed',findings:[]}))"]}]}}]);
       const scope=resolveChangeScope(root,{all:true});
-      console.log(JSON.stringify(dispatchChecks(packs,buildPlan(packs,{stage:'pre-commit',mode:'all',changedPaths:[]}),{subject:new ValidationSubject(root,scope),scope,assets:new PackagedCheckerAssets(${JSON.stringify(assets)}),packIds:new Set(['fixture']),stage:'pre-commit',asOf:'2026-09-20T12:00:00Z'},{root:${JSON.stringify(runs)},deadlineMs:3000,trigger:"test",expectedStatus:"failed"})));
+      // The fixture proves detached ownership and exactly-once execution, not a three-second startup target on CI hosts.
+      console.log(JSON.stringify(dispatchChecks(packs,buildPlan(packs,{stage:'pre-commit',mode:'all',changedPaths:[]}),{subject:new ValidationSubject(root,scope),scope,assets:new PackagedCheckerAssets(${JSON.stringify(assets)}),packIds:new Set(['fixture']),stage:'pre-commit',asOf:'2026-09-20T12:00:00Z'},{root:${JSON.stringify(runs)},deadlineMs:15000,trigger:"test",expectedStatus:"failed"})));
     `;
     const submitted = JSON.parse(execFileSync(process.execPath, ["--input-type=module", "-e", source], { encoding: "utf8", timeout: 5000,
       env: { ...process.env, GOVERNANCE_GENERATION_REGISTRY: generationPath, GOVERNANCE_GENERATION_TOKEN: parent.token, GOVERNANCE_GENERATION_OWNER: parent.owner } }));
     generations.release(parent.token, parent.owner);
     assert.equal(generations.state().readers.length, 1);
     let observed = inspectCheckRun(submitted.run_id, runs);
-    const deadline = Date.now() + 10000;
+    const deadline = Date.now() + 20000;
     while ((observed.state !== "terminal" || generations.state().readers.length) && Date.now() < deadline) { await new Promise(resolve => setTimeout(resolve, 100)); observed = inspectCheckRun(submitted.run_id, runs); }
     assert.equal(generations.state().readers.length, 0);
     assert.equal(generations.state().written, true);
