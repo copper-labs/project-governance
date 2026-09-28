@@ -54,6 +54,10 @@ export class StartupHttp {
         return result;
       }
       throw new Error("Startup redirect limit exceeded");
+    }catch(error){
+      // The local timer owns this abort, so provider wording must not change the deadline contract.
+      if(controller.signal.aborted)throw new Error("Startup discovery deadline expired",{cause:error});
+      throw error;
     }finally{clearTimeout(timer);}
   }
   async json(url:string) {return JSON.parse(new TextDecoder("utf-8",{fatal:true}).decode(await this.read(url)));}

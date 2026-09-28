@@ -122,7 +122,8 @@ test("transport aborts at deadline while duplicate events never dispatch twice",
     return new Promise((_resolve, reject) => init!.signal!.addEventListener("abort", () => { aborted = true; reject(new Error("aborted")); }, { once: true }));
   };
   try {
-    const adapter = new JevDecisionAdapter({ ...config, deadlineMs: 30 }, f.path, { coordinationRoot: (f.path) + ".coordination", token: "synthetic-test", fetch: transport });
+    // Give in-flight event lookup room on loaded CI; the timer still proves abort and single dispatch.
+    const adapter = new JevDecisionAdapter({ ...config, deadlineMs: 1000 }, f.path, { coordinationRoot: (f.path) + ".coordination", token: "synthetic-test", fetch: transport });
     const first = adapter.decide(request);
     const second = await adapter.decide(request);
     assert.equal(second.reason, "repeated-observation-unavailable");

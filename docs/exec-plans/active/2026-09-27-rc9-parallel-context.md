@@ -286,7 +286,14 @@ repeating the fresh cases after inspecting them would turn them into development
 held-out proof. No ordinary accepted-task savings are established.
 
 The operator raised the operation envelope from 15 to 30 seconds after a large inventory exhausted
-metadata time. This does not enlarge source permission or spending. The affected review, source
-checks and installed-package proof are complete; exact commit/tag and release readback remain.
+metadata time. This does not enlarge source permission or spending. The first tagged workflow then
+exposed a startup HTTP deadline race outside the retrieval changes: the local timer could abort a
+pending call while its provider error was reported as an ordinary abort. The runtime now names that
+deadline consistently and retains the underlying error for diagnosis. A loaded local suite also
+exposed a duplicate-event test whose 30-millisecond timer could expire before its assertion; the
+test now grants one second while retaining its single-dispatch and timeout checks. The corrected
+full suite, typecheck and clean installed-archive proof pass. A narrow Claude Opus 5.5 medium review
+found no blocking deadline defect. Source sign-off, the corrected commit and tagged workflow rerun
+remain before release readback.
 Keep failed development results intact. All identities, source copies, review audits and results
 remain outside this checkout. No adopter upgrade or publication has occurred.
