@@ -229,7 +229,7 @@ expansion regressions. Complete the whole related batch before consolidated QA o
 
 ## P6 — Publish and adopt deliberately
 
-- [ ] Freeze exact source, satisfy change-narrative and release checks, publish immutable
+- [x] Freeze exact source, satisfy change-narrative and release checks, publish immutable
   `3.0.0-rc.9`, and read back tag, archive, runtime lock and checksums using the existing release process.
   Respect the operator's standing publication authorization; do not disable repository CI as a side effect.
 - [ ] At an authorized adoption seam, inspect registered active worktrees and shared hook ownership.
@@ -308,7 +308,9 @@ proof. The third tagged native Linux workflow passed the legacy Python and wheel
 failed one diagnostic fixture in the default-concurrency Node suite: a child read stopped before
 the fixture reached its three-probe cap. That same case passes alone on Linux. The engine test
 runner now bounds file concurrency, and that fixture has enough execution time for the three-read
-authority claim; separate explicit deadline tests keep their short budgets. A new source sign-off,
-tagged native Linux run and exact release readback remain open.
+authority claim; separate explicit deadline tests keep their short budgets. The final tagged native
+Linux workflow passed source tests, typecheck, packaging and installed proof. The tag resolves to
+the qualified commit; the published archive matches the local qualified bytes, its lock names that
+commit, and the release is immutable. Adopter upgrades and ordinary-task measurement remain open.
 Keep failed development results intact. All identities, source copies, review audits and results
-remain outside this checkout. No adopter upgrade or publication has occurred.
+remain outside this checkout. No adopter upgrade has occurred.
