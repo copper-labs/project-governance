@@ -11,8 +11,10 @@ summary: Improve prompt and metadata fidelity, rank useful context across the pe
 
 # RC9 context quality and parallel selection
 
-The operator accepted this release direction on September 27, 2026. The RC9 source implementation
-is complete; release qualification remains open because a frozen source case still regresses.
+The operator accepted this release direction on September 27, 2026. The first RC9 implementation
+exposed a qualification defect: finding a relevant file or anchor line did not ensure that the
+model received the implementation or assertion that answered the request. Passage correction and
+release qualification remain open.
 Installed RC8 behavior remains unchanged until
 deliberate adoption. The [implementation plan](../exec-plans/active/2026-09-27-rc9-parallel-context.md)
 owns delivery status.
@@ -54,8 +56,8 @@ Do not add a summary-generating model, a second index or a new knowledge service
 | Eligible code disappears | Reconcile the source-extension policy with extraction support, including TS module variants and component files. Unknown syntax gets honest text-only facts. Replace the arbitrary short-path rejection with bounded canonical-path validation; retain traversal, secret, binary and generated-file exclusions. |
 | Sparse or unfinished index | Distinguish path-only, parsed, truncated, pending and failed extraction from useful authored documentation. A cold or interrupted index must not report a complete semantic assessment. Reuse unchanged facts within the existing worktree identity. |
 | Current intent is cut off | Preserve the complete accepted current prompt before optional prior-task background. Remove silent character slicing. If the provider payload cannot represent the current request, disclose the limit and use local fallback; do not classify a silently shortened task. |
-| Relevant files arrive in the wrong order | Preserve mandatory and explicitly pinned material, then rank optional positive answers by returned relevance score with stable path/identity ties. Retain uncertainty and fallback candidates. Scores are model estimates, not calibrated guarantees; keep threshold changes separate and measured. |
-| Correct file, wrong excerpt | Use existing heading/symbol spans to select useful whole-line passages within the existing packet allowance. Permit bounded separate passages when the request spans sections, with exact references and original-source access. Do not pass a file-level relevance result off as passage-level proof. |
+| Relevant files arrive in the wrong order | Preserve mandatory and explicitly pinned material, then use metadata relevance to order optional files with stable path/identity ties. Positive passage judgments can promote the positive set for delivery but cannot use small probability differences to overturn its file order. Retain uncertainty and fallback candidates. Scores are model estimates, not calibrated guarantees. |
+| Correct file, wrong excerpt | Prefer a complete, bounded test, declaration or document section over an arbitrary high-scoring line window. Preserve exact original ranges and hashes. Mark a selected unit incomplete when its body does not fit; never call its label or setup proof of its assertions. |
 
 Required instructions cannot be shortened or demoted by these changes. Excluded paths remain
 excluded. Better metadata does not replace source inspection for diagnosis or code changes.
@@ -63,6 +65,60 @@ An apparent contradiction between prose and source must remain visible, not be r
 Literal test descriptions can supplement declarations, with their own bounded metadata field and
 exact source spans. They are authored clues, not proof that a test ran or passed. Keep them out of
 symbol/signature counts, disclose capped extraction, and allow nested source spans to overlap.
+Within the existing 96-span bound, test files reserve eight slots for literal test labels. This
+keeps abundant declarations from hiding every authored test body; reaching either bound remains
+visible as partial extraction.
+
+After metadata selection across the complete permitted inventory (which may return partial
+coverage), optionally ask JEV whether each captured passage directly
+contains evidence for the original request, and classify its role (implementation, test,
+documentation, operations or other) only where the source path does not already establish that role.
+These are distinct typed questions over the same bounded,
+source-permitted passages. An uncertain, invalid, missing or late answer cannot exclude a source;
+the existing local order remains available. This stage is explicitly enabled in the DL03 question
+list and shares the same retrieval clock, source permissions, family spend and receipt chain. It
+never adds a second source index or authorizes an action. The passage judgment refers to the
+actual captured constituent passage, not a file description. Record its exact range and digest;
+deterministic composition may join several positively judged constituents for delivery.
+
+Group consecutive small declarations of the same observed syntax kind into a passage of at most
+1,024 bytes when only blank or comment lines separate them. Preserve each member's original span
+and completeness. This reduces repeated question framing and lets related validators or assertions
+reach JEV together. Rank these observed units using the existing source terms. Offer two rounds
+across the four strongest permitted file ranks, then continue breadth-first across the remaining
+files, with at most 64 prepared passages. This bounds source work without removing any path from
+the metadata inventory. Record eligible, prepared, assessed and capped units separately.
+
+For this opt-in stage, retain up to one quarter of the existing byte allowance, capped at 65,536
+bytes, and up to two calls for passage work. Leave at least one configured call for metadata.
+Read cumulative family spending, including prior passage calls, before planning each stage. Fit
+passage batches to the remaining allowance before dispatch; never open a second paid allowance.
+The transactional runtime still owns admission if concurrent work consumes the planned capacity.
+Reduced metadata coverage must remain explicit. A large inventory may need an operator-approved
+budget change; a longer clock alone cannot resolve a spending limit.
+
+The deterministic packet builder keeps required and explicit material first. For optional material,
+it promotes positive direct-evidence judgments in existing metadata/local order, choosing the
+earliest positive with a new role before repeating a role. Passage probabilities determine the
+positive threshold; they do not replace the file or prepared-unit ranking. Promote positive files
+only within contiguous runs of files actually assessed at passage level. An unassessed or invalid
+judgment keeps its original position and cannot be displaced by lower-ranked positives. It does not impose a fixed
+role quota: a request may need two tests or no test. A role label alone is not evidence of relevance.
+Uncertain judgments retain metadata/local order and local excerpts. Join adjacent positive source
+ranges when their bounded union fits, keeping the separating source lines and exact hashes. Admit
+passages in judgment order before joining; a later neighbor cannot crowd out an earlier admitted
+passage. If a
+judged composition cannot be represented or its source changed, return the local excerpt and a
+named judgment limitation.
+The packet records complete-unit versus partial-unit coverage, omitted useful candidates and the
+reason a candidate did not fit. Original files remain addressable for follow-up reads.
+
+If the maintained index lacks current syntax facts for an already captured optional source, use
+the same literal extractor on those bytes before passage selection. Reuse matching cached facts;
+bound new extraction to 64 captured files, 256 KiB each and the remaining selection clock. Record
+reuse, extraction and limitations. This neither writes a second index nor scans more source paths.
+Cold index state must not reduce an available captured file to one lexical window merely because
+its syntax facts have not reached the cache yet.
 
 For a new repository, readiness should distinguish an empty inventory from a broken index and
 identify missing project purpose or authoritative guidance. Do not invent architecture to fill an
@@ -102,19 +158,20 @@ This uses the existing evaluation endpoint, not a new asynchronous bulk-job API 
 
 | Boundary | RC9 behavior |
 | --- | --- |
-| Complete retrieval operation | At most 15,000 ms of cooperative work, starting before local preparation |
+| Complete retrieval operation | At most 30,000 ms of cooperative work, starting before local preparation |
 | Provider selection and admission | Use the remaining operation time, reserving the final 500 ms for delivery and cleanup |
+| Opt-in passage stage | Reserve the last 5,000 ms of selection for passage preparation and judgment; unused time does not delay return |
 | Individual metadata request | Retain the existing one-second cap or stricter profile deadline; start this clock at actual dispatch |
-| Managed prompt hook | 20 seconds, allowing process startup and return/cleanup around the runtime's 15-second operation |
+| Managed prompt hook | 40 seconds, allowing process startup and return/cleanup around the runtime's 30-second operation |
 
-The 15 seconds is an upper bound, not an intended delay or 15 seconds per batch. Return as soon as
+The 30 seconds is an upper bound, not an intended delay or 30 seconds per batch. Return as soon as
 useful work is complete. Preparation, queue waiting, packing, selection and validation share the
 same operation deadline. Do not retain a hidden 3.5-second selection default in CLI, prompt,
 provider-context or expansion callers. A caller cancellation can end work sooner.
 Other decision consumers retain their configured total call allowance, including admission; they
 do not gain a second full HTTP allowance after waiting. Without an explicit caller cutoff, expiry
 of that original allowance remains provider-owned for failure reporting and scoped suppression.
-Compute the selection cutoff as operation start plus 14,500 ms. Each dispatched call gets the
+Compute the selection cutoff as operation start plus 29,500 ms. Each dispatched call gets the
 smaller of its individual cap and the time remaining to that cutoff. Preparation that consumes
 the selection allowance proceeds directly to local delivery, without opening another clock.
 
@@ -126,7 +183,7 @@ record overruns rather than claiming that JavaScript timers can interrupt arbitr
 
 Each explicit expansion has the same operation envelope and shares the original family's paid
 allowance, lifetime and two-expansion ceiling. A task switch or expansion cannot reset spending.
-The hook installer reconciles exact known managed definitions to 20 seconds through the existing
+The hook installer reconciles exact known managed definitions to 40 seconds through the existing
 backed process; preserve authored handlers and follow RC8 shared-source discovery. Doctor must
 identify an older effective timeout. Host approval and observed prompt delivery remain adoption proof.
 
@@ -271,7 +328,11 @@ Mark development cases versus reserved cases before tuning; do not tune on every
 same set independent validation. Pin the model, attempt limit and spend ceiling before live execution.
 
 Score evidence groups rather than demanding one exact file when equivalent authoritative evidence
-exists. Check both retrieval and delivery: needed files found, needed passages delivered, misleading
+exists. A source satisfies a group only when delivered lines contain the substantive behavior or
+assertions named in its frozen answer rubric; a matching path, heading, test label or setup line is
+insufficient. An inclusive proof range requires every line in that range, not just its endpoints.
+Independently review any equivalent source and record why it proves the same point
+before comparison. Check both retrieval and delivery: needed files found, needed passages delivered, misleading
 material included, required guidance retained, bytes delivered, follow-up reads, latency and provider
 usage. Record a reason at each lost step: missing source, extraction, disclosure, ranking, packet
 budget, dispatch or host delivery. Where a downstream model is not run, extra reads and task outcome
@@ -300,7 +361,7 @@ repository shape that lacks authorized live proof. A small benchmark supports th
 not a claim of broad accuracy or production savings.
 
 A healthy representative inventory larger than one batch must finish with complete permitted
-coverage within the 15-second operation, without lost required context or leaked leases. A larger
+coverage within the 30-second operation, without lost required context or leaked leases. A larger
 or deliberately slow inventory may return partial coverage with correct cutoff/fallback evidence.
 No fixed inventory size can guarantee complete live service responses under every workload.
 

@@ -7,6 +7,11 @@ export function metadataQuestionGroup(consumerId: string, questions: QuestionIns
   return consumerId === "DL03" && Array.isArray(questions) && questions.length > 0 &&
     questions.every(question => question.consumerId === "DL03" && question.definitionId === "context.metadata-relevance/1");
 }
+export function passageQuestionGroup(consumerId: string, questions: QuestionInstance[]): boolean {
+  return consumerId === "DL03" && Array.isArray(questions) && questions.length > 0 &&
+    questions.every(question => question.consumerId === "DL03" &&
+      ["context.passage-evidence/1", "context.passage-role/1"].includes(question.definitionId));
+}
 
 /** One schema owner for the expanded decision contract; every validator below derives from it. */
 export const DECISION_SCHEMA_VERSION = 2;
@@ -86,7 +91,9 @@ export function decisionConsumerId(value: unknown): DecisionConsumerId {
 export function validateDecisionRequest(request: DecisionRequest2, definitions: Record<string, QuestionDefinition>): void {
   if (request.schemaVersion !== DECISION_SCHEMA_VERSION) throw new Error("Unsupported decision schema version");
   const metadata = metadataQuestionGroup(request.consumerId, request.questions);
-  if (request.evidenceLayout !== undefined && (!["shared-v1", "per-question-v1"].includes(request.evidenceLayout) || !metadata)) throw new Error("Unsupported shared evidence layout");
+  if (request.evidenceLayout !== undefined && (!["shared-v1", "per-question-v1"].includes(request.evidenceLayout) ||
+    !(metadata || request.evidenceLayout === "shared-v1" && passageQuestionGroup(request.consumerId, request.questions))))
+    throw new Error("Unsupported shared evidence layout");
   text(request.requestId, "decision request id", 64);
   decisionConsumerId(request.consumerId);
   if (!Array.isArray(request.consumers) || !request.consumers.length || request.consumers.length > DECISION_CONSUMER_IDS.length ||

@@ -34,14 +34,16 @@ test("prompt hooks preserve complete bounded output and reconcile only the exact
  const config=plan.configuration as {hooks:Record<string,{hooks:Record<string,unknown>[]}[]>};
  const prompt=config.hooks.UserPromptSubmit![0]!.hooks[0]!;
  assert.equal(prompt.additionalContextLimit,0);
- assert.equal(prompt.timeout,20);
+ assert.equal(prompt.timeout,40);
  prompt.timeout=10;
  assert.equal(config.hooks.SessionStart![0]!.hooks[0]!.additionalContextLimit,undefined);
  delete prompt.additionalContextLimit;
  const original=JSON.stringify(config),updated=startupHooks(config,"/project","/external/tasks.sqlite");
  assert.equal(JSON.stringify(config),original);
  assert.equal((updated.configuration as typeof config).hooks.UserPromptSubmit![0]!.hooks[0]!.additionalContextLimit,0);
- assert.equal((updated.configuration as typeof config).hooks.UserPromptSubmit![0]!.hooks[0]!.timeout,20);
+ assert.equal((updated.configuration as typeof config).hooks.UserPromptSubmit![0]!.hooks[0]!.timeout,40);
+ prompt.timeout=20;prompt.additionalContextLimit=0;
+ assert.equal((startupHooks(config,"/project","/external/tasks.sqlite").configuration as typeof config).hooks.UserPromptSubmit![0]!.hooks[0]!.timeout,40);
  prompt.additionalContextLimit=1200;
  assert.throws(()=>startupHooks(config,"/project","/external/tasks.sqlite"),/differs/);
 });

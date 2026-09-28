@@ -3,11 +3,14 @@ import { contextExcerpt } from "./context-excerpts.ts";
 import { canonical, digest, text } from "./core.ts";
 import { CONTEXT_PATH_LIMIT, CONTEXT_PROMPT_LIMIT } from "./context-limits.ts";
 import type { Candidate, DecisionOptions, DecisionProvider, DecisionRequest, DecisionResult } from "./decisions.ts";
+import type { PassageJudgment } from "./context-passage-advice.ts";
 
 export interface ContextPacketRequest {
   taskRevision: string; purpose: string; required: Candidate[]; optional: Candidate[]; maximumBytes: number; optionalExcerptBytes?: number;
   priorityIds?: string[];
   sourceSpans?: Record<string, Array<{ name: string; start: number; end: number }>>;
+  passageJudgments?: Record<string, PassageJudgment>;
+  passageAssessedIds?: string[];
 }
 
 /** Ranking can reorder optional evidence; it cannot remove required context or introduce source. */
@@ -24,8 +27,16 @@ export async function buildContextPacket(input: ContextPacketRequest, provider: 
   const bytes = (entries: Candidate[]) => Buffer.byteLength(canonical(entries));
   if (bytes(input.required) > input.maximumBytes) throw new Error("required context exceeds budget");
   if (input.optionalExcerptBytes !== undefined && (!Number.isSafeInteger(input.optionalExcerptBytes) || input.optionalExcerptBytes < 128 || input.optionalExcerptBytes > 65536)) throw new Error("Optional excerpt budget must be 128 to 65536 bytes");
-  const optional = input.optionalExcerptBytes === undefined ? input.optional
-    : input.optional.map(candidate => contextExcerpt(candidate, input.purpose, input.optionalExcerptBytes!, input.sourceSpans?.[candidate.id]));
+  const judgmentLimitations: Record<string, "judgment-source-mismatch" | "judgment-not-representable"> = {};
+  const optional = input.optionalExcerptBytes === undefined ? input.optional : input.optional.map(candidate => {
+    const baseline = () => contextExcerpt(candidate, input.purpose, input.optionalExcerptBytes!, input.sourceSpans?.[candidate.id]);
+    const judgment = input.passageJudgments?.[candidate.id];
+    if (!judgment || judgment.interpretation !== "positive") return baseline();
+    if (judgment.sourceDigest !== candidate.sourceDigest) { judgmentLimitations[candidate.id] = "judgment-source-mismatch"; return baseline(); }
+    const excerpt = contextExcerpt(candidate, input.purpose, input.optionalExcerptBytes!, input.sourceSpans?.[candidate.id], judgment.preferredSpans);
+    if (digest(excerpt.excerpt) !== judgment.excerptDigest) { judgmentLimitations[candidate.id] = "judgment-not-representable"; return baseline(); }
+    return excerpt;
+  });
   const unrepresentable = new Set(input.optionalExcerptBytes === undefined ? [] : optional
     .filter((candidate, index) => Buffer.byteLength(candidate.excerpt) > input.optionalExcerptBytes! ||
       (!candidate.excerpt.trim() && Boolean(input.optional[index]!.excerpt.trim())))
@@ -55,6 +66,35 @@ export async function buildContextPacket(input: ContextPacketRequest, provider: 
     if (!Array.isArray(input.priorityIds) || input.priorityIds.length > 128 || input.priorityIds.some(id => !ids.includes(id))) throw new Error("Invalid context priority paths");
     order = [...new Set([...input.priorityIds.filter(id => order.includes(id)), ...order])];
   }
+  if (input.passageJudgments) {
+    const pinned = new Set(input.priorityIds ?? []);
+    const assessed = new Set(input.passageAssessedIds ?? Object.keys(input.passageJudgments));
+    const positive = (id: string) => input.passageJudgments?.[id] &&
+      input.passageJudgments[id]!.interpretation === "positive" && !judgmentLimitations[id] &&
+      input.passageJudgments[id]!.sourceDigest === optional.find(entry => entry.id === id)?.sourceDigest &&
+      input.passageJudgments[id]!.excerptDigest === digest(optional.find(entry => entry.id === id)?.excerpt);
+    const unpinned = order.filter(id => !pinned.has(id)), reordered: string[] = [];
+    let segment: string[] = [];
+    const flush = () => {
+      const remaining = segment.filter(positive), roles = new Set<string>(), balanced: string[] = [];
+      while (remaining.length) {
+        const nextRole = balanced.length ? remaining.findIndex(id => {
+          const role = input.passageJudgments![id]!.role;
+          return role !== null && !roles.has(role);
+        }) : 0;
+        const id = remaining.splice(nextRole < 0 ? 0 : nextRole, 1)[0]!; balanced.push(id);
+        if (input.passageJudgments![id]!.role) roles.add(input.passageJudgments![id]!.role!);
+      }
+      reordered.push(...balanced, ...segment.filter(id => !balanced.includes(id)));
+      segment = [];
+    };
+    for (const id of unpinned) {
+      if (!assessed.has(id) || judgmentLimitations[id]) { flush(); reordered.push(id); }
+      else segment.push(id);
+    }
+    flush();
+    order = [...order.filter(id => pinned.has(id)), ...reordered];
+  }
   const selected = [...input.required], omitted = input.optional
     .filter(candidate => unrepresentable.has(candidate.id))
     .map(candidate => candidate.id);
@@ -68,8 +108,8 @@ export async function buildContextPacket(input: ContextPacketRequest, provider: 
     else { omitted.push(id); omissionReasons[id] = "packet-budget"; }
   }
   return { version: 1 as const, taskRevision: input.taskRevision, inputDigest: digest(input),
-    entries: selected, omitted, omissionReasons, bytes: bytes(selected), decision, reason,
+    entries: selected, omitted, omissionReasons, judgmentLimitations, bytes: bytes(selected), decision, reason,
     measurement: { excerpts: selected.filter(entry => entry.sourceRange || entry.sourceRanges).map(entry => ({ id: entry.id, sourceDigest: entry.sourceDigest,
-      ...entry.sourceRange, ...(entry.sourceRanges ? { ranges: entry.sourceRanges } : {}) })), availableOptionalBytes: bytes(input.optional), deliveredBytes: bytes(selected),
+      ...entry.sourceRange, ...(entry.sourceRanges ? { ranges: entry.sourceRanges } : {}), ...(entry.sourceUnits ? { units: entry.sourceUnits } : {}) })), availableOptionalBytes: bytes(input.optional), deliveredBytes: bytes(selected),
       tokenSavings: null, benefit: "not-evaluated" as const } };
 }

@@ -4,14 +4,36 @@ import { extname, posix } from "node:path";
 import { createHash } from "node:crypto";
 import { sourceClues } from "./context-source-index.ts";
 import { localDocumentLinks } from "./checkers/document-links.ts";
+import type { Candidate } from "./decisions.ts";
 
-export const SOURCE_EXTRACTOR = "literal-syntax-5";
+export const SOURCE_EXTRACTOR = "literal-syntax-6";
 export interface SourceSpan { kind: string; name: string; signature: string; start: number; end: number }
 export interface SourceLink { kind: "import" | "export" | "require" | "reference" | "dynamic-import" | "document"; target: string; line: number }
 export interface SourceFacts {
   digest: string; language: string; bytes: number; descriptor: string | null;
   coverage: "syntax" | "syntax-partial" | "markdown" | "heuristic" | "unavailable";
   spans: SourceSpan[]; links: SourceLink[]; documentationApplicable: boolean; overviewObserved: boolean;
+}
+
+/** Reuse current facts or extract only already captured bytes when the index is still cold. */
+export function capturedSourceSpans(candidates: Candidate[], cached: ReadonlyMap<string, Pick<SourceFacts, "digest" | "spans">>, deadlineAt: number) {
+  if (candidates.length > 64) throw new Error("Too many captured sources for bounded syntax extraction");
+  const started = performance.now(), spans: Record<string, SourceSpan[]> = {};
+  const limitations: Array<{ path: string; reason: string }> = [];
+  let reusedCount = 0, extractedCount = 0;
+  for (const candidate of candidates) {
+    const existing = cached.get(candidate.id);
+    if (existing?.digest === candidate.sourceDigest) { spans[candidate.id] = existing.spans; reusedCount++; continue; }
+    if (performance.now() >= deadlineAt) { limitations.push({ path: candidate.id, reason: "facts-deadline" }); continue; }
+    if (Buffer.byteLength(candidate.excerpt) > 256 * 1024) { limitations.push({ path: candidate.id, reason: "facts-size-limit" }); continue; }
+    try {
+      const facts = extractSourceFacts(candidate.id, Buffer.from(candidate.excerpt));
+      if (facts.digest !== candidate.sourceDigest) { limitations.push({ path: candidate.id, reason: "facts-source-mismatch" }); continue; }
+      spans[candidate.id] = facts.spans; extractedCount++;
+    } catch { limitations.push({ path: candidate.id, reason: "facts-unavailable" }); }
+  }
+  return { spans, coverage: { capturedCount: candidates.length, reusedCount, extractedCount,
+    spanFileCount: Object.values(spans).filter(items => items.length).length, limitations, elapsedMs: performance.now() - started } };
 }
 const bounded = (value: string, size: number) => Buffer.from(value).subarray(0, size).toString("utf8").replace(/\uFFFD$/u, "");
 export function extractSourceFacts(path: string, bytes: Buffer): SourceFacts {
@@ -32,9 +54,10 @@ function extractTypeScriptFacts(path: string, text: string, facts: SourceFacts):
   const file = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, true);
   let nodes = 0, limited = false;
   const testLabels: string[] = [];
+  const testFile = /(?:^|\/)(?:tests?\/|[^/]+\.(?:test|spec)\.)/u.test(path);
   const line = (offset: number) => file.getLineAndCharacterOfPosition(offset).line + 1;
   const declaration = (node: ts.Node) => {
-    if (facts.spans.length >= 96) { limited = true; return; }
+    if (facts.spans.length >= (testFile ? 88 : 96)) { limited = true; return; }
     if (!(ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node) || ts.isInterfaceDeclaration(node) ||
         ts.isTypeAliasDeclaration(node) || ts.isEnumDeclaration(node) || ts.isVariableDeclaration(node) || ts.isMethodDeclaration(node))) return;
     if (!node.name || !ts.isIdentifier(node.name)) return;
@@ -60,7 +83,7 @@ function extractTypeScriptFacts(path: string, text: string, facts: SourceFacts):
   const visit = (node: ts.Node) => {
     if (++nodes > 20000 || facts.links.length >= 128) { limited = true; return; }
     // Labels are authored behavior clues, not proof of a passing test. Nested ranges may overlap.
-    if (ts.isCallExpression(node) && /(?:^|\/)(?:tests?\/|[^/]+\.(?:test|spec)\.)/u.test(path)) {
+    if (ts.isCallExpression(node) && testFile) {
       const call = node.expression, callee = ts.isPropertyAccessExpression(call) && ["only", "skip", "todo"].includes(call.name.text) ? call.expression : call;
       const label = node.arguments[0];
       if (ts.isIdentifier(callee) && ["test", "it", "describe"].includes(callee.text) && label && ts.isStringLiteralLike(label)) {

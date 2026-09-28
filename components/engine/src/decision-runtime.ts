@@ -11,6 +11,7 @@ import { JevDecisionClient, decisionCancellationReason, type TransportOptions, t
 import { resolveConsumerMode, type DecisionSettings } from "./decision-settings.ts";
 import {
   decisionNativeUsage, parseDecisionEnvelope, requestIdentity,
+  metadataQuestionGroup, passageQuestionGroup,
   type DecisionConsumerId, type DecisionCoverage, type DecisionEffect, type DecisionFailureStage, type DecisionMode,
   type EvidenceItem, type QuestionInstance, type QuestionOutcome,
 } from "./decision-schema.ts";
@@ -139,7 +140,9 @@ export class DecisionRuntime {
     const started = performance.now();
     const signals = [this.#options.signal, ask.signal].filter((signal): signal is AbortSignal => signal !== undefined);
     const signal = signals.length ? AbortSignal.any(signals) : undefined;
-    const resolved = this.eligibility(ask.consumerId, ask.evidenceLayout ? "context.metadata-relevance/1" : undefined);
+    const metadata = metadataQuestionGroup(ask.consumerId, ask.questions);
+    const passage = passageQuestionGroup(ask.consumerId, ask.questions);
+    const resolved = this.eligibility(ask.consumerId, metadata ? "context.metadata-relevance/1" : undefined);
     const consumer = resolved.consumer;
     const requestId = randomUUID();
     const key = this.#eventKey(ask);
@@ -173,9 +176,8 @@ export class DecisionRuntime {
     if (!ask.questions.length) return fallback("no-enabled-questions");
     if (ask.legacyDataClass !== undefined && (participants.length !== 1 || participants[0] !== "DL03" ||
       ask.questions.some(question => question.definitionId !== "legacy.context-rank/1"))) return fallback("data-sharing-disabled");
-    const metadata = ask.evidenceLayout !== undefined;
-    if (metadata && (participants.length !== 1 || ask.consumerId !== "DL03" || ask.legacyDataClass !== undefined ||
-      ask.questions.some(question => question.definitionId !== "context.metadata-relevance/1"))) return fallback("data-sharing-disabled");
+    if (ask.evidenceLayout && (participants.length !== 1 || ask.consumerId !== "DL03" || ask.legacyDataClass !== undefined ||
+      !(metadata || passage && ask.evidenceLayout === "shared-v1"))) return fallback("data-sharing-disabled");
     const dataClass = (id: DecisionConsumerId) => metadata ? "metadata" : ask.legacyDataClass ?? DECISION_CONSUMERS[id].dataClass;
     if (participants.some(id => !this.settings.legacy.allowedDataClasses.includes(dataClass(id)))) return fallback("data-sharing-disabled");
     if (metadata && ask.sourcePaths?.length && (!this.settings.legacy.allowedDataClasses.includes("source") ||
@@ -199,7 +201,8 @@ export class DecisionRuntime {
         if (entry === "workflow-diagnose") return true;
         return effect !== "advise" || (resolved.effect !== "advise" && !(entry === "workflow-observe" && resolved.effect === "choose-read"));
       })) return fallback("entry-effect-incompatible");
-    if (ask.budgetFamily && !ask.budgetPartition || ask.budgetPartition && (ask.budgetPartition !== "context-selection" || !metadata || !/^[a-f0-9]{64}$/u.test(ask.budgetInvocationId ?? "")) ||
+    if (ask.budgetFamily && !ask.budgetPartition || ask.budgetPartition && (ask.budgetPartition !== "context-selection" ||
+      !(metadata || passage) || !/^[a-f0-9]{64}$/u.test(ask.budgetInvocationId ?? "")) ||
       ask.budgetInvocationId && !ask.budgetPartition) return fallback("budget-partition-incompatible");
     if (ask.deadlineAt !== undefined && !Number.isFinite(ask.deadlineAt)) return fallback("invalid-deadline");
     if (!this.#client.tokenPresent) return fallback("missing-token");
@@ -218,7 +221,7 @@ export class DecisionRuntime {
     // The reservation identity is the consumer-group event key, so one event cannot be spent twice.
     let admittedReservation: BudgetReservation | undefined;
     // A metadata batch must get a genuine provider timeout before the larger retrieval allowance.
-    const providerDeadline = metadata ? Math.min(this.settings.legacy.deadlineMs, 1000) : this.settings.legacy.deadlineMs;
+    const providerDeadline = metadata || passage ? Math.min(this.settings.legacy.deadlineMs, 1000) : this.settings.legacy.deadlineMs;
     const deadlineAt = ask.deadlineAt ?? started + this.settings.legacy.deadlineMs;
     if (performance.now() >= deadlineAt) return fallback("deadline", { requestIdentity: identity });
     const transport = await this.#client.ask(body, providerDeadline, signal, () => {

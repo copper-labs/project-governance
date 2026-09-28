@@ -28,7 +28,7 @@ export function startupHooks(configuration:unknown,workspace:string,receipts:str
     if(handler.command.includes("startup observe") && handler.command.includes("project-governance")) {
      const timeout=events[name as keyof typeof events];
      const completePrompt=name==="UserPromptSubmit" && handler.additionalContextLimit===0;
-     const previousPromptTimeout=name==="UserPromptSubmit" && [10,15].includes(Number(handler.timeout)) && typeof handler.timeout==="number";
+     const previousPromptTimeout=name==="UserPromptSubmit" && [10,15,20].includes(Number(handler.timeout)) && typeof handler.timeout==="number";
      if(!timeout || handler.command!==command || handler.type!=="command" || handler.timeout!==timeout && !previousPromptTimeout ||
        Object.keys(handler).length!==(completePrompt?4:3) ||
        (handler.additionalContextLimit!==undefined && !completePrompt) || Object.keys(group).length!==1)

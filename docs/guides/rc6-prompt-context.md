@@ -212,9 +212,10 @@ or resumes the continuity task when intent and scope are clear. Checks retain th
 
 The accepted [RC9 specification](../specs/engine-rc9-parallel-context.md) and
 [implementation plan](../exec-plans/active/2026-09-27-rc9-parallel-context.md) replace the separate
-3.5-second selection cutoff with one 15-second total retrieval budget. Preparation and waiting
+3.5-second selection cutoff with one 30-second total retrieval budget. Preparation and waiting
 count toward it, with the last 500 ms reserved for delivery/cleanup. Managed prompt hooks allow
-20 seconds so the host can start and return the bounded operation.
+40 seconds so the host can start and return the bounded operation. Opt-in passage judgment retains
+the last five seconds of selection and shares the existing call/byte allowance.
 
 JEV will receive fuller metadata batches where existing byte limits permit them, with at most
 four requests in flight through one local pool shared across worktrees. Rate pacing and brief
@@ -228,6 +229,15 @@ only when it still delivers the evidence needed for the task.
 The implementation and live comparison are pending. Do not change an RC8 timeout alone and call
 that the parallel selection repair. Coordinated adoption must include the effective shared hook
 source, each selected worktree's launcher and ordinary prompt receipts.
+
+To opt in to RC9 passage judgment, preserve existing DL03 questions and add
+`context.passage-evidence/1` and `context.passage-role/1` beside
+`context.metadata-relevance/1`. This sends bounded source passages from approved paths after
+metadata selection. It does not send whole files. Known test, implementation and documentation
+roles come from paths; JEV only classifies the role where that remains unknown. A positive answer
+can change optional passage delivery. Missing credentials, uncertainty or an exhausted allowance
+retains local excerpts and references to the originals. Existing profiles do not gain these questions
+merely by upgrading.
 
 ## Continue a native prompt entry
 

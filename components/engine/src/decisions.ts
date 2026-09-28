@@ -11,7 +11,8 @@ import { boundDecisionEvidence, type ExcerptCoverage } from "./decision-excerpts
 
 export type DecisionKind = "rank_optional_context" | "rank_diagnostics" | "advise_intent";
 export interface SourceRange { firstLine: number; lastLine: number; totalLines: number; excerptDigest: string; complete: false }
-export interface Candidate { id: string; sourceDigest: string; excerpt: string; sourceRange?: SourceRange; sourceRanges?: SourceRange[] }
+export interface SourceUnit { kind: string; name: string; firstLine: number; lastLine: number; complete: boolean }
+export interface Candidate { id: string; sourceDigest: string; excerpt: string; sourceRange?: SourceRange; sourceRanges?: SourceRange[]; sourceUnits?: SourceUnit[] }
 export interface DecisionRequest {
   version: 1; kind: DecisionKind; taskRevision: string; purpose: string;
   candidates: Candidate[]; dataClass: "source" | "diagnostic" | "synthetic";

@@ -119,9 +119,10 @@ check required-context budgets across routes. The accepted
 [RC9 context quality and parallel selection contract](specs/engine-rc9-parallel-context.md) and
 [implementation plan](exec-plans/active/2026-09-27-rc9-parallel-context.md) define metadata/prompt
 repairs, useful passage delivery, real-repository scenarios, fuller JEV batches, bounded concurrent
-requests, shared local rate admission and a 15-second total retrieval budget.
-RC9 source implementation is complete; release qualification remains open on a measured ranking
-regression. These documents do not change installed RC8 behavior. The
+requests, shared local rate admission and a 30-second total retrieval budget.
+RC9 source implementation is in final qualification. Frozen development cases confirm a corrected
+ranking regression, while fresh cases expose remaining coverage and passage limits. These
+documents do not change installed RC8 behavior. The
 [computer-use research](research/2026-09-25-jev-computer-use.md) evaluates optional JEV action
 selection without declaring another executor part of the release.
 The [repository-index research](research/2026-09-25-repository-index-harness-practices.md) compares

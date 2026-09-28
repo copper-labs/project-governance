@@ -12,6 +12,7 @@ import { readDecisionBudget, contextFamilyScope, DECISION_BUDGET_FILE } from "..
 import { Store } from "../../harness/src/store/store.ts";
 import { defaultDbPath } from "../../harness/src/store/location.ts";
 import { DatabaseSync } from "node:sqlite";
+import { CONTEXT_OPERATION_MS } from "../src/context-timing.ts";
 
 const assets = resolve("src/project_governance_runtime/assets/skills"), cli = resolve("components/engine/src/cli.ts");
 function fixture(t: TestContext, paid: boolean) {
@@ -88,7 +89,7 @@ test("slow preparation retains selection time; expired operations return local c
   assert.equal(slow.metadata?.reason, "answered"); assert.equal(calls, 1);
   assert.ok(slow.timing.preparationMs >= 5500); assert.equal(slow.timing.limitReason, null);
   const late = await contextRouteCommand(["--task", "Second implementation"], f.root, assets, undefined,
-    { operationStartedAt: performance.now() - 16000 });
+    { operationStartedAt: performance.now() - CONTEXT_OPERATION_MS - 1000 });
   assert.equal(late.ready, true); assert.equal(late.metadata?.reason, "cancelled"); assert.equal(calls, 1);
   assert.equal(late.timing.limitReason, "operation-deadline"); assert.equal(late.timing.providerCallMs, 0);
 });

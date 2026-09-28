@@ -1,8 +1,9 @@
 /** Separate local preparation from optional provider latency; neither can renew the overall allowance. */
-export const CONTEXT_OPERATION_MS = 15_000;
+export const CONTEXT_OPERATION_MS = 30_000;
 export const CONTEXT_DELIVERY_RESERVE_MS = 500;
 export const CONTEXT_SELECTION_MS = CONTEXT_OPERATION_MS - CONTEXT_DELIVERY_RESERVE_MS;
-export const CONTEXT_HOOK_SECONDS = 20;
+export const CONTEXT_PASSAGE_RESERVE_MS = 5_000;
+export const CONTEXT_HOOK_SECONDS = 40;
 
 export class ContextTiming {
   readonly started: number;

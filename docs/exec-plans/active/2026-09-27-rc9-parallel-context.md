@@ -6,15 +6,15 @@ status: active
 owner: project-governance
 created: 2026-09-27
 updated: 2026-09-27
-summary: Repair context fidelity, qualify realistic repository scenarios, and deliver bounded parallel JEV selection within a 15-second retrieval envelope before RC9 publication.
+summary: Repair context fidelity, qualify realistic repository scenarios, and deliver bounded parallel JEV selection within a 30-second retrieval envelope before RC9 publication.
 ---
 
 # RC9 implementation plan
 
 Owner: [RC9 context quality and parallel selection specification](../../specs/engine-rc9-parallel-context.md).
-The operator has authorized implementation. RC9 source implementation and the first comparison
-are complete. Independent review corrections are reconciled. Release qualification remains open
-on a measured ranking regression; publication is pending. Package metadata names RC9 for local
+The operator has authorized implementation. The first RC9 comparison exposed a passage-quality
+regression and an evaluation that overcounted anchor lines. The five-part correction below is in
+progress; publication is pending. Package metadata names RC9 for local
 qualification only. Active adopter checkouts remain unchanged.
 
 One writer owns the timing, admission and selection batch. Work solo during preparation: the
@@ -24,8 +24,9 @@ review cycles. Runtime evidence, adopter identities and review artifacts remain 
 
 ## Accepted scope and defaults
 
-- A 15-second total retrieval operation, including local preparation and admission wait; reserve
-  its last 500 ms for return/cleanup and allow 20 seconds in the managed host hook.
+- A 30-second total retrieval operation, including local preparation and admission wait; reserve
+  its last 500 ms for return/cleanup and allow 40 seconds in the managed host hook. For opted-in
+  passage judgment, retain the last five seconds of selection. Return immediately when work finishes.
 - Remove the separate 3.5-second selection cutoff. Preserve the one-second individual metadata
   request cap or stricter profile setting, measured from actual dispatch.
 - Metadata-only batching up to 256 questions when existing evidence, wire and provider token bounds
@@ -39,11 +40,37 @@ review cycles. Runtime evidence, adopter identities and review artifacts remain 
 - Evaluate three different real repository shapes using frozen, external case artifacts. Keep
   installed-policy limitations, synthetic overlays and actual development outcomes distinct.
 
+## P5a — Correct useful-passage delivery before release
+
+- [x] Strengthen the external answer rubric. Freeze substantive behavior/assertion windows for
+  each expected evidence group, allow independently reviewed authoritative equivalents, and report
+  file recall separately from actual delivered proof. Do not promote a test name or setup to proof.
+- [x] Select a complete bounded source unit where one fits. If no relevant unit fits, return a
+  precisely ranged partial excerpt and mark it incomplete. Retain original source identity and
+  follow-up access; keep required content untouched.
+- [x] Add explicitly opt-in DL03 JEV questions for direct passage evidence and passage role. Pass
+  the original task and the actual bounded passage under current source policy. Use the existing
+  provider, family budget and 30-second envelope; preserve local fallback on every non-answer.
+- [x] Assemble optional passages by direct evidence and complementary roles in existing file/unit
+  relevance order, without a confidence-based re-sort, rigid quota or hidden exclusion. Record
+  omissions, completeness and JEV receipts.
+- [x] Run focused tests, then compare the frozen mobile, multilingual-library and web snapshots plus fresh held-out
+  cases under matched disclosure and packet limits. Account for missing proof, extra reads,
+  provider calls and time; do not infer accepted-task token savings from shorter output.
+
+The prior nine cases remain development/regression evidence because they have already been inspected.
+New reserved cases must be frozen before judging the corrected implementation. If the permitted
+profile cannot disclose needed source, report a policy limit rather than silently broadening it.
+Proof ranges are inclusive: checking only their endpoints is insufficient. Related small declarations
+now share one captured passage, with completeness per member; known source roles need no model call.
+Preparation spreads across ranked files and fits remaining call/byte allowance before dispatch.
+Uncertain answers retain local order and excerpts. Composition failures have named diagnostics.
+
 ## P0 — Freeze the contract and comparison
 
 - [x] Verify official API semantics: questions within a call and independent concurrent calls;
   published token/rate limits; no vendor basis for the local 63-question cap.
-- [x] Identify both local serialization points and define the 15-second envelope and shared-pool scope.
+- [x] Identify both local serialization points and define the 30-second envelope and shared-pool scope.
 - [x] Update owning specifications, navigation and version-qualified operator guidance.
 - [x] Before code changes, retain a hash-identified RC8 comparison artifact and synthetic fixture
   outside the checkout. Capture effective profile/model, required context, known relevant sources,
@@ -79,9 +106,10 @@ Owners: `context-source-index.ts`, `context-source-facts.ts`, `context-path-poli
   facts. Give empty projects actionable readiness without creating a mandatory prose-writing gate.
 - [x] Preserve the full accepted current prompt before optional task background. Replace silent
   truncation with explicit capacity/fallback evidence and test important intent at the end.
-- [x] Keep required/pinned material first, then order optional positive answers by score with stable
-  ties. Improve bounded passage selection through existing section/symbol spans, retaining exact
-  original references. Measure any extra passage work against the same 15-second operation.
+- [x] Keep required/pinned material first, then order optional files by metadata relevance with
+  stable ties. Direct positive passage judgments retain that file order. Improve bounded passage
+  selection through existing section/symbol spans, retaining exact
+  original references. Measure any extra passage work against the same 30-second operation.
 - [x] Compare per-question file metadata against the current shared layout using the same facts.
   Adopt a layout only from quality evidence; keep the current uncertainty threshold initially.
 
@@ -94,18 +122,18 @@ Track documentation backfill through existing gap recommendations when touched o
 Owners: `context-timing.ts`, `context-metadata.ts`, `decision-request-preparation.ts`,
 `decision-schema.ts`, `context-route-command.ts`, `startup-hooks.ts`, and affected prompt/host adapters.
 
-- [x] Implement the single 15-second operation deadline and delivery reserve. Inventory every
+- [x] Implement the single 30-second operation deadline and delivery reserve. Inventory every
   prompt, CLI, provider-context and expansion caller; remove obsolete selection defaults without
   changing unrelated index-maintenance limits that happen to use the same number.
 - [x] Separate queue/preparation time from the per-request dispatch clock. Record cutoff ownership
   so local deadlines cannot create provider cooldown.
 - [x] Define metadata-group count/evidence limits once. Pack using the real payload, profile limits
   and both token constraints, preserving source descriptions and complete inventory eligibility.
-- [x] Reconcile managed 15-second and other exact supported hook definitions to 20 seconds through
+- [x] Reconcile managed 10-, 15-, and 20-second hook definitions to 40 seconds through
   the existing backed/shared-source installer. Update readiness and portable host adapters together.
 
 Focused checkpoint: timing, request preparation/schema, metadata packing and shared-hook tests.
-Use fake clocks and representative payloads; no repeated 15-second sleeps. Prove the first call
+Use fake clocks and representative payloads; no repeated 30-second sleeps. Prove the first call
 gets its actual per-call allowance after a wait, old managed hooks are recognized, and authored
 definitions are preserved. Passing this slice alone does not qualify RC9 parallel behavior.
 
@@ -167,7 +195,7 @@ expansion regressions. Complete the whole related batch before consolidated QA o
 - [x] For each missing expected group, attribute the loss to source availability, extraction,
   disclosure, ranking, passage budget, dispatch or delivery. Record file recall and passage delivery
   separately; preserve unknown downstream token use, extra reads and task outcomes.
-- [ ] Use held-out cases once after tuning. Require no unexplained loss of required evidence or
+- [x] Use held-out cases once after tuning. Require no unexplained loss of required evidence or
   matched-baseline regression. Disclose policy-blocked cases and missing live coverage by repository
   shape; do not inflate success by excluding hard or unshared cases from reporting.
 - [x] Require full permitted coverage on the healthy representative fixture, expected relevant-source
@@ -177,7 +205,7 @@ expansion regressions. Complete the whole related batch before consolidated QA o
 - [x] Obtain one Claude architecture/code review on the frozen diff and existing evidence through
   the governed review route. Record the actual available model and effort; no silent substitution.
   Reconcile findings and recheck affected seams. Another broad cycle needs a new concrete risk.
-- [ ] Finish the release notes, operator guidance and implementation closeout. Do not claim ordinary
+- [x] Finish the release notes, operator guidance and implementation closeout. Do not claim ordinary
   accepted-task savings from this synthetic proof.
 
 ### Required focused matrix
@@ -196,7 +224,7 @@ expansion regressions. Complete the whole related batch before consolidated QA o
 | Deadline / steering cancellation | Stop admission and abort owned calls; no late packet mutation; correct spent/unknown usage and ownership release |
 | Crash / unavailable storage | Bounded lease recovery, no destructive reset, no ungoverned call and no refund of uncertain work |
 | Replay / task switch / expansion | Reuse only matching batches; original history, family allowance and lifetime survive |
-| Managed hook in linked worktree | Main definition source and sibling launcher agree; 20-second host envelope; authored hooks/trust preserved |
+| Managed hook in linked worktree | Main definition source and sibling launcher agree; 40-second host envelope; authored hooks/trust preserved |
 | Installed synthetic live comparison | Same model/input, coverage and relevance evidence, actual concurrency/timing/usage; all owned leases/readers settled |
 
 ## P6 — Publish and adopt deliberately
@@ -220,45 +248,45 @@ existing decision/runtime entry points, SQLite technology, receipt surfaces and 
 The local pool intentionally shares a conservative allowance across keys until measured contention
 justifies something more elaborate. Repair the existing extraction and packet path; do not add bulk
 generated summaries, a full semantic graph, an embedding service or a second retrieval framework.
-Keep the first external evaluation to nine real-source cases plus small controlled overlays. Expand
-only when a concrete miss needs a new case, rather than constructing a large benchmark platform.
+Keep the external evaluation to nine development cases, one fresh reserved case per repository shape,
+and small controlled overlays. Do not construct a large benchmark platform.
 
 ## Qualification findings and remaining seam
 
-The corrected source passed 661 engine, 73 continuity and four release-metadata tests, plus
-typecheck. Focused checks cover actual cross-process SQLite contention after dispatch, paid-budget
-exhaustion with concurrent siblings, deadline ownership, cleanup timing and multi-range delivery.
-The source governance check reported no blockers and 75 advisory comment findings.
+The initial transport and hook candidate completed focused, consolidated and installed proof.
+The passage correction changed that candidate, so earlier packaging and integrated qualification
+are not current release proof. The final engine suite passes 677 tests; typecheck, continuity,
+script, legacy wheel and clean installed-archive proof pass. The staged source governance run has
+only nonblocking comment warnings. Publication and exact tag/asset readback remain open.
 
-One Claude Opus 5.5 medium review and an affected recheck resolved the original ten findings.
-Small follow-up corrections remove duplicate literal test labels, preserve the original total
-deadline of other consumers, and finalize telemetry after cleanup. The extractor now has separate
-script, Markdown and native-format helpers. The reviewed transport and selection functions keep
-their shared operation lifetime; accepted cohesion is recorded in the existing policy registry.
-The governed review route could not start because this source checkout lacks the compiled profile
-facts. The explicit read-only Claude wrapper supplied the same review inputs; no silent model
-substitution or paid retry through the failed route occurred.
+An initial architecture review and affected recheck resolved the transport findings. The operator
+then requested another Claude Opus 5.5 medium second opinion on passage quality. It identified
+fine-grained question overhead, lost adjacent proof, role questions answered already by paths,
+confidence overriding uncertainty, incomplete budget reservation and an endpoint-only evaluation bug.
+An affected recheck found positive-file probability could demote the strongest metadata file and
+cold captured files could lack syntax spans. The packet now preserves file order, and captured
+bytes receive bounded local extraction when their index facts are unavailable. The final narrow
+Claude Opus 5.5 medium recheck found the unassessed-file ordering repair sound and no remaining
+correctness finding. Its low test-gap recommendation is covered by the final assertion.
 
-The exact archive passed clean offline installation and the installed prompt, linked-worktree,
-public API, decision-consumer and experiment fixtures. It also received complete live answers
-for 24 and 1,200 synthetic entries;
-the representative case took about 6.3 seconds with four concurrent calls. This is synthetic
-retrieval proof, not accepted-development or token-saving evidence.
+The proof rubric now checks every original line in each declared range. Development reports have
+been rescored without changing their retained inputs or packets. The corrected cold mobile replay
+through the provider delivers all three proof groups in about 24 seconds, with 3,525 of 7,947
+permitted metadata candidates assessed; the remainder hit the existing spending ceiling. The
+web case delivers one of three groups in about three seconds: one source is disallowed by the
+existing profile, and one permitted source reaches the packet with the wrong passage. A
+provider-free replay of recorded earlier positive judgments shows the corrected composer can
+retain the web validator without a new call. These are diagnostic cases, not accepted-task savings.
 
-All nine frozen source cases were rerun after the corrections without changing permissions,
-packet limits or answer labels. The two development cases improved, but the held-out case retains
-two of three required passage anchors versus three under the RC8 comparison. Its remaining test
-reference is recognized as relevant and loses initial packet capacity to higher-scored related
-implementation references. Narrow disclosure and cumulative budgets explain other cases' misses.
+Three fresh cases were frozen before execution and run once in cold-index RC8, provider-free RC9,
+and live RC9 arms. The live arm delivered one of five proof groups, the same count as provider-free
+RC9. Two mobile-library groups ranked outside the captured source set, two multilingual-library groups were
+not assessed under their budget, and the one web group was delivered. These results are limitations;
+repeating the fresh cases after inspecting them would turn them into development cases, not restore
+held-out proof. No ordinary accepted-task savings are established.
 
-The release gate remains open. Old positive-reference ordering, an offline application of the
-existing rank-fusion formula to descriptors, and the alternate question-local layout did not remove
-the regression. A separate provider-free diagnostic fused the existing index order with confidence
-order. It restored the missing passage but lost a passage in another development case; no net
-quality improvement justified adopting it. Confidence that a source is useful does not establish
-which sources jointly cover the request within a compact packet.
-Do not promote these diagnostics into defaults or repeat provider calls until one happens to pass.
-The next correction must preserve distinct requested evidence needs when the compact packet fills,
-within the existing authority and byte limits. Keep the failed held-out result and label later
-attempts as regression rechecks. All identities, source copies, review audits and results remain
-outside this checkout. No adopter upgrade or remote publication has occurred.
+The operator raised the operation envelope from 15 to 30 seconds after a large inventory exhausted
+metadata time. This does not enlarge source permission or spending. The affected review, source
+checks and installed-package proof are complete; exact commit/tag and release readback remain.
+Keep failed development results intact. All identities, source copies, review audits and results
+remain outside this checkout. No adopter upgrade or publication has occurred.

@@ -9,7 +9,8 @@ import type { ValidationSubject } from "../src/change-subject.ts";
 import { DecisionRuntime } from "../src/decision-runtime.ts";
 import { profileDecisionSettings } from "../src/decision-settings.ts";
 import { digest } from "../src/core.ts";
-import { readDecisionBudget, decisionBudgetStoreStatus } from "../src/decision-budget.ts";
+import { readDecisionBudget, decisionBudgetStoreStatus, contextBudgetScope } from "../src/decision-budget.ts";
+import { selectContextPassages } from "../src/context-passage-advice.ts";
 import { sourceDescription } from "../src/context-source-index.ts";
 
 const syntheticSubject = (methods: Record<string, unknown> = {}) => ({
@@ -22,6 +23,48 @@ const settings = (overrides: Record<string, unknown> = {}) => profileDecisionSet
   mode: "auto", allowed_data_classes: ["metadata"], allowed_metadata_paths: ["src/**"],
   consumers: { DL03: { mode: "auto", questions: ["context.metadata-relevance/1"] } }, ...overrides,
 } } });
+
+test("opt-in passage selection retains calls and bytes in the same retrieval allowance", async t => {
+  const root = mkdtempSync(join(tmpdir(), "metadata-passage-reserve-")); t.after(() => rmSync(root, { recursive: true, force: true }));
+  const configured = settings({ allowed_data_classes: ["metadata", "source"], allowed_source_paths: ["src/**"],
+    budget: { max_calls: 3, max_request_bytes: 131072 }, consumers: { DL03: { mode: "auto",
+      questions: ["context.metadata-relevance/1", "context.passage-evidence/1", "context.passage-role/1"] } } });
+  let calls = 0;
+  const runtime = new DecisionRuntime(configured, root, { coordinationRoot: root, token: "fixture", fetch: async (_url, init) => {
+    calls++; const wire = JSON.parse(String(init?.body));
+    return Response.json({ model: configured.legacy.model, answers: Object.fromEntries(Object.keys(wire.questions)
+      .map(name => [name, { type: "noul", noul: 0.9 }])) });
+  } });
+  const scope = { workspace: root, taskId: "task", taskRevision: "1" };
+  const paths = Array.from({ length: 300 }, (_, index) => `src/item-${index}.ts`);
+  const metadata = await selectContextMetadata(subject, contextMetadataCatalog(paths, "repair", [], [], new Set()), "repair",
+    runtime, scope, digest("subject"), "reserved", undefined, performance.now() + 5000, undefined, undefined,
+    { deferBudgetClose: true, reservePassageBudget: true });
+  assert.equal(calls, 1); assert.equal(metadata.reason, "passage-reserved-budget");
+  assert.equal(metadata.coverage.passageReservedCalls, 2);
+  assert.ok((readDecisionBudget(root, contextBudgetScope(scope, metadata.invocationId))?.bytes ?? Infinity) <= metadata.coverage.metadataByteCeiling);
+  const passage = await selectContextPassages(runtime, [{ id: "src/repair.ts", sourceDigest: digest("source"), excerpt: "export function repair() { return true; }\n" }], {
+    purpose: "repair", scope, subjectDigest: digest("subject"), revision: "1", environment: "explicit", invocationId: metadata.invocationId,
+    policyDigest: configured.configDigest, deadlineAt: performance.now() + 5000, excerptBytes: 1024 });
+  assert.equal(passage.reason, "answered"); assert.equal(calls, 2);
+  assert.equal(readDecisionBudget(root, contextBudgetScope(scope, metadata.invocationId))?.calls, 2);
+  assert.equal(runtime.closeContextInvocation(scope, metadata.invocationId), true);
+});
+
+test("missing credentials cannot be mislabeled as a passage reservation limit", async t => {
+  const root = mkdtempSync(join(tmpdir(), "metadata-missing-reserve-")); t.after(() => rmSync(root, { recursive: true, force: true }));
+  const configured = settings({ budget: { max_calls: 3, max_request_bytes: 8192 } });
+  const runtime = new DecisionRuntime(configured, root, { coordinationRoot: root, token: "", fetch: async () => { throw Error("must stay local"); } });
+  const paths = Array.from({ length: 300 }, (_, index) => `src/item-${index}.ts`);
+  const result = await selectContextMetadata(subject, contextMetadataCatalog(paths, "repair", [], [], new Set()), "repair",
+    runtime, { workspace: root, taskId: "task", taskRevision: "1" }, digest("subject"), "missing-reserved", undefined,
+    performance.now() + 5000, undefined, undefined, { deferBudgetClose: true, reservePassageBudget: true });
+  assert.equal(result.reason, "missing-token");
+  assert.equal(result.coverage.passageReservedCalls, 0);
+  assert.equal(result.coverage.submittedCount, 0);
+  assert.ok(result.decisions.every(item => !item.providerCalled && item.budget.state === "not-required"));
+  assert.deepEqual(result.order, paths.slice().sort((a, b) => a.localeCompare(b)));
+});
 
 test("metadata batch packing keeps general coverage and skips items that cannot fit", () => {
   const items = new Map<string, EvidenceItem>();

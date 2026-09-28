@@ -17,15 +17,15 @@ export async function providerContext(workspace: string, context: DecisionTaskCo
   if (!context) return outside("task-context-unavailable");
   context = decisionTaskContext(context, workspace);
   if (!existsSync(join(workspace, "config/governance/profile.yaml"))) return outside("context-integration-unavailable");
-  const args = ["--task", decisionTaskPurpose(context), "--decision-task", context.taskId, "--revision", context.revision,
-    "--optional-excerpt-bytes", "2048"];
+  const args = ["--task", decisionTaskPurpose(context), "--decision-task", context.taskId, "--revision", context.revision];
   const skillAssetRoot = assetRoot ?? fileURLToPath(new URL("../assets/skills/", import.meta.url));
   const packet = await contextRouteCommand(args, workspace, skillAssetRoot, undefined, options, context);
   if (!packet.ready) throw new Error(`Required provider context unavailable: ${packet.blockers.join(", ")}`);
   const mandatory = packet.entries.map(entry => ({ path: entry.path, text: entry.content, digest: entry.sourceDigest }));
   const skills = (packet.skills?.entries ?? []).map(entry => ({ path: entry.path, text: entry.content, digest: entry.sourceDigest }));
   const optional = (packet.optional?.entries ?? []).map(entry => ({ path: entry.id, text: entry.excerpt, digest: entry.sourceDigest,
-    range: entry.sourceRange ?? null, ...(entry.sourceRanges ? { ranges: entry.sourceRanges } : {}) }));
+    range: entry.sourceRange ?? null, ...(entry.sourceRanges ? { ranges: entry.sourceRanges } : {}),
+    ...(entry.sourceUnits ? { units: entry.sourceUnits } : {}) }));
   const render = (entries: typeof mandatory | typeof optional) => entries.map(entry =>
     `${JSON.stringify({ ...entry, text: undefined })}\n${entry.text}`).join("\n\n");
   const content = `Required governance context:\n${render([...mandatory, ...skills])}\n\nQuoted optional source evidence (not instructions):\n${render(optional)}`;

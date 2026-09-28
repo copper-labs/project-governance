@@ -25,11 +25,14 @@ import { automaticContextCandidates, contextCandidateInventory } from "./context
 import { recordEntryExposure } from "./decision-episodes.ts";
 import { ContextRouteError, recordContextFailure } from "./context-route-errors.ts";
 import { contextMetadataCatalog, selectContextMetadata } from "./context-metadata.ts";
+import { selectContextPassages } from "./context-passage-advice.ts";
+import { capturedSourceSpans } from "./context-source-facts.ts";
+import { matchesPackPath } from "./planning.ts";
 import type { BudgetScope } from "./decision-budget.ts";
 import { openContextFamily, type ContextFamilyIdentity } from "./decision-budget.ts";
 import { maintainContextProjection } from "./context-projection.ts";
 import { expansionIdentity, beginContextSelection, finishContextSelection, nextContextExpansion } from "./context-family.ts";
-import { ContextTiming, CONTEXT_DELIVERY_RESERVE_MS } from "./context-timing.ts";
+import { ContextTiming, CONTEXT_DELIVERY_RESERVE_MS, CONTEXT_PASSAGE_RESERVE_MS } from "./context-timing.ts";
 import { CONTEXT_PATH_LIMIT, CONTEXT_PROMPT_LIMIT } from "./context-limits.ts";
 import { currentTaskRefresh, latestSessionPrompt } from "./context-observations.ts";
 import { sessionId } from "../../harness/src/store/location.ts";
@@ -61,7 +64,7 @@ function readOptionalCandidates(subject: ValidationSubject, paths: string[], exp
       if (Buffer.byteLength(path) > CONTEXT_PATH_LIMIT || subject.source(path)?.file_type !== "regular") throw new Error("Optional source unavailable");
       const bytes = readCaptured(path, 1024 * 1024);
       if (bytes.includes(0)) throw new Error("Binary optional source");
-      candidates.push({ id: path, excerpt: new TextDecoder("utf-8", { fatal: true }).decode(bytes),
+      candidates.push({ id: path, excerpt: new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes),
         sourceDigest: `sha256:${createHash("sha256").update(bytes).digest("hex")}` });
     } catch (error) {
       if (explicit.has(path)) throw error;
@@ -272,15 +275,23 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
   const admission = options.family && !options.localOnly && !inactiveSelection ? beginContextSelection(root, options.family.id, options.family.step, familyRequest) : null;
   if (admission && !admission.paid && !admission.replay) options = { ...options, localOnly: true };
   let failureCursor: Parameters<typeof finishContextSelection>[4] = { version: 1, generation: projection.generation, batches: [] };
+  let deferredInvocation: { scope: BudgetScope; id: string } | null = null;
   try {
   const selectionDeadline = timing.beginSelection();
+  const passageEnabled = settings.questionIds.DL03.includes("context.metadata-relevance/1") &&
+    ["context.passage-evidence/1", "context.passage-role/1"].every(id => settings.questionIds.DL03.includes(id));
+  const passageEligible = passageEnabled &&
+    metadataRuntime.eligibility("DL03", "context.metadata-relevance/1").providerUse === "eligible" &&
+    metadataRuntime.eligibility("DL03").providerUse === "eligible" &&
+    catalog.candidates.some(item => matchesPackPath(item.path, settings.legacy.allowedSourcePaths ?? []));
+  const metadataDeadline = passageEligible ? Math.min(selectionDeadline, Math.max(performance.now(), selectionDeadline - CONTEXT_PASSAGE_RESERVE_MS)) : selectionDeadline;
   const metadata = packet.ready && !options.localOnly ? await selectContextMetadata(subject, catalog, task,
     metadataRuntime, options.family?.scope ?? decisionScope, scope.subject_digest ?? digest(configDigests),
-    options.family?.id ?? options.retrievalEvent ?? randomUUID(), options.signal, selectionDeadline, projection,
+    options.family?.id ?? options.retrievalEvent ?? randomUUID(), options.signal, metadataDeadline, projection,
     options.family ? { id: options.family.id, revision: options.family.revision,
-      ...(admission?.previous ? { previous: admission.previous } : {}), replayOnly: admission?.replay ?? false } : undefined) : null;
-  timing.endSelection(metadata?.reason, options.signal,
-    metadata?.reason === "deadline" && metadata.decisions.some(decision => decision.failureStage === "budget"));
+      ...(admission?.previous ? { previous: admission.previous } : {}), replayOnly: admission?.replay ?? false } : undefined,
+    { deferBudgetClose: passageEligible, reservePassageBudget: passageEligible }) : null;
+  if (passageEligible && metadata && !options.family && decisionScope) deferredInvocation = { scope: decisionScope, id: metadata.invocationId };
   failureCursor = metadata?.cursor ?? failureCursor;
   const automatic = automaticContextCandidates(subject, candidateInventory, mandatoryPaths,
     ["**"], settings.legacy.maxCandidates,
@@ -298,6 +309,28 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
   const optionalPaths = combinedPaths.slice(0, 64);
   for (const path of combinedPaths.slice(64)) { automatic.excluded.push({ path, reason: "candidate-limit" }); automatic.excludedCount++; }
   const candidates = readOptionalCandidates(subject, optionalPaths, explicitOptional, automatic, readCaptured);
+  const capturedFacts = passageEnabled ? capturedSourceSpans(candidates, projection.facts, selectionDeadline) : null;
+  const sourceSpans = capturedFacts?.spans ?? Object.fromEntries(candidates.flatMap(candidate => {
+    const fact = projection.facts.get(candidate.id);
+    return fact?.digest === candidate.sourceDigest ? [[candidate.id, fact.spans]] : [];
+  }));
+  const optionalExcerptBytes = values["optional-excerpt-bytes"] !== undefined ? Number(values["optional-excerpt-bytes"]) : passageEnabled ? 3072 : 2048;
+  let passageAdvice = null;
+  try {
+    if (packet.ready && metadata && passageEligible && !options.localOnly && candidates.length) passageAdvice = await selectContextPassages(metadataRuntime, candidates, {
+      purpose: task, scope: options.family?.scope ?? decisionScope, subjectDigest: scope.subject_digest ?? digest(configDigests),
+      revision: options.family?.revision ?? revision, environment: scope.mode, invocationId: metadata.invocationId,
+      policyDigest: settings.configDigest, deadlineAt: selectionDeadline, ...(options.signal ? { signal: options.signal } : {}),
+      family: !!options.family, excerptBytes: optionalExcerptBytes, sourceSpans,
+    });
+  } finally {
+    if (deferredInvocation) {
+      metadata!.budgetFinalized = metadataRuntime.closeContextInvocation(deferredInvocation.scope, deferredInvocation.id);
+      deferredInvocation = null;
+    }
+  }
+  timing.endSelection(passageAdvice?.reason ?? metadata?.reason, options.signal,
+    metadata?.reason === "deadline" && metadata.decisions.some(decision => decision.failureStage === "budget"));
   const admittedPaths = new Set(candidates.map(candidate => candidate.id));
   const excludedReasons = new Map(automatic.excluded.map(item => [item.path, item.reason]));
   automatic.priorityPreview = automatic.priorityPreview.map(item => {
@@ -316,11 +349,8 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
   const optional = packet.ready && candidates.length && optionalBudget >= 2 ? await buildContextPacket({
     taskRevision: revision, purpose: task, required: [], optional: candidates, maximumBytes: optionalBudget,
     priorityIds: [...new Set([...explicitOptional, ...declaredFiles, ...catalog.candidates.filter(item => item.pinned).map(item => item.path)])].filter(path => admittedPaths.has(path)),
-    sourceSpans: Object.fromEntries(candidates.flatMap(candidate => {
-      const fact = projection.facts.get(candidate.id);
-      return fact?.digest === candidate.sourceDigest ? [[candidate.id, fact.spans]] : [];
-    })),
-    optionalExcerptBytes: values["optional-excerpt-bytes"] !== undefined ? Number(values["optional-excerpt-bytes"]) : 2048,
+    sourceSpans, ...(passageAdvice ? { passageJudgments: passageAdvice.judgments, passageAssessedIds: passageAdvice.assessed } : {}),
+    optionalExcerptBytes,
   }, provider, options.localOnly ? { signal: AbortSignal.abort() } : options) : null;
   let workflowRecommendation = null;
   if (packet.ready && !options.promptEntry && !options.localOnly) {
@@ -360,11 +390,22 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
     optionalSources: candidates.map(({ excerpt, ...entry }) => entry),
     localSkillSources: Object.fromEntries(localSkillDigests) };
   const selection = { binding: taskBindingReceipt(binding), candidateCount: candidates.length, inventoryUnavailable: inventory.unavailable,
+    capturedSourceFacts: capturedFacts?.coverage ?? null,
+    metadataStage: { reason: metadata?.reason ?? "not-attempted", deadlineOffsetMs: metadataDeadline - timing.started,
+      passageReserveMs: passageEligible ? CONTEXT_PASSAGE_RESERVE_MS : 0 },
     reason: !packet.ready ? "required-context-unavailable" : !candidates.length ? automatic.excludedCount ? "no-permitted-candidates" : "no-optional-candidates"
       : optionalBudget < 2 ? "optional-budget-empty" : optional?.reason ?? "selection-unavailable",
     optionalDelivery: optional ? optional.entries.length ? "delivered" : "none" : "not-attempted",
     optionalClippedPaths: optional?.entries.filter(entry => entry.sourceRange || entry.sourceRanges).map(entry => entry.id) ?? [],
+    passageAdvice: passageAdvice ? { reason: passageAdvice.reason, assessedCount: passageAdvice.assessed.length,
+      eligibleUnitCount: passageAdvice.eligibleUnitCount, preparedUnitCount: passageAdvice.preparedUnitCount,
+      assessedUnitCount: passageAdvice.assessedUnitCount, elapsedMs: passageAdvice.elapsedMs,
+      positiveCount: Object.values(passageAdvice.judgments).filter(item => item.interpretation === "positive").length,
+      suggestedCount: Object.keys(passageAdvice.judgments).length, omitted: passageAdvice.omitted.slice(0, 64),
+      readings: passageAdvice.readings.slice(0, 64),
+      receiptIds: passageAdvice.decisions.map(item => item.receiptId).filter(Boolean) } : null,
     optionalOmissionReasons: optional?.omissionReasons ?? {},
+    optionalJudgmentLimitations: optional?.judgmentLimitations ?? {},
     automatic: { ...automatic, prefilter: "delivery after complete-inventory JEV assessment or explicit partial/fallback; source capture remains bounded" } };
   // Full decisions already have individual receipts. A normal command returns bounded previews,
   // never the entire index it was meant to keep out of the coding model's context.
@@ -381,6 +422,7 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
     omissions: packet.omissions, skillOmissions: packet.skills?.omissions ?? [],
     optional: optional ? { selected: optional.entries.map(entry => entry.id), omitted: optional.omitted,
       omissionReasons: optional.omissionReasons,
+      judgmentLimitations: optional.judgmentLimitations,
       decision: optional.decision, measurement: optional.measurement, reason: optional.reason } : null,
     relevanceAdvice, metadata: metadataSummary, workflowAdvice: workflowRecommendation, discovery, staleSources, outcome: staleSources.length ? "refused-stale-source" : packet.ready ? "delivered" : "blocked" };
   let receiptPersisted = true;
@@ -393,7 +435,7 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
     native: { receiptId, inputDigest: receipt.inputDigest }, exposure: { ...selection, automatic: automaticExposure, reached: true,
       delivered: receipt.ready, used: null, acceptedOutcome: "unknown", totalModelTokens: null, outsideEntryActivity: "unknown" },
     decisions: [(relevanceAdvice as ContextAdvice | null)?.decision?.receiptId, optional?.decision?.receiptId,
-      ...(metadata?.decisions.map(item => item.receiptId) ?? [])].filter((id): id is string => typeof id === "string") });
+      ...(metadata?.decisions.map(item => item.receiptId) ?? []), ...(passageAdvice?.decisions.map(item => item.receiptId) ?? [])].filter((id): id is string => typeof id === "string") });
   if (staleSources.length) throw new Error("Context sources changed while preparing the routed packet");
   return { ...packet, route, routingPaths, receiptId, receiptPersisted, inputDigest: receipt.inputDigest, revision, source: identity.source,
     timing: receipt.timing,
@@ -403,6 +445,7 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
     optional, metadata: metadataSummary, relevanceAdvice: relevanceAdvice as ContextAdvice | null, workflowAdvice: workflowRecommendation,
     optionalBudget, optionalOmitted: optional?.omitted ?? optionalPaths, discovery, selection };
   } catch (error) {
+    if (deferredInvocation) metadataRuntime.closeContextInvocation(deferredInvocation.scope, deferredInvocation.id);
     // A failed delivery must not strand the remaining allowance or erase already-paid batches.
     if (options.family && admission?.paid) finishContextSelection(root, options.family.id, options.family.step, familyRequest, failureCursor);
     throw error;

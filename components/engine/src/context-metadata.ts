@@ -4,6 +4,7 @@ import { localContextPath } from "./context-path-policy.ts";
 import type { ValidationSubject } from "./change-subject.ts";
 import { interpretNoul, type DecisionAsk, type DecisionOutcome, type DecisionRuntime } from "./decision-runtime.ts";
 import type { BudgetScope } from "./decision-budget.ts";
+import { contextBudgetScope, contextFamilyScope, readDecisionBudget } from "./decision-budget.ts";
 import { METADATA_MAX_QUESTIONS, type EvidenceItem } from "./decision-schema.ts";
 import { CONTEXT_SELECTION_MS } from "./context-timing.ts";
 import { prepareDecisionRequest } from "./decision-request-preparation.ts";
@@ -66,7 +67,7 @@ export function contextMetadataCatalog(paths: string[], purpose: string, exact: 
 /** Full permitted inventory stays independent of lexical hits; family replay binds the whole batch. */
 export async function selectContextMetadata(subject: ValidationSubject, catalog: ReturnType<typeof contextMetadataCatalog>,
   purpose: string, runtime: DecisionRuntime, scope: BudgetScope | null, subjectDigest: string,
-  eventId: string, signal?: AbortSignal, deadlineAt = performance.now() + CONTEXT_SELECTION_MS, projection?: ReturnType<typeof maintainContextProjection>, family?: MetadataFamily, evaluation: { concurrency?: number; layout?: "shared-v1" | "per-question-v1" } = {}) {
+  eventId: string, signal?: AbortSignal, deadlineAt = performance.now() + CONTEXT_SELECTION_MS, projection?: ReturnType<typeof maintainContextProjection>, family?: MetadataFamily, evaluation: { concurrency?: number; layout?: "shared-v1" | "per-question-v1"; deferBudgetClose?: boolean; reservePassageBudget?: boolean } = {}) {
   const started = performance.now(), baseline = catalog.candidates.map(item => item.path), decisions: DecisionOutcome[] = [];
   const layout = evaluation.layout ?? "shared-v1", concurrency = evaluation.concurrency ?? PROVIDER_CONCURRENCY;
   if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > PROVIDER_CONCURRENCY) throw new Error("invalid metadata concurrency");
@@ -124,6 +125,16 @@ export async function selectContextMetadata(subject: ValidationSubject, catalog:
   const general = assessable.filter(path => !visited.has(path) && !prioritySet.has(path))
     .map(path => ({ path, hash: digest({ eventId: family?.id ?? eventId, path }) })).sort((a, b) => a.hash.localeCompare(b.hash)).map(item => item.path);
   let priorityAssessed = 0, generalAssessed = 0;
+  const reserveCalls = evaluation.reservePassageBudget && runtime.eligibility("DL03", "context.metadata-relevance/1").providerUse === "eligible"
+    ? Math.min(2, runtime.settings.budget.maxCalls - 1) : 0;
+  const reserveBytes = reserveCalls ? Math.min(65_536, Math.floor(runtime.settings.budget.maxRequestBytes / 4)) : 0;
+  const metadataByteCeiling = Math.max(0, runtime.settings.budget.maxRequestBytes - reserveBytes);
+  const metadataCallCeiling = runtime.settings.budget.maxCalls - reserveCalls;
+  const spent = scope ? readDecisionBudget(runtime.stateRoot, family
+    ? contextFamilyScope(scope.workspace, invocationId) : contextBudgetScope(scope, invocationId)) : null;
+  // Receipt counters are cumulative. The store also includes earlier passage calls in a family.
+  let claimedBytes = Math.max(spent?.bytes ?? 0, ...(family?.previous?.batches ?? []).map(batch => batch.outcome.budget.bytes ?? 0));
+  let claimedCalls = Math.max(spent?.calls ?? 0, ...(family?.previous?.batches ?? []).map(batch => batch.outcome.budget.calls ?? 0));
   let reason = enabled ? assessable.length ? "not-attempted" : "metadata-scope-disabled" : "metadata-question-disabled";
   const controller = new AbortController(), cancel = () => controller.abort(signal?.reason);
   if (signal?.aborted) cancel(); else signal?.addEventListener("abort", cancel, { once: true });
@@ -176,6 +187,13 @@ export async function selectContextMetadata(subject: ValidationSubject, catalog:
       packingMs += performance.now() - packingStart;
       if (!batch.length) { reason = "input-budget"; continue; }
       if (controller.signal.aborted || performance.now() >= deadlineAt) { requeue(batch); stop = true; break; }
+      if (reserveBytes) {
+        const prepared = prepareDecisionRequest(askFor(batch), runtime.settings, ["DL03"], "budget-planning");
+        if (!prepared.ok || claimedBytes + prepared.requestBytes > metadataByteCeiling || claimedCalls + 1 > metadataCallCeiling) {
+          requeue(batch); reason = "passage-reserved-budget"; stop = true; break;
+        }
+        claimedBytes += prepared.requestBytes; claimedCalls++;
+      }
       firstBatchMs ??= performance.now() - started;
       const index = nextBatch++;
       active++; peakConcurrency = Math.max(peakConcurrency, active);
@@ -203,11 +221,13 @@ export async function selectContextMetadata(subject: ValidationSubject, catalog:
     }
     const failure = completed.find(batch => batch && !batch.outcome.delivered && !["shadow", "repeated-observation"].includes(batch.outcome.reason));
     reason = signal?.aborted ? "cancelled" : performance.now() >= deadlineAt ? "deadline"
+      : reason === "passage-reserved-budget" ? reason
       : settled.some(item => item.status === "rejected") ? "selection-unavailable"
       : failure?.outcome.reason ?? completed.at(-1)?.outcome.reason ?? reason;
   } finally {
     clearTimeout(cutoff); signal?.removeEventListener("abort", cancel);
-    if (!family && scope && decisions.some(item => ["reserved", "duplicate"].includes(item.budget.state))) budgetFinalized = runtime.closeContextInvocation(scope, invocationId);
+    if (!family && scope && !evaluation.deferBudgetClose && decisions.some(item => ["reserved", "duplicate"].includes(item.budget.state)))
+      budgetFinalized = runtime.closeContextInvocation(scope, invocationId);
   }
   if (!priorities.length && !general.length && reason === "not-attempted" && replayedBatches) reason = "exact-batch-replay";
   if (unfittable.length && answered.size < assessable.length && ["answered", "shadow", "repeated-observation"].includes(reason)) reason = "input-budget";
@@ -219,7 +239,8 @@ export async function selectContextMetadata(subject: ValidationSubject, catalog:
     unassessedCount: assessable.length - answered.size, notPermittedCount: notPermitted, unavailableCount: excluded.length,
     unfittableCount: unfittable.length, complete: answered.size === assessable.length && assessable.length > 0, inventoryComplete: answered.size === baseline.length, reason, attempted: assessed.size > 0,
     applied: decisions.some(item => item.delivered), mode: decisions[0]?.mode ?? "off", traversalStart: parseInt(digest({ eventId }).slice(7, 15), 16),
-    priorityAssessed, generalAssessed, replayedBatches, invalidatedBatches };
+    priorityAssessed, generalAssessed, replayedBatches, invalidatedBatches,
+    passageReservedBytes: reserveBytes, metadataByteCeiling, passageReservedCalls: reserveCalls, metadataCallCeiling };
   return { version: 3, catalog, order, reason, assessed: [...assessed], metadataPermittedCount: assessable.length, coverage, cursor,
     invocationId, budgetFinalized, excluded, decisions, delivered: positive.size > 0, sourceBodiesTransmitted: described.size > 0, rawSourceFilesTransmitted: false,
     sourceIndex: sourceIndexObservation(projection, described.size, baseline.length, descriptionOmissions),

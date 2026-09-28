@@ -68,11 +68,11 @@ async function verifyOwnerRollover({ packageRoot, temporary, workspace, environm
         ${JSON.stringify(`import {captureStartupHostOwner} from ${JSON.stringify(ownerUrl)}; console.log(JSON.stringify(captureStartupHostOwner('codex')));`)}],
         {cwd:${JSON.stringify(workspace)},env:process.env,encoding:'utf8',timeout:5000});
       const result=spawnSync(${JSON.stringify(launcher)},${JSON.stringify(['startup', 'observe', '--provider', 'codex', '--event-stdin', '--workspace', workspace, '--registry', registry, '--receipts', receipts])},
-        {cwd:${JSON.stringify(workspace)},env:process.env,input:${JSON.stringify(JSON.stringify(nativeEvent))},encoding:'utf8',timeout:30000,maxBuffer:1048576});
+        {cwd:${JSON.stringify(workspace)},env:process.env,input:${JSON.stringify(JSON.stringify(nativeEvent))},encoding:'utf8',timeout:50000,maxBuffer:1048576});
       process.stdout.write(JSON.stringify({parentPid:process.pid,probeStatus:probe.status,captured:JSON.parse(probe.stdout||'null'),
         status:result.status,stdout:result.stdout,stderr:result.stderr,error:result.error?.message}));`;
     const parent = spawnSync(process.execPath, ['--input-type=module', '-e', command],
-      { cwd: workspace, env: environment, encoding: 'utf8', timeout: 35000, maxBuffer: 1024 * 1024 });
+      { cwd: workspace, env: environment, encoding: 'utf8', timeout: 55000, maxBuffer: 1024 * 1024 });
     assert.equal(parent.status, 0, parent.stderr || parent.error?.message);
     const result = JSON.parse(parent.stdout);
     assert.equal(result.probeStatus, 0);
@@ -129,13 +129,13 @@ async function verifyLinkedNativeHooks({ packageRoot, sibling, siblingRegistry, 
     const child = `import {spawnSync} from 'node:child_process';
       process.title='codex';
       const result=spawnSync('/bin/sh',['-c',${JSON.stringify(command)}],{cwd:${JSON.stringify(cwd)},env:process.env,
-        input:${JSON.stringify(JSON.stringify(input))},encoding:'utf8',timeout:30000,maxBuffer:1048576});
+        input:${JSON.stringify(JSON.stringify(input))},encoding:'utf8',timeout:50000,maxBuffer:1048576});
       if(result.stdout)process.stdout.write(result.stdout);
       if(result.stderr)process.stderr.write(result.stderr);
       if(result.error)process.stderr.write(result.error.message);
       process.exit(result.status??1);`;
     const result = spawnSync(process.execPath, ['--input-type=module', '-e', child], { cwd, env: environment,
-      encoding: 'utf8', timeout: 35000, maxBuffer: 1024 * 1024 });
+      encoding: 'utf8', timeout: 55000, maxBuffer: 1024 * 1024 });
     assert.equal(result.status, 0, result.stderr || result.stdout || result.error?.message);
     return JSON.parse(result.stdout);
   };
@@ -262,7 +262,7 @@ function verifyTaskSwitch({ invoke, launcher, workspace, environment, session, c
   assert.equal(refreshed.selection.binding.taskId, second.task.taskId);
   assert.equal(refreshed.expansion.entry, first.contextEntry.entryId);
   assert.ok(refreshed.expansion.transitionId);
-  assert.equal(refreshed.timing.operationBudgetMs, 15000);
+  assert.equal(refreshed.timing.operationBudgetMs, 30000);
   assert.equal(refreshed.metadata.reason, 'answered');
   assert.equal(readFileSync(calls, 'utf8').trim().split('\n').length, 2);
   delete environment.HARNESS_SESSION;
@@ -297,7 +297,7 @@ export async function verifyRc6Prompt(packageRoot, archive) {
   for (const key of Object.keys(environment)) if (/^(GOVERNANCE_|HARNESS_)/u.test(key)) delete environment[key];
   const cli = join(resolve(packageRoot), 'dist/engine/src/cli.js');
   const invoke = (command, args, input) => {
-    const result = spawnSync(command, args, { cwd: workspace, env: environment, input, encoding: 'utf8', timeout: 30000, maxBuffer: 1024 * 1024 });
+    const result = spawnSync(command, args, { cwd: workspace, env: environment, input, encoding: 'utf8', timeout: 50000, maxBuffer: 1024 * 1024 });
     assert.equal(result.status, 0, result.stderr || result.error?.message);
     return JSON.parse(result.stdout);
   };
@@ -319,7 +319,7 @@ export async function verifyRc6Prompt(packageRoot, archive) {
     assert.equal(hooks.hooks.UserPromptSubmit.length, 1);
     const handler = hooks.hooks.UserPromptSubmit[0].hooks[0];
     assert.equal(handler.additionalContextLimit, 0);
-    assert.equal(handler.timeout, 20);
+    assert.equal(handler.timeout, 40);
     const event = { session_id: 'installed-host', turn_id: 'turn-one', hook_event_name: 'UserPromptSubmit', cwd: workspace, prompt: 'Fix the app launch.' };
     const output = invoke('/bin/sh', ['-c', handler.command], JSON.stringify(event));
     assert.equal(output.hookSpecificOutput.hookEventName, 'UserPromptSubmit');
