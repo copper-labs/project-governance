@@ -16,10 +16,6 @@ Git remains the implementation history and recovery mechanism.
 
 ## Active
 
-- [RC10.1 Python parser repair](active/2026-09-30-rc10-1-python-parser.md) repairs valid scalar
-  expression bodies and absent names while preserving policy. Local qualification is complete;
-  publication and immutable release readback follow through the normal workflow.
-
 - [RC10 reliable context and procedure selection](active/2026-09-29-rc10-context-use.md) is the
   published prerelease: correct entry/worktree use, visible semantic coverage, exact packet/answer
   reuse, optional procedure sections, recent telemetry and a deliberately scoped development pilot.
@@ -69,6 +65,10 @@ Git remains the implementation history and recovery mechanism.
   Gemini, Claude, and Codex wrappers independently of later implementation-plan improvements.
 
 ## Completed
+
+- [RC10.1 Python parser repair](completed/2026-09-30-rc10-1-python-parser.md) repairs valid scalar
+  expression bodies and absent names while preserving policy. The immutable prerelease is published;
+  its exact source, archive and metadata passed independent release readback.
 
 - [Shared test execution](completed/2026-09-10-shared-test-execution.md) delivers deterministic
   batches, Codex and Claude CLI handoff, proactive skill routing, and bounded usage observations.

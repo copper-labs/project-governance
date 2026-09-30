@@ -128,7 +128,7 @@ The approved [RC10 reliable context and procedure selection](specs/engine-rc10-c
 worktree alignment, actual descriptor/passage disclosure, exact reuse, optional runbook sections
 and outcome-linked measurement. Runtime changes are implemented; the plan records qualification
 and publication status. Adopters retain their own pins until deliberately upgraded.
-The [RC10.1 parser repair](exec-plans/active/2026-09-30-rc10-1-python-parser.md) fixes valid Python
+The [RC10.1 parser repair](exec-plans/completed/2026-09-30-rc10-1-python-parser.md) fixes valid Python
 expression bodies in the shared source/comment bridge while preserving enforcement and adopter pins.
 RC9 is published as an immutable prerelease. Frozen development cases confirm a corrected ranking
 regression, while fresh cases expose remaining coverage and passage limits. Adopters remain on

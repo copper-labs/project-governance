@@ -2,7 +2,7 @@
 id: plan.rc10-1-python-parser
 title: RC10.1 Python Parser Repair
 type: exec-plan
-status: active
+status: completed
 owner: project-governance
 created: 2026-09-30
 updated: 2026-09-30
@@ -26,7 +26,7 @@ The [kernel contract](../../specs/governance-kernel.md#built-in-packs) remains t
   Opus 5.5 medium review. Reconcile actionable findings at the affected seam.
 - [x] Run the full compiled test suite and offline installed-archive proof once at the release
   boundary. Check frozen real-repository Python images externally without executing project code.
-- [ ] Commit through normal hooks and publish `3.0.0-rc.10.1` through the existing tag workflow.
+- [x] Commit through normal hooks and publish `3.0.0-rc.10.1` through the existing tag workflow.
   Confirm successful CI, immutable prerelease status, exact source, archive and metadata hashes.
 
 Local qualification passed: 797 compiled tests, type checking, 15 final focused checks, the offline
@@ -34,6 +34,11 @@ installed archive and eight frozen real-repository Python images. Opus 5.5 mediu
 blockers. Low-priority assertion and proof-label refinements received focused rechecks; the runtime
 implementation remained unchanged. Wildcard pattern syntax was not independently qualified and
 does not introduce a new Python minimum in this hotfix.
+
+Published [3.0.0-rc.10.1](https://github.com/copper-labs/project-governance/releases/tag/3.0.0-rc.10.1)
+as an immutable prerelease from `7a1ab98a478349de86a5b72826ed1d9dd359dc50`.
+The independent release workflow passed. Published archive bytes and metadata match the qualified
+local candidate; the source tag, lock and hashes were verified after download.
 
 ## Adoption boundary
 
