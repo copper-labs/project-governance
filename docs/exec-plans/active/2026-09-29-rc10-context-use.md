@@ -314,9 +314,13 @@ synthetic installed-hook proof; no adopter upgrade or native chat acceptance is 
   behavior merely to shrink code. Challenge duplicate stores, knobs, worker loops and repeated scans.
 - [x] Update release notes and closeout with implemented features, default-off optional procedure declaration,
   supported fallback, evidence limits and deliberate adoption guidance. Verify local ownership cleanup.
-- [ ] Publish immutable `3.0.0-rc.10` using the standing release authorization and existing publication
+- [x] Publish immutable `3.0.0-rc.10` using the standing release authorization and existing publication
   process. Read back source SHA, tag/archive, checksums and installed runtime. Do not change adopter
   pins or bypass required policy as a publication side effect.
+
+Published on 2026-09-30 from `7ffae6e4fe8384744157c6f6cf3db986960a07b3` after the normal release
+workflow passed. Downloaded archive bytes match the locally qualified installed candidate exactly;
+the lock, update metadata and dereferenced tag agree. Deliberate adoption remains P6.
 
 Exit: source, package and publication agree. Actual development efficiency remains P6 field evidence.
 
