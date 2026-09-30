@@ -6,8 +6,8 @@ import { sourceClues } from "./context-source-index.ts";
 import { localDocumentLinks } from "./checkers/document-links.ts";
 import type { Candidate } from "./decisions.ts";
 
-export const SOURCE_EXTRACTOR = "literal-syntax-6";
-export interface SourceSpan { kind: string; name: string; signature: string; start: number; end: number }
+export const SOURCE_EXTRACTOR = "literal-syntax-11";
+export interface SourceSpan { kind: string; name: string; signature: string; start: number; end: number; level?: number; ancestry?: string[] }
 export interface SourceLink { kind: "import" | "export" | "require" | "reference" | "dynamic-import" | "document"; target: string; line: number }
 export interface SourceFacts {
   digest: string; language: string; bytes: number; descriptor: string | null;
@@ -61,7 +61,7 @@ function extractTypeScriptFacts(path: string, text: string, facts: SourceFacts):
     if (!(ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node) || ts.isInterfaceDeclaration(node) ||
         ts.isTypeAliasDeclaration(node) || ts.isEnumDeclaration(node) || ts.isVariableDeclaration(node) || ts.isMethodDeclaration(node))) return;
     if (!node.name || !ts.isIdentifier(node.name)) return;
-    const name = node.name.text, start = node.getStart(file);
+    const name = node.name.text, start = node.getStart(file, true);
     const parameters = ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node) ? "(" + node.parameters.map(parameter =>
       (ts.isIdentifier(parameter.name) ? parameter.name.text : "<destructured>") + (parameter.type ? `: ${parameter.type.getText(file)}` : "")).join(", ") + ")" : "";
     const type = !ts.isTypeAliasDeclaration(node) && "type" in node && node.type ? `: ${node.type.getText(file)}` : "";
@@ -124,20 +124,30 @@ function extractTypeScriptFacts(path: string, text: string, facts: SourceFacts):
     symbolsOmitted: Math.max(0, declarations.length - 12) });
 }
 
-/** Markdown headings stop at the next observed heading, including the first omitted one. */
-function extractMarkdownFacts(text: string, facts: SourceFacts): void {
-  let fence: string | null = null;
-  let firstOmittedBoundary: number | undefined;
-  for (const [index, value] of text.split(/\r?\n/u).entries()) {
+/** One parser owns heading boundaries for cached facts and complete procedure capture. */
+export function markdownSections(text: string): SourceSpan[] {
+  const lines = text.split(/\r?\n/u), spans: SourceSpan[] = [], open: SourceSpan[] = [];
+  let fence: string | null = null, frontmatter = lines[0]?.trim() === "---";
+  for (const [index, value] of lines.entries()) {
+    if (frontmatter) { if (index > 0 && value.trim() === "---") frontmatter = false; continue; }
     const marker = value.match(/^\s*(`{3,}|~{3,})/u)?.[1];
     if (marker) { if (!fence) fence = marker; else if (marker[0] === fence[0] && marker.length >= fence.length) fence = null; continue; }
-    const heading = !fence && value.match(/^#{1,6}\s+(.+)$/u);
-    if (heading && facts.spans.length < 96) facts.spans.push({ kind: "heading", name: bounded(heading[1]!, 128), signature: "", start: index + 1, end: index + 1 });
-    else if (heading) firstOmittedBoundary ??= index + 1;
+    const heading = !fence && value.match(/^(#{1,6})\s+(.+)$/u);
+    if (!heading) continue;
+    const level = heading[1]!.length;
+    while (open.length && open.at(-1)!.level! >= level) open.pop()!.end = index;
+    const span: SourceSpan = { kind: "heading", name: bounded(heading[2]!.replace(/\s+#+\s*$/u, ""), 128), signature: "",
+      level, ancestry: open.map(parent => parent.name), start: index + 1, end: lines.length };
+    spans.push(span); open.push(span);
   }
+  return spans;
+}
+
+function extractMarkdownFacts(text: string, facts: SourceFacts): void {
+  const spans = markdownSections(text);
+  facts.spans = spans.slice(0, 96);
+  if (spans.length > 96) facts.descriptor = JSON.stringify({ ...JSON.parse(facts.descriptor ?? "{}"), spanLimitReached: true });
   facts.links = localDocumentLinks(text).slice(0, 128).map(link => ({ kind: "document", ...link }));
-  const lineCount = text.split(/\r?\n/u).length;
-  closeSpans(facts, firstOmittedBoundary, lineCount);
   facts.coverage = "markdown";
 }
 
@@ -146,9 +156,14 @@ function extractHeuristicFacts(path: string, text: string, facts: SourceFacts): 
   const lines = text.split(/\r?\n/u);
   let firstOmittedBoundary: number | undefined;
   for (const [index, value] of lines.entries()) {
-    const declaration = value.match(/^\s*(?:(?:public|private|protected|internal|open|final|override|suspend|static|async|export)\s+)*(?:fun|func|def|fn|class|struct|interface|protocol|enum)\s+([\p{L}_$][\p{L}\p{N}_$]*)/u);
-    if (declaration && facts.spans.length < 96) facts.spans.push({ kind: "heuristic-declaration", name: bounded(declaration[1]!, 96),
-      signature: bounded(value.trim(), 256), start: index + 1, end: index + 1 });
+    const declaration = value.match(/^\s*(?:(?:public|private|protected|internal|open|final|override|suspend|static|async|export)\s+)*(?:enum\s+class|fun|func|def|fn|class|struct|interface|protocol|enum)\s+([\p{L}_$][\p{L}\p{N}_$]*|`[^`\r\n]+`)/u);
+    if (declaration && facts.spans.length < 96) {
+      let start = index;
+      // An attached test/behavior annotation belongs to this declaration, not its predecessor.
+      while (start > 0 && /^\s*@[\p{L}_][\p{L}\p{N}_.]*(?:\([^\n]*\))?\s*$/u.test(lines[start - 1]!)) start--;
+      facts.spans.push({ kind: "heuristic-declaration", name: bounded(declaration[1]!, 96),
+        signature: bounded(value.trim(), 256), start: start + 1, end: index + 1 });
+    }
     else if (declaration) firstOmittedBoundary ??= index + 1;
   }
   closeSpans(facts, firstOmittedBoundary, lines.length);

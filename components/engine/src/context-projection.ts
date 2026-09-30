@@ -104,7 +104,7 @@ export function maintainContextProjection(subject: ValidationSubject, paths: str
   }
   const extractedAt = performance.now();
   let factBytes = 0;
-  const retainedFacts = new Set<string>(), factLimit = Math.min(options.factByteLimit ?? 16 * 1024 * 1024, 16 * 1024 * 1024);
+  const retainedFacts = new Set<string>(), factLimit = Math.min(options.factByteLimit ?? 32 * 1024 * 1024, 32 * 1024 * 1024);
   for (const [path, fact] of byPath) {
     const id = sourceFactId(fact, extractor), bytes = retainedFacts.has(id) ? 0 : Buffer.byteLength(JSON.stringify(fact));
     if (factBytes + bytes > factLimit) { byPath.delete(path); unavailable.push({ path, reason: "index-capacity" }); }

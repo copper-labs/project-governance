@@ -1,23 +1,24 @@
 ---
 id: guide.rc6-prompt-context
-title: Configure and Observe RC6 Prompt Context
+title: Configure and Observe Prompt Context
 type: guide
 status: current
 owner: project-governance
 created: 2026-09-25
-updated: 2026-09-27
+updated: 2026-09-30
 summary: Enable prompt delivery and optional metadata selection, then inspect actual usage without inferring savings.
 ---
 
-# Configure and observe RC6 prompt context
+# Configure and observe prompt context
 
 ## Implementation status
 
-The current RC6 candidate implements native prompt entry, a maintained per-worktree SQLite source
-index, basic source-backed relationships, and bounded metadata selection with two entry-linked
-expansions. This guide gives the implemented commands. It does not claim publication, host trust,
-first-read order, accepted work, or measured savings. The
-[implementation plan](../exec-plans/active/2026-09-23-rc6-linked-retrieval.md) tracks qualification.
+The runtime implements native prompt entry, a maintained per-worktree SQLite source index, basic
+source-backed relationships and bounded metadata selection with two entry-linked expansions.
+The [RC10 contract](../specs/engine-rc10-context-use.md) adds compact assessment, validated packet
+reuse, optional project procedures and recent telemetry. This guide does not establish host trust,
+first-read order, accepted work or measured savings. The
+[RC10 plan](../exec-plans/active/2026-09-29-rc10-context-use.md) tracks candidate qualification and adoption.
 
 The [RC6 contract](../specs/engine-rc6-linked-retrieval.md) keeps the coding model fixed. Code chooses
 required guidance and captures current source. Optional JEV advice orders eligible paths before
@@ -148,9 +149,8 @@ continuity:
     allowed_data_classes: [metadata, source]
     allowed_metadata_paths: [src/**, docs/**, tests/**]
     allowed_source_paths: [src/**, docs/**, tests/**]
-    deadline_ms: 1000
     evidence_bytes: 16384
-    max_candidates: 16
+    max_candidates: 64
     budget:
       max_calls: 256
       max_request_bytes: 4194304
@@ -195,14 +195,11 @@ A newer root turn, the completed second expansion, or 15 minutes closes the fami
 Missing-token or off-mode entry uses local fallback without allocating paid-family accounting.
 This allowance cannot spend review/CI capacity or the ordinary active-scope pool.
 Both pools retain the shared 8 MiB budget-store safety limit. Inspect actual coverage and budget
-receipts before changing these limits. In RC7/RC8, selection starts its separate 3.5-second allowance
-after preparation, within a 10-second total operation. This applies to prompt, CLI and provider-context
-selection and may leave large inventories partly assessed; synchronous source work is size-bounded,
-not a hard timing guarantee.
-Each metadata call has at most one second or the stricter profile timeout. Reaching the overall
-retrieval cutoff does not trigger provider cooldown; a provider's own timeout still does.
-The native prompt entry runs only the enabled index question. Legacy body-ranking and workflow
-advice remain on their existing deliberate command paths. No provider is required for local routing.
+receipts before changing these limits. Context preparation, selection and delivery use one
+30-second operation with a 40-second managed host envelope. There is no per-request context
+timeout. Overall cutoff does not trigger provider cooldown; a provider's own timeout still does.
+The native prompt path runs the enabled metadata and passage questions. Workflow advice remains
+on its deliberate command path. No provider is required for local routing.
 
 The adapter adds bound intent to short follow-ups. It does not invent acceptance criteria, reopen a
 closed task, or use the last task from another session. The operator/agent still deliberately creates
@@ -214,8 +211,8 @@ The accepted [RC9 specification](../specs/engine-rc9-parallel-context.md) and
 [implementation plan](../exec-plans/active/2026-09-27-rc9-parallel-context.md) replace the separate
 3.5-second selection cutoff with one 30-second total retrieval budget. Preparation and waiting
 count toward it, with the last 500 ms reserved for delivery/cleanup. Managed prompt hooks allow
-40 seconds so the host can start and return the bounded operation. Opt-in passage judgment retains
-the last five seconds of selection and shares the existing call/byte allowance.
+40 seconds so the host can start and return the bounded operation. Opt-in passage judgment shares
+the single operation clock and the existing call/byte allowance.
 
 JEV will receive fuller metadata batches where existing byte limits permit them, with at most
 four requests in flight through one local pool shared across worktrees. Rate pacing and brief
@@ -242,6 +239,22 @@ merely by upgrading.
 ## Continue a native prompt entry
 
 The Codex prompt hook creates the initial entry automatically and gives its entry ID in the packet.
+It also names the actual execution checkout and worktree locator. Shared hook definitions may come
+from the main checkout; that does not make the main checkout the execution target. Align the chat
+with the intended existing worktree before work. Missing local entries do not authorize a sibling lookup.
+
+Read an unchanged packet under the same session with:
+
+```sh
+.governance/runtime/bin/project-governance context-route --entry <entry-id>
+```
+
+This revalidates the newest local entry, binding, configuration and captured sources without a new
+selection or provider call. It returns the served turn and age. A bare `context-route` cannot know
+which native turn you mean and returns `entry-turn-unobserved`; supply the hook's reference. An
+explicit reference is declared reuse, not independent evidence of the current native turn. A stale
+or superseded entry has a named reason and supported refresh action; no automatic paid retry occurs.
+
 If that packet is unavailable, an explicit route supplies local context for the current purpose:
 
 ```sh
@@ -260,6 +273,71 @@ An optional path fetches an original; `--links` asks for one hop of declared lin
 the same observed host session and worktree, and step 2 follows a completed step 1. It shares the
 initial entry's allowance. Missing credentials or an exhausted family still permits local routing
 and deliberate original reads; neither condition widens hosted disclosure.
+
+## Deliver project procedures
+
+Opt in by listing existing project-owned Markdown guides in the router. Preserve all existing routes
+and questions when editing the profile:
+
+```yaml
+context_router:
+  # Same ordinary file slot as the manual command; total route limits still apply.
+  optional_excerpt_bytes: 8192
+  procedure_sources:
+    - docs/guides/local-development.md
+continuity:
+  decisions:
+    consumers:
+      DL03:
+        questions:
+          - context.metadata-relevance/1
+          - context.passage-evidence/1
+          - context.passage-role/1
+```
+
+This fragment is an addition, not a complete profile or permission grant. Explicitly approve the
+document through the existing `source` data class and `allowed_source_paths`; metadata selection
+also needs its existing metadata class and paths. Source permission allows both extracted descriptions
+and passage bodies for those paths. Passage questions must be enabled separately. Doctor shows
+the effective settings and their limits without probing the provider.
+
+The existing passage queue assesses complete parent sections independently of file relevance. Nested
+steps stay with their parent, and shared introductory prerequisites accompany delivered sections.
+Answered scores order bounded quotes and sections; they are uncalibrated advice. Required and
+explicitly pinned material stays first. Source units retain original range order for tied scores.
+Optional delivery gives each file its first useful unit before adding more from the same file.
+Further evidence is added in rounds across files, before ordinary background. Confirmed source units
+can use remaining space in the same declared packet; no extra budget is created. Previously delivered
+ranges survive every extension, and incomplete added units remain visibly partial.
+Omitted positive sections are named. An unconfirmed section too large for ordinary delivery keeps
+its strongest section as an explicitly partial quote and retains its original reference; smaller,
+weaker sections cannot substitute for it. Sections too large even for classification remain
+reference-only. A quoted guide
+does not authorize commands, waive checks or override instructions. Without JEV, declared originals
+remain available as references and required rules remain intact.
+
+File descriptions and passage bodies have different jobs. Description scores rank what to inspect
+next. Positive ranks precede uncertain ranks; uncertain ranks precede local background. Those scores
+do not establish body evidence. Receipts retain confidence counts and an uncertain preview. The
+passage stage checks the actual source and uses its answered scores to choose quotes next, balancing
+supported source/test roles. Uncertain quotes keep their ordinary limit and visible label. Shadow or
+unavailable advice keeps the local order.
+
+Metadata, passage assessment and delivery share one 30-second operation envelope, with a 40-second
+managed host timeout to return fallback and settle ownership. There is no per-request timeout.
+Provider admission still enforces the shared rate/concurrency limits. Verified measured input usage
+settles a conservative rate estimate; unknown usage remains reserved. Paid family calls and bytes
+are never refunded by this settlement.
+
+RC10's compact metadata payload carries the full current request and all approved distinguishing
+facts with less repeated framing. Coverage distinguishes cached, permitted, submitted and answered
+descriptors from path-only answers. The index retains up to 32 MiB of facts in its existing 64 MiB
+SQLite envelope; an extractor version change revisits earlier capacity omissions. Cold preparation
+may still need bounded refreshes. A complete path count does not prove complete semantic coverage.
+Classification can inspect more of a captured unit than the small excerpt sent to the coding
+model, within existing disclosure and evidence limits. Preparation uses remaining family capacity,
+with no separate 256-unit cutoff. Native delivery uses the declared route envelope, with no extra
+8 KiB optional ceiling. Larger declared envelopes do not establish better outcomes or token savings.
 
 ## Keep continuity history separate
 
@@ -304,6 +382,13 @@ cached input and reasoning remain subsets of their respective totals. Counts ove
 are known subtotals, not a claim of complete usage or savings. Compare similar accepted work,
 additional reads and rework before promoting optional selection.
 
+RC10 reads recent context/decision metrics through the existing bounded SQLite telemetry projection,
+filtering workspace, runtime and time before limiting results. It retains at most 1,000 compact context
+records and 1 MiB of payloads per worktree, separately from operational receipts. Status reports
+eviction and unknown write coverage. If that projection is unavailable, a bounded receipt scan is
+labelled partial when it cannot prove globally newest coverage. Missing evidence is unknown usage,
+not zero usage. Doctor links the latest retained native entry and route rather than re-evaluating them.
+
 ## Improve documentation without a repository-wide rewrite
 
 For behavior being changed, document its purpose, public contract and important constraints at the
@@ -328,3 +413,21 @@ observations: unread or unapproved files remain unknown, and a module guide may 
 flagged file. Revalidate current source and inspect the module guide before adding a description.
 Prioritize touched areas and repeated packet expansions; leave unrelated legacy debt for later.
 No extra provider call, background rewrite, new debt database or new approval gate is introduced.
+
+For large repositories, review the existing `max_candidates` setting as well as the full-index
+allowance. It controls captured file bodies after metadata assessment; its legacy default is 16.
+A fully approved large-repository pilot can use 64. Doctor reports the effective window. Complete
+metadata coverage does not mean every file body was captured or every section was delivered.
+Answered uncertain section scores can improve ordering within a file, with explicit uncertainty,
+source checks and the ordinary excerpt allowance. They do not authorize execution or acceptance.
+
+`optional_excerpt_bytes` applies to normal native prompts as well as shell refreshes. It accepts
+128–65,536 bytes; omitting it retains the existing 3,072-byte passage or 2,048-byte inactive default.
+Larger slots trade breadth for fuller source. Review the route's expansion/total envelope alongside
+the slot. The release's large-repository library regressions use 64 candidates, 8 KiB slots and
+48,000 optional packet bytes; smaller profiles still have recorded misses. This is retrieval proof,
+separate from installed synthetic-hook proof and accepted-task outcomes.
+
+When a relevant test literally imports an already captured implementation, packet fitting can keep
+the two beside each other. Both source hashes and non-negative advice must still match. This does
+not capture new files, turn uncertainty into confirmation, enlarge slots or override required rules.

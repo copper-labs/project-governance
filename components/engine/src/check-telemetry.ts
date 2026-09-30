@@ -51,11 +51,36 @@ export function checkTelemetry(root: string, workspace: string, options: { stage
   const reviewCounts: Record<string, number> = {};
   const expectationCounts = { unspecified: 0, matched: 0, unexpected: 0, invalid: 0 };
   const durations: number[] = []; let packs = 0, commands = 0, blocked = 0, matched = 0;
-  for (const id of names.slice(0, limit)) {
+  const retainedProjection = readRunProjection(root, target);
+  const captured = new Map<string, { metric: Record<string, unknown> | null; intent: Record<string, unknown> | null; at: number }>();
+  let scanComplete = true, scanned = 0;
+  for (const id of names) {
+    if (++scanned > 10000) { scanComplete = false; break; }
     try {
-      const metric = record(join(root, id, "metrics.json"));
+      const metric = retainedProjection.state === "available" ? null : record(join(root, id, "metrics.json"));
+      // Do not count a completed retained result as unfinished merely because the projection omitted it.
+      const intent = metric || retainedProjection.state === "available" && record(join(root, id, "metrics.json")) ? null : record(join(root, id, "run.json"));
+      const value = metric ?? intent;
+      if (!value) continue;
+      const owner = metric ? value.workspace : value.root, stage = metric ? value.stage : value.plan && object(value.plan).stage;
+      const at = Date.parse(String(value.started_at));
+      if (owner !== target || !Number.isFinite(at) || at < since || options.stage && stage !== options.stage ||
+          options.runtimeVersion && value.runtime_version !== options.runtimeVersion || options.trigger && value.trigger !== options.trigger) continue;
+      captured.set(id, { metric, intent, at });
+    } catch { counts.invalid++; }
+  }
+  if (retainedProjection.state === "available") for (const metric of retainedProjection.metrics) {
+    const at = Date.parse(metric.started_at);
+    if (at < since || options.stage && metric.stage !== options.stage || options.runtimeVersion && metric.runtime_version !== options.runtimeVersion ||
+        options.trigger && metric.trigger !== options.trigger) continue;
+    captured.set(metric.run_id, { metric: metric as unknown as Record<string, unknown>, intent: null, at });
+  }
+  const selected = [...captured.entries()].sort((a, b) => b[1].at - a[1].at || a[0].localeCompare(b[0]));
+  for (const [id, captured] of selected.slice(0, limit)) {
+    try {
+      const metric = captured.metric;
       if (!metric) {
-        const intent = record(join(root, id, "run.json"));
+        const intent = captured.intent;
         if (intent?.["root"] === target) {
           const plan = intent["plan"] && typeof intent["plan"] === "object" ? object(intent["plan"]) : {};
           if (options.stage && plan["stage"] !== options.stage) continue;
@@ -89,8 +114,8 @@ export function checkTelemetry(root: string, workspace: string, options: { stage
   }
   durations.sort((a, b) => a - b);
   const percentile = (fraction: number) => durations.length ? durations[Math.max(0, Math.ceil(durations.length * fraction) - 1)] : null;
-  const { metrics: retained, ...projection } = readRunProjection(root, target);
-  return { rolling_projection: { ...projection, retained_records: retained.length, write_coverage: "not-verified", rejected_writes: null }, version: 1, kind: "project-governance-check-telemetry", workspace: target, scope: "native-check-runs", scanned_runs: Math.min(names.length, limit), matched_runs: matched,
-    truncated: names.length > limit, counts, review_disposition_counts: reviewCounts, expectation_counts: expectationCounts, elapsed_ms: { samples: durations.length, median: percentile(0.5), p95: percentile(0.95), total: durations.reduce((a, b) => a + b, 0) },
+  const { metrics: retained, ...projection } = retainedProjection;
+  return { rolling_projection: { ...projection, retained_records: retained.length, write_coverage: "not-verified", rejected_writes: null }, version: 1, kind: "project-governance-check-telemetry", workspace: target, scope: "native-check-runs", scanned_runs: scanned, selection: retainedProjection.state === "available" ? "newest-matching-projection-first" : "newest-matching-capture-first; bounded-receipt-fallback", scan_complete: scanComplete, matched_runs: matched,
+    truncated: !scanComplete || selected.length > limit || (retainedProjection.evicted_records ?? 0) > 0, counts, review_disposition_counts: reviewCounts, expectation_counts: expectationCounts, elapsed_ms: { samples: durations.length, median: percentile(0.5), p95: percentile(0.95), total: durations.reduce((a, b) => a + b, 0) },
     pack_count: packs, command_count: commands, blocked_pack_count: blocked, model_tokens: null, token_coverage: "unavailable", benefit_claim: "not-evaluated" };
 }

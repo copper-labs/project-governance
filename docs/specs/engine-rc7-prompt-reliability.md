@@ -50,8 +50,9 @@ differs from the packet's historical association. It returns that context needs 
 
 The existing context-route continuation accepts this verified transition in the same session,
 worktree and latest turn. It builds a new packet for the current request and current task scope.
-It does not require an initial failed expansion or a new operator prompt. Plain context-route
+It does not require an initial failed expansion or a new operator prompt. `context-route --task <current request>`
 after a recorded switch also joins the current entry allowance rather than opening fresh spending.
+An exact `--entry` replay is separate; a bare shell command cannot identify the current host turn.
 Unverified changes, delegated workers, closed tasks and foreign sessions/worktrees still fail.
 
 Preserve the original prompt, packet, task association, provider jobs and native usage records.

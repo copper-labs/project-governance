@@ -226,3 +226,52 @@ dispositions:
     check, comparison and telemetry assertions. Concurrency, observers, provider delivery and cleanup
     already have separate helpers. Keeping this short orchestration together makes replay and native
     result comparisons readable without another fixture-state abstraction.
+- finding: quality.large-function
+  path: components/engine/src/context-packet.ts
+  symbol: buildContextPacket
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex source reconciliation and Claude Opus 5.5 medium completed-candidate and affected review
+  approved_on: '2026-09-30'
+  responsibility: Fit one source-validated evidence packet within its exact serialized allowance.
+  rationale: Judgment validation, ordering, first-unit admission and range-preserving extensions
+    share the same original candidates and delivered-byte accounting. Source extraction, excerpt
+    construction, procedure boundaries and provider selection already have separate owners.
+    Keeping the remaining fold together makes required context, pins and uncertainty visible
+    across fitting rounds without distributing mutable allowance and retained-range state.
+- finding: quality.large-function
+  path: components/engine/src/context-passage-advice.ts
+  symbol: selectContextPassages
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex source reconciliation and Claude Opus 5.5 medium completed-candidate and affected review
+  approved_on: '2026-09-30'
+  responsibility: Assess captured source and procedure units under one optional decision lifetime.
+  rationale: Preparation, shared queue consumption and answer folding retain one source identity,
+    operation deadline and invocation allowance. Unit extraction, wire framing and provider
+    admission already have independent owners. Splitting the remaining fold solely by length
+    would scatter uncertainty, omission and source-validation state without isolating another duty.
+- finding: quality.large-function
+  path: components/engine/scripts/verify-rc6-prompt.mjs
+  symbol: verifyWorktreeCutover
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex source reconciliation and Claude Opus 5.5 medium completed-candidate and affected review
+  approved_on: '2026-09-30'
+  responsibility: Prove an installed pin cutover across linked worktrees with a retained generation reader.
+  rationale: The scenario carries shared hook definitions, per-worktree stores, merged pins and
+    an active reader through one deliberate cutover. Native hook invocation and installation
+    requests already have helpers. Keeping the scenario together preserves its before-and-after
+    ownership assertions without duplicating expensive installed setup or hiding preserved state.
+- finding: quality.large-file
+  path: components/engine/test/context-rc10.test.ts
+  symbol: <file>
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex source reconciliation and Claude Opus 5.5 medium completed-candidate and affected review
+  approved_on: '2026-09-30'
+  responsibility: Prove the RC10 packet contract across source, procedure, uncertainty and replay boundaries.
+  rationale: These named scenarios share captured-source and decision-wire fixtures to check the
+    same delivery contract and its fallback. The underlying extraction, admission and telemetry
+    owners have their own suites. Splitting solely by file size would duplicate those fixtures
+    without separating a distinct runtime responsibility; individual tests remain independently runnable.

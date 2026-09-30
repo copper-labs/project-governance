@@ -188,7 +188,8 @@ Use ledger/job bindings where available. Explicit `--decision-task` and `--decis
 arguments remain for manual/unbound entry where the public CLI lacks that binding. Reject conflicts
 with an authoritative binding. Do not introduce a project-global current task, infer identity from
 prose, or add a session manager. Context-route's existing `--task` is prose, not
-a durable task ID. For `context-route`, reuse existing `--revision` and add only `--decision-task`;
+a durable task ID. Fresh shell `context-route` requires `--task <current request>`; a durable
+`--decision-task` alone cannot supply current intent. Reuse existing `--revision` and add only `--decision-task`;
 do not add a competing revision argument. A legacy invocation without a bound or explicit task ID deliberately
 falls back with `scope-unavailable`, even if its migrated E3 question remains enabled. Document that
 migration effect and the updated invocation; profile compatibility does not imply an unscoped call.

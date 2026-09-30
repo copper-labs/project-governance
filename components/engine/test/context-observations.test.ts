@@ -5,9 +5,10 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { digest, durableJson } from "../src/core.ts";
 import { contextStateRoot } from "../src/context-command.ts";
-import { codexUsageRecord, importContextUsage, contextObservationStatus, recordContextObservation, collectContextHostUsage, indexPromptEntry } from "../src/context-observations.ts";
+import { codexUsageRecord, importContextUsage, contextObservationStatus, recordContextObservation, collectContextHostUsage, indexPromptEntry, publishContextObservation } from "../src/context-observations.ts";
+import { readContextProjection } from "../src/telemetry-projection.ts";
 import { Store } from "../../harness/src/store/store.ts";
-import { defaultDbPath } from "../../harness/src/store/location.ts";
+import { defaultDbPath, workContext } from "../../harness/src/store/location.ts";
 import { execFileSync } from "node:child_process";
 
 test("native response usage joins exact prompt identity, excludes cumulative counters and deduplicates", () => {
@@ -17,7 +18,7 @@ test("native response usage joins exact prompt identity, excludes cumulative cou
     execFileSync("git", ["init", "-q"], { cwd: root });
     const store = new Store(defaultDbPath(root)), task = store.createTask("Record native usage", [], { worktree: root }); store.close();
     const entryId = digest("entry").slice(7), state = contextStateRoot(root), transcript = join(root, "host.jsonl");
-    durableJson(join(state, "prompt-entries", `${entryId}.json`), { version: 1, entryId, workspace: root, session: "thread", turn: "root-turn",
+    durableJson(join(state, "prompt-entries", `${entryId}.json`), { version: 1, entryId, workspace: root, worktreeLocator: workContext(root).locator, session: "thread", turn: "root-turn",
       scopeKind: "bound-task", binding: { taskId: task.taskId }, status: "prepared" });
     indexPromptEntry(root, entryId, "thread", "root-turn");
     const row = { type: "token_usage_record", payload: { thread_id: "thread", session_id: "internal-session", turn_id: "model-turn", root_turn_id: "root-turn", response_id: "response-1",
@@ -46,6 +47,32 @@ test("native response usage joins exact prompt identity, excludes cumulative cou
     for (const name of readdirSync(join(state, "context-observations"))) assert.ok(!readFileSync(join(state, "context-observations", name), "utf8").includes("private user prose"));
     writeFileSync(transcript, '{"type":"unsupported-format"}\n');
     assert.equal(collectContextHostUsage(root, "thread", transcript).state, "format-unrecognized");
+  } finally {
+    if (old === undefined) delete process.env.XDG_STATE_HOME; else process.env.XDG_STATE_HOME = old;
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("recent status retains native rollover and binding observations without private receipt contents", () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "context-observation-status-"))), old = process.env.XDG_STATE_HOME;
+  process.env.XDG_STATE_HOME = join(root, "state");
+  try {
+    const state = contextStateRoot(root), kinds = ["startup-owner-rollover", "task-binding", "task-refresh", "task-switch"];
+    for (const kind of kinds) {
+      const path = join(state, "context-observations", `${digest(kind).slice(7)}.json`);
+      const value = { version: 1, kind, entryId: "e".repeat(64), createdAt: new Date().toISOString(),
+        binding: { taskId: "task", revision: "1" }, privateProse: "receipt-only private detail" };
+      assert.equal(publishContextObservation(path, value, root), true);
+      assert.equal(publishContextObservation(path, value, root), false);
+      assert.equal(readFileSync(path, "utf8").includes(value.privateProse), true);
+    }
+    const report = contextObservationStatus(root);
+    assert.equal(report.projection.state, "available");
+    for (const kind of kinds) assert.equal(report.counts[`context-observations:${kind}`], 1);
+    const projection = readContextProjection(state, root);
+    assert.equal(JSON.stringify(projection).includes("receipt-only private detail"), false);
+    assert.ok(projection.records.every(item => item.taskId === "task" && item.taskRevision === "1"));
+    assert.deepEqual(report.usage, { inputTokens: null, outputTokens: null, responses: 0 });
   } finally {
     if (old === undefined) delete process.env.XDG_STATE_HOME; else process.env.XDG_STATE_HOME = old;
     rmSync(root, { recursive: true, force: true });

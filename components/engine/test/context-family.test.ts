@@ -15,6 +15,7 @@ import { contextMetadataCatalog, selectContextMetadata } from "../src/context-me
 import { DecisionRuntime } from "../src/decision-runtime.ts";
 import { profileDecisionSettings } from "../src/decision-settings.ts";
 import type { ValidationSubject } from "../src/change-subject.ts";
+import { beginContextSelection, finishContextSelection } from "../src/context-family.ts";
 
 test("family requests reserve once, share spending, close after two expansions and expire on admission", t => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "context-family-"))); t.after(() => rmSync(root, { recursive: true, force: true }));
@@ -50,6 +51,21 @@ test("new observed turns close older families and abandoned expiry does not exha
   assert.equal(openContextFamily(root, newer, newer.started), "opened");
   assert.equal(beginContextRequest(root, next.id, 0, "request", newer.started).status, "closed-or-unavailable");
   const db = new DatabaseSync(join(root, DECISION_BUDGET_FILE), { readOnly: true }); assert.equal(db.prepare("PRAGMA user_version").get()!["user_version"], 2); db.close();
+});
+
+test("large permitted catalogs retain their exact paid cursor past the former one-MiB read ceiling", t => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "large-context-cursor-"))), old = process.env.XDG_STATE_HOME;
+  process.env.XDG_STATE_HOME = join(root, "state");
+  t.after(() => { if (old === undefined) delete process.env.XDG_STATE_HOME; else process.env.XDG_STATE_HOME = old; rmSync(root, { recursive: true, force: true }); });
+  const state = contextStateRoot(root), entry = digest("large-cursor").slice(7), request = digest("selection");
+  assert.equal(openContextFamily(state, { id: entry, workspace: root, locator: "fixture", session: "s", turn: "1", started: Date.now() }), "opened");
+  assert.equal(beginContextSelection(root, entry, 0, request).status, "reserved");
+  const cursor = { version: 1 as const, generation: "fixture", batches: Array.from({ length: 220 }, (_, index) => ({ signature: digest(index),
+    paths: Array.from({ length: 38 }, (_, path) => `src/component-${index}-${path}.ts`), outcome: { retained: "x".repeat(6000) } as any })) };
+  assert.ok(Buffer.byteLength(JSON.stringify(cursor)) > 1024 * 1024);
+  assert.equal(finishContextSelection(root, entry, 0, request, cursor), true);
+  const replay = beginContextSelection(root, entry, 0, request);
+  assert.equal(replay.replay, true); assert.equal(replay.paid, false); assert.deepEqual(replay.previous, cursor);
 });
 
 test("no-provider turns allocate no budget database and expired paid accounting cannot starve ordinary work", t => {

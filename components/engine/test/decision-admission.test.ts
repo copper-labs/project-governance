@@ -30,6 +30,38 @@ test("request-rate ceiling spans clients and expires after the rolling minute", 
   assert.equal(sibling.acquire("key", 1, 160000, 2000).state, "admitted");
 });
 
+test("measured rate usage replaces an estimate without releasing ownership or lowering later reports", t => {
+  const root = mkdtempSync(join(tmpdir(), "provider-measured-")), pool = new ProviderPool(root), sibling = new ProviderPool(root);
+  t.after(() => { pool.close(); sibling.close(); rmSync(root, { recursive: true, force: true }); });
+  const first = pool.acquire("key", 150000, 100000, 2000);
+  assert.equal(first.state, "admitted"); if (first.state !== "admitted") return;
+  assert.equal(pool.dispatch(first.id, "key", 100000, 2000), true);
+  for (const value of [null, NaN, -1, 1.5]) pool.reportUsage(first.id, value);
+  assert.equal(sibling.acquire("other-key", 60000, 100000, 2000).state, "wait");
+  pool.reportUsage(first.id, 10000);
+  const second = sibling.acquire("other-key", 60000, 100000, 2000);
+  assert.equal(second.state, "admitted"); if (second.state !== "admitted") return;
+  assert.equal(second.active, 2, "settlement must retain the first execution slot");
+  sibling.release(second.id, false);
+  pool.reportUsage(first.id, 180000);
+  pool.reportUsage(first.id, 1);
+  assert.equal(sibling.acquire("other-key", 60000, 100000, 2000).state, "wait", "duplicate reports cannot lower known usage");
+  pool.release(first.id, true);
+  assert.equal(sibling.acquire("other-key", 60000, 100000, 2000).state, "wait", "release retains the measured rolling rate cost");
+  assert.equal(sibling.acquire("other-key", 60000, 101000, 2000).state, "admitted");
+});
+
+test("settled calls retain the request-rate count", t => {
+  const root = mkdtempSync(join(tmpdir(), "provider-measured-requests-")), pool = new ProviderPool(root);
+  t.after(() => { pool.close(); rmSync(root, { recursive: true, force: true }); });
+  for (let i = 0; i < PROVIDER_REQUESTS_PER_MINUTE; i++) {
+    const entry = pool.acquire("key", 1, 100000, 2000);
+    assert.equal(entry.state, "admitted"); if (entry.state !== "admitted") return;
+    pool.reportUsage(entry.id, 0); pool.release(entry.id, true);
+  }
+  assert.equal(pool.acquire("key", 1, 100000, 2000).state, "wait");
+});
+
 test("crashed leases expire; a late owner cannot release or dispatch its replacement", t => {
   const root = mkdtempSync(join(tmpdir(), "provider-fencing-")), pool = new ProviderPool(root);
   t.after(() => { pool.close(); rmSync(root, { recursive: true, force: true }); });

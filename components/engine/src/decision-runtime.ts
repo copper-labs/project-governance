@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync, statSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
+import { projectContextMetric } from "./telemetry-projection.ts";
+import { RELEASE_VERSION } from "./release-version.ts";
 import { digest, durableJson, object } from "./core.ts";
 import { matchesPackPath } from "./planning.ts";
 import { DECISION_CONSUMERS, DECISION_QUESTIONS } from "./decision-catalog.ts";
@@ -33,7 +35,7 @@ export interface DecisionAsk {
   /** Repository-relative source paths transmitted in this request, checked against the profile scope. */
   sourcePaths?: string[];
   metadataPaths?: string[];
-  evidenceLayout?: "shared-v1" | "per-question-v1";
+  evidenceLayout?: "compact-v1" | "shared-v1" | "per-question-v1";
   /** Isolate frequent prompt retrieval from check-time decision budgets without changing task identity. */
   budgetPartition?: "context-selection";
   budgetInvocationId?: string;
@@ -131,7 +133,18 @@ export class DecisionRuntime {
   #record(key: string, outcome: DecisionOutcome): string | null {
     if (this.#options.receipts === false) return null;
     // Telemetry storage failure never alters the decision, the budget or native execution.
-    try { durableJson(this.#receiptPath(key), { version: 2, receiptId: key, createdAt: new Date().toISOString(), outcome }); return key; }
+    try {
+      const createdAt = new Date().toISOString();
+      durableJson(this.#receiptPath(key), { version: 2, runtimeVersion: RELEASE_VERSION, receiptId: key, createdAt, outcome });
+      if (outcome.scope) projectContextMetric(this.stateRoot, { id: key, workspace: outcome.scope.workspace, capturedAt: createdAt,
+        kind: "decision", entryId: null, routeId: null, familyId: outcome.budget.invocationId ?? null,
+        taskId: outcome.scope.taskId, taskRevision: outcome.scope.taskRevision, status: outcome.method, reason: outcome.reason,
+        counts: { providerCalled: outcome.providerCalled === undefined ? null : Number(outcome.providerCalled), answered: Object.values(outcome.answers).filter(item => item.status === "answered").length,
+          inputTokens: outcome.usage.inputTokens, outputTokens: outcome.usage.outputTokens, latencyMs: outcome.latencyMs,
+          httpMs: outcome.transport?.httpMs ?? null, admissionMs: outcome.transport?.admissionMs ?? null,
+          requestBytes: outcome.transport?.requestBytes ?? null } });
+      return key;
+    }
     catch { return null; }
   }
 
@@ -178,7 +191,7 @@ export class DecisionRuntime {
     if (ask.legacyDataClass !== undefined && (participants.length !== 1 || participants[0] !== "DL03" ||
       ask.questions.some(question => question.definitionId !== "legacy.context-rank/1"))) return fallback("data-sharing-disabled");
     if (ask.evidenceLayout && (participants.length !== 1 || ask.consumerId !== "DL03" || ask.legacyDataClass !== undefined ||
-      !(metadata || passage && ask.evidenceLayout === "shared-v1"))) return fallback("data-sharing-disabled");
+      !(metadata || passage && ["compact-v1", "shared-v1"].includes(ask.evidenceLayout)))) return fallback("data-sharing-disabled");
     const dataClass = (id: DecisionConsumerId) => metadata ? "metadata" : ask.legacyDataClass ?? DECISION_CONSUMERS[id].dataClass;
     if (participants.some(id => !this.settings.legacy.allowedDataClasses.includes(dataClass(id)))) return fallback("data-sharing-disabled");
     if (metadata && ask.sourcePaths?.length && (!this.settings.legacy.allowedDataClasses.includes("source") ||

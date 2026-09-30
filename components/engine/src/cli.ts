@@ -41,6 +41,7 @@ import { contextRouteCommand } from "./context-route-command.ts";
 import { contextIndexCommand } from "./context-index-command.ts";
 import { ContextRouteError, CONTEXT_ROUTE_HELP } from "./context-route-errors.ts";
 import { associatePromptTask, contextObservationStatus, importContextUsage, recordContextObservation } from "./context-observations.ts";
+import { workContext } from "../../harness/src/store/location.ts";
 import { contextDoctor } from "./context-doctor.ts";
 import { workflowObservationCommand } from "./decision-workflow-observation.ts";
 import { repositoryMap } from "./repository-map.ts";
@@ -363,16 +364,17 @@ Use the owning command contract for structured request fields.
     if (command === "--version") { console.log(`project-governance ${RELEASE_VERSION}`); return 0; }
     if (command === "telemetry") {
       if (args[1] === "context") {
+        const workspace = workContext(process.cwd()).worktree;
         const operation = args[2] ?? "status";
         const { values } = parseArgs({ args: args.slice(3), strict: true, allowPositionals: false, options: {
           entry: { type: "string" }, transcript: { type: "string" }, path: { type: "string" }, disposition: { type: "string" }, evidence: { type: "string" },
         } });
-        if (operation === "status" && !Object.keys(values).length) { console.log(JSON.stringify(contextObservationStatus(process.cwd()))); return 0; }
+        if (operation === "status" && !Object.keys(values).length) { console.log(JSON.stringify(contextObservationStatus(workspace))); return 0; }
         if (!values.entry) throw new Error("Context observation requires --entry ID");
-        if (operation === "import" && values.transcript) { console.log(JSON.stringify(importContextUsage(process.cwd(), values.entry, values.transcript))); return 0; }
-        if (operation === "expansion" && values.path) { console.log(JSON.stringify(recordContextObservation(process.cwd(), values.entry, { kind: "expansion", path: values.path }))); return 0; }
+        if (operation === "import" && values.transcript) { console.log(JSON.stringify(importContextUsage(workspace, values.entry, values.transcript))); return 0; }
+        if (operation === "expansion" && values.path) { console.log(JSON.stringify(recordContextObservation(workspace, values.entry, { kind: "expansion", path: values.path }))); return 0; }
         if (operation === "outcome" && values.evidence && ["accepted", "reopened"].includes(values.disposition ?? "")) {
-          console.log(JSON.stringify(recordContextObservation(process.cwd(), values.entry, { kind: "outcome", disposition: values.disposition as "accepted" | "reopened", evidence: values.evidence }))); return 0;
+          console.log(JSON.stringify(recordContextObservation(workspace, values.entry, { kind: "outcome", disposition: values.disposition as "accepted" | "reopened", evidence: values.evidence }))); return 0;
         }
         throw new Error("Use telemetry context status|import|expansion|outcome with explicit entry references");
       }

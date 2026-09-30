@@ -1,7 +1,7 @@
 import { object, text } from "./core.ts";
 import { matchesPackPath } from "./planning.ts";
 import { safeSubjectPath } from "./change-subject.ts";
-import { contextBudget } from "./checkers/context-router.ts";
+import { contextBudget, contextExcerptBudget } from "./checkers/context-router.ts";
 import { promptPacketLimit } from "./prompt-context-budget.ts";
 import { CONTEXT_PROMPT_LIMIT } from "./context-limits.ts";
 
@@ -66,6 +66,8 @@ export function routeContext(raw: unknown, task: string, changedPaths: string[])
     }
     return { id, score, reasons, route };
   }).sort((a, b) => b.score - a.score || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const procedureSources = list(router.procedure_sources).map(safeSubjectPath);
+  if (procedureSources.some(path => !/\.mdx?$/iu.test(path))) throw new Error("Procedure sources must name Markdown files");
   const defaultRoute = router.default_route === undefined ? null : scores.find(item => item.id === text(router.default_route, "default route"));
   if (router.default_route !== undefined && !defaultRoute) throw new Error("Context default_route must name a declared route");
   const selected = scores[0]?.score ? scores[0] : defaultRoute ?? null;
@@ -77,7 +79,9 @@ export function routeContext(raw: unknown, task: string, changedPaths: string[])
   // Every path owner remains mandatory, even outside the optional secondary display limit.
   const owners = [...new Set([route, ...pathOwners.map(item => item.route)])];
   // Mixed work gets the largest declared envelope, never a sum or a route-name-dependent cap.
-  return { outcome, selected: selected ? { id: selected.id, score: selected.score, reasons: selected.reasons } : null,
+  return { outcome, procedureSources,
+    ...(router.optional_excerpt_bytes === undefined ? {} : { optionalExcerptBytes: contextExcerptBudget(router.optional_excerpt_bytes) }),
+    selected: selected ? { id: selected.id, score: selected.score, reasons: selected.reasons } : null,
     secondary: scores.slice(1).filter(item => selected && item.score > 0 && selected.score - item.score <= threshold).slice(0, secondaryLimit).map(({ id, score, reasons }) => ({ id, score, reasons })),
     matchedPathRoutes: pathOwners.map(item => item.id), ...contextOwnerRequirements(router, owners),
     ready: false, remaining: "Required files and skills must be materialized and verified before this route is ready." };

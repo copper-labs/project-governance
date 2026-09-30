@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-02-16
-updated: 2026-09-27
+updated: 2026-09-29
 summary: Active and completed execution plans for the current source repository.
 ---
 
@@ -16,10 +16,16 @@ Git remains the implementation history and recovery mechanism.
 
 ## Active
 
-- [RC9 context quality and parallel selection](active/2026-09-27-rc9-parallel-context.md) owns the
-  next release: metadata/prompt/passage repairs, real-repository evaluation, fuller batches, bounded
-  parallel dispatch, shared local pacing and a 15-second retrieval budget. The first source-grounded
-  case pack is prepared; implementation, comparison execution and qualification are pending.
+- [RC10 reliable context and procedure selection](active/2026-09-29-rc10-context-use.md) is the
+  proposed next release: correct entry/worktree use, visible semantic coverage, exact packet/answer
+  reuse, optional procedure sections, recent telemetry and a deliberately scoped development pilot.
+  Planning is complete; implementation and publication have not started.
+
+- [RC9 context quality and parallel selection](active/2026-09-27-rc9-parallel-context.md) retains
+  the published release's implementation/proof and remaining field-adoption work. It delivered
+  bounded parallel dispatch and shared local pacing within a 30-second operation envelope.
+  The published [RC9.1 deadline correction](active/2026-09-28-rc9-1-context-deadlines.md) removes
+  the redundant per-request cutoff. Use RC10 for the next proposed implementation sequence.
 
 - [RC8 hook and context repair](active/2026-09-25-rc8-hook-sources.md) resolves Codex's main-checkout
   definitions, prevents incomplete cutovers, speeds repository preparation and checks context budgets.

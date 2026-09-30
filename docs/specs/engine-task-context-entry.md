@@ -71,9 +71,10 @@ task/action binding; observation reads that binding, not an ambient session over
 
 ## Context before reading
 
-The normal `context-route` entry accepts omitted task/revision when resolution succeeds. Explicit
-values remain supported and must agree with a bound decision identity. An explicit task description
-can narrow the retrieval query without changing the stored requirement used by task advice. A check's
+RC10 `context-route` requires `--task <current request>` for fresh selection, or `--entry <id>` for
+validated reuse of this prompt's native packet. Other flags cannot substitute for current intent.
+Revision may be inherited from the resolved binding. An explicit task description can narrow the
+retrieval query without changing the stored requirement used by task advice. A check's
 `--decision-purpose` adds focus to the bound requirement; it never replaces it or invalidates the check.
 
 The compiled runtime owns one short managed block in each supported host instruction file. It tells

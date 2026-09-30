@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-08-21
-updated: 2026-09-25
+updated: 2026-09-30
 summary: Routes evaluators, operators, contributors, and agents through the shortest useful Project Governance documentation journeys.
 ---
 
@@ -37,7 +37,8 @@ reference for that proof boundary.
 Use [Work Safely Across Git Worktrees and Codex Chats](guides/source-control-and-worktrees.md)
 for task ownership, separate implementation checkouts, reviewed integration, coordinated governance
 adoption, shared build/device resources and cleanup. It distinguishes operating practices from
-runtime enforcement and current behavior from the expanded RC6 qualification still to be completed.
+runtime enforcement. The [prompt-context guide](../guides/rc6-prompt-context.md) explains same-worktree
+entry reuse, procedure opt-in, actual semantic coverage and unknown outcome evidence in RC10.
 
 ## Agent Entry
 

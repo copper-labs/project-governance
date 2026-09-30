@@ -5,7 +5,7 @@ import type { ValidationSubject } from "./change-subject.ts";
 import { interpretNoul, type DecisionAsk, type DecisionOutcome, type DecisionRuntime } from "./decision-runtime.ts";
 import type { BudgetScope } from "./decision-budget.ts";
 import { contextBudgetScope, contextFamilyScope, readDecisionBudget } from "./decision-budget.ts";
-import { METADATA_MAX_QUESTIONS, type EvidenceItem } from "./decision-schema.ts";
+import { compactMetadataItem, METADATA_MAX_QUESTIONS, type EvidenceItem } from "./decision-schema.ts";
 import { CONTEXT_SELECTION_MS } from "./context-timing.ts";
 import { prepareDecisionRequest } from "./decision-request-preparation.ts";
 import { PROVIDER_CONCURRENCY } from "./decision-admission.ts";
@@ -67,9 +67,9 @@ export function contextMetadataCatalog(paths: string[], purpose: string, exact: 
 /** Full permitted inventory stays independent of lexical hits; family replay binds the whole batch. */
 export async function selectContextMetadata(subject: ValidationSubject, catalog: ReturnType<typeof contextMetadataCatalog>,
   purpose: string, runtime: DecisionRuntime, scope: BudgetScope | null, subjectDigest: string,
-  eventId: string, signal?: AbortSignal, deadlineAt = performance.now() + CONTEXT_SELECTION_MS, projection?: ReturnType<typeof maintainContextProjection>, family?: MetadataFamily, evaluation: { concurrency?: number; layout?: "shared-v1" | "per-question-v1"; deferBudgetClose?: boolean; reservePassageBudget?: boolean } = {}) {
+  eventId: string, signal?: AbortSignal, deadlineAt = performance.now() + CONTEXT_SELECTION_MS, projection?: ReturnType<typeof maintainContextProjection>, family?: MetadataFamily, evaluation: { concurrency?: number; layout?: "compact-v1" | "shared-v1" | "per-question-v1"; deferBudgetClose?: boolean; reservePassageBudget?: boolean } = {}) {
   const started = performance.now(), baseline = catalog.candidates.map(item => item.path), decisions: DecisionOutcome[] = [];
-  const layout = evaluation.layout ?? "shared-v1", concurrency = evaluation.concurrency ?? PROVIDER_CONCURRENCY;
+  const layout = evaluation.layout ?? "compact-v1", concurrency = evaluation.concurrency ?? PROVIDER_CONCURRENCY;
   if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > PROVIDER_CONCURRENCY) throw new Error("invalid metadata concurrency");
   const enabled = runtime.settings.questionIds.DL03.includes("context.metadata-relevance/1");
   const assessable: string[] = [], excluded: Array<{ path: string; reason: string }> = [];
@@ -84,13 +84,18 @@ export async function selectContextMetadata(subject: ValidationSubject, catalog:
   const detailAllowed = enabled && runtime.settings.mode !== "off" && runtime.settings.consumers.DL03.mode !== "off" &&
     !runtime.eligibility("DL03").reasons.includes("missing-token") && runtime.settings.legacy.allowedDataClasses.includes("metadata") && runtime.settings.legacy.allowedDataClasses.includes("source");
   const descriptionOmissions: string[] = [], unfittable: string[] = [];
-  const positive = new Map<string, number>(), assessed = new Set<string>(), answered = new Set<string>(), described = new Set<string>(), visited = new Set<string>();
+  const descriptorPermitted = assessable.filter(path => runtime.settings.legacy.allowedDataClasses.includes("source") && runtime.settings.legacy.allowedDataClasses.includes("metadata") && matchesPackPath(path, runtime.settings.legacy.allowedSourcePaths ?? []));
+  const descriptorAvailable = new Set(descriptorPermitted.filter(path => projection!.entries.has(path)));
+  const positive = new Map<string, number>(), uncertain = new Map<string, number>(), negative = new Set<string>();
+  const assessed = new Set<string>(), answered = new Set<string>(), described = new Set<string>(), answeredDescribed = new Set<string>(), visited = new Set<string>();
   const permitted = new Set(assessable), itemByPath = new Map<string, EvidenceItem>();
   const purposeItem: EvidenceItem = { id: "purpose", text: purpose, sourceDigest: digest(purpose), provenance: "supplied", trust: "untrusted" };
   const purposeBytes = Buffer.byteLength(purpose), limit = runtime.settings.legacy.evidenceBytes;
   const definition = DECISION_QUESTIONS["context.metadata-relevance/1"]!;
-  const wireLimit = Math.min(65536, runtime.settings.budget.maxRequestBytes), baseWire = 1000 + Buffer.byteLength(JSON.stringify(purposeItem));
-  const itemWire = (item: EvidenceItem) => Buffer.byteLength(JSON.stringify(item)) + Buffer.byteLength(JSON.stringify({ instructions: { question: definition.instructions, evidenceIds: ["purpose", item.id] }, type: "noul" })) + 32;
+  const wireLimit = Math.min(65536, runtime.settings.budget.maxRequestBytes), baseWire = 1000 + Buffer.byteLength(JSON.stringify(purposeItem)) + (layout === "compact-v1" ? Buffer.byteLength(definition.instructions) : 0);
+  const itemWire = (item: EvidenceItem) => layout === "compact-v1"
+    ? Buffer.byteLength(JSON.stringify(compactMetadataItem(item))) + 150
+    : Buffer.byteLength(JSON.stringify(item)) + Buffer.byteLength(JSON.stringify({ instructions: { question: definition.instructions, evidenceIds: ["purpose", item.id] }, type: "noul" })) + 32;
   for (const path of assessable) {
     const detail = detailAllowed && matchesPackPath(path, runtime.settings.legacy.allowedSourcePaths ?? []) ? projection.entries.get(path) : null;
     let item: EvidenceItem = { id: path, text: detail?.text ?? path, sourceDigest: detail?.sourceDigest ?? digest(path), provenance: "derived", trust: "untrusted" };
@@ -108,9 +113,16 @@ export async function selectContextMetadata(subject: ValidationSubject, catalog:
     decisions.push(outcome);
     if (outcome.providerCalled) for (const path of paths) { assessed.add(path); visited.add(path); if (itemByPath.get(path)?.text !== path) described.add(path); }
     paths.forEach((path, i) => {
-      if (outcome.answers[`file-${i}`]?.status === "answered") answered.add(path);
+      if (outcome.answers[`file-${i}`]?.status === "answered") {
+        answered.add(path); if (itemByPath.get(path)?.text !== path) answeredDescribed.add(path);
+      }
       const answer = outcome.answers[`file-${i}`];
-      if (outcome.delivered && answer?.status === "answered" && answer.shape === "noul" && interpretNoul(answer).value === "positive") positive.set(path, answer.probability);
+      if (outcome.delivered && answer?.status === "answered" && answer.shape === "noul") {
+        const interpretation = interpretNoul(answer).value;
+        if (interpretation === "positive") positive.set(path, answer.probability);
+        else if (interpretation === "uncertain") uncertain.set(path, answer.probability);
+        else negative.add(path);
+      }
     });
   };
   let replayedBatches = 0, invalidatedBatches = 0, providerCallMs = 0, httpTotalMs = 0, admissionTotalMs = 0, packingMs = 0, peakConcurrency = 0, firstBatchMs: number | null = null, budgetFinalized: boolean | null = null;
@@ -138,7 +150,6 @@ export async function selectContextMetadata(subject: ValidationSubject, catalog:
   let reason = enabled ? assessable.length ? "not-attempted" : "metadata-scope-disabled" : "metadata-question-disabled";
   const controller = new AbortController(), cancel = () => controller.abort(signal?.reason);
   if (signal?.aborted) cancel(); else signal?.addEventListener("abort", cancel, { once: true });
-  const cutoff = setTimeout(() => controller.abort("context-selection-deadline"), Math.max(0, deadlineAt - performance.now()));
   const completed: Array<{ paths: string[]; signature: string; outcome: DecisionOutcome }> = [];
   let nextBatch = 0, active = 0, stop = false;
   const askFor = (batch: string[]): DecisionAsk => {
@@ -153,6 +164,26 @@ export async function selectContextMetadata(subject: ValidationSubject, catalog:
   };
   const fits = (batch: string[]) => prepareDecisionRequest({ ...askFor(batch),
     scope: scope ?? { workspace: subject.root, taskId: "unbound", taskRevision: "unbound" } }, runtime.settings, ["DL03"], "packing").ok;
+  const forecastPriorities = [...priorities], forecastGeneral = [...general];
+  let forecastBytes = 0, forecastCalls = 0, forecastUnrepresentable = 0;
+  while (forecastPriorities.length || forecastGeneral.length) {
+    const packed = packMetadataBatch(forecastPriorities, forecastGeneral, itemByPath,
+      { purposeBytes, evidenceBytes: limit, baseWire, wireBytes: wireLimit, itemWire });
+    forecastUnrepresentable += packed.unfittable.length;
+    let offset = 0;
+    while (offset < packed.batch.length) {
+      let size = packed.batch.length - offset, request = prepareDecisionRequest({ ...askFor(packed.batch.slice(offset)), scope: scope ?? { workspace: subject.root, taskId: "unbound", taskRevision: "unbound" } }, runtime.settings, ["DL03"], "forecast");
+      while (!request.ok && size > 1) request = prepareDecisionRequest({ ...askFor(packed.batch.slice(offset, offset + --size)), scope: scope ?? { workspace: subject.root, taskId: "unbound", taskRevision: "unbound" } }, runtime.settings, ["DL03"], "forecast");
+      if (request.ok) { forecastBytes += request.requestBytes; forecastCalls++; } else forecastUnrepresentable++;
+      offset += size;
+    }
+  }
+  const preflight = { remainingInventoryCount: priorities.length + general.length, requestBytes: forecastBytes, requestCalls: forecastCalls,
+    alreadySpentBytes: claimedBytes, alreadySpentCalls: claimedCalls, familyByteLimit: runtime.settings.budget.maxRequestBytes,
+    metadataByteCeiling, metadataCallCeiling, fitsBytes: claimedBytes + forecastBytes <= metadataByteCeiling,
+    fitsCalls: claimedCalls + forecastCalls <= metadataCallCeiling, unrepresentableCount: forecastUnrepresentable,
+    operationRemainingMs: Math.max(0, deadlineAt - performance.now()), latencyQualification: "not-established",
+    recommendation: claimedBytes + forecastBytes > metadataByteCeiling ? "explicit-byte-allowance-required-within-8388608-ceiling" : null };
   const requeue = (paths: string[]) => {
     priorities.unshift(...paths.filter(path => prioritySet.has(path)));
     general.unshift(...paths.filter(path => !prioritySet.has(path)));
@@ -207,6 +238,7 @@ export async function selectContextMetadata(subject: ValidationSubject, catalog:
       if (!outcome.delivered && !["shadow", "repeated-observation", "no-usable-answers"].includes(outcome.reason) && outcome.failureStage !== "answer-validation") stop = true;
     }
   };
+  const cutoff = setTimeout(() => controller.abort("context-selection-deadline"), Math.max(0, deadlineAt - performance.now()));
   try {
     // Promise.allSettled owns all local handlers even when one sibling unexpectedly rejects.
     const settled = await Promise.allSettled(Array.from({ length: concurrency }, worker));
@@ -234,15 +266,33 @@ export async function selectContextMetadata(subject: ValidationSubject, catalog:
   const pinned = new Set(catalog.candidates.filter(item => item.pinned).map(item => item.path));
   const relevant = baseline.filter(path => !pinned.has(path) && positive.has(path))
     .sort((a, b) => positive.get(b)! - positive.get(a)! || a.localeCompare(b));
-  const order = [...baseline.filter(path => pinned.has(path)), ...relevant, ...baseline.filter(path => !pinned.has(path) && !positive.has(path))];
+  // File scores choose what to inspect next. Uncertainty is not evidence of irrelevance.
+  // Keep confidence labels and passage confirmation separate from this advisory rank.
+  const tentative = baseline.filter(path => !pinned.has(path) && uncertain.has(path))
+    .sort((a, b) => uncertain.get(b)! - uncertain.get(a)! || a.localeCompare(b));
+  const applied = positive.size > 0 || uncertain.size > 0;
+  const order = [...baseline.filter(path => pinned.has(path)), ...relevant, ...tentative,
+    ...baseline.filter(path => !pinned.has(path) && !positive.has(path) && !uncertain.has(path))];
   const coverage = { eligibleCount: baseline.length, permittedCount: assessable.length, submittedCount: assessed.size, answeredCount: answered.size,
     unassessedCount: assessable.length - answered.size, notPermittedCount: notPermitted, unavailableCount: excluded.length,
     unfittableCount: unfittable.length, complete: answered.size === assessable.length && assessable.length > 0, inventoryComplete: answered.size === baseline.length, reason, attempted: assessed.size > 0,
-    applied: decisions.some(item => item.delivered), mode: decisions[0]?.mode ?? "off", traversalStart: parseInt(digest({ eventId }).slice(7, 15), 16),
+    applied, mode: decisions[0]?.mode ?? "off", traversalStart: parseInt(digest({ eventId }).slice(7, 15), 16),
     priorityAssessed, generalAssessed, replayedBatches, invalidatedBatches,
     passageReservedBytes: reserveBytes, metadataByteCeiling, passageReservedCalls: reserveCalls, metadataCallCeiling };
-  return { version: 3, catalog, order, reason, assessed: [...assessed], metadataPermittedCount: assessable.length, coverage, cursor,
-    invocationId, budgetFinalized, excluded, decisions, delivered: positive.size > 0, sourceBodiesTransmitted: described.size > 0, rawSourceFilesTransmitted: false,
-    sourceIndex: sourceIndexObservation(projection, described.size, baseline.length, descriptionOmissions),
+  return { version: 3, catalog, order, reason, assessed: [...assessed], metadataPermittedCount: assessable.length, coverage, preflight, cursor,
+    invocationId, budgetFinalized, excluded, decisions, delivered: applied,
+    ordering: { rule: "positive-then-uncertain-before-baseline", positiveCount: positive.size,
+      uncertainCount: uncertain.size, supportedNegativeCount: negative.size,
+      uncertainPreview: tentative.slice(0, 16).map(path => ({ path, probability: uncertain.get(path)! })),
+      previewTruncated: tentative.length > 16, confirmsSourceEvidence: false },
+    sourceBodiesTransmitted: described.size > 0, rawSourceFilesTransmitted: false,
+    sourceIndex: { ...sourceIndexObservation(projection, described.size, baseline.length, descriptionOmissions),
+      descriptorCoverage: { cachedCount: projection.entries.size, metadataPermittedCount: assessable.length,
+        descriptorPermittedCount: descriptorPermitted.length, descriptorAvailableCount: descriptorAvailable.size,
+        descriptorSubmittedCount: described.size, descriptorAnsweredCount: answeredDescribed.size,
+        pathOnlySubmittedCount: assessed.size - described.size, pathOnlyAnsweredCount: answered.size - answeredDescribed.size,
+        pathOnlyReasons: { disclosureNotApproved: assessable.length - descriptorPermitted.length,
+          factsUnavailable: descriptorPermitted.length - descriptorAvailable.size, inferenceUnavailable: detailAllowed ? 0 : descriptorAvailable.size, individuallyUnrepresentable: descriptionOmissions.length },
+        sourcePermissionAlsoPermitsBodies: true, passageConsumerRequired: true } },
     firstBatchMs, providerCallMs, httpTotalMs, admissionTotalMs, packingMs, peakConcurrency, evidenceLayout: layout, elapsedMs: performance.now() - started };
 }

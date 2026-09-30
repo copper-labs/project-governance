@@ -1,3 +1,4 @@
+import { wireMetadataEvidence } from "./fixtures/context-wire.ts";
 import { test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -24,7 +25,7 @@ function fixture(t: TestContext) {
   const catalog = contextMetadataCatalog(paths, "repair", [], [], new Set()), scope = { workspace: root, taskId: "task", taskRevision: "1" };
   const response = (wire: any) => Response.json({ model: settings.legacy.model,
     answers: Object.fromEntries(Object.entries(wire.questions).map(([name, value]) => [name,
-      { type: "noul", noul: (value as any).instructions.evidenceIds[1] === "src/079.ts" ? 0.99 : 0.8 }])) });
+      { type: "noul", noul: wireMetadataEvidence(wire, value).id === "src/079.ts" ? 0.99 : 0.8 }])) });
   return { root, subject, settings, paths, catalog, scope, response };
 }
 
@@ -33,7 +34,7 @@ test("parallel batches cover the permitted inventory with stable score order ind
   const fetcher: typeof fetch = async (_url, init) => {
     active++; peak = Math.max(peak, active); const serial = ++count, wire = JSON.parse(String(init?.body));
     for (const value of Object.values(wire.questions) as any[]) {
-      const path = value.instructions.evidenceIds[1]; assert.equal(seen.has(path), false); seen.add(path);
+      const path = wireMetadataEvidence(wire, value).id; assert.equal(seen.has(path), false); seen.add(path);
     }
     await new Promise(resolve => setTimeout(resolve, serial % 4 * 10 + 10)); active--; return f.response(wire);
   };

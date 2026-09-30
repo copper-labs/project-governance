@@ -112,7 +112,11 @@ export class ProviderPool {
 
   reportUsage(id: string, inputTokens: number | null) {
     if (inputTokens !== null && Number.isSafeInteger(inputTokens) && inputTokens >= 0)
-      this.#db.prepare("UPDATE calls SET reported=?,tokens=max(tokens,?) WHERE id=?").run(inputTokens, inputTokens, id);
+      // Reserve conservatively until the provider measures usage. Settling a known rate cost
+      // neither refunds the task's paid attempt nor frees its execution slot.
+      this.#db.prepare(`UPDATE calls SET
+        tokens=CASE WHEN reported IS NULL THEN ? ELSE max(tokens,?) END,
+        reported=max(coalesce(reported,0),?) WHERE id=?`).run(inputTokens, inputTokens, inputTokens, id);
   }
   close() { this.#db.close(); }
 }

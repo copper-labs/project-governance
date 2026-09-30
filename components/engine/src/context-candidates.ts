@@ -6,6 +6,18 @@ import type { ValidationSubject } from "./change-subject.ts";
 
 const within = (path: string, scope: string) => path === scope || path.startsWith(scope + "/");
 
+/** Explicit scope stays first; declarations share body-capture capacity with ranked source. */
+export function contextCaptureOrder(explicit: Iterable<string>, declared: string[], procedures: string[], ranked: string[], metadataOrder = ranked) {
+  const pinned = new Set([...explicit, ...declared]), procedureSet = new Set(procedures);
+  const guides = [...new Set([...metadataOrder.filter(path => procedureSet.has(path)), ...procedures])].filter(path => !pinned.has(path));
+  const sources = ranked.filter(path => !procedureSet.has(path) && !pinned.has(path)), balanced: string[] = [];
+  for (let index = 0; index < Math.max(guides.length, sources.length); index++) {
+    if (guides[index]) balanced.push(guides[index]!);
+    if (sources[index]) balanced.push(sources[index]!);
+  }
+  return [...new Set([...pinned, ...balanced])];
+}
+
 /** Inventory paths only. Hosted sharing is checked separately before provider disclosure. */
 export function contextCandidateInventory(subject: ValidationSubject, scopes: string[], changed: string[]) {
   let inventory: string[];
@@ -62,7 +74,9 @@ export function automaticContextCandidates(subject: ValidationSubject, relevant:
     inspectedCount++;
     if (permitted(path)) {
       seeds.push(path); dispositions.set(path, "seeded");
-      if (seeds.length === Math.min(32, maximum)) break;
+      // After an inventory-wide assessment, do not reserve half the source window for lexical
+      // discoveries at the expense of JEV's remaining ranked files. Explicit expansion keeps links.
+      if (seeds.length === (priority?.ordered ? maximum : Math.min(32, maximum))) break;
     }
   }
   let discovery: ReturnType<typeof discoverContext> | null = null;

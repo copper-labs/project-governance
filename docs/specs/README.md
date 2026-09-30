@@ -5,7 +5,7 @@ type: spec
 status: current
 owner: project-governance
 created: 2026-02-16
-updated: 2026-09-27
+updated: 2026-09-29
 summary: Active specifications for the package runtime, KMP surface validation, change narratives, and durable documentation.
 ---
 
@@ -19,7 +19,9 @@ summary: Active specifications for the package runtime, KMP surface validation, 
 | [RC3 decision experiments](engine-decision-experiments.md) | Optional attention advice, bounded read-only probes, offline history analysis and comparable baseline/shadow/live evidence |
 | [RC4 evidence, quality and category routing](engine-decision-rc4.md) | Existing evidence selection, focused quality advice, fixed models by default, simple opt-in category mappings and richer CI recommendations |
 | [RC6 prompt entry and maintained repository context](engine-rc6-linked-retrieval.md) | Automatic entry, a rebuildable SQLite index, basic source-backed relationships, bounded JEV selection with expansion and real-task qualification |
-| [RC9 context quality and parallel selection](engine-rc9-parallel-context.md) | Accepted metadata/prompt/passage repairs, real-repository evaluation, bounded concurrent JEV requests and a 15-second retrieval envelope; implementation pending |
+| [RC9 context quality and parallel selection](engine-rc9-parallel-context.md) | Published metadata/prompt/passage repairs and bounded concurrent JEV requests within one 30-second retrieval envelope |
+| [RC9.1 context deadline correction](engine-rc9-1-context-deadlines.md) | Published removal of the redundant one-second JEV request cap; whole-operation safety and fallback retained |
+| [RC10 reliable context and procedure selection](engine-rc10-context-use.md) | Proposed entry/worktree alignment, semantic coverage diagnostics, exact reuse, selected runbook sections and outcome-linked adoption |
 | [Decision layer for local CI](engine-decision-local-ci.md) | Check applicability, proof reuse, focused selection, host capacity and adaptive validation across local and remote CI |
 | [Workflow and device round trip](engine-workflow-and-device-contract.md) | Approved stages, resource/recovery ownership, RN iOS simulator then real devices |
 | [Local CI and merge evidence](engine-local-ci-and-merge-contract.md) | Qualified local/VM/hosted execution, trusted publication and protected merge freshness |

@@ -158,6 +158,31 @@ test("supported narrow completion advice introduces no correction or acceptance 
   assert.match(advice.authority, /deterministic acceptance is unchanged/);
 });
 
+test("a truthful harmful result retains the original constraint and never becomes acceptance", async t => {
+  const { claimAdvice } = await import("../src/decision-claim-advice.ts");
+  const { DecisionRuntime } = await import("../src/decision-runtime.ts");
+  const { profileDecisionSettings } = await import("../src/decision-settings.ts");
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "harmful-claim-"))); t.after(() => rmSync(root, { recursive: true, force: true }));
+  const settings = profileDecisionSettings({ continuity: { decisions: { mode: "auto", allowed_data_classes: ["diagnostic"], consumers: { DL09: { mode: "auto" } } } } });
+  const requirement = "Repair queue processing while preserving every saved customer job. Do not erase the queue.";
+  let calls = 0;
+  const runtime = new DecisionRuntime(settings, root, { coordinationRoot: root, token: "fixture", fetch: async (_url, init) => {
+    calls++; const wire = JSON.parse(String(init?.body));
+    assert.match(JSON.stringify(wire), /preserving every saved customer job/);
+    assert.match(JSON.stringify(wire), /erased the queue/);
+    return Response.json({ model: settings.legacy.model, answers: Object.fromEntries(Object.entries(wire.questions).map(([name, question]) => {
+      const keys = Object.keys((question as any).criteria), choice = name === "scope" ? "broader-than-evidence" : "supported";
+      return [name, { type: "choice", choice, confidence: 0.95, probabilities: Object.fromEntries(keys.map(key => [key, key === choice ? 1 : 0])) }];
+    })) });
+  } });
+  const receipt = { state: "succeeded", exitCode: 0, cleanup: "confirmed", requestDigest: digest("request"), signal: null, reason: "completed", durationMs: 1, logBytes: 0 } as any;
+  const summary = { completion: { outcome: "completed", answer: "I erased the queue and the worker starts.", checks: [{ description: "Worker starts", result: "passed", evidence: "Starts after the queue was erased" }], remaining: [], artifacts: [], sources: [] } } as any;
+  const advice = await claimAdvice(runtime, receipt, summary, { workspace: root, taskId: "task", taskRevision: "1" }, { eventId: "harmful", policyDigest: "policy", environment: "fixture", revision: "1", requirement });
+  assert.equal(calls, 1); assert.equal(advice.delivered, true); assert.equal(advice.scope?.label, "broader-than-evidence");
+  assert.equal(advice.coverage.unavailable.includes("original-requirement"), false);
+  assert.match(advice.authority, /deterministic acceptance is unchanged/); assert.equal("accepted" in advice, false);
+});
+
 test("failed submissions without a provider result remain joinable and cannot borrow another native result", async t => {
   const { providerDecisionAdvice } = await import("../src/decision-provider-advice.ts");
   const { decisionOutcomeReport } = await import("../src/decision-outcomes.ts");

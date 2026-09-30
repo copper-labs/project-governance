@@ -1,12 +1,28 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawnSync, execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdtempSync, realpathSync, rmSync, readFileSync } from "node:fs";
+import { mkdtempSync, realpathSync, rmSync, readFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { durableJson } from "../src/core.ts";
+import { contextStateRoot } from "../src/context-command.ts";
+
+test("telemetry context status resolves a nested directory to its execution worktree", () => {
+  const workspace = realpathSync(mkdtempSync(join(tmpdir(), "cli-context-directory-"))), state = join(workspace, "state");
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: workspace }); mkdirSync(join(workspace, "src"));
+    const env = { ...process.env, XDG_STATE_HOME: state }, old = process.env.XDG_STATE_HOME; process.env.XDG_STATE_HOME = state;
+    try { durableJson(join(contextStateRoot(workspace), "context-observations", `${"a".repeat(64)}.json`),
+      { kind: "task-switch", createdAt: new Date().toISOString(), entryId: "e".repeat(64) }); }
+    finally { if (old === undefined) delete process.env.XDG_STATE_HOME; else process.env.XDG_STATE_HOME = old; }
+    const cli = fileURLToPath(new URL("../src/cli.ts", import.meta.url));
+    const nested = spawnSync(process.execPath, [cli, "telemetry", "context", "status"], { cwd: join(workspace, "src"), env, encoding: "utf8", timeout: 10000 });
+    assert.equal(nested.status, 0, nested.stderr);
+    assert.equal(JSON.parse(nested.stdout).counts["context-observations:task-switch"], 1);
+  } finally { rmSync(workspace, { recursive: true, force: true }); }
+});
 
 test("public telemetry review preserves results and filters versioned status", () => {
   const workspace = realpathSync(mkdtempSync(join(tmpdir(), "cli-telemetry-")));

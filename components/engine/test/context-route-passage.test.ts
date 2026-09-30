@@ -51,7 +51,7 @@ test("normal routing applies opted-in passage advice and links its source-free r
   assert.ok(!receipt.includes("assert.equal(launchStatus"));
   assert.ok(result.selection.passageAdvice?.receiptIds.every(id => receipt.includes(id!)));
   assert.equal(result.selection.capturedSourceFacts?.spanFileCount, 1);
-  assert.equal(result.selection.metadataStage.passageReserveMs, 5000);
+  assert.equal(result.selection.metadataStage.passageReserveMs, 0, "metadata and passages share one operation deadline");
   const profilePath = join(root, "config/governance/profile.yaml"), metadataOnly = JSON.parse(readFileSync(profilePath, "utf8"));
   metadataOnly.continuity.decisions.allowed_data_classes = ["metadata"];
   writeFileSync(profilePath, JSON.stringify(metadataOnly));

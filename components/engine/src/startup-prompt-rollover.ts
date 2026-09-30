@@ -79,7 +79,7 @@ export async function nativeOwnerRolloverResult(error: unknown, provider: string
       try { publishContextObservation(join(contextStateRoot(workspace), "context-observations",
         `${digest({ kind: "startup-owner-rollover", session: input.session_id, turn: input.turn_id }).slice(7)}.json`),
         { version: 1, kind: "startup-owner-rollover", status: "context-attempted", sessionDigest: digest(input.session_id),
-          turnDigest: digest(input.turn_id), priorStartupOwner: "retained", createdAt: new Date().toISOString() }); }
+          turnDigest: digest(input.turn_id), priorStartupOwner: "retained", createdAt: new Date().toISOString() }, workspace); }
       catch { /* Nonblocking analytics. */ }
       return context;
     }

@@ -5,11 +5,15 @@ type: exec-plan
 status: active
 owner: project-governance
 created: 2026-09-27
-updated: 2026-09-27
+updated: 2026-09-29
 summary: Repair context fidelity, qualify realistic repository scenarios, and deliver bounded parallel JEV selection within a 30-second retrieval envelope before RC9 publication.
 ---
 
 # RC9 implementation plan
+
+RC9 is published. [RC9.1](2026-09-28-rc9-1-context-deadlines.md) supersedes the original individual
+request allowance recorded below. Keep that history for its frozen proof; do not reintroduce its
+one-second cap. [RC10](2026-09-29-rc10-context-use.md) owns the next proposed implementation.
 
 Owner: [RC9 context quality and parallel selection specification](../../specs/engine-rc9-parallel-context.md).
 The operator has authorized implementation. The first RC9 comparison exposed a passage-quality

@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-09-25
-updated: 2026-09-25
+updated: 2026-09-30
 summary: A practical workflow for owning changes, using Codex worktrees, integrating reviewed commits, adopting governance and cleaning up without disturbing other agents.
 ---
 
@@ -174,6 +174,13 @@ A stale main-checkout hook must be repaired through that checkout's backed insta
 with affected active agents paused at a seam. Then reconcile each active tree's own runtime.
 No extra branch is required, and an installer in one tree never implicitly edits its siblings.
 See the [RC8 contract](../../specs/engine-rc8-hook-sources.md).
+
+RC10 prompt output names the actual execution workspace/locator and the shared definition source
+separately. Its `context-route --entry <id>` reference only replays a validated packet in that same
+worktree and session. A missing entry does not search siblings or silently choose a different task.
+If a chat is attached to the wrong directory, correct that host attachment first; changing AGENTS
+or copying another tree's receipt cannot repair it. See the
+[current context-use contract](../../specs/engine-rc10-context-use.md).
 
 After changing the shared definitions, review their normal host trust and inspect native hook
 discovery from each active worktree. Confirm the selected source, command and timeout, then a

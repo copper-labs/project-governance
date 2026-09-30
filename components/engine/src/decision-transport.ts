@@ -130,8 +130,8 @@ export class JevDecisionClient {
       if (signal?.aborted) return done({ ok: false, reason: decisionCancellationReason(signal), failureStage: "transport" });
       const remaining = Math.floor(Math.min(deadlineMs, operationDeadline - performance.now()));
       if (remaining < 1) return done({ ok: false, reason: "admission-deadline", failureStage: "budget" });
-      // Metadata has an explicit operation clock and a separate dispatch cap. Other callers
-      // retain their original total allowance; its expiry still belongs to the provider.
+      // A caller-owned operation retains its original clock through admission and dispatch.
+      // No request gains a fresh allowance after waiting for shared capacity.
       timeoutOwner = deadlineAt !== undefined && remaining < deadlineMs ? "caller" : deadlineOwner;
       timer = setTimeout(() => controller.abort(), remaining);
       httpStart = performance.now(); failureStage = "transport";

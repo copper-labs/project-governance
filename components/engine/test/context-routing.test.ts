@@ -1,6 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { routeContext } from "../src/context-routing.ts";
+test("the native profile declares the same optional excerpt bound as manual retrieval", () => {
+  const router = { default_route: "project", optional_excerpt_bytes: 8192, routes: [{ id: "project" }] };
+  assert.equal(routeContext(router, "current request", []).optionalExcerptBytes, 8192);
+  assert.equal(routeContext({ routes: [] }, "current request", []).optionalExcerptBytes, undefined);
+  for (const value of [0, 127, 65537, "8192"]) assert.throws(() => routeContext({ ...router, optional_excerpt_bytes: value }, "request", []), /optional_excerpt_bytes/);
+});
 test("required routing uses path and whole-term signals and retains mandatory groups", () => {
   const router = { default_context: ["AGENTS.md"], routes: [
     { id: "ios", match: { path_globs: ["ios/*"], product_terms: ["iOS"] }, primary_context: ["ios/rules.md"], active_plan_context: ["plan.md"], skills: ["apple"], validations: ["native"] },

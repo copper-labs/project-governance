@@ -187,7 +187,13 @@ using the automatic path. Do not patch a pinned runtime.
 ```sh
 project-governance harness task create --outcome "Repair the request retry behavior" \
   --acceptance "Preserve errors and pass the focused regression" --scope src/request.ts --scope docs/specs/retries.md
-project-governance context-route
+project-governance context-route --task "Repair the request retry behavior"
+```
+
+For RC10, use the entry reference from the native packet when reading unchanged context:
+
+```sh
+project-governance context-route --entry <entry-id>
 project-governance check --stage pre-commit --mode impacted --staged
 ```
 
@@ -205,9 +211,10 @@ stale intent, closed task and missing store are visible fallback reasons, not gr
 another active task. A custom `harness --db` store is not automatically discovered; use the default
 store or a validated explicit decision-context file for that integration.
 
-Candidate discovery examines changed paths first, then exact scope files, then an alphabetical prefix.
-This bounds work before JEV; it does not promise to find every relevant file. Inspect exclusions and
-omitted counts, and narrow task scopes when the prefix misses useful context. Mixed required routes
+Current metadata selection presents the full permitted index across bounded batches. Changed and
+explicit paths affect priority, not an alphabetical shortlist before JEV. Source capture after ranking
+remains bounded; inspect semantic coverage, passage limits and packet omissions, then expand originals
+when necessary. See the [prompt-context guide](rc6-prompt-context.md). Mixed required routes
 use the largest declared budget envelope; required overflow remains a blocker.
 Directory scopes match every captured file beneath them, including unchanged files. Prefer specific
 task paths to avoid pulling in unrelated required owners. Failed inventory is a named context blocker.

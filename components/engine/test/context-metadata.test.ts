@@ -1,3 +1,4 @@
+import { wireMetadataEvidence } from "./fixtures/context-wire.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -96,20 +97,20 @@ test("shared metadata reaches a late file, preserves pinned paths and reuses pai
   let calls = 0;
   const runtime = new DecisionRuntime(settings(), root, { coordinationRoot: root, token: "fixture", fetch: async (_url, init) => {
     calls++; const wire = JSON.parse(String(init?.body));
-    assert.equal(wire.state.layout, "shared-v1");
-    assert.equal(wire.state.evidence.filter((item: any) => item.id === "purpose").length, 1);
+    assert.equal(wire.state.layout, "compact-v1");
+    assert.equal(wire.state.purpose, "where is the mechanism");
     assert.ok(Object.keys(wire.questions).length <= 256);
     assert.equal(JSON.stringify(wire).split("where is the mechanism").length - 1, 1);
     return Response.json({ model: "jev-1.13.0", answers: Object.fromEntries(Object.entries(wire.questions).map(([name, raw]) =>
-      [name, { type: "noul", noul: (raw as any).instructions.evidenceIds.includes("src/099.ts") ? 0.95 : 0.5 }])) });
+      [name, { type: "noul", noul: wireMetadataEvidence(wire, raw).id === "src/099.ts" ? 0.95 : 0.5 }])) });
   } });
   const run = () => selectContextMetadata(subject, catalog, "where is the mechanism", runtime,
     { workspace: root, taskId: "task", taskRevision: "1" }, digest("subject"), "turn1");
   const result = await run();
-  assert.equal(calls, 2); assert.equal(result.assessed.length, 100);
+  assert.equal(calls, 1); assert.equal(result.assessed.length, 100);
   assert.deepEqual(result.order.slice(0, 2), ["src/000.ts", "src/099.ts"]);
   assert.equal(result.sourceBodiesTransmitted, false);
-  assert.deepEqual((await run()).order, result.order); assert.equal(calls, 2);
+  assert.deepEqual((await run()).order, result.order); assert.equal(calls, 1);
 });
 
 test("prompt budgets cannot consume check-time allowance and historical hints cannot outrank current terms", async t => {
@@ -132,7 +133,7 @@ test("prompt budgets cannot consume check-time allowance and historical hints ca
   assert.equal(readDecisionBudget(root, scope), null);
 });
 
-test("metadata permission, uncertainty, deadline and budgets all retain the local order", async t => {
+test("metadata permission, missing and invalid answers, deadline and budgets retain the local fallback", async t => {
   const root = mkdtempSync(join(tmpdir(), "context-metadata-fallback-")); t.after(() => rmSync(root, { recursive: true, force: true }));
   const catalog = contextMetadataCatalog(["src/a.ts", "src/b.ts"], "fix", [], [], new Set());
   const run = (runtime: DecisionRuntime, id: string) => selectContextMetadata(subject, catalog, "fix", runtime,
@@ -144,12 +145,41 @@ test("metadata permission, uncertainty, deadline and budgets all retain the loca
   const noToken = await run(new DecisionRuntime(settings(), root, { coordinationRoot: root, token: "", fetch: fetcher }), "no-token");
   assert.equal(noToken.reason, "missing-token"); assert.equal(calls, 0);
   const unclear = await run(new DecisionRuntime(settings(), root, { coordinationRoot: root, token: "fixture", fetch: fetcher }), "unclear");
-  assert.deepEqual(unclear.order, ["src/a.ts", "src/b.ts"]); assert.equal(unclear.delivered, false);
+  assert.deepEqual(unclear.order, ["src/a.ts", "src/b.ts"]);
+  assert.equal(unclear.ordering.positiveCount, 0); assert.equal(unclear.ordering.uncertainCount, 1);
   const small = await run(new DecisionRuntime(settings({ budget: { max_calls: 1, max_request_bytes: 1024 } }), root, { coordinationRoot: root, token: "fixture", fetch: fetcher }), "budget");
   assert.ok(["input-budget", "budget-exhausted"].includes(small.reason));
   const timed = await run(new DecisionRuntime(settings({ deadline_ms: 500 }), join(root, "timeout"), { coordinationRoot: join(root, "timeout"), token: "fixture", fetch: async () => new Promise(() => {}) }), "timeout");
   assert.deepEqual(timed.order, ["src/a.ts", "src/b.ts"]); assert.equal(timed.delivered, false);
   assert.ok(timed.decisions[0]?.providerCalled);
+});
+
+test("answered uncertain file scores reach source inspection without becoming confirmed evidence", async t => {
+  const root = mkdtempSync(join(tmpdir(), "metadata-ordinal-")); t.after(() => rmSync(root, { recursive: true, force: true }));
+  const paths = ["src/pinned.ts", "src/lexical.ts", "src/main.ts", "src/assertion.ts", "src/unanswered.ts"];
+  const catalog = contextMetadataCatalog(paths, "lexical", [paths[0]!], [], new Set());
+  const configured = settings();
+  const runtime = new DecisionRuntime(configured, root, { coordinationRoot: root, token: "fixture", fetch: async (_url, init) => {
+    const wire = JSON.parse(String(init?.body));
+    const probabilities: Record<string, number> = { "src/pinned.ts": 0.1, "src/lexical.ts": 0.3, "src/main.ts": 0.73, "src/assertion.ts": 0.68 };
+    return Response.json({ model: configured.legacy.model, answers: Object.fromEntries(Object.entries(wire.questions).flatMap(([name, q]) => {
+      const probability = probabilities[wireMetadataEvidence(wire, q).id];
+      return probability === undefined ? [] : [[name, { type: "noul", noul: probability }]];
+    })) });
+  } });
+  const result = await selectContextMetadata(subject, catalog, "lexical", runtime,
+    { workspace: root, taskId: "task", taskRevision: "1" }, digest("subject"), "turn");
+  assert.deepEqual(result.order, ["src/pinned.ts", "src/main.ts", "src/assertion.ts", "src/lexical.ts", "src/unanswered.ts"]);
+  assert.equal(result.ordering.positiveCount, 0); assert.equal(result.ordering.uncertainCount, 3);
+  assert.equal(result.ordering.supportedNegativeCount, 1); assert.equal(result.ordering.confirmsSourceEvidence, false);
+  assert.equal(result.delivered, true); assert.equal(result.coverage.unassessedCount, 1);
+  const shadow = new DecisionRuntime(settings({ consumers: { DL03: { mode: "shadow", questions: ["context.metadata-relevance/1"] } } }), root,
+    { coordinationRoot: root, token: "fixture", fetch: async () => Response.json({ model: configured.legacy.model,
+      answers: { "file-0": { type: "noul", noul: 0.73 }, "file-1": { type: "noul", noul: 0.68 } } }) });
+  const unmodified = await selectContextMetadata(subject, catalog, "lexical", shadow,
+    { workspace: root, taskId: "task", taskRevision: "1" }, digest("subject"), "shadow");
+  assert.deepEqual(unmodified.order, catalog.candidates.map(item => item.path));
+  assert.equal(unmodified.ordering.uncertainCount, 0); assert.equal(unmodified.delivered, false);
 });
 
 test("every eligible item beyond the old cutoff reaches JEV, including a misleading name with approved source clues", async t => {
@@ -166,8 +196,8 @@ test("every eligible item beyond the old cutoff reaches JEV, including a mislead
   const runtime = new DecisionRuntime(configured, root, { coordinationRoot: root, token: "fixture", fetch: async (_url, init) => {
     const wire = JSON.parse(String(init?.body));
     const answers = Object.fromEntries(Object.entries(wire.questions).map(([name, raw]) => {
-      const path = (raw as any).instructions.evidenceIds[1]; seen.add(path);
-      const item = wire.state.evidence.find((entry: any) => entry.id === path);
+      const path = wireMetadataEvidence(wire, raw).id; seen.add(path);
+      const item = wireMetadataEvidence(wire, raw);
       if (path.endsWith("utility.ts")) { descriptions++; assert.match(item.text, /refreshExpiredCredentials/); }
       else assert.equal(item.text, path, "metadata consent alone must not disclose source-derived text");
       return [name, { type: "noul", noul: item.text.includes("refreshExpiredCredentials") ? 0.95 : 0.1 }];
@@ -188,7 +218,7 @@ test("budget and deadline limits expose incomplete coverage without deleting una
   const fetcher: typeof fetch = async (_url, init) => { calls++; const wire = JSON.parse(String(init?.body));
     return Response.json({ model: "jev-1.13.0", answers: Object.fromEntries(Object.keys(wire.questions).map(name => [name, { type: "noul", noul: 0.8 }])) }); };
   const scope = { workspace: root, taskId: "task", taskRevision: "1" };
-  const partial = await selectContextMetadata(subject, catalog, "find mechanism", new DecisionRuntime(settings({ budget: { max_calls: 1, max_request_bytes: 131072 } }), root, { coordinationRoot: root, token: "fixture", fetch: fetcher }), scope, digest("subject"), "partial");
+  const partial = await selectContextMetadata(subject, catalog, "find mechanism", new DecisionRuntime(settings({ evidence_bytes: 512, budget: { max_calls: 1, max_request_bytes: 131072 } }), root, { coordinationRoot: root, token: "fixture", fetch: fetcher }), scope, digest("subject"), "partial");
   assert.equal(calls, 1); assert.equal(partial.reason, "budget-exhausted");
   assert.equal(partial.coverage.complete, false); assert.ok(partial.coverage.unassessedCount > 126);
   assert.equal(partial.order.length, paths.length);
@@ -236,7 +266,7 @@ test("a bounded index supplies visited metadata windows, rotates across turns an
     evidence_bytes: 16384, budget: { max_calls: 1, max_request_bytes: 131072 } }), root, { coordinationRoot: root, token: "fixture", fetch: async (_url, init) => {
     const wire = JSON.parse(String(init?.body));
     return Response.json({ model: "jev-1.13.0", answers: Object.fromEntries(Object.entries(wire.questions).map(([name, q]) => {
-      seen.add((q as any).instructions.evidenceIds[1]); return [name, { type: "noul", noul: 0.8 }];
+      seen.add(wireMetadataEvidence(wire, q).id); return [name, { type: "noul", noul: 0.8 }];
     })) });
   } });
   const starts = new Set<number>(), scope = { workspace: root, taskId: "same-session", taskRevision: "1" };
@@ -267,7 +297,7 @@ test("unfittable items do not stop later batches and large wire descriptions fal
   const indexed = syntheticSubject({ source: () => ({ file_type: "regular" }), readBatch: () => new Map([[path, Buffer.from(text)]]) });
   const fallback = await selectContextMetadata(indexed, contextMetadataCatalog([path], "find", [], [], new Set()), "find",
     new DecisionRuntime(settings({ allowed_data_classes: ["metadata", "source"], allowed_source_paths: ["src/**"], budget: { max_calls: 1, max_request_bytes: 3000 } }), root, { coordinationRoot: root, token: "fixture", fetch: async (_url, init) => {
-      const wire = JSON.parse(String(init?.body)); assert.equal(wire.state.evidence[1].text, path); return Response.json({ model: "jev-1.13.0", answers: { "file-0": { type: "noul", noul: 0.9 } } });
+      const wire = JSON.parse(String(init?.body)); assert.equal(wire.state.items.c0.path, path); assert.equal(wire.state.items.c0.facts, null); return Response.json({ model: "jev-1.13.0", answers: { "file-0": { type: "noul", noul: 0.9 } } });
     } }), { workspace: root, taskId: "wire-fallback", taskRevision: "1" }, digest("source"), "wire");
   assert.equal(fallback.coverage.complete, true); assert.deepEqual(fallback.sourceIndex.descriptionOmissions, [path]);
 });

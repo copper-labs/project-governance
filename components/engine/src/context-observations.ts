@@ -1,5 +1,5 @@
 import { closeSync, constants, fstatSync, lstatSync, openSync, readSync, readdirSync, realpathSync, linkSync, unlinkSync, opendirSync } from "node:fs";
-import { join, isAbsolute } from "node:path";
+import { join, isAbsolute, basename, dirname } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { digest, durableJson, object } from "./core.ts";
 import { narrativeFile } from "./narrative-inputs.ts";
@@ -10,6 +10,9 @@ import { defaultDbPath, sessionId, workContext } from "../../harness/src/store/l
 import type { TaskBindingObservation } from "../../harness/src/cli.ts";
 import { resolveTaskContext, taskBindingReceipt, type TaskBindingReceipt } from "./decision-task-binding.ts";
 import type { DecisionTaskContext } from "./decision-task-context.ts";
+import { recentReceipts } from "./telemetry-receipt-reader.ts";
+import { projectContextMetric, readContextProjection } from "./telemetry-projection.ts";
+import { ContextRouteError } from "./context-route-errors.ts";
 import { DocumentationObservations } from "./context-documentation.ts";
 
 const ID = /^[a-f0-9]{64}$/u;
@@ -29,21 +32,49 @@ function entryIndexName(name: string) {
   return match ? { time: match[1] ? Number(match[1]) : null, turn: match[2]!, entryId: match[3]! } : null;
 }
 
-export function publishContextObservation(path: string, value: unknown): boolean {
+export function publishContextObservation(path: string, value: unknown, workspace?: string): boolean {
   const temporary = `${path}.${randomUUID()}.tmp`;
   try {
     durableJson(temporary, value);
-    try { linkSync(temporary, path); return true; }
+    try {
+      linkSync(temporary, path);
+      if (workspace) try {
+        const record = object(value), state = contextStateRoot(workspace);
+        if (dirname(path) === join(state, "context-observations") &&
+            ["task-binding", "task-refresh", "task-switch", "startup-owner-rollover"].includes(String(record.kind))) {
+          const binding = record.binding && typeof record.binding === "object" && !Array.isArray(record.binding)
+            ? record.binding as Record<string, unknown> : {};
+          const entryId = typeof record.entryId === "string" ? record.entryId : null;
+          projectContextMetric(state, { id: basename(path, ".json"), workspace: realpathSync(workspace), capturedAt: String(record.createdAt),
+            kind: "observation", entryId, familyId: entryId, routeId: null,
+            taskId: typeof binding.taskId === "string" ? binding.taskId : null,
+            taskRevision: typeof binding.revision === "string" ? binding.revision : null,
+            status: String(record.kind), reason: null, counts: {} });
+        }
+      } catch { /* The immutable observation still owns proof if its compact projection fails. */ }
+      return true;
+    }
     catch (error) { if ((error as NodeJS.ErrnoException).code === "EEXIST") return false; throw error; }
   } finally { try { unlinkSync(temporary); } catch { /* A failed write may not have created a file. */ } }
 }
 
 /** Read explicit entry identities; a current ambient task cannot retarget historical observations. */
 export function readPromptEntry(workspace: string, id: string) {
-  if (!ID.test(id)) throw new Error("Invalid prompt entry ID");
-  const entry = read(join(contextStateRoot(workspace), "prompt-entries"), `${id}.json`);
-  if (entry.version !== 1 || entry.entryId !== id || entry.workspace !== realpathSync(workspace) ||
-      typeof entry.session !== "string" || typeof entry.turn !== "string") throw new Error("Prompt entry identity mismatch");
+  if (!ID.test(id)) throw new ContextRouteError("entry-malformed", "Use the 64-character entry reference from the native context packet.");
+  let entry: Record<string, unknown>;
+  try { entry = read(join(contextStateRoot(workspace), "prompt-entries"), `${id}.json`); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT")
+      throw new ContextRouteError("entry-unavailable-in-workspace", `Entry is unavailable in ${realpathSync(workspace)}. Align this chat and its commands with the same execution worktree; no sibling lookup or paid retry was attempted.`);
+    throw new ContextRouteError("entry-unreadable", "The local entry cannot be read safely. Inspect context doctor and the current required originals.");
+  }
+  if (entry.version !== 1) throw new ContextRouteError("entry-format-unsupported", "The local entry format is unsupported. Use the current native packet reference.");
+  if (entry.workspace !== realpathSync(workspace))
+    throw new ContextRouteError("entry-workspace-mismatch", `The recorded workspace differs from execution workspace ${realpathSync(workspace)}. Align the host at a pause seam.`);
+  if (entry.entryId !== id || typeof entry.session !== "string" || typeof entry.turn !== "string")
+    throw new ContextRouteError("entry-malformed", "The local entry identity is malformed; inspect the current packet reference.");
+  if (entry.worktreeLocator !== workContext(workspace).locator)
+    throw new ContextRouteError("entry-worktree-identity-changed", "The checkout identity changed. Use a native prompt in the verified execution worktree.");
   return entry;
 }
 
@@ -75,9 +106,8 @@ export function latestSessionPrompt(workspace: string, session: string) {
     if (entry.session !== session || entry.turn !== newest.turn ||
         typeof entry.submittedAt !== "string" || Date.parse(entry.submittedAt) !== newest.time)
       return { reason: "session-entry-identity-unverified" };
-    if (entry.worktreeLocator !== workContext(workspace).locator) return { reason: "entry-worktree-identity-changed" };
     return { entry, reason: "session-entry-found" };
-  } catch { return { reason: "session-entry-unavailable" }; }
+  } catch (error) { return { reason: error instanceof ContextRouteError ? error.code : "session-entry-unavailable" }; }
   finally { handle?.closeSync(); }
 }
 
@@ -134,11 +164,11 @@ export function associatePromptTask(observed: TaskBindingObservation) {
       const directory = join(contextStateRoot(workspace), "context-observations");
       // A mixed-task turn cannot truthfully allocate all native response tokens to either task.
       if (existing.taskId !== binding.taskId) publishContextObservation(join(directory, `${switchId(entryId)}.json`),
-        { version: 1, kind: "task-switch", entryId, entryDigest: digest(entry), createdAt: new Date().toISOString() });
+        { version: 1, kind: "task-switch", entryId, entryDigest: digest(entry), createdAt: new Date().toISOString() }, workspace);
       const id = refreshId(entryId, binding);
       const recorded = publishContextObservation(join(directory, `${id}.json`), { version: 1, kind: "task-refresh", entryId,
         entryDigest: digest(entry), session, worktreeLocator: entry.worktreeLocator, binding, previousBinding: existing,
-        requestedAt: observed.requestedAt, createdAt: new Date().toISOString(), provenance: "explicit-continuity-bind" });
+        requestedAt: observed.requestedAt, createdAt: new Date().toISOString(), provenance: "explicit-continuity-bind" }, workspace);
       if (!currentTaskRefresh(workspace, entry, binding)) return unavailable("entry-association-conflict");
       return { status: "refresh-required", entryId, transitionId: id, replay: !recorded,
         next: "Use context-route --task <current request>. It refreshes this entry for the current task and retains the shared allowance." };
@@ -151,7 +181,7 @@ export function associatePromptTask(observed: TaskBindingObservation) {
     if (digest(taskBindingReceipt(resolveTaskContext(workspace, { session }))) !== digest(binding)) return unavailable("current-binding-changed");
     const recorded = publishContextObservation(path, { version: 1, kind: "task-binding", entryId, entryDigest: digest(entry),
       session, worktreeLocator: entry.worktreeLocator, binding, requestedAt: observed.requestedAt,
-      createdAt: new Date().toISOString(), provenance: "explicit-continuity-bind" });
+      createdAt: new Date().toISOString(), provenance: "explicit-continuity-bind" }, workspace);
     const winner = promptEntryTaskBinding(workspace, entry);
     if (!winner || winner.taskId !== binding.taskId || winner.revision !== binding.revision) return unavailable("entry-association-conflict");
     return { status: "linked", entryId, replay: !recorded };
@@ -251,12 +281,18 @@ export function importContextUsage(workspace: string, entryId: string, transcrip
           projectUsage(id, usage);
           duplicates++; continue;
         }
-        if (!publishContextObservation(path, { version: 1, kind: "usage", entryId, createdAt: new Date().toISOString(), usage, source: window.source })) {
+        const capturedAt = new Date().toISOString();
+        if (!publishContextObservation(path, { version: 1, kind: "usage", entryId, createdAt: capturedAt, usage, source: window.source })) {
           const prior = read(directory, `${id}.json`);
           if (prior.entryId !== entryId || digest(prior.usage) !== digest(usage)) throw new Error("Native usage attribution conflict");
           projectUsage(id, usage);
           duplicates++; continue;
         }
+        projectContextMetric(contextStateRoot(workspace), { id, workspace: String(entry.workspace), capturedAt,
+          kind: "usage", entryId, familyId: entryId, routeId: typeof entry.routeReceiptId === "string" ? entry.routeReceiptId : null,
+          taskId: !switched ? taskBinding?.taskId ?? null : null, taskRevision: !switched ? taskBinding?.revision ?? null : null,
+          status: "observed", reason: null, counts: { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens,
+            cachedInputTokens: usage.cachedInputTokens, reasoningTokens: usage.reasoningTokens } });
         recorded++;
         projectUsage(id, usage);
       } catch { invalid++; }
@@ -281,7 +317,7 @@ export function collectContextHostUsage(workspace: string, session: string, tran
       const value = entryIndexName(name);
       return value && turnPrefixes.has(value.turn) ? [value] : [];
     });
-    const names = [...new Map(matching.map(value => [value.entryId, value])).values()];
+    const names = [...new Map(matching.map(value => [value.entryId, value])).values()].sort((a, b) => (b.time ?? 0) - (a.time ?? 0) || a.entryId.localeCompare(b.entryId));
     const entries = names.slice(0, 128).flatMap(name => {
       try { const entry = readPromptEntry(workspace, name.entryId); return entry.session === session && turns.has(String(entry.turn)) ? [entry] : []; }
       catch { return []; }
@@ -297,38 +333,53 @@ export function collectContextHostUsage(workspace: string, session: string, tran
 
 /** Explicit observations never rewrite the prepared entry or infer acceptance from a passing check. */
 export function recordContextObservation(workspace: string, entryId: string, observation: { kind: "expansion"; path: string } | { kind: "outcome"; disposition: "accepted" | "reopened"; evidence: string }) {
-  readPromptEntry(workspace, entryId);
+  const entry = readPromptEntry(workspace, entryId);
   if (observation.kind === "expansion") safeSubjectPath(observation.path);
   else if (!["accepted", "reopened"].includes(observation.disposition) || !observation.evidence || observation.evidence.length > 512) throw new Error("Outcome requires an evidence reference");
   const id = digest({ entryId, observation }).slice(7), path = join(contextStateRoot(workspace), "context-observations", `${id}.json`);
-  publishContextObservation(path, { version: 1, entryId, ...observation, createdAt: new Date().toISOString(), provenance: "host-reported" });
+  const capturedAt = new Date().toISOString();
+  const historical = promptEntryTaskBinding(workspace, entry);
+  if (publishContextObservation(path, { version: 1, entryId, ...observation, createdAt: capturedAt, provenance: "host-reported" }))
+    projectContextMetric(contextStateRoot(workspace), { id, workspace: String(entry.workspace), capturedAt, kind: observation.kind,
+      entryId, familyId: entryId, routeId: typeof entry.routeReceiptId === "string" ? entry.routeReceiptId : null,
+      taskId: historical?.taskId ?? null, taskRevision: historical?.revision ?? null, status: observation.kind === "outcome" ? observation.disposition : "observed",
+      reason: null, counts: { accepted: observation.kind === "outcome" ? Number(observation.disposition === "accepted") : null } });
   return { recorded: true, id };
 }
 
 export function contextObservationStatus(workspace: string) {
-  const root = contextStateRoot(workspace), counts: Record<string, number> = {}, reasons: Record<string, number> = {};
+  const root = contextStateRoot(workspace), counts: Record<string, number> = Object.create(null), reasons: Record<string, number> = Object.create(null);
   const usage = { inputTokens: null as number | null, outputTokens: null as number | null, responses: 0 };
   const documentation = new DocumentationObservations();
   let truncated = false, invalid = 0, readBytes = 0;
-  for (const collection of ["prompt-entries", "entry-failures", "prompt-rejections", "context-observations"]) {
-    const directory = join(root, collection); let names: string[];
-    try { names = readdirSync(directory).filter(name => /^[a-f0-9-]+\.json$/u.test(name)).sort(); }
-    catch { continue; }
-    if (names.length > 1000) truncated = true;
-    for (const name of names.slice(0, 1000)) try {
-      const size = lstatSync(join(directory, name)).size;
-      if (size > 65536 || readBytes + size > 8 * 1024 * 1024) { truncated = true; continue; } readBytes += size;
-      const item = read(directory, name), kind = String(item.kind ?? item.status ?? "unknown");
-      if (collection === "prompt-entries" && item.workspace === realpathSync(workspace)) documentation.add(item);
-      counts[`${collection}:${kind}`] = (counts[`${collection}:${kind}`] ?? 0) + 1;
-      const reason = item.reason ?? item.code ?? item.selectionReason;
-      if (typeof reason === "string") reasons[reason] = (reasons[reason] ?? 0) + 1;
-      if (collection === "context-observations" && kind === "usage") {
-        const values = object(item.usage); usage.responses++;
-        for (const key of ["inputTokens", "outputTokens"] as const) if (numeric(values[key]) !== null) usage[key] = (usage[key] ?? 0) + Number(values[key]);
-      }
-    } catch { invalid++; }
-  }
-  return { version: 1, counts, reasons, usage, documentation: documentation.result(truncated), truncated, invalid, readBytes, selection: "bounded receipt scan; incomplete when truncated",
+  const projection = readContextProjection(root, workspace, { kinds: ["entry", "route", "usage", "outcome", "expansion", "failure", "observation"] });
+  const labels = { entry: "prompt-entries", route: "routes", usage: "context-observations", outcome: "context-observations",
+    expansion: "context-observations", failure: "entry-failures", decision: "decisions", observation: "context-observations" };
+  const receipts = recentReceipts(root, ["prompt-entries", "entry-failures", "prompt-rejections", "context-observations", "routes"],
+    { limit: 1000, maximumBytes: 8 * 1024 * 1024,
+      prioritized: projection.records.map(item => ({ collection: item.kind === "failure" && item.status === "not-delivered" ? "prompt-rejections" : labels[item.kind], name: `${item.id}.json` })),
+      predicate: item => item.workspace === undefined || item.workspace === realpathSync(workspace) });
+  invalid += receipts.invalid; readBytes = receipts.readBytes; truncated = receipts.truncated;
+  let latestEntry: Record<string, unknown> | null = null, latestRoute: Record<string, unknown> | null = null;
+  for (const { collection, name, value: item } of receipts.records) try {
+    const kind = String(item.kind ?? item.status ?? item.outcome ?? "unknown");
+    if (!/^[a-z][a-z0-9-]{0,79}$/u.test(kind)) throw new Error("Invalid observation kind");
+    const reference = { id: basename(name, ".json"), capturedAt: new Date(Date.parse(String(item.createdAt ?? item.capturedAt))).toISOString(),
+      workspace: realpathSync(workspace), status: kind, entryId: ID.test(String(item.entryId)) ? item.entryId : null,
+      routeId: typeof item.routeReceiptId === "string" && /^[a-f0-9-]{1,80}$/u.test(item.routeReceiptId) ? item.routeReceiptId : collection === "routes" ? basename(name, ".json") : null };
+    if (collection === "prompt-entries" && !latestEntry) latestEntry = reference;
+    if (collection === "routes" && !latestRoute) latestRoute = reference;
+    if (collection === "prompt-entries" && item.workspace === realpathSync(workspace)) documentation.add(item);
+    counts[`${collection}:${kind}`] = (counts[`${collection}:${kind}`] ?? 0) + 1;
+    const reason = item.reason ?? item.code ?? item.selectionReason;
+    if (typeof reason === "string") reasons[reason] = (reasons[reason] ?? 0) + 1;
+    if (collection === "context-observations" && kind === "usage") {
+      const values = object(item.usage); usage.responses++;
+      for (const key of ["inputTokens", "outputTokens"] as const) if (numeric(values[key]) !== null) usage[key] = (usage[key] ?? 0) + Number(values[key]);
+    }
+  } catch { invalid++; }
+  return { version: 1, counts, reasons, usage, documentation: documentation.result(truncated), truncated, scanComplete: receipts.scanComplete, invalid, readBytes,
+    selection: receipts.selection, projection: { state: projection.state, role: "receipt-read-hints", truncated: projection.truncated,
+      evictedRecords: projection.evictedRecords, evictedBytes: projection.evictedBytes, writeCoverage: projection.writeCoverage, limits: projection.limits }, latestEntry, latestRoute,
     confirmedModelUse: null, avoidedTokens: null, benefit: "requires comparable accepted tasks; counters are known subtotals" };
 }

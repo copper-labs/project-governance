@@ -1,3 +1,4 @@
+import { wireMetadataEvidence } from "./fixtures/context-wire.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -89,7 +90,7 @@ test("positive scores rank optional deep paths while explicit paths remain pinne
   const runtime = new DecisionRuntime(settings, root, { coordinationRoot: root, token: "fixture", fetch: async (_url, init) => {
     const wire = JSON.parse(String(init?.body));
     return Response.json({ model: "jev-1.13.0", answers: Object.fromEntries(Object.entries(wire.questions).map(([name, raw]) => {
-      const path = (raw as any).instructions.evidenceIds[1];
+      const path = wireMetadataEvidence(wire, raw).id;
       return [name, { type: "noul", noul: path === deep ? 0.99 : 0.8 }];
     })) });
   } });
@@ -100,6 +101,17 @@ test("positive scores rank optional deep paths while explicit paths remain pinne
   const captured = automaticContextCandidates(subject, paths, new Set(), ["**"], 3,
     { purpose: "near", exact: [], changed: [], ordered: result.order });
   assert.ok(captured.paths.includes(deep), "Long eligible paths must survive actual source capture after ranking");
+});
+
+test("the complete source window follows assessed metadata order beyond its thirty-second file", () => {
+  const paths = Array.from({ length: 96 }, (_, index) => `src/module-${String(index).padStart(3, "0")}.ts`);
+  const ranked = [...paths].reverse();
+  const subject = { source: () => ({ file_type: "regular" }), paths() { throw new Error("Unused discovery must not replace ranked files"); } } as unknown as ValidationSubject;
+  const request = { purpose: "Repair pending work", exact: [], changed: [], ordered: ranked };
+  const full = automaticContextCandidates(subject, paths, new Set(), ["**"], 64, request);
+  assert.deepEqual(full.paths, ranked.slice(0, 64));
+  assert.equal(full.discovery, null);
+  assert.deepEqual(automaticContextCandidates(subject, paths, new Set(), ["**"], 16, request).paths, ranked.slice(0, 16), "An explicit smaller allowance is still respected");
 });
 
 test("native prompt entry preserves intent beyond the old character limit", async t => {

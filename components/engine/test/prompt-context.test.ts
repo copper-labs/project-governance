@@ -89,7 +89,7 @@ test("oversized required context is a blocker, never silently truncated guidance
   assert.match(renderPromptContext(packet, { state: "ready", candidates: [], inspected: 0, omissions: [] }, "entry").text, /Shadow results were not applied/);
   packet.metadata.coverage = { attempted: true, complete: true, answeredCount: 10, mode: "shadow", applied: false };
   const shadow = renderPromptContext(packet, { state: "ready", candidates: [], inspected: 0, omissions: [] }, "entry");
-  assert.match(shadow.text, /Shadow JEV assessment/); assert.match(shadow.text, /Results were not applied/);
+  assert.match(shadow.text, /Shadow JEV assessment/); assert.match(shadow.text, /Shadow results were not applied/);
 });
 
 test("native delivery honors the declared envelope above the old cap, with required skills intact", () => {

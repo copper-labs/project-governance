@@ -123,11 +123,20 @@ test("doctor reports required-file bytes and unavailable sources without provide
   const f = fixture();
   try {
     writeFileSync(join(f.root, "policy.md"), "Required policy\n");
-    writeFileSync(join(f.root, "config/governance/profile.yaml"), JSON.stringify({ context_router: { default_route: "default", routes: [{ id: "default", primary_context: ["policy.md", "missing.md"], active_plan_context: ["policy.md"] }] } }));
+    const profile = { context_router: { default_route: "default", routes: [{ id: "default", primary_context: ["policy.md", "missing.md"], active_plan_context: ["policy.md"] }] } };
+    const profilePath = join(f.root, "config/governance/profile.yaml");
+    writeFileSync(profilePath, JSON.stringify(profile));
     const report = contextDoctor(f.root);
     assert.deepEqual(report.requiredGuidance, [{ path: "policy.md", bytes: 16 }, { path: "missing.md", bytes: null }]);
     assert.ok(report.findings.some(item => item.id === "context.required-unavailable"));
     assert.equal(report.network, "not-attempted"); assert.equal(report.mutations, "none");
+    assert.equal((report.inference?.limits as Record<string, unknown>).optionalExcerptBytes, 2048);
+    const continuity = { decisions: { mode: "auto", consumers: { DL03: { mode: "auto",
+      questions: ["context.metadata-relevance/1", "context.passage-evidence/1", "context.passage-role/1"] } } } };
+    writeFileSync(profilePath, JSON.stringify({ ...profile, continuity }));
+    assert.equal((contextDoctor(f.root).inference?.limits as Record<string, unknown>).optionalExcerptBytes, 3072);
+    writeFileSync(profilePath, JSON.stringify({ context_router: { ...profile.context_router, optional_excerpt_bytes: 8192 }, continuity }));
+    assert.equal((contextDoctor(f.root).inference?.limits as Record<string, unknown>).optionalExcerptBytes, 8192);
   } finally { f.cleanup(); }
 });
 

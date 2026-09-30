@@ -113,3 +113,27 @@ test("provider total-input and state-plus-largest-question limits are enforced s
   assert.equal(tooMuchTotal.ok, false);
   if (!tooMuchTotal.ok) { assert.equal(tooMuchTotal.reason, "input-budget"); assert.ok(tooMuchTotal.tokenEstimate! > 64000); }
 });
+
+test("compact passage questions address distinct bodies and reject invented question identities", async () => {
+  const { DECISION_QUESTIONS } = await import("../src/decision-catalog.ts");
+  const { validateDecisionRequest } = await import("../src/decision-schema.ts");
+  const prepared = structuredClone(request);
+  prepared.evidenceLayout = "compact-v1";
+  prepared.evidence = [
+    { ...request.evidence[0]!, id: "purpose", text: "Find why completed work survives a late event" },
+    { ...request.evidence[0]!, id: "a", text: JSON.stringify({ path: "src/bridge.ts", passage: "return retained;" }) },
+    { ...request.evidence[0]!, id: "b", text: JSON.stringify({ path: "tests/bridge.test.ts", passage: "assert.equal(terminalCount, 1);" }) },
+  ];
+  prepared.questions = ["a", "b"].map(id => ({ name: id, definitionId: "context.passage-evidence/1", consumerId: "DL03", evidenceIds: ["purpose", id] }));
+  validateDecisionRequest(prepared, DECISION_QUESTIONS);
+  const wire = decisionPayload(prepared, DECISION_QUESTIONS, "jev-test") as any;
+  assert.equal(wire.state.items.c0.passage, "return retained;");
+  assert.equal(wire.state.items.c1.passage, "assert.equal(terminalCount, 1);");
+  assert.match(wire.questions.a.instructions.question, /state\.items\.c0/);
+  assert.match(wire.questions.b.instructions.question, /state\.items\.c1/);
+  assert.equal(wire.state.instructions["context.passage-evidence/1"], DECISION_QUESTIONS["context.passage-evidence/1"]!.instructions);
+  assert.throws(() => parseDecisionEnvelope({ model: "jev-test", answers: { a: { type: "noul", noul: 0.9 },
+    b: { type: "noul", noul: 0.8 }, invented: { type: "noul", noul: 1 } } }, prepared, DECISION_QUESTIONS, "jev-test", "payload"), /unrequested/);
+  prepared.questions[0]!.evidenceIds = ["a", "b"];
+  assert.throws(() => validateDecisionRequest(prepared, DECISION_QUESTIONS), /one purpose/);
+});

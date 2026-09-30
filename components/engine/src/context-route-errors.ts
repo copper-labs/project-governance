@@ -1,3 +1,5 @@
+import { realpathSync } from "node:fs";
+import { projectContextMetric } from "./telemetry-projection.ts";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { durableJson } from "./core.ts";
@@ -31,14 +33,19 @@ export function recordContextFailure(root: string, error: unknown): ContextRoute
   if (known !== error) known.cause = error;
   try {
     known.receiptPath = join(contextStateRoot(root), "entry-failures", `${randomUUID()}.json`);
-    durableJson(known.receiptPath, { version: 1, createdAt: new Date().toISOString(), caller: "context-route", status: "failed",
+    const capturedAt = new Date().toISOString();
+    durableJson(known.receiptPath, { version: 1, createdAt: capturedAt, caller: "context-route", status: "failed",
       code: known.code, message: known.message, providerCalled: null, providerUsage: "unknown", taskUse: "unknown" });
+    projectContextMetric(contextStateRoot(root), { id: known.receiptPath.split("/").at(-1)!.replace(".json", ""), workspace: realpathSync(root), capturedAt,
+      kind: "failure", entryId: null, routeId: null, familyId: null, taskId: null, taskRevision: null,
+      status: "failed", reason: known.code, counts: { providerCalled: null } });
   } catch { known.receiptPath = null; }
   return known;
 }
 
 export const CONTEXT_ROUTE_HELP = `context-route [--task <purpose> --revision <revision>] [--decision-task <id>]
-  Uses the current session's bound task when available. --task is prose, not a task ID.
+  --entry <id> revalidates a native packet without selection; requires its matching host session.
+  A bare shell command cannot identify the current host turn. --task is prose, not a task ID.
   After refresh-required, the normal command joins the current turn and its shared allowance.
   --changed-path <path>   Repeatable routing scope (file or directory).
   --optional-path <path>  Repeatable local excerpt input; does not grant hosted disclosure.

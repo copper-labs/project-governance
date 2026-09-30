@@ -5,7 +5,7 @@ type: spec
 status: active
 owner: project-governance
 created: 2026-09-27
-updated: 2026-09-27
+updated: 2026-09-29
 summary: Improve prompt and metadata fidelity, rank useful context across the permitted inventory, and qualify bounded parallel JEV selection against frozen repository scenarios.
 ---
 
@@ -24,6 +24,9 @@ This amendment replaces RC6's fixed metadata batch count and serialized transpor
 [maintained index and disclosure contract](engine-rc6-linked-retrieval.md),
 [task-transition accounting](engine-rc7-prompt-reliability.md), and
 [RC8 preparation, shared-hook and required-context repairs](engine-rc8-hook-sources.md).
+The published [RC9.1 correction](engine-rc9-1-context-deadlines.md) removes RC9's original
+per-request cap. The clock requirements below reflect that correction; its expedited qualification
+limits remain in the RC9.1 delivery record.
 
 ## Problem and intended result
 
@@ -161,7 +164,7 @@ This uses the existing evaluation endpoint, not a new asynchronous bulk-job API 
 | Complete retrieval operation | At most 30,000 ms of cooperative work, starting before local preparation |
 | Provider selection and admission | Use the remaining operation time, reserving the final 500 ms for delivery and cleanup |
 | Opt-in passage stage | Reserve the last 5,000 ms of selection for passage preparation and judgment; unused time does not delay return |
-| Individual metadata request | Retain the existing one-second cap or stricter profile deadline; start this clock at actual dispatch |
+| Individual metadata or passage request | Use the remaining operation deadline; RC9.1 removes the separate one-second cap |
 | Managed prompt hook | 40 seconds, allowing process startup and return/cleanup around the runtime's 30-second operation |
 
 The 30 seconds is an upper bound, not an intended delay or 30 seconds per batch. Return as soon as
@@ -171,8 +174,8 @@ provider-context or expansion callers. A caller cancellation can end work sooner
 Other decision consumers retain their configured total call allowance, including admission; they
 do not gain a second full HTTP allowance after waiting. Without an explicit caller cutoff, expiry
 of that original allowance remains provider-owned for failure reporting and scoped suppression.
-Compute the selection cutoff as operation start plus 29,500 ms. Each dispatched call gets the
-smaller of its individual cap and the time remaining to that cutoff. Preparation that consumes
+Compute the selection cutoff as operation start plus 29,500 ms. Each context call uses the
+time remaining to that cutoff, without a separate per-call timer. Preparation that consumes
 the selection allowance proceeds directly to local delivery, without opening another clock.
 
 At the selection cutoff, stop admission, abort owned in-flight requests, settle their bounded

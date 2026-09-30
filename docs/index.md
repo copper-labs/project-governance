@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-07-05
-updated: 2026-09-27
+updated: 2026-09-29
 summary: Entry point for the reusable, package-based project governance runtime.
 ---
 
@@ -123,6 +123,11 @@ requests, shared local rate admission and a 30-second total retrieval budget.
 The [RC9.1 context deadline correction](specs/engine-rc9-1-context-deadlines.md) and its
 [delivery plan](exec-plans/active/2026-09-28-rc9-1-context-deadlines.md) remove RC9's redundant
 one-second JEV request cap while retaining the 30-second operation limit and fallback.
+The approved [RC10 reliable context and procedure selection](specs/engine-rc10-context-use.md) and
+[implementation/adoption plan](exec-plans/active/2026-09-29-rc10-context-use.md) address prompt/command
+worktree alignment, actual descriptor/passage disclosure, exact reuse, optional runbook sections
+and outcome-linked measurement. Runtime changes are implemented; the plan records qualification
+and publication status. Adopters retain their own pins until deliberately upgraded.
 RC9 is published as an immutable prerelease. Frozen development cases confirm a corrected ranking
 regression, while fresh cases expose remaining coverage and passage limits. Adopters remain on
 their pinned runtimes until deliberately upgraded. The

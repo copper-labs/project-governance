@@ -21,7 +21,7 @@ import { resolveDecisionScope } from "./decision-scope.ts";
 import { resolveWorkflowCandidates, workflowAdvice } from "./decision-workflow-advice.ts";
 import { resolveTaskContext, taskBindingReceipt } from "./decision-task-binding.ts";
 import { decisionTaskPurpose, type DecisionTaskContext } from "./decision-task-context.ts";
-import { automaticContextCandidates, contextCandidateInventory } from "./context-candidates.ts";
+import { automaticContextCandidates, contextCandidateInventory, contextCaptureOrder } from "./context-candidates.ts";
 import { recordEntryExposure } from "./decision-episodes.ts";
 import { ContextRouteError, recordContextFailure } from "./context-route-errors.ts";
 import { contextMetadataCatalog, selectContextMetadata } from "./context-metadata.ts";
@@ -32,9 +32,15 @@ import type { BudgetScope } from "./decision-budget.ts";
 import { openContextFamily, type ContextFamilyIdentity } from "./decision-budget.ts";
 import { maintainContextProjection } from "./context-projection.ts";
 import { expansionIdentity, beginContextSelection, finishContextSelection, nextContextExpansion } from "./context-family.ts";
-import { ContextTiming, CONTEXT_DELIVERY_RESERVE_MS, CONTEXT_PASSAGE_RESERVE_MS } from "./context-timing.ts";
+import { ContextTiming, CONTEXT_DELIVERY_RESERVE_MS } from "./context-timing.ts";
 import { CONTEXT_PATH_LIMIT, CONTEXT_PROMPT_LIMIT } from "./context-limits.ts";
 import { currentTaskRefresh, latestSessionPrompt } from "./context-observations.ts";
+import { readPreparedPrompt } from "./context-packet-replay.ts";
+import { workContext } from "../../harness/src/store/location.ts";
+import { inspectStartupHookSource } from "./startup-hook-source.ts";
+import { projectContextMetric } from "./telemetry-projection.ts";
+import { RELEASE_VERSION } from "./release-version.ts";
+import { contextExcerptBudget } from "./checkers/context-router.ts";
 import { sessionId } from "../../harness/src/store/location.ts";
 
 export interface ContextRouteOptions extends DecisionOptions {
@@ -130,13 +136,26 @@ function projectionReceiptPreview(projection: ReturnType<typeof maintainContextP
     declarations: projection.catalogLinks.filter(link => admitted.has(link.source)).slice(0, 64) };
 }
 
+export type RoutedContextPacket = Awaited<ReturnType<typeof capturedContextRoute>>;
+
 /** Mandatory routing runs without a provider. Only captured project configuration selects requirements. */
 export async function contextRouteCommand(args: string[], root: string,
-  assetRoot = fileURLToPath(new URL("../assets/skills/", import.meta.url)), suppliedProvider?: DecisionProvider, options: ContextRouteOptions = {}, taskContext?: DecisionTaskContext) {
+  assetRoot = fileURLToPath(new URL("../assets/skills/", import.meta.url)), suppliedProvider?: DecisionProvider, options: ContextRouteOptions = {}, taskContext?: DecisionTaskContext): Promise<RoutedContextPacket & { reuse?: { status: string; turn: string; submittedAt: string; ageMs: number } }> {
   const timing = new ContextTiming(options.operationStartedAt), controller = new AbortController();
   const timer = setTimeout(() => controller.abort("context-operation-deadline"), Math.max(0, timing.deadline - performance.now()));
   const signal = options.signal ? AbortSignal.any([options.signal, controller.signal]) : controller.signal;
-  try { return await capturedContextRoute(args, root, assetRoot, suppliedProvider, { ...options, signal }, timing, taskContext); }
+  try {
+    root = workContext(root).worktree;
+    const replayEntry = args.length === 2 && args[0] === "--entry" ? args[1]
+      : args.length === 1 && args[0]!.startsWith("--entry=") ? args[0]!.slice("--entry=".length) : undefined;
+    if (replayEntry !== undefined && !options.family && !taskContext) {
+      const reused = readPreparedPrompt(root, replayEntry, assetRoot, options.session);
+      if (!reused.route) throw new ContextRouteError("entry-packet-unavailable", "This entry has no reusable route. Use its required originals or a declared expansion.");
+      return { ...reused.route, reuse: { status: "validated-entry-replay", turn: String(reused.entry.turn),
+        submittedAt: String(reused.entry.submittedAt), ageMs: Math.max(0, Date.now() - Date.parse(String(reused.entry.submittedAt))) } };
+    }
+    return await capturedContextRoute(args, root, assetRoot, suppliedProvider, { ...options, signal }, timing, taskContext);
+  }
   catch (error) {
     throw recordContextFailure(root, error);
   } finally { clearTimeout(timer); }
@@ -155,6 +174,8 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
     "optional-path": { type: "string", multiple: true }, "discover-path": { type: "string", multiple: true },
     entry: { type: "string" }, expansion: { type: "string" }, links: { type: "string", multiple: true },
   } });
+  if (!values.task && !options.family && !taskContext)
+    throw new ContextRouteError("entry-turn-unobserved", "A shell command cannot identify the current host turn. Use context-route --entry <id> from this prompt's packet for validated reuse, or --task <current request> for refresh.");
   let automaticRefresh = false;
   // A deliberate bind can refresh the same turn through the ordinary command, without retry diagnosis.
   if (!values.entry && !options.family && !values.staged && !values["decision-task"] && !values["decision-context"] && !taskContext) {
@@ -284,7 +305,7 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
     metadataRuntime.eligibility("DL03", "context.metadata-relevance/1").providerUse === "eligible" &&
     metadataRuntime.eligibility("DL03").providerUse === "eligible" &&
     catalog.candidates.some(item => matchesPackPath(item.path, settings.legacy.allowedSourcePaths ?? []));
-  const metadataDeadline = passageEligible ? Math.min(selectionDeadline, Math.max(performance.now(), selectionDeadline - CONTEXT_PASSAGE_RESERVE_MS)) : selectionDeadline;
+  const metadataDeadline = selectionDeadline;
   const metadata = packet.ready && !options.localOnly ? await selectContextMetadata(subject, catalog, task,
     metadataRuntime, options.family?.scope ?? decisionScope, scope.subject_digest ?? digest(configDigests),
     options.family?.id ?? options.retrievalEvent ?? randomUUID(), options.signal, metadataDeadline, projection,
@@ -293,9 +314,12 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
     { deferBudgetClose: passageEligible, reservePassageBudget: passageEligible }) : null;
   if (passageEligible && metadata && !options.family && decisionScope) deferredInvocation = { scope: decisionScope, id: metadata.invocationId };
   failureCursor = metadata?.cursor ?? failureCursor;
-  const automatic = automaticContextCandidates(subject, candidateInventory, mandatoryPaths,
+  const procedurePaths = route.procedureSources.filter(path => !mandatoryPaths.has(path)), procedureSet = new Set(procedurePaths);
+  const sourceInventory = candidateInventory.filter(path => !procedureSet.has(path));
+  const automatic = automaticContextCandidates(subject, sourceInventory, mandatoryPaths,
     ["**"], settings.legacy.maxCandidates,
-    { purpose: task, exact: pathScopes, changed: scope.records.map(record => record.path), ordered: metadata?.order ?? catalog.candidates.map(item => item.path) });
+    { purpose: task, exact: pathScopes, changed: scope.records.map(record => record.path),
+      ordered: (metadata?.order ?? catalog.candidates.map(item => item.path)).filter(path => !procedureSet.has(path)) });
   automatic.excluded.push(...catalog.excluded.slice(0, Math.max(0, 64 - automatic.excluded.length)));
   automatic.excludedCount += catalog.excludedCount;
   automatic.omittedCount += allCandidatePaths.length - candidateInventory.length;
@@ -305,7 +329,8 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
     ...projection.catalogLinks.filter(link => linkSeeds.has(link.source)).map(link => link.resolved)];
   const explicitOptional = new Set([...(values["optional-path"] ?? []), ...(discovery?.paths ?? []), ...expandedLinks.slice(0, 32)].filter(path => !mandatoryPaths.has(path)));
   if (explicitOptional.size > 64) throw new Error("Too many explicit optional context inputs");
-  const combinedPaths = [...new Set([...explicitOptional, ...declaredFiles.filter(path => !mandatoryPaths.has(path)), ...automatic.paths])];
+  const combinedPaths = contextCaptureOrder(explicitOptional, declaredFiles.filter(path => !mandatoryPaths.has(path)),
+    procedurePaths, automatic.paths, metadata?.order ?? catalog.candidates.map(item => item.path));
   const optionalPaths = combinedPaths.slice(0, 64);
   for (const path of combinedPaths.slice(64)) { automatic.excluded.push({ path, reason: "candidate-limit" }); automatic.excludedCount++; }
   const candidates = readOptionalCandidates(subject, optionalPaths, explicitOptional, automatic, readCaptured);
@@ -314,14 +339,19 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
     const fact = projection.facts.get(candidate.id);
     return fact?.digest === candidate.sourceDigest ? [[candidate.id, fact.spans]] : [];
   }));
-  const optionalExcerptBytes = values["optional-excerpt-bytes"] !== undefined ? Number(values["optional-excerpt-bytes"]) : passageEnabled ? 3072 : 2048;
+  const optionalExcerptBytes = contextExcerptBudget(values["optional-excerpt-bytes"] !== undefined ? Number(values["optional-excerpt-bytes"])
+    : route.optionalExcerptBytes ?? (passageEnabled ? 3072 : 2048));
+  const optionalBudget = Math.max(0, Math.min(packet.limits.expansion - packet.used.expansion, packet.limits.total - packet.used.total,
+    options.maximumOptionalBytes ?? Infinity));
+  const procedureBytes = Math.max(0, Math.min(65536, optionalBudget,
+    settings.legacy.evidenceBytes - Buffer.byteLength(task) - 1024));
   let passageAdvice = null;
   try {
     if (packet.ready && metadata && passageEligible && !options.localOnly && candidates.length) passageAdvice = await selectContextPassages(metadataRuntime, candidates, {
       purpose: task, scope: options.family?.scope ?? decisionScope, subjectDigest: scope.subject_digest ?? digest(configDigests),
       revision: options.family?.revision ?? revision, environment: scope.mode, invocationId: metadata.invocationId,
       policyDigest: settings.configDigest, deadlineAt: selectionDeadline, ...(options.signal ? { signal: options.signal } : {}),
-      family: !!options.family, excerptBytes: optionalExcerptBytes, sourceSpans,
+      family: !!options.family, excerptBytes: optionalExcerptBytes, sourceSpans, procedurePaths, procedureBytes,
     });
   } finally {
     if (deferredInvocation) {
@@ -339,8 +369,6 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
     return item.disposition === "seeded" || item.disposition === "discovered"
       ? { ...item, disposition: excludedReasons.get(item.path) ?? "candidate-not-materialized" } : item;
   });
-  const optionalBudget = Math.max(0, Math.min(packet.limits.expansion - packet.used.expansion, packet.limits.total - packet.used.total,
-    options.maximumOptionalBytes ?? Infinity));
   let relevanceAdvice: ContextAdvice | null = null;
   const provider = routedDecisionProvider({ supplied: suppliedProvider, options, settings, metadata, profile, root, scope,
     decisionScope, configDigests, task, revision, deadlineAt: timing.deadline - CONTEXT_DELIVERY_RESERVE_MS,
@@ -349,7 +377,11 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
   const optional = packet.ready && candidates.length && optionalBudget >= 2 ? await buildContextPacket({
     taskRevision: revision, purpose: task, required: [], optional: candidates, maximumBytes: optionalBudget,
     priorityIds: [...new Set([...explicitOptional, ...declaredFiles, ...catalog.candidates.filter(item => item.pinned).map(item => item.path)])].filter(path => admittedPaths.has(path)),
-    sourceSpans, ...(passageAdvice ? { passageJudgments: passageAdvice.judgments, passageAssessedIds: passageAdvice.assessed } : {}),
+    procedurePaths, procedureBytes, sourceSpans,
+    sourceLinks: projection.links.flatMap(link => link.resolved && link.targetDigest && admittedPaths.has(link.source) &&
+      admittedPaths.has(link.resolved) && ["import", "require"].includes(link.kind)
+      ? [{ source: link.source, target: link.resolved, sourceDigest: link.sourceDigest, targetDigest: link.targetDigest }] : []),
+    ...(passageAdvice ? { passageJudgments: passageAdvice.judgments, passageUnitOrder: passageAdvice.unitOrder } : {}),
     optionalExcerptBytes,
   }, provider, options.localOnly ? { signal: AbortSignal.abort() } : options) : null;
   let workflowRecommendation = null;
@@ -389,20 +421,31 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
     skills: packet.skills?.entries.map(({ content, reasons, ...entry }) => entry) ?? [],
     optionalSources: candidates.map(({ excerpt, ...entry }) => entry),
     localSkillSources: Object.fromEntries(localSkillDigests) };
+  const procedureReferences = procedurePaths.map(path => ({ path, sourceDigest: candidates.find(candidate => candidate.id === path)?.sourceDigest ?? null,
+    status: optional?.entries.some(entry => entry.id === path) ? optional.unitOrdering[path] || !passageAdvice?.judgments[path]?.procedure ? "delivered-unconfirmed-sections" : optional.omittedJudgedUnits.some(unit => unit.path === path)
+      ? "delivered-subset-of-selected-sections" : "delivered-complete-selected-sections"
+      : !admittedPaths.has(path) ? "source-unavailable-or-capture-limit"
+      : !matchesPackPath(path, settings.legacy.allowedSourcePaths ?? []) || !settings.legacy.allowedDataClasses.includes("source") ? "source-scope-disabled"
+      : passageAdvice?.omitted.find(item => item.path === path)?.reason ?? passageAdvice?.reason ?? "procedure-selection-unavailable" }));
   const selection = { binding: taskBindingReceipt(binding), candidateCount: candidates.length, inventoryUnavailable: inventory.unavailable,
     capturedSourceFacts: capturedFacts?.coverage ?? null,
     metadataStage: { reason: metadata?.reason ?? "not-attempted", deadlineOffsetMs: metadataDeadline - timing.started,
-      passageReserveMs: passageEligible ? CONTEXT_PASSAGE_RESERVE_MS : 0 },
+      passageReserveMs: 0 },
     reason: !packet.ready ? "required-context-unavailable" : !candidates.length ? automatic.excludedCount ? "no-permitted-candidates" : "no-optional-candidates"
       : optionalBudget < 2 ? "optional-budget-empty" : optional?.reason ?? "selection-unavailable",
     optionalDelivery: optional ? optional.entries.length ? "delivered" : "none" : "not-attempted",
     optionalClippedPaths: optional?.entries.filter(entry => entry.sourceRange || entry.sourceRanges).map(entry => entry.id) ?? [],
     passageAdvice: passageAdvice ? { reason: passageAdvice.reason, assessedCount: passageAdvice.assessed.length,
-      eligibleUnitCount: passageAdvice.eligibleUnitCount, preparedUnitCount: passageAdvice.preparedUnitCount,
+      procedures: passageAdvice.procedures, eligibleUnitCount: passageAdvice.eligibleUnitCount, preparedUnitCount: passageAdvice.preparedUnitCount,
       assessedUnitCount: passageAdvice.assessedUnitCount, elapsedMs: passageAdvice.elapsedMs,
+      preparationMs: passageAdvice.preparationMs, packingMs: passageAdvice.packingMs,
+      classificationBytes: passageAdvice.classificationBytes, deliveryExcerptBytes: optionalExcerptBytes,
       positiveCount: Object.values(passageAdvice.judgments).filter(item => item.interpretation === "positive").length,
+      uncertainOrderedCount: Object.keys(passageAdvice.unitOrder).length,
       suggestedCount: Object.keys(passageAdvice.judgments).length, omitted: passageAdvice.omitted.slice(0, 64),
       readings: passageAdvice.readings.slice(0, 64),
+      readingCount: passageAdvice.readings.length, readingsTruncated: passageAdvice.readings.length > 64,
+      omittedCount: passageAdvice.omitted.length, omissionsTruncated: passageAdvice.omitted.length > 64,
       receiptIds: passageAdvice.decisions.map(item => item.receiptId).filter(Boolean) } : null,
     optionalOmissionReasons: optional?.omissionReasons ?? {},
     optionalJudgmentLimitations: optional?.judgmentLimitations ?? {},
@@ -415,19 +458,43 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
   const expansion = options.family ? { entry: options.family.id, step: options.family.step, status: admission?.status ?? "local-only", completed: familyCompleted,
     transitionId: options.family.transitionId ?? null,
     nextStep: options.family.step < 2 ? options.family.step + 1 : null, sharedAllowance: true, originalReadsAvailable: true } : null;
-  const receipt = { version: 1, receiptId, createdAt: new Date().toISOString(), ...identity, selection, expansion,
+  const execution = { workspace: root, worktreeLocator: workContext(root).locator,
+    nativeSession: options.session ?? null, entryId: options.family?.id ?? null,
+    definitionSource: inspectStartupHookSource(root).definitionRoot };
+  const receipt = { version: 1, runtimeVersion: RELEASE_VERSION, workspace: root, receiptId, execution, createdAt: new Date().toISOString(), ...identity, selection, expansion,
     timing: timing.snapshot(metadata?.providerCallMs ?? 0, projection.status.elapsedMs),
     projection: projectionReceiptPreview(projection, admittedPaths),
+    procedureReferences: procedureReferences.slice(0, 64), procedureReferenceCount: procedureReferences.length,
     inputDigest: digest(identity), ready: packet.ready && !staleSources.length, blockers: packet.blockers,
     omissions: packet.omissions, skillOmissions: packet.skills?.omissions ?? [],
     optional: optional ? { selected: optional.entries.map(entry => entry.id), omitted: optional.omitted,
       omissionReasons: optional.omissionReasons,
       judgmentLimitations: optional.judgmentLimitations,
+      unitOrdering: optional.unitOrdering,
+      omittedJudgedUnits: optional.omittedJudgedUnits,
       decision: optional.decision, measurement: optional.measurement, reason: optional.reason } : null,
     relevanceAdvice, metadata: metadataSummary, workflowAdvice: workflowRecommendation, discovery, staleSources, outcome: staleSources.length ? "refused-stale-source" : packet.ready ? "delivered" : "blocked" };
   let receiptPersisted = true;
   try { durableJson(join(contextStateRoot(root), "routes", `${receiptId}.json`), receipt); }
   catch (error) { if (!options.localOnly || !options.promptEntry) throw error; receiptPersisted = false; }
+  if (receiptPersisted) projectContextMetric(contextStateRoot(root), { id: receiptId, workspace: root, capturedAt: receipt.createdAt,
+    kind: "route", entryId: options.family?.id ?? null, familyId: options.family?.id ?? null, routeId: receiptId,
+    taskId: binding.context?.taskId ?? null, taskRevision: binding.context?.revision ?? null, status: receipt.outcome,
+    reason: metadata?.reason ?? selection.reason, counts: {
+      eligible: metadata?.coverage.eligibleCount ?? null, permitted: metadata?.coverage.permittedCount ?? null,
+      submitted: metadata?.coverage.submittedCount ?? null, answered: metadata?.coverage.answeredCount ?? null,
+      cachedDescriptors: metadata?.sourceIndex.descriptorCoverage.cachedCount ?? null,
+      permittedDescriptors: metadata?.sourceIndex.descriptorCoverage.descriptorPermittedCount ?? null,
+      submittedDescriptors: metadata?.sourceIndex.descriptorCoverage.descriptorSubmittedCount ?? null,
+      answeredDescriptors: metadata?.sourceIndex.descriptorCoverage.descriptorAnsweredCount ?? null,
+      pathOnlyAnswered: metadata?.sourceIndex.descriptorCoverage.pathOnlyAnsweredCount ?? null,
+      procedureFiles: procedurePaths.length, procedureUnits: passageAdvice?.procedures.eligibleUnits ?? null,
+      procedureAssessed: passageAdvice?.procedures.assessedUnits ?? null, deliveredFiles: optional?.entries.length ?? 0,
+      deliveredBytes: optional?.bytes ?? 0, totalMs: receipt.timing.totalMs, httpWorkMs: metadata?.httpTotalMs ?? null,
+      admissionWorkMs: metadata?.admissionTotalMs ?? null, replayedBatches: metadata?.coverage.replayedBatches ?? 0,
+      familyByteLimit: settings.budget.maxRequestBytes, familyCallLimit: settings.budget.maxCalls,
+      operationBudgetMs: receipt.timing.operationBudgetMs,
+    } });
   // The route receipt owns per-path diagnostics. Repeating its preview in every immutable
   // exposure episode would exhaust the bounded outcome reader during an adoption study.
   const { priorityPreview: _preview, ...automaticExposure } = selection.automatic;
@@ -437,11 +504,12 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
     decisions: [(relevanceAdvice as ContextAdvice | null)?.decision?.receiptId, optional?.decision?.receiptId,
       ...(metadata?.decisions.map(item => item.receiptId) ?? []), ...(passageAdvice?.decisions.map(item => item.receiptId) ?? [])].filter((id): id is string => typeof id === "string") });
   if (staleSources.length) throw new Error("Context sources changed while preparing the routed packet");
-  return { ...packet, route, routingPaths, receiptId, receiptPersisted, inputDigest: receipt.inputDigest, revision, source: identity.source,
+  return { ...packet, execution, route, routingPaths, receiptId, receiptPersisted, inputDigest: receipt.inputDigest, revision, source: identity.source,
     timing: receipt.timing,
     projection: receipt.projection,
     expansion: expansion ? { ...expansion, argv: expansion.nextStep ? ["project-governance", "context-route", "--entry", expansion.entry,
       "--expansion", String(expansion.nextStep), "--task", task, "--revision", revision] : null } : null,
+    procedureReferences: receipt.procedureReferences, procedureReferenceCount: receipt.procedureReferenceCount,
     optional, metadata: metadataSummary, relevanceAdvice: relevanceAdvice as ContextAdvice | null, workflowAdvice: workflowRecommendation,
     optionalBudget, optionalOmitted: optional?.omitted ?? optionalPaths, discovery, selection };
   } catch (error) {

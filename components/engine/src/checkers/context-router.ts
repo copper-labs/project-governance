@@ -8,6 +8,12 @@ import { profileDecisionConfig } from "../decision-configuration.ts";
 export const CONTEXT_BUDGET = { primary_context_tokens: 6000, active_plan_context_tokens: 1500, expansion_context_tokens: 3000, total_context_tokens: 10000 };
 export const MAX_CONTEXT_TOKENS = (256 * 1024 - 16000) / 4;
 const fields = new Set(["ecosystems", "target_families", "runtime_profiles", "support_tiers", "artifact_profiles", "consumers", "ui_posture", "device_topology", "boundary_pressure"]);
+/** The profile and manual command share one representation bound; the route still owns total bytes. */
+export function contextExcerptBudget(value: unknown): number {
+  if (!Number.isSafeInteger(value) || (value as number) < 128 || (value as number) > 65536)
+    throw new Error("optional_excerpt_bytes must be 128 to 65536 bytes");
+  return value as number;
+}
 /** Shared limits prevent validation and packet construction from accepting different budgets. */
 export function contextBudget(value: unknown): typeof CONTEXT_BUDGET {
   if (value !== undefined && !objectValue(value)) throw new Error("token_budget must be a mapping");
@@ -73,7 +79,12 @@ export function checkContextRouter(subject: ValidationSubject, packIds: Readonly
     const router = profile["context_router"];
     if (!objectValue(router)) errors.push("context_router: expected a mapping");
     else {
+      if (router.optional_excerpt_bytes !== undefined) try { contextExcerptBudget(router.optional_excerpt_bytes); }
+      catch (error) { errors.push(`context_router: ${(error as Error).message}`); }
       if (profile["profile_id"] && factsDocument["profile_id"] && profile["profile_id"] !== factsDocument["profile_id"]) errors.push("profile.yaml and facts.lock.yaml identify different repositories");
+      paths(router["procedure_sources"], "context_router.procedure_sources");
+      if (Array.isArray(router.procedure_sources) && (router.procedure_sources.length > 1000 || router.procedure_sources.some(path => typeof path !== "string" || !/\.mdx?$/iu.test(path))))
+        errors.push("context_router.procedure_sources: expected at most 1000 Markdown file paths");
       paths(router["default_context"], "context_router.default_context"); skills(router["default_skills"], "context_router.default_skills");
       const routes = Object.hasOwn(router, "routes") ? router["routes"] : [], seen = new Set<string>();
       if (!Array.isArray(routes)) errors.push("context_router.routes: expected a list");

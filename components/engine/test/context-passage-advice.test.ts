@@ -11,6 +11,7 @@ import { buildContextPacket } from "../src/context-packet.ts";
 import { DecisionRuntime } from "../src/decision-runtime.ts";
 import { profileDecisionSettings } from "../src/decision-settings.ts";
 import { digest } from "../src/core.ts";
+import { wirePassageEvidence } from "./fixtures/context-wire.ts";
 import { contextBudgetScope, reserveDecisionCall } from "../src/decision-budget.ts";
 
 test("source excerpts carry the assertion and launch outcome, not only the matching label", () => {
@@ -35,9 +36,8 @@ test("passage judgments keep complementary evidence ahead of a second similar so
     calls++;
     const wire = JSON.parse(String(init?.body));
     assert.ok(Object.keys(wire.questions).every(name => name.startsWith("evidence-")), "literal source roles need no paid role question");
-    const byId = new Map(wire.state.evidence.map((item: { id: string; text: string }) => [item.id, item.text]));
     const answers = Object.fromEntries(Object.entries(wire.questions).map(([name, raw]) => {
-      const item = JSON.parse(String(byId.get((raw as any).instructions.evidenceIds[1])));
+      const item = wirePassageEvidence(wire, raw);
       const isTest = item.path.startsWith("tests/");
       if (name.startsWith("evidence-")) return [name, { type: "noul", noul: isTest ? 0.9 : item.path.endsWith("a.js") ? 0.99 : 0.98 }];
       const role = isTest ? "test" : "implementation";
@@ -63,36 +63,93 @@ test("passage judgments keep complementary evidence ahead of a second similar so
   assert.equal(packet.omissionReasons["src/b.js"], "packet-budget");
 });
 
-test("positive passage probabilities cannot demote the first metadata-ranked file of the same role", async () => {
+test("confirmed body evidence ranks quotes above metadata while explicit pins and equal-score ties stay stable", async () => {
   const candidates = ["src/entry.js", "src/detail.js"].map(id => ({ id, sourceDigest: digest(id), excerpt: `${id}: implementation\n` }));
-  const packet = await buildContextPacket({ taskRevision: "1", purpose: "implementation", required: [], optional: candidates,
+  const input = { taskRevision: "1", purpose: "implementation", required: [], optional: candidates,
     maximumBytes: 240, optionalExcerptBytes: 1024, passageJudgments: Object.fromEntries(candidates.map((item, index) => [item.id,
       { sourceDigest: item.sourceDigest, excerptDigest: digest(item.excerpt), probability: index ? 0.87 : 0.75,
-        interpretation: "positive" as const, role: "implementation", roleSource: "path" as const, preferredSpans: [] }])) },
-    { async decide(request) { return { version: 1 as const, kind: request.kind, inputDigest: digest(request),
+        interpretation: "positive" as const, role: "implementation", roleSource: "path" as const, preferredSpans: [] }])) };
+  const provider = { async decide(request: any) { return { version: 1 as const, kind: request.kind, inputDigest: digest(request),
       delivered: candidates.map(item => item.id), suggested: null, method: "baseline" as const, reason: "metadata",
-      model: null, questionVersion: "fixture", confidence: null, latencyMs: 0, usage: { inputTokens: null, outputTokens: null } }; } });
-  assert.deepEqual(packet.entries.map(item => item.id), ["src/entry.js"]);
-  assert.equal(packet.omissionReasons["src/detail.js"], "packet-budget");
+      model: null, questionVersion: "fixture", confidence: null, latencyMs: 0, usage: { inputTokens: null, outputTokens: null } }; } };
+  const packet = await buildContextPacket(input, provider);
+  assert.deepEqual(packet.entries.map(item => item.id), ["src/detail.js"]);
+  assert.equal(packet.omissionReasons["src/entry.js"], "packet-budget");
   assert.deepEqual(packet.judgmentLimitations, {});
+  const pinned = await buildContextPacket({ ...input, priorityIds: ["src/entry.js"] }, provider);
+  assert.deepEqual(pinned.entries.map(item => item.id), ["src/entry.js"]);
+  input.passageJudgments["src/detail.js"]!.probability = 0.75;
+  assert.deepEqual((await buildContextPacket(input, provider)).entries.map(item => item.id), ["src/entry.js"]);
 });
 
-test("an unassessed higher-ranked file keeps its place when a lower file is positive", async () => {
+test("confirmed optional evidence precedes unassessed background unless the operator pins that background", async () => {
   const candidates = ["src/entry.js", "src/detail.js"].map(id => ({ id, sourceDigest: digest(id), excerpt: `${id}: implementation\n` }));
   const second = candidates[1]!;
-  const packet = await buildContextPacket({ taskRevision: "1", purpose: "implementation", required: [], optional: candidates,
-    maximumBytes: 240, optionalExcerptBytes: 1024, passageAssessedIds: [second.id], passageJudgments: { [second.id]: {
+  const input = { taskRevision: "1", purpose: "implementation", required: [], optional: candidates,
+    maximumBytes: 240, optionalExcerptBytes: 1024, passageJudgments: { [second.id]: {
       sourceDigest: second.sourceDigest, excerptDigest: digest(second.excerpt), probability: 0.94,
-      interpretation: "positive", role: "implementation", roleSource: "path", preferredSpans: [] } } },
-    { async decide(request) { return { version: 1 as const, kind: request.kind, inputDigest: digest(request),
+      interpretation: "positive" as const, role: "implementation", roleSource: "path" as const, preferredSpans: [] } } };
+  const provider = { async decide(request: any) { return { version: 1 as const, kind: request.kind, inputDigest: digest(request),
       delivered: candidates.map(item => item.id), suggested: null, method: "baseline" as const, reason: "metadata",
-      model: null, questionVersion: "fixture", confidence: null, latencyMs: 0, usage: { inputTokens: null, outputTokens: null } }; } });
-  assert.deepEqual(packet.entries.map(item => item.id), ["src/entry.js"]);
-  assert.equal(packet.omissionReasons["src/detail.js"], "packet-budget");
+      model: null, questionVersion: "fixture", confidence: null, latencyMs: 0, usage: { inputTokens: null, outputTokens: null } }; } };
+  const packet = await buildContextPacket(input, provider);
+  assert.deepEqual(packet.entries.map(item => item.id), ["src/detail.js"]);
+  assert.equal(packet.omissionReasons["src/entry.js"], "packet-budget");
   assert.deepEqual(packet.judgmentLimitations, {});
+  const pinned = await buildContextPacket({ ...input, priorityIds: [candidates[0]!.id] }, provider);
+  assert.deepEqual(pinned.entries.map(item => item.id), ["src/entry.js"]);
 });
 
-test("a higher passage probability cannot evict the first relevant unit inside a file", async t => {
+test("uncertain role balancing cannot displace confirmed implementation and assertion evidence", async () => {
+  const candidates = ["tests/background.test.js", "src/owner.js", "tests/owner.test.js"].map(id => ({ id, sourceDigest: digest(id), excerpt: `${id}: evidence\n` }));
+  const positive = Object.fromEntries(candidates.slice(1).map(item => [item.id, { sourceDigest: item.sourceDigest,
+    excerptDigest: digest(item.excerpt), probability: 0.8, interpretation: "positive" as const,
+    role: item.id.startsWith("tests/") ? "test" : "implementation", roleSource: "path" as const, preferredSpans: [] }]));
+  const background = candidates[0]!;
+  const packet = await buildContextPacket({ taskRevision: "1", purpose: "Check owner and its assertion", required: [], optional: candidates,
+    maximumBytes: 360, optionalExcerptBytes: 1024, passageJudgments: positive,
+    passageUnitOrder: { [background.id]: { sourceDigest: background.sourceDigest, excerptDigest: digest(background.excerpt), preferredSpans: [],
+      basis: "uncertain-score", kind: "source", probability: 0.74, role: "test", roleSource: "path", policy: "passage-score-3" } } },
+    { async decide(request) { return { version: 1, kind: request.kind, inputDigest: digest(request), delivered: candidates.map(item => item.id),
+      suggested: null, method: "baseline", reason: "metadata", model: null, questionVersion: "fixture", confidence: null, latencyMs: 0,
+      usage: { inputTokens: null, outputTokens: null } }; } });
+  assert.deepEqual(packet.entries.map(item => item.id), ["src/owner.js", "tests/owner.test.js"]);
+  assert.equal(packet.omissionReasons[background.id], "packet-budget");
+});
+
+test("current literal relationships preserve a confirmed test and its uncertain implementation without pinning", async () => {
+  const candidates = ["tests/action.test.js", "src/background.js", "src/action.js"].map(id => ({ id, sourceDigest: digest(id), excerpt: `${id}: evidence\n` }));
+  const testSource = candidates[0]!, implementation = candidates[2]!;
+  const input = { taskRevision: "1", purpose: "Find action and its assertion", required: [], optional: candidates, maximumBytes: 360, optionalExcerptBytes: 1024,
+    passageJudgments: Object.fromEntries(candidates.slice(0, 2).map((item, index) => [item.id, { sourceDigest: item.sourceDigest,
+      excerptDigest: digest(item.excerpt), probability: index ? 0.85 : 0.95, interpretation: "positive" as const,
+      role: index ? "implementation" : "test", roleSource: "path" as const, preferredSpans: [] }])),
+    passageUnitOrder: { [implementation.id]: { sourceDigest: implementation.sourceDigest, excerptDigest: digest(implementation.excerpt), preferredSpans: [],
+      basis: "uncertain-score" as const, kind: "source" as const, probability: 0.67, role: "implementation", roleSource: "path" as const, policy: "passage-score-3" as const } },
+    sourceLinks: [{ source: testSource.id, target: implementation.id, sourceDigest: testSource.sourceDigest, targetDigest: implementation.sourceDigest }] };
+  const provider = { async decide(request: any) { return { version: 1 as const, kind: request.kind, inputDigest: digest(request), delivered: candidates.map(item => item.id),
+    suggested: null, method: "baseline" as const, reason: "metadata", model: null, questionVersion: "fixture", confidence: null, latencyMs: 0,
+    usage: { inputTokens: null, outputTokens: null } }; } };
+  const packet = await buildContextPacket(input, provider);
+  assert.deepEqual(packet.entries.map(item => item.id), [testSource.id, implementation.id]);
+  assert.equal(packet.unitOrdering[implementation.id], "uncertain-score");
+  assert.equal(packet.measurement.relationships.reorderedPairs, 1);
+  assert.equal(packet.measurement.relationships.preview[0]?.delivered, true);
+  const stale = await buildContextPacket({ ...input, sourceLinks: [{ ...input.sourceLinks[0]!, targetDigest: digest("old") }] }, provider);
+  assert.deepEqual(stale.entries.map(item => item.id), [testSource.id, candidates[1]!.id]);
+  assert.equal(stale.measurement.relationships.reorderedPairs, 0);
+  const staleSource = await buildContextPacket({ ...input, sourceLinks: [{ ...input.sourceLinks[0]!, sourceDigest: digest("old") }] }, provider);
+  assert.equal(staleSource.measurement.relationships.reorderedPairs, 0);
+  assert.deepEqual(staleSource.entries.map(item => item.id), [testSource.id, candidates[1]!.id]);
+  const pinned = await buildContextPacket({ ...input, priorityIds: [candidates[1]!.id] }, provider);
+  assert.equal(pinned.entries[0]?.id, candidates[1]!.id);
+  const pinnedPair = await buildContextPacket({ ...input, maximumBytes: 600, priorityIds: [candidates[1]!.id] }, provider);
+  assert.deepEqual(pinnedPair.entries.map(item => item.id), [candidates[1]!.id, testSource.id, implementation.id]);
+  const unanswered = await buildContextPacket({ ...input, passageUnitOrder: {} }, provider);
+  assert.equal(unanswered.measurement.relationships.reorderedPairs, 0);
+});
+
+test("answered passage probabilities order units within their file rather than by word overlap", async t => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "passage-unit-order-")));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const path = "src/config.js", source =
@@ -106,10 +163,9 @@ test("a higher passage probability cannot evict the first relevant unit inside a
       questions: ["context.passage-evidence/1", "context.passage-role/1"] } } } } });
   const runtime = new DecisionRuntime(settings, root, { coordinationRoot: root, token: "fixture", fetch: async (_url, init) => {
     const wire = JSON.parse(String(init?.body));
-    const byId = new Map(wire.state.evidence.map((item: { id: string; text: string }) => [item.id, item.text]));
     return Response.json({ model: settings.legacy.model, answers: Object.fromEntries(Object.entries(wire.questions).map(([name, raw]) => {
-      const passage = JSON.parse(String(byId.get((raw as any).instructions.evidenceIds[1])));
-      return [name, { type: "noul", noul: passage.passage.includes("validateCount") ? 0.82 : 0.86 }];
+      const passage = wirePassageEvidence(wire, raw);
+      return [name, { type: "noul", noul: passage.passage.includes("validateCount") ? 0.82 : passage.passage.includes("startWorker") ? 0.86 : 0.1 }];
     })) });
   } });
   const purpose = "Locate count validation guard";
@@ -117,11 +173,11 @@ test("a higher passage probability cannot evict the first relevant unit inside a
     scope: { workspace: root, taskId: "task", taskRevision: "1" }, subjectDigest: digest("subject"), revision: "1",
     environment: "explicit", invocationId: "e".repeat(64), policyDigest: settings.configDigest,
     deadlineAt: performance.now() + 5000, excerptBytes: 1000, sourceSpans: { [path]: facts.spans } });
-  assert.equal(advice.readings.length, 2);
-  assert.equal(advice.judgments[path]?.preferredSpans[0]?.name, "validateCount");
+  assert.equal(advice.judgments[path]?.preferredSpans[0]?.name, "startWorker");
   const excerpt = contextExcerpt(candidate, purpose, 1000, facts.spans, advice.judgments[path]?.preferredSpans);
-  assert.match(excerpt.excerpt, /validateCount/);
-  assert.doesNotMatch(excerpt.excerpt, /startWorker/);
+  assert.match(excerpt.excerpt, /startWorker/);
+  assert.ok(excerpt.sourceUnits?.some(unit => unit.name === "startWorker" && unit.complete));
+  assert.ok(excerpt.sourceUnits?.some(unit => unit.name === "validateCount" && !unit.complete), "The second useful passage may use only the leftover space");
 });
 
 test("JEV can choose two complete test units inside one relevant file", async t => {
@@ -139,11 +195,10 @@ test("JEV can choose two complete test units inside one relevant file", async t 
       questions: ["context.passage-evidence/1", "context.passage-role/1"] } } } } });
   const runtime = new DecisionRuntime(settings, root, { coordinationRoot: root, token: "fixture", fetch: async (_url, init) => {
     const wire = JSON.parse(String(init?.body));
-    const byId = new Map(wire.state.evidence.map((item: { id: string; text: string }) => [item.id, item.text]));
     return Response.json({ model: settings.legacy.model, answers: Object.fromEntries(Object.entries(wire.questions).map(([name, raw]) => {
       if (name.startsWith("role-")) return [name, { type: "choice", choice: "test", confidence: 0.9,
         probabilities: { implementation: 0, test: 0.9, documentation: 0, operations: 0, other: 0, unknown: 0.1 } }];
-      const passage = JSON.parse(String(byId.get((raw as any).instructions.evidenceIds[1])));
+      const passage = wirePassageEvidence(wire, raw);
       return [name, { type: "noul", noul: passage.passage.includes("releaseDeferred, true") ? 0.95 : 0.1 }];
     })) });
   } });
@@ -196,9 +251,9 @@ test("a lower-priority adjacent unit cannot crowd out an already selected passag
     [span("releaseWorker"), span("validateCount"), span("releaseNeighbor")]);
   assert.match(excerpt.excerpt, /releaseWorker/);
   assert.match(excerpt.excerpt, /validateCount/);
-  assert.doesNotMatch(excerpt.excerpt, /releaseNeighbor/);
   assert.ok(Buffer.byteLength(excerpt.excerpt) <= 1000);
-  assert.ok(excerpt.sourceUnits?.every(item => item.complete));
+  assert.ok(["releaseWorker", "validateCount"].every(name => excerpt.sourceUnits?.some(item => item.name === name && item.complete)));
+  assert.ok(excerpt.sourceUnits?.filter(item => item.name === "releaseNeighbor").every(item => !item.complete));
 });
 
 test("budget-fitted breadth preserves the next file and omits excess units before dispatch", async t => {
@@ -218,7 +273,7 @@ test("budget-fitted breadth preserves the next file and omits excess units befor
   const deliveredPaths = new Set<string>();
   const runtime = new DecisionRuntime(settings, root, { coordinationRoot: root, token: "fixture", fetch: async (_url, init) => {
     const wire = JSON.parse(String(init?.body));
-    for (const item of wire.state.evidence.filter((item: any) => item.id !== "purpose")) deliveredPaths.add(JSON.parse(item.text).path);
+    for (const question of Object.values(wire.questions)) deliveredPaths.add(wirePassageEvidence(wire, question).path);
     return Response.json({ model: settings.legacy.model, answers: Object.fromEntries(Object.keys(wire.questions)
       .map(name => [name, { type: "noul", noul: 0.9 }])) });
   } });

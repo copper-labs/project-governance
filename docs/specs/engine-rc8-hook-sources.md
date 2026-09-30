@@ -5,7 +5,7 @@ type: spec
 status: current
 owner: project-governance
 created: 2026-09-25
-updated: 2026-09-27
+updated: 2026-09-29
 summary: Repair shared hook ownership, bounded repository preparation and required-context readiness before coordinated adoption.
 ---
 
@@ -16,10 +16,10 @@ This amendment also corrects preparation and delivery gaps in the
 [RC7 operation and selection clocks](engine-rc7-prompt-reliability.md), complete eligible inventory,
 fixed coding model, explicit disclosure and provider-free fallback. Computer use remains deferred.
 
-For the next release, the accepted [RC9 amendment](engine-rc9-parallel-context.md) replaces the
-earlier clocks and serialized selection with a 15-second retrieval envelope and bounded parallel
-JEV calls. Implementation is pending; this document's shared-source, preparation and required-context
-repairs remain part of that release.
+The published [RC9 amendment](engine-rc9-parallel-context.md) replaces the earlier clocks and
+serialized selection with one 30-second retrieval envelope and bounded parallel JEV calls.
+[RC9.1](engine-rc9-1-context-deadlines.md) removes the redundant per-request cap. This document's
+shared-source, preparation and required-context repairs remain in effect.
 
 ## Observed failure and owner
 

@@ -7,7 +7,9 @@ This guide applies only to the compiled major-version engine. It does not change
 Read shared skill discovery with `skill-read --path catalog.yaml`. Read a referenced packaged file
 with `skill-read --path <path-relative-to-skills-root>`, for example `test-execution/SKILL.md`.
 The JSON response contains exact content and its digest, with a 64 KiB per-file limit. Use
-`context-route` for required task guidance; catalog browsing does not replace that routing.
+`context-route --entry <id>` to reuse the current prompt's packet. After binding a task, use
+`context-route --task <current request>` to refresh its guidance; catalog browsing does not replace
+that routing. A bare command cannot identify the current host turn.
 These commands read the selected package without recreating the wheel's physical skill directory.
 
 When unrelated work is present, pass repeated `--changed-path <repository-relative-path>` arguments

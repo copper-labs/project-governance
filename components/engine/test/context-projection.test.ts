@@ -157,6 +157,19 @@ test("signatures omit values and function locals; CommonJS and unresolved aliase
   assert.deepEqual(markdown.spans.map(span => [span.name, span.start]), [["First", 1], ["Last", 6]]);
 });
 
+test("Kotlin enum class descriptions retain the declared type name", () => {
+  const facts = extractSourceFacts("src/contracts.kt", Buffer.from("enum class AllowedTarget { LOCAL, REMOTE }\ninternal enum class ValidationCode { MISSING, CYCLE }\nfun validate() = ValidationCode.MISSING\n"));
+  assert.deepEqual(facts.spans.map(span => span.name), ["AllowedTarget", "ValidationCode", "validate"]);
+  const descriptor = JSON.parse(facts.descriptor!);
+  assert.deepEqual(descriptor.symbols, ["AllowedTarget", "ValidationCode", "validate"]);
+  assert.equal(descriptor.extraction, "heuristic");
+});
+
+test("attached native annotations stay with their declaration's source range", () => {
+  const facts = extractSourceFacts("src/GuardTest.kt", Buffer.from("fun earlier() { check(true) }\n\n@Test\n@Timeout(10)\nfun rejectsUnsafeInput() { check(!allowed) }\n"));
+  assert.deepEqual(facts.spans.map(span => [span.name, span.start, span.end]), [["earlier", 1, 2], ["rejectsUnsafeInput", 3, 6]]);
+});
+
 test("rebuild recovers corrupt and oversized caches without changing an active reader's snapshot", t => {
   const f = fixture(t); f.write("a.ts", "export const a=1;\n"); f.run();
   const reader = new DatabaseSync(join(f.state, PROJECTION_FILE)); reader.exec("BEGIN");

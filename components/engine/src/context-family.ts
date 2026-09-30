@@ -51,7 +51,7 @@ export function beginContextSelection(workspace: string, entry: string, step: nu
   try {
     const expected = "previousDigest" in admission ? admission.previousDigest : "cursorDigest" in admission ? admission.cursorDigest : undefined;
     if (expected) {
-      const value = object(JSON.parse(narrativeFile(state, cursorPath(state, entry, status === "duplicate" ? step : step - 1))));
+      const value = object(JSON.parse(narrativeFile(state, cursorPath(state, entry, status === "duplicate" ? step : step - 1), 8 * 1024 * 1024)));
       if (digest(value) !== expected || value.entry !== entry || value.version !== 1) throw new Error("cursor differs");
       previous = value.cursor as MetadataCursor;
       if (previous.version !== 1 || !Array.isArray(previous.batches)) throw new Error("invalid cursor");
@@ -64,7 +64,7 @@ export function beginContextSelection(workspace: string, entry: string, step: nu
 }
 export function finishContextSelection(workspace: string, entry: string, step: number, request: string, cursor: MetadataCursor) {
   const state = contextStateRoot(workspace), value = { version: 1, entry, step, cursor };
-  if (Buffer.byteLength(JSON.stringify(value)) > 1024 * 1024) return false;
+  if (Buffer.byteLength(JSON.stringify(value)) > 8 * 1024 * 1024) return false;
   try { durableJson(cursorPath(state, entry, step), value); return finishContextRequest(state, entry, step, request, digest(value)); }
   catch { return false; }
 }

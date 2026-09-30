@@ -1,13 +1,14 @@
+import { recentReceipts } from "./telemetry-receipt-reader.ts";
+import { readContextProjection } from "./telemetry-projection.ts";
 import { boundedOutcomeReader, decisionOutcomeReport } from "./decision-outcomes.ts";
 import { DECISION_FAILURE_STAGES } from "./decisions.ts";
 import { opendirSync, lstatSync, realpathSync } from "node:fs";
 import { join } from "node:path";
-import { narrativeFile } from "./narrative-inputs.ts";
 import { object } from "./core.ts";
 import { DECISION_CONSUMER_IDS } from "./decision-schema.ts";
 
 /** Descriptive operational receipts only; frozen evaluation sets and source excerpts are never scanned. */
-export function decisionTelemetry(root: string, options: { limit?: number; since?: string; outcomesManifest?: string } = {}, outcomesReader = boundedOutcomeReader()) {
+export function decisionTelemetry(root: string, options: { limit?: number; since?: string; outcomesManifest?: string; workspace?: string; runtimeVersion?: string } = {}, outcomesReader = boundedOutcomeReader()) {
   // macOS temporary/state roots commonly have a /var -> /private/var alias.
   try { root = realpathSync(root); }
   catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
@@ -22,29 +23,19 @@ export function decisionTelemetry(root: string, options: { limit?: number; since
   let readBytes = 0, truncated = false;
   let repeatedObservations = 0, unidentifiedUsage = 0;
   const seen = new Set<string>(), usageSeen = new Set<string>();
-  outer: for (const collection of ["receipts", "routes"]) {
-    const directory = join(root, collection);
-    let entries: ReturnType<typeof opendirSync>;
+  const projection = readContextProjection(root, options.workspace ?? process.cwd(), { kinds: ["route"], since,
+    ...(options.runtimeVersion ? { runtimeVersion: options.runtimeVersion } : {}), limit: Math.min(limit, 1000) });
+  const receipts = recentReceipts(root, ["receipts", "routes"], { limit, since,
+    prioritized: projection.records.map(metric => ({ collection: "routes", name: `${metric.id}.json` })),
+    predicate: receipt => (!options.workspace || receipt.workspace === undefined || receipt.workspace === options.workspace) &&
+      (!options.runtimeVersion || receipt.runtimeVersion === options.runtimeVersion) });
+  counts.invalid += receipts.invalid; readBytes = receipts.readBytes; truncated = receipts.truncated;
+  for (const { collection, name, value: receipt } of receipts.records) {
+    counts.inspected++;
     try {
-      const stat = lstatSync(directory);
-      if (!stat.isDirectory() || stat.isSymbolicLink() || realpathSync(directory) !== directory) throw new Error("Invalid receipt directory");
-      entries = opendirSync(directory);
-    } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") continue; counts.invalid++; continue; }
-    try {
-      for (let entry = entries.readSync(); entry !== null; entry = entries.readSync()) {
-        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.json$/u.test(entry.name)) continue;
-        if (counts.inspected >= limit) { truncated = true; break outer; }
-        counts.inspected++;
-        try {
-          const path = join(directory, entry.name), stat = lstatSync(path);
-          if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 256 * 1024) throw new Error("Invalid receipt");
-          if (readBytes + stat.size > 16 * 1024 * 1024) { truncated = true; break outer; }
-          readBytes += stat.size;
-          const receipt = object(JSON.parse(narrativeFile(directory, entry.name)));
-          if (receipt.version !== 1 || `${receipt.receiptId}.json` !== entry.name || seen.has(String(receipt.receiptId)) ||
-              typeof receipt.createdAt !== "string" || !Number.isFinite(Date.parse(receipt.createdAt))) throw new Error("Invalid receipt identity");
-          seen.add(String(receipt.receiptId));
-          if (Date.parse(receipt.createdAt) < since) continue;
+      if (receipt.version !== 1 || `${receipt.receiptId}.json` !== name || seen.has(String(receipt.receiptId)) ||
+          typeof receipt.createdAt !== "string" || !Number.isFinite(Date.parse(receipt.createdAt))) throw new Error("Invalid receipt identity");
+      seen.add(String(receipt.receiptId));
           const outcome = receipt.outcome;
           if (!["delivered", "blocked", "refused-stale-source"].includes(String(outcome))) throw new Error("Invalid decision outcome");
           const optional = collection === "routes" ? (receipt.optional === null ? null : object(receipt.optional)) : receipt;
@@ -77,20 +68,20 @@ export function decisionTelemetry(root: string, options: { limit?: number; since
           } else counts.without_decision++;
           counts.matched++;
           counts[outcome === "refused-stale-source" ? "stale" : outcome === "blocked" ? "blocked" : "delivered"]++;
-        } catch { counts.invalid++; }
-      }
-    } finally { entries.closeSync(); }
+    } catch { counts.invalid++; }
   }
   latency.sort((a, b) => a - b);
   const percentile = (fraction: number) => latency.length ? latency[Math.ceil(latency.length * fraction) - 1] : null;
   return { version: 1, kind: "project-governance-decision-telemetry", scope: "operational-context-receipts", counts, reasons, kinds, baselines, failure_stages: failureStages,
-    truncated, selection: "bounded-directory-scan; not a representative sample", read_bytes: readBytes,
+    truncated, scanComplete: receipts.scanComplete, selection: receipts.selection,
+    runtimeFilter: options.runtimeVersion ? { version: options.runtimeVersion, unversionedActivity: "excluded; attribution unknown" } : null,
+    projection: { state: projection.state, role: "receipt-read-hints", evictedRecords: projection.evictedRecords, writeCoverage: projection.writeCoverage }, read_bytes: readBytes,
     latency_ms: { samples: latency.length, median: percentile(0.5), p95: percentile(0.95) },
     usage_accounting: { repeated_observations: repeatedObservations, unidentified_usage_observations: unidentifiedUsage,
       denominator: "latency and decision_samples count caller observations; token samples count identified decisions; explicit null identity is excluded" },
     tokens: { decision_samples: decisionSamples, input_samples: inputSamples, output_samples: outputSamples,
       input_total: inputSamples ? inputTokens : null, output_total: outputSamples ? outputTokens : null },
-    pilot: decisionPilotTelemetry(root, { limit, since }),
+    pilot: decisionPilotTelemetry(root, { limit, since, workspace: options.workspace ?? process.cwd(), ...(options.runtimeVersion ? { runtimeVersion: options.runtimeVersion } : {}) }),
     exposure: entryExposureTelemetry(root, { limit, since }),
     ...(options.outcomesManifest ? { outcome_report: decisionOutcomeReport(root, options.outcomesManifest, outcomesReader) } : {}),
     benefit_claim: "not-evaluated", avoided_llm_tokens: null };
@@ -144,7 +135,7 @@ function entryExposureTelemetry(root: string, options: { limit: number; since: n
 }
 
 /** One read-only projection of the shared operational receipts; native usage belongs to a batch. */
-function decisionPilotTelemetry(root: string, options: { limit: number; since: number }) {
+function decisionPilotTelemetry(root: string, options: { limit: number; since: number; workspace: string; runtimeVersion?: string }) {
   const counts = { inspected: 0, matched: 0, invalid: 0, duplicate_reservations: 0 };
   const consumers: Record<string, { observations: number; delivered: number; questions: number }> = {};
   const reasons: Record<string, number> = {};
@@ -153,23 +144,16 @@ function decisionPilotTelemetry(root: string, options: { limit: number; since: n
   const tokens = { input_samples: 0, output_samples: 0, input_total: 0, output_total: 0 };
   const seen = new Set<string>();
   let readBytes = 0, truncated = false;
-  let entries: ReturnType<typeof opendirSync> | undefined;
-  try {
-    const directory = join(root, "decisions"), stat = lstatSync(directory);
-    if (!stat.isDirectory() || stat.isSymbolicLink() || realpathSync(directory) !== directory) throw new Error("Invalid decision collection");
-    entries = opendirSync(directory);
-    for (let entry = entries.readSync(); entry !== null; entry = entries.readSync()) {
-      if (!/^[0-9a-f]{32}\.json$/u.test(entry.name)) continue;
-      if (counts.inspected >= options.limit) { truncated = true; break; }
-      counts.inspected++;
-      try {
-        const file = lstatSync(join(directory, entry.name));
-        if (!file.isFile() || file.isSymbolicLink() || file.size > 256 * 1024) throw new Error("Invalid decision receipt");
-        if (readBytes + file.size > 16 * 1024 * 1024) { truncated = true; break; }
-        readBytes += file.size;
-        const receipt = object(JSON.parse(narrativeFile(directory, entry.name)));
-        if (receipt.version !== 2 || `${receipt.receiptId}.json` !== entry.name || typeof receipt.createdAt !== "string" || !Number.isFinite(Date.parse(receipt.createdAt))) throw new Error("Invalid receipt identity");
-        if (Date.parse(receipt.createdAt) < options.since) continue;
+  const projection = readContextProjection(root, options.workspace, { kinds: ["decision"], since: options.since,
+    ...(options.runtimeVersion ? { runtimeVersion: options.runtimeVersion } : {}), limit: Math.min(options.limit, 1000) });
+  const receipts = recentReceipts(root, ["decisions"], { limit: options.limit, since: options.since,
+    prioritized: projection.records.map(metric => ({ collection: "decisions", name: `${metric.id}.json` })),
+    predicate: receipt => !options.runtimeVersion || receipt.runtimeVersion === options.runtimeVersion });
+  counts.invalid += receipts.invalid; readBytes = receipts.readBytes; truncated = receipts.truncated;
+  for (const { name, value: receipt } of receipts.records) {
+    counts.inspected++;
+    try {
+      if (receipt.version !== 2 || `${receipt.receiptId}.json` !== name || typeof receipt.createdAt !== "string" || !Number.isFinite(Date.parse(receipt.createdAt))) throw new Error("Invalid receipt identity");
         const outcome = object(receipt.outcome), usage = object(outcome.usage), budget = object(outcome.budget), allocation = object(outcome.usageAllocation);
         if (outcome.version !== 2 || !Array.isArray(outcome.consumers) || !outcome.consumers.length ||
             new Set(outcome.consumers).size !== outcome.consumers.length ||
@@ -201,12 +185,11 @@ function decisionPilotTelemetry(root: string, options: { limit: number; since: n
         }
         if (usage.inputTokens !== null) { tokens.input_samples++; tokens.input_total += Number(usage.inputTokens); }
         if (usage.outputTokens !== null) { tokens.output_samples++; tokens.output_total += Number(usage.outputTokens); }
-      } catch { counts.invalid++; }
-    }
-  } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") counts.invalid++; }
-  finally { entries?.closeSync(); }
+    } catch { counts.invalid++; }
+  }
   return { counts, consumers, reasons, transport, timing: { ...timing, accounting: "sum of per-call durations; not elapsed task time" }, tokens: { ...tokens,
     input_total: tokens.input_samples ? tokens.input_total : null, output_total: tokens.output_samples ? tokens.output_total : null },
-    usage_allocation: "native usage counted once per reservation; question counts shown per consumer", truncated, read_bytes: readBytes,
+    usage_allocation: "native usage counted once per reservation; question counts shown per consumer", truncated,
+    scanComplete: receipts.scanComplete, selection: receipts.selection, read_bytes: readBytes,
     outcomes: "not-joined", avoided_llm_tokens: null, benefit_claim: "not-evaluated" };
 }

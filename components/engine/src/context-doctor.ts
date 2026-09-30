@@ -1,3 +1,4 @@
+import { CONTEXT_OPERATION_MS } from "./context-timing.ts";
 import { MANAGED_CODEX_STARTUP_COMMAND } from "./startup-hooks.ts";
 import { startupHooks } from "./startup-hooks.ts";
 import { lstatSync, realpathSync } from "node:fs";
@@ -6,6 +7,7 @@ import { parse } from "yaml";
 import { narrativeFile } from "./narrative-inputs.ts";
 import { routeContext } from "./context-routing.ts";
 import { contextObservationStatus } from "./context-observations.ts";
+import { DecisionRuntime } from "./decision-runtime.ts";
 import { profileDecisionSettings } from "./decision-settings.ts";
 import { documentationReadiness } from "./context-documentation.ts";
 import { projectionStatus } from "./context-projection-store.ts";
@@ -19,19 +21,35 @@ export function contextDoctor(workspace: string) {
   let requiredGuidance: Array<{ path: string; bytes: number | null }> = [];
   let budgets: ReturnType<typeof contextBudgetReadiness> | null = null;
   let metadata = { enabled: false, disclosure: false }, hook = "unavailable";
+  let inference: Record<string, unknown> | null = null;
+  let optionalExcerptBytes: number | undefined;
   let hookSource: ReturnType<typeof inspectStartupHookSource> | null = null;
   try {
     const profile = parse(narrativeFile(workspace, "config/governance/profile.yaml"));
     if (!profile?.context_router) findings.push({ id: "context.router-missing", message: "Declare context_router and a default_route in config/governance/profile.yaml." });
     else {
       const route = routeContext(profile.context_router, "unspecified initial development request", []);
+      optionalExcerptBytes = route.optionalExcerptBytes;
       if (route.outcome !== "matched") findings.push({ id: "context.no-default-route", message: "Prompts without matching paths or terms have no route. Declare default_route with required shared guidance." });
       budgets = contextBudgetReadiness(workspace, profile.context_router);
       requiredGuidance = budgets.requiredGuidance; findings.push(...budgets.findings);
     }
     const settings = profileDecisionSettings(profile);
+    const passageEnabled = settings.questionIds.DL03.includes("context.metadata-relevance/1") &&
+      ["context.passage-evidence/1", "context.passage-role/1"].every(id => settings.questionIds.DL03.includes(id));
     metadata = { enabled: settings.mode !== "off" && settings.consumers.DL03.mode !== "off" && settings.questionIds.DL03.includes("context.metadata-relevance/1"),
       disclosure: settings.legacy.allowedDataClasses.includes("metadata") && Boolean(settings.allowedMetadataPaths?.length) };
+    const eligibility = new DecisionRuntime(settings, contextStateRoot(workspace)).eligibility("DL03", "context.metadata-relevance/1");
+    inference = { configuredMode: settings.consumers.DL03.mode, effectiveMode: eligibility.mode, providerUse: eligibility.providerUse,
+      reasons: eligibility.reasons, metadataApproved: metadata.disclosure, sourceClassApproved: settings.legacy.allowedDataClasses.includes("source"),
+      descriptorPaths: settings.legacy.allowedSourcePaths ?? [], metadataPaths: settings.allowedMetadataPaths ?? [],
+      passageQuestionsEnabled: passageEnabled,
+      procedureSources: profile.context_router?.procedure_sources ?? [], descriptorPermissionAlsoPermitsBodies: true,
+      limits: { requestBytes: settings.budget.maxRequestBytes, calls: settings.budget.maxCalls, operationMs: CONTEXT_OPERATION_MS,
+        sourceCandidates: settings.legacy.maxCandidates, optionalExcerptBytes: optionalExcerptBytes ?? (passageEnabled ? 3072 : 2048),
+        passagePreparation: "remaining-family-bytes-and-operation" } };
+    if (metadata.enabled && metadata.disclosure && !settings.legacy.allowedDataClasses.includes("source"))
+      findings.push({ id: "context.path-only-disclosure", message: "Metadata is approved, but source-derived descriptions are not. JEV sees paths only; approve intended descriptions/body paths explicitly if appropriate." });
     if (metadata.enabled && !metadata.disclosure) findings.push({ id: "context.metadata-not-approved", message: "Metadata selection is enabled but needs explicit metadata data class and allowed_metadata_paths. Local retrieval still works." });
   } catch { findings.push({ id: "context.configuration-unavailable", message: "Inspect the project profile, default route and its required files." }); }
   try {
@@ -64,7 +82,7 @@ export function contextDoctor(workspace: string) {
   const indexObservation = projection.status === "present" && "generations" in projection
     ? projection.generations.some(generation => Number(generation.paths) > 0) ? "populated-snapshot" : "empty-snapshot"
     : "not-observed";
-  return { version: 1, capability: "context", status: findings.length ? "needs-attention" : "configured", findings, metadata, requiredGuidance,
+  return { version: 1, capability: "context", status: findings.length ? "needs-attention" : "configured", findings, metadata, inference, requiredGuidance,
     budgets: budgets ? { routes: budgets.routes, coverage: budgets.coverage } : null,
     localRetrieval: "provider-independent", promptHook: hook, promptHookSource: hookSource, hostTrust: "not-observable", beforeFirstRead: "requires-installed-host-evidence",
     projection, repositoryContext: { indexObservation, overviewFiles: projectOverview, purposeQuality: "not-established",

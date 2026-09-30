@@ -173,7 +173,8 @@ async function verifyWorktreeCutover({ packageRoot, archive, temporary, workspac
   git(workspace, 'config', 'extensions.worktreeConfig', 'true');
   git(workspace, 'config', '--worktree', 'core.hooksPath', '.githooks');
   git(workspace, 'add', '.');
-  git(workspace, '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'Pin initial runtime');
+  if (git(workspace, 'diff', '--cached', '--name-only'))
+    git(workspace, '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'Pin initial runtime');
   const integrationBranch = git(workspace, 'branch', '--show-current');
   const sibling = join(temporary, 'linked-worktree'), siblingRegistry = join(sibling, '.governance/installation.sqlite');
   git(workspace, 'worktree', 'add', '-q', '-b', 'fixture-feature', sibling, 'HEAD');
@@ -290,6 +291,61 @@ function verifyNativeEnvelope({ invoke, hooks, workspace, launcher, event }) {
   }
 }
 
+/** Exercise procedure/source delivery and exact reuse through the shipped native hook. */
+function verifyRc10Delivery({ invoke, hooks, workspace, launcher, environment, temporary, event }) {
+  const profile = join(workspace, 'config/governance/profile.yaml'), before = readFileSync(profile), app = readFileSync(join(workspace, 'app.ts'));
+  const guide = join(workspace, 'recovery.md'), assertion = join(workspace, 'app.test.ts'), calls = join(temporary, 'delivery-calls.jsonl'), preload = join(temporary, 'delivery-fixture.mjs');
+  const oldSession = environment.HARNESS_SESSION, oldOptions = environment.NODE_OPTIONS, oldToken = environment.JEV_TOKEN;
+  const turn = { ...event, session_id: 'delivery-host', turn_id: 'delivery-turn', prompt: 'Retain the original result when a run closes; use the recovery procedure and its assertion.' };
+  // Unborn startup was proved above. Ordinary development starts from a committed installation,
+  // so generated host files do not consume slots reserved for explicitly changed source.
+  execFileSync('git', ['add', '.'], { cwd: workspace, env: environment });
+  execFileSync('git', ['-c', 'core.hooksPath=/dev/null', '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
+    'commit', '-qm', 'Install the fixture runtime'], { cwd: workspace, env: environment });
+  try {
+    writeFileSync(guide, '# Recovery\nKeep the operator original.\n\n## Retained result\nNever delete the saved original run.\n' + 'Preserve the exact prior result and its trace.\n'.repeat(130));
+    writeFileSync(join(workspace, 'app.ts'), 'export function closeRun(record) {\n' + '  inspectRecordedOwner(record);\n'.repeat(150) + '  if (record.closed) return record.original;\n}\n');
+    writeFileSync(assertion, "test('the original survives closeout', () => {\n" + '  inspectRecordedFixture();\n'.repeat(50) + '  assert.equal(closeRun(closedRecord), closedRecord.original);\n});\n');
+    writeFileSync(profile, JSON.stringify({ context_router: { default_route: 'project', optional_excerpt_bytes: 8192, procedure_sources: ['recovery.md'], routes: [{ id: 'project', token_budget: { expansion_context_tokens: 4000, total_context_tokens: 14000 } }] },
+      continuity: { decisions: { mode: 'auto', evidence_bytes: 16384, max_candidates: 64, allowed_data_classes: ['metadata', 'source'], allowed_metadata_paths: ['app.ts', 'app.test.ts', 'recovery.md'], allowed_source_paths: ['app.ts', 'app.test.ts', 'recovery.md'],
+        budget: { max_calls: 32, max_request_bytes: 524288 }, consumers: { DL03: { mode: 'auto', questions: ['context.metadata-relevance/1', 'context.passage-evidence/1', 'context.passage-role/1'] } } } } }));
+    writeFileSync(preload, `import {appendFileSync} from 'node:fs'; globalThis.fetch=async(url,init)=>{
+      if(url!=='https://api.typesafe.ai/v1/systemone') throw Error('Unexpected provider');
+      const wire=JSON.parse(init.body); if(wire.state.layout!=='compact-v1') throw Error('Missing compact layout');
+      appendFileSync(${JSON.stringify(calls)},JSON.stringify({questions:Object.keys(wire.questions).length})+'\\n');
+      return Response.json({model:'jev-1.13.0',answers:Object.fromEntries(Object.entries(wire.questions).map(([name,q])=>{
+        const key=q.instructions.question.match(/state\\.items\\.(c\\d+)/)?.[1],item=wire.state.items[key];
+        if(!item)throw Error('Unnamed source item');
+        return [name,{type:'noul',noul:item.passage?0.95:item.path==='recovery.md'?0.1:0.95}];
+      }))});};`);
+    environment.JEV_TOKEN = 'fixture'; environment.NODE_OPTIONS = `--import ${pathToFileURL(preload).href}`; environment.HARNESS_SESSION = turn.session_id;
+    const command = hooks.hooks.UserPromptSubmit[0].hooks[0].command, output = invoke('/bin/sh', ['-c', command], JSON.stringify(turn));
+    const text = output.hookSpecificOutput.additionalContext;
+    assert.match(text, /Never delete the saved original run/); assert.match(text, /record.closed/); assert.match(text, /assert.equal/);
+    assert.ok(text.includes(JSON.stringify(readFileSync(join(workspace, 'app.ts'), 'utf8'))),
+      'The native profile allowance must deliver this complete source unit, which exceeds the default 3 KB slot');
+    assert.ok(Buffer.byteLength(text) > 8000, 'The normal hook must honor the declared envelope instead of a second 8 KB optional cap');
+    const entry = text.match(/Entry ([a-f0-9]{64}); route/)?.[1]; assert.ok(entry);
+    const count = () => readFileSync(calls, 'utf8').trim().split('\n').length, dispatched = count();
+    assert.ok(dispatched >= 2);
+    assert.deepEqual(invoke('/bin/sh', ['-c', command], JSON.stringify(turn)), output);
+    assert.equal(invoke(launcher, ['context-route', '--entry', entry]).reuse.status, 'validated-entry-replay');
+    assert.equal(count(), dispatched, 'A normal repeat and explicit replay cannot pay for another selection');
+    writeFileSync(guide, readFileSync(guide, 'utf8') + '\nChanged current source.\n');
+    const stale = spawnSync(launcher, ['context-route', '--entry', entry], { cwd: workspace, env: environment, encoding: 'utf8', timeout: 5000 });
+    assert.notEqual(stale.status, 0); assert.equal(JSON.parse(stale.stderr).code, 'entry-source-stale'); assert.equal(count(), dispatched);
+    environment.JEV_TOKEN = '';
+    const fallback = invoke('/bin/sh', ['-c', command], JSON.stringify({ ...turn, turn_id: 'delivery-fallback' }));
+    assert.match(fallback.hookSpecificOutput.additionalContext, /recovery.md/); assert.equal(count(), dispatched);
+  } finally {
+    invoke('/bin/sh', ['-c', hooks.hooks.SessionEnd[0].hooks[0].command], JSON.stringify({ ...turn, hook_event_name: 'SessionEnd' }));
+    writeFileSync(profile, before); writeFileSync(join(workspace, 'app.ts'), app); rmSync(guide, { force: true }); rmSync(assertion, { force: true });
+    if (oldSession === undefined) delete environment.HARNESS_SESSION; else environment.HARNESS_SESSION = oldSession;
+    if (oldOptions === undefined) delete environment.NODE_OPTIONS; else environment.NODE_OPTIONS = oldOptions;
+    if (oldToken === undefined) delete environment.JEV_TOKEN; else environment.JEV_TOKEN = oldToken;
+  }
+}
+
 export async function verifyRc6Prompt(packageRoot, archive) {
   const temporary = realpathSync(mkdtempSync(join(tmpdir(), 'rc6-installed-prompt-'))), workspace = join(temporary, 'repo');
   mkdirSync(workspace);
@@ -347,7 +403,7 @@ export async function verifyRc6Prompt(packageRoot, archive) {
     const preload = join(temporary, 'metadata-fixture.mjs'), calls = join(temporary, 'metadata-calls.jsonl');
     writeFileSync(preload, `import {appendFileSync} from 'node:fs'; globalThis.fetch=async(url,init)=>{
       if(url!=='https://api.typesafe.ai/v1/systemone') throw Error('Unexpected provider');
-      const wire=JSON.parse(init.body); if(wire.state.layout!=='shared-v1') throw Error('Missing metadata layout');
+      const wire=JSON.parse(init.body); if(wire.state.layout!=='compact-v1') throw Error('Missing metadata layout');
       appendFileSync(${JSON.stringify(calls)},JSON.stringify({questions:Object.keys(wire.questions).length})+'\\n');
       return Response.json({model:'jev-1.13.0',answers:Object.fromEntries(Object.keys(wire.questions).map(id=>[id,{type:'noul',noul:0.95}]))});};`);
     writeFileSync(join(workspace, 'config/governance/profile.yaml'), JSON.stringify({ context_router: { default_route: 'project', routes: [{ id: 'project' }] },
@@ -358,6 +414,7 @@ export async function verifyRc6Prompt(packageRoot, archive) {
     assert.match(active.hookSpecificOutput.additionalContext, /app.ts/);
     assert.equal(readFileSync(calls, 'utf8').trim().split('\n').length, 1);
     verifyTaskSwitch({ invoke, launcher, workspace, environment, session: event.session_id, calls });
+    verifyRc10Delivery({ invoke, hooks, workspace, launcher, environment, temporary, event });
     const observed = invoke(launcher, ['telemetry', 'context', 'status']).documentation;
     assert.equal(observed.status, 'observed-subset');
     const appGap = observed.candidates.find(item => item.path === 'app.ts');
@@ -384,6 +441,6 @@ export async function verifyRc6Prompt(packageRoot, archive) {
       assert.deepEqual(refused, {});
     }
     await verifyWorktreeCutover({ packageRoot, archive, temporary, workspace, environment, lock });
-    return { status: 'passed', scope: 'Exact installed package, initial and linked-worktree hooks, stale sibling hook refusal, merged pin cutover, unborn prompt stdin, no-token fallback, active metadata fixture, recoverable prompt reader, synthetic native-parent rollover admission and lifecycle failure. Real native host trust/use not tested.', sourceIdentity: 'synthetic fixture only' };
+    return { status: 'passed', scope: 'Exact installed package, initial and linked-worktree hooks, stale sibling hook refusal, merged pin cutover, unborn prompt stdin, no-token fallback, compact metadata/procedure/source/assertion delivery through the native hook, exact no-dispatch replay, recoverable prompt reader, synthetic native-parent rollover admission and lifecycle failure. Real native host trust/use not tested.', sourceIdentity: 'synthetic fixture only' };
   } finally { rmSync(temporary, { recursive: true, force: true }); }
 }

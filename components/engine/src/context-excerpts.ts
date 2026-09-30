@@ -18,7 +18,7 @@ const adjacent = (lines: string[], left: Span, right: Span) => right.start > lef
     .every(line => /^\s*(?:(?:\/\/|\*|#).*)?$/u.test(line));
 
 /** Group consecutive small declarations so one passage can express a local behavior, not one label. */
-export function contextSourceClusters(candidate: Candidate, spans: Span[], maximumBytes = 1024): Span[] {
+export function contextSourceClusters(candidate: Candidate, spans: Span[], maximumBytes = 3072): Span[] {
   const lines = sourceLines(candidate.excerpt);
   const sorted = spans.filter(span => span.start > 0 && span.end >= span.start && span.end <= lines.length)
     .sort((a, b) => a.start - b.start || a.end - b.end);
@@ -39,7 +39,7 @@ export function contextSourceClusters(candidate: Candidate, spans: Span[], maxim
 }
 
 /** Rank source-owned units without pretending that a name or setup proves the requested behavior. */
-export function contextSpanChoices(candidate: Candidate, purpose: string, spans: Span[]) {
+export function contextSpanChoices(candidate: Candidate, purpose: string, spans: Span[], includeUnmatched = false) {
   const lines = sourceLines(candidate.excerpt), terms = new Set(words(purpose));
   return spans.filter(span => Number.isSafeInteger(span.start) && Number.isSafeInteger(span.end) &&
     span.start > 0 && span.end >= span.start && span.start <= lines.length)
@@ -49,7 +49,7 @@ export function contextSpanChoices(candidate: Candidate, purpose: string, spans:
       const body = new Set(words(lines.slice(span.start - 1, span.end).join("")).filter(term => terms.has(term)));
       const excerpt = lines.slice(span.start - 1, span.end).join("");
       return { span, named, body, excerpt, bytes: Buffer.byteLength(excerpt), score: named.size * 4 + body.size };
-    }).filter(item => item.score > 0).sort((a, b) => b.score - a.score || b.named.size - a.named.size ||
+    }).filter(item => includeUnmatched || item.score > 0).sort((a, b) => b.score - a.score || b.named.size - a.named.size ||
       a.bytes - b.bytes || a.span.start - b.span.start);
 }
 
@@ -57,7 +57,7 @@ export function contextSpanChoices(candidate: Candidate, purpose: string, spans:
 export function contextExcerpt(candidate: Candidate, purpose: string, maximumBytes: number, spans: Span[] = [], preferred: Span[] = []): Candidate {
   if (!Number.isSafeInteger(maximumBytes) || maximumBytes < 128 || maximumBytes > 65536) throw new Error("Optional excerpt budget must be 128 to 65536 bytes");
   if (candidate.sourceRange || candidate.sourceRanges) throw new Error("Cannot excerpt an already ranged candidate");
-  if (Buffer.byteLength(candidate.excerpt) <= maximumBytes) return candidate;
+  if (!preferred.length && Buffer.byteLength(candidate.excerpt) <= maximumBytes) return candidate;
   const lines = sourceLines(candidate.excerpt);
   const valid = spans.filter(span => Number.isSafeInteger(span.start) && Number.isSafeInteger(span.end) &&
     span.start > 0 && span.end >= span.start && span.start <= lines.length)
@@ -90,7 +90,15 @@ export function contextExcerpt(candidate: Candidate, purpose: string, maximumByt
       let parts: Candidate[] = [];
       // Admit in judgment order first. A later neighbor cannot evict an already admitted passage.
       for (const span of chosen) {
-        const part = contextExcerpt(candidate, purpose, maximumBytes, [span]);
+        const body = lines.slice(span.start - 1, span.end).join("");
+        const marker = (first: number, last: number) => Buffer.byteLength(`[source lines ${first}-${last}]\n`);
+        const framing = parts.length ? 1 + marker(span.start, span.end) + (parts.length === 1
+          ? marker(parts[0]!.sourceRange!.firstLine, parts[0]!.sourceRange!.lastLine) : 0) : 0;
+        const remaining = maximumBytes - Buffer.byteLength(content(parts)) - framing;
+        if (remaining < 128) continue;
+        const part: Candidate = Buffer.byteLength(body) <= remaining
+          ? { ...candidate, excerpt: body, sourceRange: range(lines, span.start, span.end), sourceUnits: units(span, true) }
+          : contiguousExcerpt(candidate, purpose, remaining, [span], span);
         if (!part.sourceRange || parts.some(other => other.sourceRange &&
           !(part.sourceRange!.lastLine < other.sourceRange.firstLine || part.sourceRange!.firstLine > other.sourceRange.lastLine))) continue;
         const trial = combine([...parts, part]);
