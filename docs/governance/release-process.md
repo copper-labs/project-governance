@@ -5,7 +5,7 @@ type: governance
 status: current
 owner: project-governance
 created: 2026-08-15
-updated: 2026-09-06
+updated: 2026-09-30
 summary: Defines compiled major-release proof and deliberate publication, with retained legacy wheel guidance.
 ---
 
@@ -15,7 +15,8 @@ summary: Defines compiled major-release proof and deliberate publication, with r
 
 The coordinated major release uses `@organta/project-governance`, one bundled `.tgz` archive,
 Node `>=24.16.0 <25`, and the schema-2 runtime lock. Package and canonical dependency-lock
-versions must match the exact stable or `MAJOR.MINOR.PATCH-rc.N` tag (positive N). Preview versions are local qualification artifacts;
+versions must match the exact stable, `MAJOR.MINOR.PATCH-rc.N`, or RC hotfix
+`MAJOR.MINOR.PATCH-rc.N.M` tag (positive N and M). Preview versions are local qualification artifacts;
 the release metadata builder refuses to publish them as stable releases.
 
 Release candidates publish with GitHub prerelease status and `latest: false`. Their update metadata

@@ -1,5 +1,6 @@
 import { verifyDecisionExperiments } from "./verify-decision-experiments.mjs";
 import { verifyRc6Prompt } from "./verify-rc6-prompt.mjs";
+import { verifyPythonParser } from "./verify-python-parser.mjs";
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
@@ -36,13 +37,14 @@ try {
   `], { cwd: root, encoding: 'utf8', timeout: 10000 });
   if (host.trim() !== 'passed') throw new Error('Installed host API missing');
   if (!readFileSync(join(pkg, manifest.exports['./host/v1'].types), 'utf8').includes('HOST_API_VERSION')) throw new Error('Host API declarations missing');
+  const pythonParser = await verifyPythonParser(pkg, root);
   const beforeStaging = readFileSync(join(pkg, "package.json"));
   const staging = await verifyExplicitStaging(pkg, archive, manifest, root);
   assert.deepEqual(readFileSync(join(pkg, "package.json")), beforeStaging, "Staging must preserve the installed parent package");
   const pilot = await verifyDecisionPilot(pkg);
   const experiments = await verifyDecisionExperiments(pkg);
   const prompt = await verifyRc6Prompt(pkg, archive);
-  console.log(JSON.stringify({ staging, prompt, decisionPilot: pilot, experiments, hostApi: 'passed', version: manifest.version, installedCommand: 'passed', scope: 'offline installation and inactive staging, public host API and decision consumers with fixture inference; not full semantic qualification; no live device or benefit claim' }));
+  console.log(JSON.stringify({ staging, prompt, pythonParser, decisionPilot: pilot, experiments, hostApi: 'passed', version: manifest.version, installedCommand: 'passed', scope: 'offline installation and inactive staging, compiled Python source/comment analysis, public host API and decision consumers with fixture inference; not full semantic qualification; no live device or benefit claim' }));
 } finally { rmSync(root, { recursive: true, force: true }); }
 
 

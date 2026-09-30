@@ -5,7 +5,7 @@ type: spec
 status: current
 owner: project-governance
 created: 2026-03-02
-updated: 2026-08-27
+updated: 2026-09-30
 summary: Contract for the package runtime, its configuration boundary, focused execution model, and bounded local telemetry.
 ---
 
@@ -144,6 +144,15 @@ their existing per-command `stages`, path selection, dependencies, and optional
 `replaces_builtin_packs` declarations. Every active pack must have at least one applicable command
 for each stage it declares. Planning blocks a selected blocking pack when that requested-stage
 claim is empty, and execution fails the pack if it still resolves to zero runnable commands.
+
+Python source checks consume the maintained Python AST for captured current and historical bytes.
+The bridge normalizes expression bodies and absent names into its existing typed tree, retaining
+positive source-location defaults. Valid conditional expressions, lambdas and unnamed exception
+handlers must reach normal policy.
+This normalization preserves declaration bounds, docstrings, decorators and existing metrics.
+Invalid current-source syntax, malformed trees and parser infrastructure failures still block.
+Invalid historical syntax retains the existing unavailable symbol comparison; this repair grants
+no comment waiver or change to documentation enforcement.
 
 ## Selection And Execution
 

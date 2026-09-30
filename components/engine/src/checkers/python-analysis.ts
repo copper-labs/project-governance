@@ -11,12 +11,15 @@ except SyntaxError as error:
  print(json.dumps({'syntaxLine':error.lineno or 1}))
  sys.exit(1)
 def encode(node):
- return {'kind':type(node).__name__,'name':getattr(node,'name',''),
- 'start':getattr(node,'lineno',1),'end':getattr(node,'end_lineno',1),
+ body=getattr(node,'body',[])
+ if isinstance(body,ast.AST): body=[body]
+ start=getattr(node,'lineno',None) or 1
+ return {'kind':type(node).__name__,'name':getattr(node,'name','') or '',
+ 'start':start,'end':getattr(node,'end_lineno',None) or start,
  'values':len(getattr(node,'values',[])),
  'doc':(ast.get_docstring(node,clean=False) or '') if isinstance(node,(ast.Module,ast.ClassDef,ast.FunctionDef,ast.AsyncFunctionDef)) else '',
  'decorators':[item.lineno for item in getattr(node,'decorator_list',[])],
- 'body':[i for i,child in enumerate(ast.iter_child_nodes(node)) if child in getattr(node,'body',[])],
+ 'body':[i for i,child in enumerate(ast.iter_child_nodes(node)) if child in body],
  'children':[encode(child) for child in ast.iter_child_nodes(node)]}
 print(json.dumps(encode(tree)))
 `;
