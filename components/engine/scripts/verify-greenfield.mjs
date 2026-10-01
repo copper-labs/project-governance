@@ -90,22 +90,62 @@ export async function verifyGreenfield(packageRoot, archive, { live = false } = 
     }
     const checked = invoke(launcher, ['check', '--pack', 'context-router', '--summary']);
     assert.equal(checked.status, 'passed');
-    const { RuntimeGenerations } = await import(pathToFileURL(join(packageRoot, 'dist/engine/src/runtime-generations.js')));
-    invoke('/bin/sh', ['-c', hooks.SessionEnd[0].hooks[0].command], JSON.stringify({ ...event, hook_event_name: 'SessionEnd' }));
-    const generations = new RuntimeGenerations(registry);
-    try { assert.equal(generations.state().readers.length, 0); assert.equal(generations.state().maintenance, null); } finally { generations.close(); }
+    // Context assertions are finished. Convert these fixture docs only for the gate, then end the session.
+    const documentationEvidence = verifyDocumentationEvidence({ temporary, launcher, invoke, write, workspace });
+    await verifyGenerationCleanup({ packageRoot, invoke, hooks, event, registry });
     return { status: 'passed', suite: 'installed-greenfield', provider: live ? 'live' : 'fixture',
       initialCommit: false, installation: 'passed', nativeEntry: 'passed', firstTask: 'context-delivery-passed', selectedEvidence: 'passed',
       providerProof: { metadata: full.metadata.decisions, coverage: compact.metadata.coverage,
         passages: full.selection.passageAdvice,
         optionalMethod: compact.optional.decision.method, selectedSources: compact.optional.entries.map(item => ({ id: item.id, sourceDigest: item.sourceDigest })) },
-      scopeGap: 'detected-without-widening', compactReplay: 'passed', externalRead: 'passed', cleanup: 'passed',
+      scopeGap: 'detected-without-widening', compactReplay: 'passed', externalRead: 'passed', documentationEvidence, cleanup: 'passed',
       missingToken: live ? 'offline-suite' : 'passed', billingFailure: live ? 'offline-suite' : 'passed',
       benefit: 'not-evaluated', sourceIdentity: 'synthetic fixture only' };
   } finally {
     if (hooks && event) run('/bin/sh', ['-c', hooks.SessionEnd[0].hooks[0].command], JSON.stringify({ ...event, hook_event_name: 'SessionEnd' }));
     rmSync(temporary, { recursive: true, force: true });
   }
+}
+
+/** End native ownership and prove that neither a reader nor a maintenance reservation survives. */
+async function verifyGenerationCleanup({ packageRoot, invoke, hooks, event, registry }) {
+  const { RuntimeGenerations } = await import(pathToFileURL(join(packageRoot, 'dist/engine/src/runtime-generations.js')));
+  invoke('/bin/sh', ['-c', hooks.SessionEnd[0].hooks[0].command], JSON.stringify({ ...event, hook_event_name: 'SessionEnd' }));
+  const generations = new RuntimeGenerations(registry);
+  try { assert.equal(generations.state().readers.length, 0); assert.equal(generations.state().maintenance, null); } finally { generations.close(); }
+}
+
+/** A new project can save raw review output without weakening its live documentation gate. */
+function verifyDocumentationEvidence({ temporary, launcher, invoke, write, workspace }) {
+  const authored = (id, body, status = 'current', type = 'guide') =>
+    `---\nid: ${id}\ntitle: Example\ntype: ${type}\nstatus: ${status}\nowner: team\ncreated: 2026-10-01\nupdated: 2026-10-01\nsummary: Example document\n---\n${body}`;
+  for (const path of ['docs/core.md', 'docs/onboarding.md']) write(path, authored(path, readFileSync(join(workspace, path), 'utf8')));
+  const source = authored('proposal', '# Proposal\nProposed behavior.\n', 'proposal', 'spec');
+  write('docs/proposal.md', source);
+  write('docs/decision.md', authored('decision', '# Decision\nChosen approach.\n', 'accepted', 'decision'));
+  const copy = 'docs/implementation/evidence/review/after/docs/proposal.md';
+  const snapshot = source + '[Original location](../../missing-original.md)\n';
+  const artifacts = { [copy]: snapshot,
+    'docs/implementation/evidence/review/before/index.md': '[Frozen reference](absent.md)\n',
+    'docs/implementation/evidence/review/raw-review.md': '[Reviewer reference](missing.md)\n' };
+  for (const [path, content] of Object.entries(artifacts)) write(path, content);
+  const summaryPath = 'docs/implementation/evidence/review/README.md', summary = authored('review', '[Raw report](raw-review.md)\n');
+  write(summaryPath, summary);
+  const args = ['check', '--stage', 'pre-commit', '--mode', 'all', '--pack', 'documentation', '--summary'];
+  assert.equal(invoke(launcher, args).status, 'passed');
+  execFileSync('git', ['add', '.'], { cwd: workspace });
+  assert.equal(invoke(launcher, ['check', '--stage', 'pre-commit', '--mode', 'impacted', '--staged', '--pack', 'documentation', '--summary']).status, 'passed');
+  write('docs/live-guide.md', authored('live-guide', '[Missing live target](missing-live.md)\n'));
+  write(summaryPath, authored('review', '[Missing evidence summary target](missing-summary.md)\n'));
+  const resultPath = join(temporary, 'documentation-failure.json');
+  assert.equal(invoke(launcher, [...args, '--json-output', resultPath], undefined, 1).status, 'failed');
+  assert.match(readFileSync(resultPath, 'utf8'), /docs\/live-guide\.md: link target does not exist: missing-live\.md/);
+  assert.match(readFileSync(resultPath, 'utf8'), /docs\/implementation\/evidence\/review\/README\.md: link target does not exist: missing-summary\.md/);
+  write('docs/live-guide.md', authored('live-guide', '# Live guide\nVerified current guidance.\n'));
+  write(summaryPath, summary);
+  assert.equal(invoke(launcher, args).status, 'passed');
+  for (const [path, content] of Object.entries(artifacts)) assert.equal(readFileSync(join(workspace, path), 'utf8'), content);
+  return 'passed';
 }
 
 /** External read observations must retain identity without relaxing local path protections. */

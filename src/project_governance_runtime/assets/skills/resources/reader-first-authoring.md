@@ -29,6 +29,28 @@ owning reference, relevant source, tests, configuration, examples, and current e
 Never invent a command, result, prerequisite, guarantee, or platform behavior to complete a
 document's shape.
 
+## Separate Authored Guidance From Raw Evidence
+
+For the compiled 3.x documentation checker, save unmodified source snapshots and raw reviewer
+output under `docs/**/evidence/**`. Write a metadata-bearing `README.md` or `index.md` summary
+that explains the source, outcome and limits, then links to the artifacts. Copies within evidence
+`before/` and `after/` subtrees retain their original links and metadata; do not repair them as
+though they were newly authored documents.
+Use lowercase `evidence`, `before` and `after` directory names. Reserve `README.md` and `index.md`
+outside frozen subtrees for authored summaries; give raw exports a different name.
+
+Keep live guides outside the evidence namespace or identify them through the enabled developer
+catalog's `reference` or `guides`. Those declarations remain validated in any location. Catalog
+`sources` may point to raw evidence. Ordinary live links still require captured repository targets;
+use portable public citations or describe an external source rather than making an absolute
+filesystem path look like a valid local link.
+
+Use `proposal` for unaccepted designs, `accepted` for recorded decisions, `current` for live
+guidance and `completed` for finished work. The compiled common vocabulary also permits `active`,
+`approved`, `archived`, `deferred`, `draft`, `in-progress`, `provisional`, `research`, `superseded`
+and `working`. Labels do not grant authority. Lessons and active execution plans retain their
+specific lifecycle requirements. Existing legacy installations keep their own checker until cutover.
+
 ## Research Bounded Gaps
 
 Read `documentation.research` from `config/governance/profile.yaml` when the module is present, or

@@ -13,3 +13,12 @@ test("document metadata enforces identity, calendar dates and lesson lifecycle",
   assert.ok(lesson.errors.some(error => error.includes("missing lesson")));
   assert.ok(lesson.errors.some(error => error.includes("evidence_links")));
 });
+
+test("proposal and decision lifecycle terms do not imply lesson promotion or approval", () => {
+  for (const status of ["proposal", "accepted", "working", "provisional", "in-progress", "research"])
+    assert.deepEqual(documentMetadata("docs/example.md", source.replace("status: active", `status: ${status}`), new Map()).errors, []);
+  const unknown = documentMetadata("docs/example.md", source.replace("status: active", "status: typo"), new Map());
+  assert.ok(unknown.errors.some(error => error.includes("unknown document status typo; expected one of:")));
+  const lesson = documentMetadata("docs/lesson.md", source.replace("status: active", "status: accepted").replace("type: spec", "type: lesson"), new Map());
+  assert.ok(lesson.errors.some(error => error.includes("lesson status must be one of:")));
+});

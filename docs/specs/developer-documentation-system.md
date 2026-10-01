@@ -5,7 +5,7 @@ type: spec
 status: current
 owner: project-governance
 created: 2026-08-21
-updated: 2026-08-21
+updated: 2026-10-01
 summary: Defines a minimal installable documentation structure, one human and agent corpus, exact catalog routing, research-enabled authoring, validation, and telemetry.
 ---
 
@@ -254,6 +254,42 @@ block on:
 It does not block on clarity, narrative quality, research conclusions, citation age, example
 execution, unsupported catalog extensions, or whether an external source agrees with a project
 decision. Those remain editorial or project-specific concerns.
+
+### Compiled runtime: live documents and saved evidence
+
+The 3.x documentation pack validates live authored Markdown against the captured candidate graph.
+It does not reinterpret saved source copies or raw reviewer output as current guides. Within
+`docs/**/evidence/**`, Markdown is an artifact by default. Authored `README.md` and `index.md`
+summaries remain checked. Within an evidence `before/` or `after/` subtree, even those filenames
+are frozen source copies and retain their original metadata and relative links.
+Use lowercase `evidence`, `before` and `after` directory names; these role names are case-sensitive.
+Reserve `README.md` and `index.md` outside frozen subtrees for authored summaries, not raw exports.
+
+The enabled developer catalog's human index, `reference` and `guides` explicitly identify live
+documents, including any stored in evidence directories. Those declarations override artifact
+classification. Catalog `sources` can reference raw evidence without making it authored guidance;
+their target existence and safe local paths remain checked. Active execution plans always retain
+their type, active status and index requirements. An invalid catalog remains a blocking finding.
+Repair an invalid catalog first; until its declarations are readable, the checker cannot identify
+catalog-only live guides inside artifact directories. Their individual findings follow that repair.
+
+Use an evidence summary to explain the source identity, result, limitations and links to raw
+artifacts. Preserve the artifacts' bytes. Put a new live guide outside the evidence namespace or
+declare it in the catalog. This convention applies to staged and whole-inventory checks and needs
+no new profile setting. It changes only documentation validation; evidence remains available to
+other applicable checks and retrieval under existing policy.
+
+The common document lifecycle accepts `accepted`, `active`, `approved`, `archived`, `completed`,
+`current`, `deferred`, `draft`, `in-progress`, `proposal`, `provisional`, `research`, `superseded`
+and `working`. Use `proposal` for an unaccepted design, `accepted` for a recorded decision,
+`current` for live guidance and `completed` for finished work. A lifecycle label never grants
+execution or rule-change authority. Unknown labels report the allowed vocabulary. Lessons and
+active plans retain their narrower lifecycle rules. Identity, dates and required metadata remain
+enforced for live documents.
+
+Live local links must still name captured repository targets. Absolute cross-repository filesystem
+references and missing generated outputs remain separate portability or missing-target findings;
+artifact classification must not grant external reads or turn them into valid local links.
 
 ## Telemetry
 

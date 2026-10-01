@@ -2,7 +2,8 @@ import { parse } from "yaml";
 import { isoDate } from "../schema-validation.ts";
 import { objectValue } from "./dependency-manifests.ts";
 const required = ["id", "title", "status", "owner", "created", "updated", "summary"];
-const statuses = new Set(["active", "approved", "archived", "completed", "current", "deferred", "draft", "superseded"]);
+const statuses = new Set(["accepted", "active", "approved", "archived", "completed", "current", "deferred", "draft",
+  "in-progress", "proposal", "provisional", "research", "superseded", "working"]);
 /** Validate authored document identity and lifecycle independently of filesystem traversal. */
 export function documentMetadata(path: string, source: string, seen: Map<string, string>, enforceDescriptions = true) {
   const errors: string[] = []; let data: Record<string, unknown> = {};
@@ -26,7 +27,7 @@ export function documentMetadata(path: string, source: string, seen: Map<string,
   if (id && seen.has(id)) errors.push(`${path}: duplicate frontmatter id ${id} also used by ${seen.get(id)}`);
   if (id) seen.set(id, path);
   if (data["type"] && data["doc_type"] && data["type"] !== data["doc_type"]) errors.push(`${path}: type and doc_type must agree when both are present`);
-  if (data["status"] && !statuses.has(String(data["status"]))) errors.push(`${path}: unknown document status`);
+  if (data["status"] && !statuses.has(String(data["status"]))) errors.push(`${path}: unknown document status ${String(data["status"])}; expected one of: ${[...statuses].join(", ")}`);
   for (const field of ["created", "updated"]) if (Object.hasOwn(data, field) && (typeof data[field] !== "string" || !isoDate(data[field]))) errors.push(`${path}: ${field} must be an ISO date in YYYY-MM-DD format`);
   if (typeof data["created"] === "string" && typeof data["updated"] === "string" && isoDate(data["created"]) && isoDate(data["updated"]) && data["updated"] < data["created"]) errors.push(`${path}: updated must be on or after created`);
   if (type === "lesson") {

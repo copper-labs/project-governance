@@ -33,7 +33,9 @@ A changed integration candidate requires current proof.
 Installed archive proof includes the dedicated greenfield suite: an empty Git repository grows
 knowledge and skills, then exercises the shipped prompt, task, context, check and cleanup paths
 before its first commit. Deterministic fixture inference covers both successful delivery and
-provider failure. Live provider qualification remains separately labelled and requires a funded
+provider failure. It also proves that saved review evidence and frozen source copies pass the
+documentation gate while a broken live guide still blocks, without rewriting the raw artifacts.
+Live provider qualification remains separately labelled and requires a funded
 account; an available token alone is not readiness proof.
 
 The release workflow repeats that source/package boundary, then creates `runtime.lock.yaml` and

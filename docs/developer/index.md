@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-08-21
-updated: 2026-09-30
+updated: 2026-10-01
 summary: Routes evaluators, operators, contributors, and agents through the shortest useful Project Governance documentation journeys.
 ---
 
@@ -31,6 +31,10 @@ Use [Change The Runtime Safely](guides/change-the-runtime.md) to find the owning
 focused proof, cross one directly affected seam, and finish with the source checkout's governed
 sign-off. Use the [Validation Strategy](../governance/validation-strategy.md) as the canonical
 reference for that proof boundary.
+
+For authored documentation and saved review artifacts, follow the
+[live-document and evidence contract](../specs/developer-documentation-system.md#compiled-runtime-live-documents-and-saved-evidence).
+Preserve raw snapshots and validate their authored summaries; recorded evidence is not a new guide.
 
 ## Work Across Branches And Codex Chats
 

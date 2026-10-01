@@ -1,6 +1,7 @@
 import { posix } from "node:path";
 import { ValidationSubject, type ChangeScope } from "../change-subject.ts";
 import { documentMetadata } from "./document-metadata.ts";
+import { documentationCatalog, documentationConfig } from "./document-catalog.ts";
 const links = (source: string) => [...source.matchAll(/(?<!!)\[[^\]]+\]\(([^)]+)\)/gu)].map(match => match[1]!.trim());
 const local = (target: string) => !target.startsWith("#") && !target.startsWith("mailto:") && !target.includes("://");
 /** Literal local links with source ranges, shared by validation and the disposable context index. */
@@ -12,9 +13,33 @@ export function localDocumentLinks(source: string) {
 }
 const activePrefix = "docs/exec-plans/active/", indexPath = "docs/exec-plans/README.md";
 
+/** Catalog references and guides remain authored even when stored beside raw evidence. */
+function declaredDocuments(subject: ValidationSubject): Set<string> {
+  try {
+    const config = documentationConfig(subject);
+    if (!config?.enabled) return new Set();
+    return new Set([`${config.root}/index.md`, ...documentationCatalog(subject, config, false)
+      .flatMap(record => [record.reference, ...record.guides])]);
+  } catch {
+    // Invalid catalogs block separately. Artifact-located guides cannot be identified until repaired.
+    return new Set();
+  }
+}
+
+/** Saved copies retain their original metadata and relative links; summaries explain the evidence. */
+function evidenceArtifact(path: string, declared: Set<string>): boolean {
+  if (!path.startsWith("docs/") || path.startsWith(activePrefix) || declared.has(path)) return false;
+  const parts = path.split("/"), evidence = parts.indexOf("evidence");
+  if (evidence < 0) return false;
+  const nested = parts.slice(evidence + 1, -1);
+  if (nested.some(part => part === "before" || part === "after")) return true;
+  return !["readme.md", "index.md"].includes(parts.at(-1)!.toLowerCase());
+}
+
 /** Validate selected Markdown using captured source and targets from the same candidate graph. */
 export function documentLinkIssues(subject: ValidationSubject, scope: ChangeScope): string[] {
   const errors: string[] = [], seen = new Map<string, string>(), paths = subject.paths(), pathSet = new Set(paths);
+  const declared = declaredDocuments(subject);
   const selected = scope.mode === "all" ? paths : scope.records.filter(record => record.after).map(record => record.path);
   let indexTargets: Set<string> | null = null;
   const read = (path: string) => new TextDecoder("utf-8", { fatal: true }).decode(subject.read(path));
@@ -27,7 +52,7 @@ export function documentLinkIssues(subject: ValidationSubject, scope: ChangeScop
     return indexTargets;
   };
   for (const path of [...new Set(selected)].sort()) {
-    if (!path.toLowerCase().endsWith(".md")) continue;
+    if (!path.toLowerCase().endsWith(".md") || evidenceArtifact(path, declared)) continue;
     let source: string;
     try { source = read(path); } catch { errors.push(`${path}: selected Markdown must be readable regular UTF-8 source`); continue; }
     if (path.startsWith("docs/")) {
