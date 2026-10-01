@@ -2,7 +2,7 @@
 id: plan.rc10-3-documentation-evidence
 title: RC10.3 Documentation Evidence Repair
 type: exec-plan
-status: active
+status: completed
 owner: project-governance
 created: 2026-10-01
 updated: 2026-10-01
@@ -36,7 +36,7 @@ adopter upgrade, provider invocation or broader retrieval change is required.
   recheck only an affected correction seam when required.
 - [x] Run one full release checkpoint: compiled and retained Python tests, type checking, wheel
   boundary and exact installed archive proof. Investigate a failed owner before repeating proof.
-- [ ] Publish authorized `3.0.0-rc.10.3` through the existing release workflow and verify source,
+- [x] Publish authorized `3.0.0-rc.10.3` through the existing release workflow and verify source,
   archive, lock/update metadata and immutable prerelease readback.
 
 ## Acceptance boundaries
@@ -84,5 +84,9 @@ The source commit hook identified an oversized scenario function in the greenfie
 Its existing native cleanup proof was extracted without changing execution order, and the affected
 installed greenfield suite passed again against the unchanged qualified runtime archive.
 
-Publication and immutable asset readback remain pending. Source hook sign-off accompanies the
-authorized narrative commit and publication push; it is not replaced by the release test matrix.
+Published [3.0.0-rc.10.3](https://github.com/copper-labs/project-governance/releases/tag/3.0.0-rc.10.3)
+as an immutable prerelease from `cd60e685acfbfa24344ec527a115e23477368100`. The independent Linux
+release workflow passed its source tests, wheel proof, type checking and installed archive boundary.
+Downloaded archive bytes and every archive member match the qualified local package. Tag source,
+lock integrity and deliberate-only update metadata passed readback. Source commit and push hooks
+also passed with retained nonblocking legacy comment advisories. Adopter pins remain unchanged.

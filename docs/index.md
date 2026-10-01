@@ -134,6 +134,9 @@ The [RC10.2 fresh-project correction](exec-plans/completed/2026-10-01-rc10-2-new
 installed first-task release suite, actionable provider diagnostics, compact context output and
 explicit accounting for companion-repository reads. Its immutable prerelease and asset readback
 are complete; live synthetic proof does not establish accepted development or token savings.
+The [RC10.3 documentation correction](exec-plans/completed/2026-10-01-rc10-3-documentation-evidence.md)
+separates saved evidence from live documents and accepts established lifecycle labels. Its immutable
+prerelease passed independent source/installed proof and exact published-asset readback.
 RC9 is published as an immutable prerelease. Frozen development cases confirm a corrected ranking
 regression, while fresh cases expose remaining coverage and passage limits. Adopters remain on
 their pinned runtimes until deliberately upgraded. The
