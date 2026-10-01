@@ -2,7 +2,7 @@
 id: plan.rc10-2-new-project
 title: RC10.2 New Project Operational Proof
 type: exec-plan
-status: active
+status: completed
 owner: project-governance
 created: 2026-10-01
 updated: 2026-10-01
@@ -47,7 +47,7 @@ diagnostics to the coding agent. Keep adopter details and evidence outside this 
   pending; never label configuration-only or fixture proof live readiness.
 - [x] Run focused tests/typecheck, freeze the candidate, obtain one Opus 5.5 medium review, reconcile
   concrete findings, then run the full compiled suite and installed archive once.
-- [ ] Publish immutable `3.0.0-rc.10.2` through the existing release workflow under the operator's
+- [x] Publish immutable `3.0.0-rc.10.2` through the existing release workflow under the operator's
   authorization; verify exact source, archive, metadata and independent CI. Do not update an
   active adopter or alter its authored policy as a publication side effect.
 
@@ -78,4 +78,16 @@ Opus 5.5 medium reviewed the implementation and confirmed its two concrete corre
 resolved. Interrupted calls no longer create false provider-health failures; compact output retains
 workflow recommendations and decision status. The offline suite also exposed an omitted
 missing-token label, which was corrected in native presentation. Required context and fallback
-remain intact. Publication is pending the immutable tag workflow and asset readback.
+remain intact.
+
+Published [3.0.0-rc.10.2](https://github.com/copper-labs/project-governance/releases/tag/3.0.0-rc.10.2)
+as an immutable prerelease from `9553f4cf844f337a5cef935476db1d8696902b5f`.
+The independent Linux release workflow passed all source tests, type checking and installed-archive
+proof, including the dedicated greenfield suite. Downloaded archive bytes and all payload files
+match the qualified local candidate. Tag, lock integrity and update metadata were verified.
+
+The first release attempt stopped in an existing diagnostic-worker child-count assertion. The
+owning source tests and full local source suite passed; an unchanged independent rerun passed.
+The intermittent failure's cause remains unknown. Retain its evidence externally rather than
+classifying it as a confirmed environment defect or weakening an assertion. Adopter upgrades
+remain separate, deliberate work at a pause seam.

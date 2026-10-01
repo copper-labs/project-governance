@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-02-16
-updated: 2026-09-30
+updated: 2026-10-01
 summary: Active and completed execution plans for the current source repository.
 ---
 
@@ -15,10 +15,6 @@ Active plans are short-lived work records. Completed plans retain concise source
 Git remains the implementation history and recovery mechanism.
 
 ## Active
-
-- [RC10.2 new-project operational proof](active/2026-10-01-rc10-2-new-project.md) repairs first-task
-  selection, provider diagnostics and context presentation, with a dedicated installed greenfield
-  release suite and separately labelled live inference qualification.
 
 - [RC10 reliable context and procedure selection](active/2026-09-29-rc10-context-use.md) is the
   published prerelease: correct entry/worktree use, visible semantic coverage, exact packet/answer
@@ -69,6 +65,10 @@ Git remains the implementation history and recovery mechanism.
   Gemini, Claude, and Codex wrappers independently of later implementation-plan improvements.
 
 ## Completed
+
+- [RC10.2 new-project operational proof](completed/2026-10-01-rc10-2-new-project.md) repairs first-task
+  selection, provider diagnostics and context presentation. The immutable prerelease passed its
+  installed greenfield suite, separately labelled live inference proof and exact asset readback.
 
 - [RC10.1 Python parser repair](completed/2026-09-30-rc10-1-python-parser.md) repairs valid scalar
   expression bodies and absent names while preserving policy. The immutable prerelease is published;
