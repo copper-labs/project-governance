@@ -234,6 +234,10 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
   const settings = profileDecisionSettings(profile);
   const inventory = contextCandidateInventory(subject, pathScopes, scope.records.map(record => record.path));
   const paths = inventory.routingPaths;
+  // An unborn repository reports every installed and authored file as added. That is an
+  // inventory, not an operator pin: otherwise bootstrap instructions consume the first task.
+  const priorityPaths = scope.unborn ? requestedPaths ? pathScopes : binding.context?.sourcePaths ?? [] : pathScopes;
+  const changedPriorities = scope.unborn ? [] : scope.records.map(record => record.path);
   const routingPaths={mode:requestedPaths?"explicit":emptyScope?"bound-task-empty-scope":binding.context?"bound-task":"captured-changes",paths};
   if (profile.context_router === undefined) throw new ContextRouteError("router-missing",
     "Configure context_router in config/governance/profile.yaml, including a default_route for prompts without a path match.");
@@ -277,9 +281,9 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
     ? subject.paths() : inventory.relevant;
   const candidateInventory = allCandidatePaths;
   const requestedOriginals = [...(values["optional-path"] ?? []), ...(values.links ?? [])].map(safeSubjectPath);
-  const catalog = contextMetadataCatalog(candidateInventory, task, [...pathScopes, ...requestedOriginals], scope.records.map(record => record.path), mandatoryPaths, options.historyHints);
+  const catalog = contextMetadataCatalog(candidateInventory, task, [...priorityPaths, ...requestedOriginals], changedPriorities, mandatoryPaths, options.historyHints);
   const projection = maintainContextProjection(subject, catalog.candidates.map(item => item.path), contextStateRoot(root),
-    { purpose: task, exact: [...pathScopes, ...(values.links ?? []).map(safeSubjectPath)], deadlineAt: performance.now() + 1000 });
+    { purpose: task, exact: [...priorityPaths, ...(values.links ?? []).map(safeSubjectPath)], deadlineAt: performance.now() + 1000 });
   const priorities = new Map(projection.priority.map((path, index) => [path, index]));
   catalog.candidates.sort((a, b) => Number(b.pinned) - Number(a.pinned) ||
     (priorities.get(a.path) ?? Infinity) - (priorities.get(b.path) ?? Infinity) || b.matches - a.matches || a.path.localeCompare(b.path));
@@ -318,7 +322,7 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
   const sourceInventory = candidateInventory.filter(path => !procedureSet.has(path));
   const automatic = automaticContextCandidates(subject, sourceInventory, mandatoryPaths,
     ["**"], settings.legacy.maxCandidates,
-    { purpose: task, exact: pathScopes, changed: scope.records.map(record => record.path),
+    { purpose: task, exact: priorityPaths, changed: changedPriorities,
       ordered: (metadata?.order ?? catalog.candidates.map(item => item.path)).filter(path => !procedureSet.has(path)) });
   automatic.excluded.push(...catalog.excluded.slice(0, Math.max(0, 64 - automatic.excluded.length)));
   automatic.excludedCount += catalog.excludedCount;

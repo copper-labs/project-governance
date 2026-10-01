@@ -4,7 +4,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { digest, durableJson, object } from "./core.ts";
 import { narrativeFile } from "./narrative-inputs.ts";
 import { contextStateRoot } from "./context-command.ts";
-import { safeSubjectPath } from "./change-subject.ts";
+import { safeSubjectPath, worktreeBytes } from "./change-subject.ts";
+import { localContextPath } from "./context-path-policy.ts";
 import { Store } from "../../harness/src/store/store.ts";
 import { defaultDbPath, sessionId, workContext } from "../../harness/src/store/location.ts";
 import type { TaskBindingObservation } from "../../harness/src/cli.ts";
@@ -332,24 +333,36 @@ export function collectContextHostUsage(workspace: string, session: string, tran
 }
 
 /** Explicit observations never rewrite the prepared entry or infer acceptance from a passing check. */
-export function recordContextObservation(workspace: string, entryId: string, observation: { kind: "expansion"; path: string } | { kind: "outcome"; disposition: "accepted" | "reopened"; evidence: string }) {
+export function recordContextObservation(workspace: string, entryId: string, observation: { kind: "expansion"; path: string; sourceWorkspace?: string } | { kind: "outcome"; disposition: "accepted" | "reopened"; evidence: string }) {
   const entry = readPromptEntry(workspace, entryId);
+  let source: { workspace: string; worktreeLocator: string; path: string; digest: string } | undefined;
   if (observation.kind === "expansion") safeSubjectPath(observation.path);
   else if (!["accepted", "reopened"].includes(observation.disposition) || !observation.evidence || observation.evidence.length > 512) throw new Error("Outcome requires an evidence reference");
-  const id = digest({ entryId, observation }).slice(7), path = join(contextStateRoot(workspace), "context-observations", `${id}.json`);
+  if (observation.kind === "expansion" && observation.sourceWorkspace !== undefined) {
+    const root = realpathSync(observation.sourceWorkspace), context = workContext(root);
+    if (context.worktree !== root || !localContextPath(observation.path)) throw new Error("External read requires a Git worktree root and an eligible relative source path");
+    const captured = worktreeBytes(root, observation.path, 1024 * 1024);
+    if (captured.type !== "regular") throw new Error("External source must be a regular file");
+    source = { workspace: root, worktreeLocator: context.locator, path: observation.path,
+      digest: `sha256:${createHash("sha256").update(captured.bytes).digest("hex")}` };
+  }
+  const recorded = { ...observation, ...(source ? { source } : {}) };
+  const id = digest({ entryId, observation: recorded }).slice(7), path = join(contextStateRoot(workspace), "context-observations", `${id}.json`);
   const capturedAt = new Date().toISOString();
   const historical = promptEntryTaskBinding(workspace, entry);
-  if (publishContextObservation(path, { version: 1, entryId, ...observation, createdAt: capturedAt, provenance: "host-reported" }))
+  if (publishContextObservation(path, { version: 1, entryId, ...recorded, createdAt: capturedAt, provenance: "host-reported" }))
     projectContextMetric(contextStateRoot(workspace), { id, workspace: String(entry.workspace), capturedAt, kind: observation.kind,
       entryId, familyId: entryId, routeId: typeof entry.routeReceiptId === "string" ? entry.routeReceiptId : null,
       taskId: historical?.taskId ?? null, taskRevision: historical?.revision ?? null, status: observation.kind === "outcome" ? observation.disposition : "observed",
-      reason: null, counts: { accepted: observation.kind === "outcome" ? Number(observation.disposition === "accepted") : null } });
+      reason: null, counts: { accepted: observation.kind === "outcome" ? Number(observation.disposition === "accepted") : null,
+        externalRead: observation.kind === "expansion" ? Number(Boolean(source && source.workspace !== realpathSync(workspace))) : null } });
   return { recorded: true, id };
 }
 
 export function contextObservationStatus(workspace: string) {
   const root = contextStateRoot(workspace), counts: Record<string, number> = Object.create(null), reasons: Record<string, number> = Object.create(null);
   const usage = { inputTokens: null as number | null, outputTokens: null as number | null, responses: 0 };
+  const reads = { local: 0, external: 0, classification: "observed reads, not established retrieval misses" };
   const documentation = new DocumentationObservations();
   let truncated = false, invalid = 0, readBytes = 0;
   const projection = readContextProjection(root, workspace, { kinds: ["entry", "route", "usage", "outcome", "expansion", "failure", "observation"] });
@@ -371,6 +384,10 @@ export function contextObservationStatus(workspace: string) {
     if (collection === "routes" && !latestRoute) latestRoute = reference;
     if (collection === "prompt-entries" && item.workspace === realpathSync(workspace)) documentation.add(item);
     counts[`${collection}:${kind}`] = (counts[`${collection}:${kind}`] ?? 0) + 1;
+    if (collection === "context-observations" && kind === "expansion") {
+      const source = item.source as Record<string, unknown> | undefined;
+      if (source?.workspace && source.workspace !== realpathSync(workspace)) reads.external++; else reads.local++;
+    }
     const reason = item.reason ?? item.code ?? item.selectionReason;
     if (typeof reason === "string") reasons[reason] = (reasons[reason] ?? 0) + 1;
     if (collection === "context-observations" && kind === "usage") {
@@ -378,7 +395,7 @@ export function contextObservationStatus(workspace: string) {
       for (const key of ["inputTokens", "outputTokens"] as const) if (numeric(values[key]) !== null) usage[key] = (usage[key] ?? 0) + Number(values[key]);
     }
   } catch { invalid++; }
-  return { version: 1, counts, reasons, usage, documentation: documentation.result(truncated), truncated, scanComplete: receipts.scanComplete, invalid, readBytes,
+  return { version: 1, counts, reasons, usage, reads, documentation: documentation.result(truncated), truncated, scanComplete: receipts.scanComplete, invalid, readBytes,
     selection: receipts.selection, projection: { state: projection.state, role: "receipt-read-hints", truncated: projection.truncated,
       evictedRecords: projection.evictedRecords, evictedBytes: projection.evictedBytes, writeCoverage: projection.writeCoverage, limits: projection.limits }, latestEntry, latestRoute,
     confirmedModelUse: null, avoidedTokens: null, benefit: "requires comparable accepted tasks; counters are known subtotals" };

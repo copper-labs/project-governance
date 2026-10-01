@@ -13,6 +13,8 @@ export interface TransportOptions {
   healthScope?: string;
 }
 export interface TransportTiming {
+  /** HTTP status only; response bodies and arbitrary provider messages are never retained. */
+  httpStatus?: number | null;
   admissionMs: number; httpMs: number; totalMs: number; rateWaitMs: number; slotWaitMs: number; coordinationWaitMs: number;
   activeConcurrency: number; dispatched: boolean; attemptId: string | null;
   requestBytes: number;
@@ -66,7 +68,7 @@ export class JevDecisionClient {
     deadlineOwner: "provider" | "caller" = "provider", deadlineAt?: number): Promise<TransportOutcome> {
     const started = performance.now(), operationDeadline = deadlineAt ?? started + deadlineMs;
     const timing: TransportTiming = { admissionMs: 0, httpMs: 0, totalMs: 0, rateWaitMs: 0, slotWaitMs: 0, coordinationWaitMs: 0,
-      activeConcurrency: 0, dispatched: false, attemptId: null, requestBytes: Buffer.byteLength(body), coordinationIssues: [],
+      activeConcurrency: 0, dispatched: false, attemptId: null, httpStatus: null, requestBytes: Buffer.byteLength(body), coordinationIssues: [],
       poolLimits: { concurrency: PROVIDER_CONCURRENCY, estimatedInputTokensPerSecond: PROVIDER_TOKENS_PER_SECOND, requestsPerMinute: PROVIDER_REQUESTS_PER_MINUTE } };
     let httpStart: number | null = null, httpEnd: number | null = null;
     const done = (outcome: { ok: true; raw: unknown } | { ok: false; reason: string; failureStage: DecisionFailureStage }): TransportOutcome => {
@@ -141,13 +143,15 @@ export class JevDecisionClient {
         signal: controller.signal, redirect: "error" });
       void pending.then(response => { if (controller.signal.aborted) void response.body?.cancel().catch(() => {}); }, () => {});
       const response = await abortable(pending, controller.signal);
+      timing.httpStatus = response.status;
       if (!response.ok) {
         const auth = response.status === 401 || response.status === 403, overload = response.status === 429 || response.status === 529;
         httpEnd = performance.now(); providerFault = false;
         void response.body?.cancel().catch(() => {});
         await cleanup("health-storage-unavailable", () => pool!.fail(credential, this.#now(), auth,
           overload ? retryDelay(response.headers.get("retry-after"), this.#now()) : 60000, overload ? "pool" : failureScope));
-        return done({ ok: false, reason: auth ? "authentication-rejected" : overload ? "provider-overloaded" : "provider-error", failureStage });
+        return done({ ok: false, reason: auth ? "authentication-rejected" : response.status === 402 ? "billing-unavailable"
+          : overload ? "provider-overloaded" : response.status >= 400 && response.status < 500 ? "request-rejected" : "provider-error", failureStage });
       }
       failureStage = "response-body";
       const reader = response.body?.getReader();

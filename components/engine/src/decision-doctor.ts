@@ -3,6 +3,7 @@ import { contextStateRoot } from "./context-command.ts";
 import { loadProfileDecisionSettings, resolveConsumerMode } from "./decision-settings.ts";
 import { DECISION_CONSUMER_IDS } from "./decision-schema.ts";
 import { DECISION_CONSUMERS } from "./decision-catalog.ts";
+import { observedDecisionHealth } from "./decision-operational-health.ts";
 
 /** Configuration visibility only: never send evidence, probe credentials or mutate provider health. */
 export function decisionDoctor(workspace: string, environment: NodeJS.ProcessEnv = process.env) {
@@ -15,8 +16,9 @@ export function decisionDoctor(workspace: string, environment: NodeJS.ProcessEnv
     if (!config.allowedQuestions.length && !DECISION_CONSUMER_IDS.some(id => settings.consumers[id].mode !== "off" && settings.questionIds[id].length)) reasons.push("questions-disabled");
     if (!config.allowedDataClasses.length) reasons.push("data-sharing-disabled");
     const sourceEnabled = config.allowedDataClasses.includes("source") && Boolean(config.allowedSourcePaths?.length);
+    const operational = observedDecisionHealth(workspace, settings.configDigest);
     if (config.allowedDataClasses.length === 1 && config.allowedDataClasses[0] === "source" && !sourceEnabled) reasons.push("source-scope-disabled");
-    return { version: 1, capability: "decisions", status: "passed", mode: config.mode,
+    return { version: 1, capability: "decisions", status: operational.state === "failed" ? "needs-attention" : "passed", mode: config.mode,
       provider: "jev", model: config.model, tokenPresent, providerUse: reasons.length ? "disabled" : "eligible",
       reasons, fallback: "deterministic-baseline", allowedQuestions: config.allowedQuestions,
       allowedDataClasses: config.allowedDataClasses, sourceScopeConfigured: sourceEnabled,
@@ -30,7 +32,8 @@ export function decisionDoctor(workspace: string, environment: NodeJS.ProcessEnv
       })),
       budget: settings.budget, budgetStore: decisionBudgetStoreStatus(contextStateRoot(workspace)), migration: settings.migration,
       expandedProviderHealthReset: "Change continuity.decisions.config_revision to open a fresh health epoch after investigating a persistent provider lock. Existing locks are never deleted automatically.",
-      network: "not-attempted", providerHealth: "not-probed", benefit: "not-evaluated", mutation: "none" };
+      network: "not-attempted", providerHealth: operational.state === "not-observed" ? "not-probed" : "observed",
+      operational, benefit: "not-evaluated", mutation: "none" };
   } catch {
     return { version: 1, capability: "decisions", status: "failed", providerUse: "invalid-configuration",
       findings: [{ id: "decisions.configuration-invalid", message: "Correct continuity.decisions in the project profile before using decision assistance." }],

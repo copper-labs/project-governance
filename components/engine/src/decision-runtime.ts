@@ -135,7 +135,8 @@ export class DecisionRuntime {
     // Telemetry storage failure never alters the decision, the budget or native execution.
     try {
       const createdAt = new Date().toISOString();
-      durableJson(this.#receiptPath(key), { version: 2, runtimeVersion: RELEASE_VERSION, receiptId: key, createdAt, outcome });
+      durableJson(this.#receiptPath(key), { version: 2, runtimeVersion: RELEASE_VERSION, configDigest: this.settings.configDigest,
+        receiptId: key, createdAt, outcome });
       if (outcome.scope) projectContextMetric(this.stateRoot, { id: key, workspace: outcome.scope.workspace, capturedAt: createdAt,
         kind: "decision", entryId: null, routeId: null, familyId: outcome.budget.invocationId ?? null,
         taskId: outcome.scope.taskId, taskRevision: outcome.scope.taskRevision, status: outcome.method, reason: outcome.reason,

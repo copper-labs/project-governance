@@ -1,6 +1,7 @@
 import { verifyDecisionExperiments } from "./verify-decision-experiments.mjs";
 import { verifyRc6Prompt } from "./verify-rc6-prompt.mjs";
 import { verifyPythonParser } from "./verify-python-parser.mjs";
+import { verifyGreenfield } from "./verify-greenfield.mjs";
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
@@ -44,7 +45,8 @@ try {
   const pilot = await verifyDecisionPilot(pkg);
   const experiments = await verifyDecisionExperiments(pkg);
   const prompt = await verifyRc6Prompt(pkg, archive);
-  console.log(JSON.stringify({ staging, prompt, pythonParser, decisionPilot: pilot, experiments, hostApi: 'passed', version: manifest.version, installedCommand: 'passed', scope: 'offline installation and inactive staging, compiled Python source/comment analysis, public host API and decision consumers with fixture inference; not full semantic qualification; no live device or benefit claim' }));
+  const greenfield = await verifyGreenfield(pkg, archive);
+  console.log(JSON.stringify({ staging, prompt, greenfield, pythonParser, decisionPilot: pilot, experiments, hostApi: 'passed', version: manifest.version, installedCommand: 'passed', scope: 'offline installation and inactive staging, installed greenfield first-task proof, compiled Python source/comment analysis, public host API and decision consumers with fixture inference; not full semantic qualification; no live device or benefit claim' }));
 } finally { rmSync(root, { recursive: true, force: true }); }
 
 

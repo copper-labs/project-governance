@@ -38,6 +38,7 @@ import { hookCheckArguments } from "./git-hooks.ts";
 import { inspectRuntimeGeneration } from "./runtime-inspection.ts";
 import { invokeRuntimeGeneration } from "./runtime-invocation.ts";
 import { contextRouteCommand } from "./context-route-command.ts";
+import { presentContextRoute } from "./context-route-presentation.ts";
 import { contextIndexCommand } from "./context-index-command.ts";
 import { ContextRouteError, CONTEXT_ROUTE_HELP } from "./context-route-errors.ts";
 import { associatePromptTask, contextObservationStatus, importContextUsage, recordContextObservation } from "./context-observations.ts";
@@ -238,8 +239,9 @@ Use the owning command contract for structured request fields.
     if (command === "context-index") { console.log(JSON.stringify(contextIndexCommand(args.slice(1), process.cwd()), null, 2)); return 0; }
     if (command === "context-route") {
       if (args.length === 2 && args[1] === "--help") { console.log(CONTEXT_ROUTE_HELP); return 0; }
-      const result = await withDecisionCancellation(options => contextRouteCommand(args.slice(1), process.cwd(), undefined, undefined, options));
-      console.log(JSON.stringify(result.value));
+      const full = args.includes("--json"), routeArgs = args.slice(1).filter(arg => arg !== "--json");
+      const result = await withDecisionCancellation(options => contextRouteCommand(routeArgs, process.cwd(), undefined, undefined, options));
+      console.log(JSON.stringify(full ? result.value : presentContextRoute(result.value)));
       return result.exitCode ?? (result.value.ready ? 0 : 2);
     }
     if (command === "source-map") {
@@ -367,12 +369,13 @@ Use the owning command contract for structured request fields.
         const workspace = workContext(process.cwd()).worktree;
         const operation = args[2] ?? "status";
         const { values } = parseArgs({ args: args.slice(3), strict: true, allowPositionals: false, options: {
-          entry: { type: "string" }, transcript: { type: "string" }, path: { type: "string" }, disposition: { type: "string" }, evidence: { type: "string" },
+          entry: { type: "string" }, transcript: { type: "string" }, path: { type: "string" }, "source-workspace": { type: "string" }, disposition: { type: "string" }, evidence: { type: "string" },
         } });
         if (operation === "status" && !Object.keys(values).length) { console.log(JSON.stringify(contextObservationStatus(workspace))); return 0; }
         if (!values.entry) throw new Error("Context observation requires --entry ID");
         if (operation === "import" && values.transcript) { console.log(JSON.stringify(importContextUsage(workspace, values.entry, values.transcript))); return 0; }
-        if (operation === "expansion" && values.path) { console.log(JSON.stringify(recordContextObservation(workspace, values.entry, { kind: "expansion", path: values.path }))); return 0; }
+        if (operation === "expansion" && values.path) { console.log(JSON.stringify(recordContextObservation(workspace, values.entry, { kind: "expansion", path: values.path,
+          ...(values["source-workspace"] ? { sourceWorkspace: values["source-workspace"] } : {}) }))); return 0; }
         if (operation === "outcome" && values.evidence && ["accepted", "reopened"].includes(values.disposition ?? "")) {
           console.log(JSON.stringify(recordContextObservation(workspace, values.entry, { kind: "outcome", disposition: values.disposition as "accepted" | "reopened", evidence: values.evidence }))); return 0;
         }

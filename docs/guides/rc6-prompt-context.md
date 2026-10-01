@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-09-25
-updated: 2026-09-30
+updated: 2026-10-01
 summary: Enable prompt delivery and optional metadata selection, then inspect actual usage without inferring savings.
 ---
 
@@ -255,6 +255,20 @@ which native turn you mean and returns `entry-turn-unobserved`; supply the hook'
 explicit reference is declared reuse, not independent evidence of the current native turn. A stale
 or superseded entry has a named reason and supported refresh action; no automatic paid retry occurs.
 
+RC10.2 returns selected evidence and compact status by default. Add `--json` to the same command
+when full index and selection diagnostics are needed. The normal result includes the retained
+receipt path, original source references and omissions; it does not repeat repository-wide facts.
+
+For a fresh project, distinguish installation from live JEV readiness. `doctor --capability decisions`
+reports eligibility separately from observed current-configuration provider health. An enabled token
+with no recorded successful call remains unobserved. A billing failure names unavailable API credit;
+restore the funded account rather than increasing a timeout. Doctor remains passive.
+
+As project records, source or local skills are created, inspect `doctor --capability context` and its
+`scopeCoverage` counts and missing-path previews. Explicitly review intended paths in both
+`allowed_metadata_paths` and `allowed_source_paths`; the installer cannot approve future directories
+automatically. Intentional restrictions remain valid, and generated `_local` evidence is excluded.
+
 If that packet is unavailable, an explicit route supplies local context for the current purpose:
 
 ```sh
@@ -381,6 +395,16 @@ host-reported. They are not inferred from a check or classifier. Imports dedupli
 cached input and reasoning remain subsets of their respective totals. Counts over a bounded window
 are known subtotals, not a claim of complete usage or savings. Compare similar accepted work,
 additional reads and rework before promoting optional selection.
+
+For a deliberate read from another repository, keep the source path relative to that repository:
+
+```sh
+project-governance telemetry context expansion --entry <id> --source-workspace <absolute-Git-root> --path docs/example.md
+```
+
+The command verifies the source worktree and records its locator and current file digest, without
+retaining the body or permitting JEV to inspect it. Local and external read counts remain separate.
+Record only a read that actually happened; this observation is not inferred evidence of model use.
 
 RC10 reads recent context/decision metrics through the existing bounded SQLite telemetry projection,
 filtering workspace, runtime and time before limiting results. It retains at most 1,000 compact context

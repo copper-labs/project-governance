@@ -16,6 +16,10 @@ Git remains the implementation history and recovery mechanism.
 
 ## Active
 
+- [RC10.2 new-project operational proof](active/2026-10-01-rc10-2-new-project.md) repairs first-task
+  selection, provider diagnostics and context presentation, with a dedicated installed greenfield
+  release suite and separately labelled live inference qualification.
+
 - [RC10 reliable context and procedure selection](active/2026-09-29-rc10-context-use.md) is the
   published prerelease: correct entry/worktree use, visible semantic coverage, exact packet/answer
   reuse, optional procedure sections, recent telemetry and a deliberately scoped development pilot.

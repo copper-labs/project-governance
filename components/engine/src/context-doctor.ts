@@ -14,6 +14,7 @@ import { projectionStatus } from "./context-projection-store.ts";
 import { contextStateRoot } from "./context-command.ts";
 import { inspectStartupHookSource } from "./startup-hook-source.ts";
 import { contextBudgetReadiness } from "./context-budget-readiness.ts";
+import { contextScopeCoverage } from "./context-scope-coverage.ts";
 
 /** Passive readiness, not host trust or successful first-read qualification. */
 export function contextDoctor(workspace: string) {
@@ -23,6 +24,7 @@ export function contextDoctor(workspace: string) {
   let metadata = { enabled: false, disclosure: false }, hook = "unavailable";
   let inference: Record<string, unknown> | null = null;
   let optionalExcerptBytes: number | undefined;
+  let scopeCoverage: ReturnType<typeof contextScopeCoverage> | null = null;
   let hookSource: ReturnType<typeof inspectStartupHookSource> | null = null;
   try {
     const profile = parse(narrativeFile(workspace, "config/governance/profile.yaml"));
@@ -35,6 +37,7 @@ export function contextDoctor(workspace: string) {
       requiredGuidance = budgets.requiredGuidance; findings.push(...budgets.findings);
     }
     const settings = profileDecisionSettings(profile);
+    scopeCoverage = contextScopeCoverage(workspace, settings);
     const passageEnabled = settings.questionIds.DL03.includes("context.metadata-relevance/1") &&
       ["context.passage-evidence/1", "context.passage-role/1"].every(id => settings.questionIds.DL03.includes(id));
     metadata = { enabled: settings.mode !== "off" && settings.consumers.DL03.mode !== "off" && settings.questionIds.DL03.includes("context.metadata-relevance/1"),
@@ -85,7 +88,7 @@ export function contextDoctor(workspace: string) {
   return { version: 1, capability: "context", status: findings.length ? "needs-attention" : "configured", findings, metadata, inference, requiredGuidance,
     budgets: budgets ? { routes: budgets.routes, coverage: budgets.coverage } : null,
     localRetrieval: "provider-independent", promptHook: hook, promptHookSource: hookSource, hostTrust: "not-observable", beforeFirstRead: "requires-installed-host-evidence",
-    projection, repositoryContext: { indexObservation, overviewFiles: projectOverview, purposeQuality: "not-established",
+    projection, scopeCoverage, repositoryContext: { indexObservation, overviewFiles: projectOverview, purposeQuality: "not-established",
       next: projectOverview.length ? "Confirm the overview describes current purpose and authoritative guidance; improve touched or repeatedly missed areas."
         : "For a new project, write a short purpose and point to its authoritative guidance. An empty index is not itself a runtime failure." },
     documentation: documentationReadiness(workspace), observations: contextObservationStatus(workspace), network: "not-attempted", mutations: "none" };

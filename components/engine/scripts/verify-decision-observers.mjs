@@ -20,6 +20,7 @@ export async function verifyDecisionObservers({ packageRoot, repo, temporary, ru
   git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'Capture observer configuration');
   const routed = run(['context-route', '--task', 'fix', '--revision', 'observer-1', '--decision-task', 'observer', '--optional-path', 'a.md', '--optional-path', 'b.md', '--workflow-candidates', 'config/governance/candidates.json']);
   assert.equal(routed.ready, true); assert.equal(routed.entries[0].content, 'Mandatory instructions remain');
+  assert.equal(routed.presentation, 'selected-context'); assert.equal(routed.metadata?.catalog, undefined);
   assert.equal(routed.relevanceAdvice.delivered, true); assert.equal(routed.workflowAdvice.recommended.id, 'inspect');
   assert.equal(existsSync(join(repo, 'unexpected-execution')), false);
   const providerDirectory = join(temporary, 'provider'); mkdirSync(providerDirectory);

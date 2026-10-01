@@ -55,5 +55,6 @@ export const CONTEXT_ROUTE_HELP = `context-route [--task <purpose> --revision <r
   --base-ref <ref>        Compare with a commit (default HEAD); cannot combine with --staged.
   --include-expansion    Include declared expansion context.
   --optional-excerpt-bytes <bytes>  Bound each optional excerpt.
-  Output is JSON with content, original references, omissions and a receipt ID.
+  --json                 Full diagnostics; the default JSON contains selected evidence and status.
+  Output preserves content, original references, omissions and the full receipt reference.
   No JEV token is required; hosted selection uses the project's explicit sharing policy.`;

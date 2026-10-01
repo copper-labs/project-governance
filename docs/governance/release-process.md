@@ -5,7 +5,7 @@ type: governance
 status: current
 owner: project-governance
 created: 2026-08-15
-updated: 2026-09-30
+updated: 2026-10-01
 summary: Defines compiled major-release proof and deliberate publication, with retained legacy wheel guidance.
 ---
 
@@ -30,6 +30,11 @@ The source-readiness workflow runs source tests, type checking, release-metadata
 construction and offline installed-command proof on each non-draft pull request update, including
 new commits. This does not replace the required device, semantic or migration evidence for a release.
 A changed integration candidate requires current proof.
+Installed archive proof includes the dedicated greenfield suite: an empty Git repository grows
+knowledge and skills, then exercises the shipped prompt, task, context, check and cleanup paths
+before its first commit. Deterministic fixture inference covers both successful delivery and
+provider failure. Live provider qualification remains separately labelled and requires a funded
+account; an available token alone is not readiness proof.
 
 The release workflow repeats that source/package boundary, then creates `runtime.lock.yaml` and
 `runtime-update.json` from the archive identity and full source commit. Metadata defaults to

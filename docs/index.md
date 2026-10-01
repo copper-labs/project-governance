@@ -130,6 +130,9 @@ and outcome-linked measurement. Runtime changes are implemented; the plan record
 and publication status. Adopters retain their own pins until deliberately upgraded.
 The [RC10.1 parser repair](exec-plans/completed/2026-09-30-rc10-1-python-parser.md) fixes valid Python
 expression bodies in the shared source/comment bridge while preserving enforcement and adopter pins.
+The [RC10.2 fresh-project correction](exec-plans/active/2026-10-01-rc10-2-new-project.md) adds an
+installed first-task release suite, actionable provider diagnostics, compact context output and
+explicit accounting for companion-repository reads. Live provider readiness remains separate.
 RC9 is published as an immutable prerelease. Frozen development cases confirm a corrected ranking
 regression, while fresh cases expose remaining coverage and passage limits. Adopters remain on
 their pinned runtimes until deliberately upgraded. The

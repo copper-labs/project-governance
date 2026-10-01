@@ -5,7 +5,7 @@ type: spec
 status: approved
 owner: project-governance
 created: 2026-09-29
-updated: 2026-09-30
+updated: 2026-10-01
 summary: Make context reach the correct worktree, expose semantic coverage gaps, reduce repeated selection, and select project procedures before ordinary development work.
 ---
 
@@ -122,6 +122,40 @@ failure. Observe only available receipts and supported identity; host trust and 
 remain unknown. Show compact configuration facts and a reference to the latest retained route and
 native-entry evidence; reuse their coverage fields rather than independently recomputing them.
 Do not add a provider probe to doctor or a new universal gate.
+
+### RC10.2 fresh-project operational proof
+
+Installed-package release proof includes a dedicated greenfield suite from an empty Git repository
+through its first bound task, native-format prompt selection and ordinary packet reuse. It exercises
+newly authored project records and local skills, successful fixture inference, missing credentials,
+billing denial, explicit disclosure repair, compact output, external read accounting and cleanup.
+In a repository without its first commit, the full added-file inventory still controls checks and
+route applicability. It must not automatically pin every file ahead of semantic selection.
+Explicit requested paths, task source declarations and mandatory guidance keep their existing
+priority. Generated installation instructions must not crowd out the first task's project evidence.
+Live inference is a separately labelled run of the same packaged path on synthetic content. Safe
+fallback cannot satisfy a live-success assertion; unavailable provider credit is an external proof
+limit and must not be labelled successful JEV operation.
+
+Transport receipts retain HTTP status and fixed operational reasons without response bodies or
+arbitrary messages. HTTP 402 is `billing-unavailable`; other client rejection is `request-rejected`,
+while authentication and overload retain their established classification and cooldown behavior.
+Passive decision doctor reports the most recent dispatched result for the current workspace,
+runtime and configuration, distinguishing unobserved health, failure and successful delivered advice.
+It never calls the provider. Success does not imply relevance quality or savings.
+
+Passive context doctor compares eligible local Git path names with the existing metadata and body
+disclosure scopes, including files created after installation. It reports bounded missing-path
+previews and never reads bodies or broadens approval. Intentional restrictions are not configuration
+errors. The normal context CLI returns selected evidence, mandatory guidance, omissions, status and
+the full receipt reference. `--json` exposes full diagnostics; native replay and programmatic route
+contracts remain unchanged.
+
+An explicit `telemetry context expansion --source-workspace <Git-root> --path <relative-path>`
+records a verified worktree locator and current source digest for an external read. It neither
+imports source into the local packet nor grants hosted disclosure. Reject unsafe paths and secret
+or generated-file classes. Distinguish external reads from local observations; neither counter
+alone establishes a retrieval miss.
 
 For required-context overflow, separate true always-required rules from task-specific procedures by
 an authored policy revision. Never let JEV shorten mandatory instructions to fit. Keep AGENTS and
