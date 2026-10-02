@@ -16,10 +16,6 @@ Git remains the implementation history and recovery mechanism.
 
 ## Active
 
-- [RC10.4 large-evidence and review reliability](active/2026-10-02-rc10-4-evidence-capture.md)
-  separates exact source capture from body limits and excludes saved artifacts from automatic
-  context while retaining summaries and explicit-original access.
-
 - [RC10 reliable context and procedure selection](active/2026-09-29-rc10-context-use.md) is the
   published prerelease: correct entry/worktree use, visible semantic coverage, exact packet/answer
   reuse, optional procedure sections, recent telemetry and a deliberately scoped development pilot.
@@ -69,6 +65,10 @@ Git remains the implementation history and recovery mechanism.
   Gemini, Claude, and Codex wrappers independently of later implementation-plan improvements.
 
 ## Completed
+
+- [RC10.4 large-evidence and review reliability](completed/2026-10-02-rc10-4-evidence-capture.md)
+  published the streamed identity and automatic artifact correction after local, independent and
+  installed release proof; immutable readback matched the qualified archive.
 
 - [RC10.3 documentation evidence repair](completed/2026-10-01-rc10-3-documentation-evidence.md)
   removes saved-snapshot and raw-report false positives while preserving live-guidance checks.

@@ -2,7 +2,7 @@
 id: plan.rc10-4-evidence-capture
 title: RC10.4 Large Evidence and Review Reliability
 type: exec-plan
-status: active
+status: completed
 owner: project-governance
 created: 2026-10-02
 updated: 2026-10-02
@@ -33,7 +33,7 @@ Work solo on the correction; one focused independent reviewer checks the frozen 
 - [x] Strengthen installed greenfield native entry with the same large-evidence regression.
 - [x] Complete type checking and the declared compiled, retained Python and installed release proof.
 - [x] Review the frozen correction with Opus 5.5 medium and reconcile material findings.
-- [ ] Publish authorized `3.0.0-rc.10.4`; verify exact source, immutable archive, lock and deliberate
+- [x] Publish authorized `3.0.0-rc.10.4`; verify exact source, immutable archive, lock and deliberate
   update metadata through release readback.
 
 ## Independent correction review
@@ -55,6 +55,15 @@ missing-token and billing fallback, documentation checks and normal ownership cl
 greenfield test keeps context capture separate from validation materialization's existing body
 limits. A source-quality finding was resolved by separating fixture setup and offline recovery
 into small test helpers.
+
+## Publication
+
+[RC10.4](https://github.com/copper-labs/project-governance/releases/tag/3.0.0-rc.10.4)
+is published as an immutable prerelease from source commit
+`3801b38d2200324fb2be6642b04d44b38ed72d17`. The release workflow passed the retained and compiled
+suites, type checking, packaging and installed proof. Public readback confirmed that the archive
+matches the locally qualified bytes, the runtime lock binds the exact release source and the
+update metadata retains deliberate adoption. Exact operational receipts remain outside source.
 
 ## Acceptance and adoption boundary
 
