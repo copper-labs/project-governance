@@ -1,6 +1,6 @@
 import { digest } from "./core.ts";
 import { matchesPackPath } from "./planning.ts";
-import { localContextPath } from "./context-path-policy.ts";
+import { automaticContextPath } from "./context-path-policy.ts";
 import type { ValidationSubject } from "./change-subject.ts";
 import { interpretNoul, type DecisionAsk, type DecisionOutcome, type DecisionRuntime } from "./decision-runtime.ts";
 import type { BudgetScope } from "./decision-budget.ts";
@@ -48,11 +48,11 @@ function sourceIndexObservation(projection: ReturnType<typeof maintainContextPro
 }
 
 /** Keep the complete eligible inventory. This ordering is fallback advice, never JEV eligibility. */
-export function contextMetadataCatalog(paths: string[], purpose: string, exact: string[], changed: string[], required: Set<string>, historyHints: string[] = []) {
+export function contextMetadataCatalog(paths: string[], purpose: string, exact: string[], changed: string[], required: Set<string>, historyHints: string[] = [], declared?: ReadonlySet<string>) {
   const query = contextTerms(purpose), exactSet = new Set(exact), changedSet = new Set(changed), pinned = new Set([...exact, ...changed]);
   const unique = [...new Set(paths)];
-  const excluded = unique.filter(path => !required.has(path) && !localContextPath(path));
-  const safe = unique.filter(path => !required.has(path) && localContextPath(path));
+  const excluded = unique.filter(path => !required.has(path) && !automaticContextPath(path, declared));
+  const safe = unique.filter(path => !required.has(path) && automaticContextPath(path, declared));
   const boundedHints = historyHints.filter(hint => safe.filter(path => path === hint || path.startsWith(hint + "/")).length <= 64);
   const ranked = safe.map(path => ({ path, pinned: pinned.has(path), exact: exactSet.has(path), changed: changedSet.has(path),
     matches: [...contextTerms(path)].filter(term => query.has(term)).length,

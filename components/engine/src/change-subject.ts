@@ -44,17 +44,22 @@ function unbornScope(root: string, staged: boolean, paths: string[]): ChangeScop
     let remaining = 8 * 1024 * 1024;
     return selected.flatMap(path => {
       let after: SubjectSource | null;
-      let captured: Buffer | undefined;
+      let count = 0;
       if (staged) after = stagedEntry!(path);
       else {
-        try { const current = worktreeBytes(root, path, remaining); captured = current.bytes; after = { kind: "worktree", path, identity: hash(current.bytes), file_type: current.type }; }
+        try {
+          const current = worktreeIdentity(root, path);
+          after = { kind: "worktree", path, identity: current.identity, file_type: current.type }; count = current.lines;
+        }
         catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return []; throw error; }
       }
       if (!after) throw new Error("First-commit source unavailable");
-      const bytes = captured ?? readSubjectSource(root, after, remaining);
-      remaining -= bytes.length;
-      if (remaining < 0) throw new Error("First-commit source exceeds capture bound");
-      const count = bytes.length ? bytes.toString("utf8").split("\n").length - Number(bytes.at(-1) === 10) : 0;
+      if (staged) {
+        const bytes = readSubjectSource(root, after, remaining);
+        remaining -= bytes.length;
+        if (remaining < 0) throw new Error("First-commit source exceeds capture bound");
+        count = bytes.length ? bytes.toString("utf8").split("\n").length - Number(bytes.at(-1) === 10) : 0;
+      }
       return [{ status: "added" as const, path, previous_path: null, before: null, after,
         changed_ranges: count ? [{ start: 1, end: count }] : [] }];
     });
@@ -76,7 +81,7 @@ function fileType(mode: string): "regular" | "symlink" {
 }
 
 /** A final symlink is checked as link payload; intermediate symlinks never authorize outside reads. */
-export function worktreeBytes(root: string, path: string, limit = 16 * 1024 * 1024): { bytes: Buffer; type: "regular" | "symlink" } {
+function worktreeChunks(root: string, path: string, limit: number, consume: (chunk: Buffer) => void): "regular" | "symlink" {
   safeSubjectPath(path); root = realpathSync(root);
   const parts = path.split("/"); let parent = root;
   for (const part of parts.slice(0, -1)) {
@@ -84,7 +89,7 @@ export function worktreeBytes(root: string, path: string, limit = 16 * 1024 * 10
     if (lstatSync(parent).isSymbolicLink()) throw new Error("worktree subject cannot traverse a symlink");
   }
   const absolute = join(root, path), stat = lstatSync(absolute);
-  if (stat.isSymbolicLink()) return { bytes: readlinkSync(absolute, { encoding: "buffer" }), type: "symlink" };
+  if (stat.isSymbolicLink()) { consume(readlinkSync(absolute, { encoding: "buffer" })); return "symlink"; }
   if (!stat.isFile() || stat.size > limit) throw new Error("worktree subject is not a bounded regular file");
   const rel = relative(root, realpathSync(absolute));
   if (rel === ".." || rel.startsWith("../") || isAbsolute(rel)) throw new Error("worktree subject escaped repository");
@@ -92,16 +97,36 @@ export function worktreeBytes(root: string, path: string, limit = 16 * 1024 * 10
   try {
     const opened = fstatSync(fd);
     if (!opened.isFile() || opened.size > limit) throw new Error("subject changed file type or exceeds budget");
-    const chunks: Buffer[] = []; let total = 0;
-    while (total <= limit) {
-      const chunk = Buffer.allocUnsafe(Math.min(65536, limit + 1 - total));
+    // The opened size bounds even identity-only reads when a producer keeps appending.
+    const readLimit = Math.min(limit, opened.size);
+    let total = 0;
+    while (total <= readLimit) {
+      const chunk = Buffer.allocUnsafe(Math.min(65536, readLimit + 1 - total));
       const count = readSync(fd, chunk, 0, chunk.length, null);
       if (!count) break;
-      chunks.push(chunk.subarray(0, count)); total += count;
+      consume(chunk.subarray(0, count)); total += count;
     }
     if (total > limit) throw new Error("subject exceeds read budget");
-    return { bytes: Buffer.concat(chunks, total), type: "regular" };
+    if (total !== opened.size) throw new Error("worktree subject changed while resolving");
+    return "regular";
   } finally { closeSync(fd); }
+}
+
+export function worktreeBytes(root: string, path: string, limit = 16 * 1024 * 1024): { bytes: Buffer; type: "regular" | "symlink" } {
+  const chunks: Buffer[] = [];
+  const type = worktreeChunks(root, path, limit, chunk => chunks.push(chunk));
+  return { bytes: Buffer.concat(chunks), type };
+}
+
+/** Inventory identity must not depend on the separate limit for delivering source content. */
+function worktreeIdentity(root: string, path: string) {
+  const content = createHash("sha256");
+  let lines = 0, bytes = 0, last: number | undefined;
+  const type = worktreeChunks(root, path, Infinity, chunk => {
+    content.update(chunk); bytes += chunk.length; last = chunk.at(-1);
+    for (let offset = chunk.indexOf(10); offset >= 0; offset = chunk.indexOf(10, offset + 1)) lines++;
+  });
+  return { identity: `sha256:${content.digest("hex")}`, type, lines: lines + Number(bytes > 0 && last !== 10) };
 }
 
 function entry(root: string, kind: "git" | "index", path: string, ref?: string): SubjectSource | null {
@@ -218,8 +243,8 @@ export function resolveChangeScope(root: string, options: { staged?: boolean; al
           record.after = afterEntry!(record.path);
           if (!record.after) throw new Error("comparison index image unavailable");
         } else {
-          const current = worktreeBytes(root, record.path);
-          record.after = { kind: "worktree", path: record.path, identity: hash(current.bytes), file_type: current.type };
+          const current = worktreeIdentity(root, record.path);
+          record.after = { kind: "worktree", path: record.path, identity: current.identity, file_type: current.type };
         }
       }
     }

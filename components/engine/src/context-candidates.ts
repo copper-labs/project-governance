@@ -1,5 +1,6 @@
 import { matchesPackPath } from "./planning.ts";
-import { localContextPath } from "./context-path-policy.ts";
+import { automaticContextPath } from "./context-path-policy.ts";
+import { declaredDocuments } from "./checkers/document-links.ts";
 import { discoverContext } from "./context-discovery.ts";
 import { CONTEXT_PATH_LIMIT } from "./context-limits.ts";
 import type { ValidationSubject } from "./change-subject.ts";
@@ -39,6 +40,7 @@ export function automaticContextCandidates(subject: ValidationSubject, relevant:
   priority?: { purpose: string; exact: string[]; changed: string[]; ordered?: string[] }) {
   if (!Number.isSafeInteger(maximum) || maximum < 1 || maximum > 64) throw new Error("Invalid candidate limit");
   const excluded: Array<{ path: string; reason: string }> = [];
+  const declared = declaredDocuments(subject);
   const dispositions = new Map<string, string>();
   let excludedCount = 0;
   const exclude = (path: string, reason: string) => {
@@ -48,7 +50,7 @@ export function automaticContextCandidates(subject: ValidationSubject, relevant:
   const permitted = (path: string) => {
     if (mandatory.has(path)) { dispositions.set(path, "required-context"); return false; }
     if (Buffer.byteLength(path) > CONTEXT_PATH_LIMIT) { exclude(path, "candidate-path-too-long"); return false; }
-    if (!localContextPath(path)) { exclude(path, "automatic-path-excluded"); return false; }
+    if (!automaticContextPath(path, declared)) { exclude(path, "automatic-path-excluded"); return false; }
     if (!matchesPackPath(path, allowed)) { exclude(path, "local-scope-excluded"); return false; }
     try { if (subject.source(path)?.file_type !== "regular") { exclude(path, "source-unavailable"); return false; } }
     catch { exclude(path, "source-unavailable"); return false; }

@@ -3,7 +3,8 @@ import { posix } from "node:path";
 import { createHash } from "node:crypto";
 import type { ValidationSubject } from "./change-subject.ts";
 import { digest } from "./core.ts";
-import { localContextPath } from "./context-path-policy.ts";
+import { automaticContextPath } from "./context-path-policy.ts";
+import { declaredDocuments } from "./checkers/document-links.ts";
 import { extractSourceFacts, resolveSourceLink, SOURCE_EXTRACTOR, type SourceFacts, type ResolvedSourceLink } from "./context-source-facts.ts";
 import { ProjectionStore, projectionIdentity, sourceFactId, type ProjectionFile } from "./context-projection-store.ts";
 import { documentationConfig, documentationCatalog } from "./checkers/document-catalog.ts";
@@ -52,7 +53,8 @@ function pendingSourceOrder(pending: string[], previous: ReturnType<ProjectionSt
 
 export function maintainContextProjection(subject: ValidationSubject, paths: string[], stateRoot: string, options: ProjectionOptions = {}) {
   const started = performance.now(), deadlineAt = options.deadlineAt ?? started + 1500, byteLimit = Math.min(options.byteLimit ?? 32 * 1024 * 1024, 32 * 1024 * 1024);
-  const inventory = [...new Set(paths.filter(localContextPath))].sort(), locator = projectionIdentity(subject.root), extractor = options.extractor ?? SOURCE_EXTRACTOR;
+  const declared = declaredDocuments(subject);
+  const inventory = [...new Set(paths.filter(path => automaticContextPath(path, declared)))].sort(), locator = projectionIdentity(subject.root), extractor = options.extractor ?? SOURCE_EXTRACTOR;
   const identified = performance.now();
   // Freshness cannot consume the entire extraction allowance on a large normalized checkout.
   const observation = subject.projectionSources(inventory, identified + Math.max(0, Math.min(500, (deadlineAt - identified) / 2)));

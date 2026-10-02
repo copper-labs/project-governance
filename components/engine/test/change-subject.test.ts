@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdtempSync, rmSync, writeFileSync, renameSync, symlinkSync, mkdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -60,6 +61,25 @@ test("worktree subjects detect edits and explicit selection requires its declare
     assert.throws(() => readSubjectSource(f.root, scope.records[0]!.after!), /changed after capture/);
     assert.throws(() => resolveChangeScope(f.root, { baseRef: "missing-ref" }), /unavailable/);
     assert.equal(resolveChangeScope(f.root, { all: true }).subject_digest, null);
+  } finally { f.close(); }
+});
+
+test("large unrelated artifacts retain exact identities without lifting source-read limits", () => {
+  const f = repository();
+  try {
+    const bytes = Buffer.alloc(17 * 1024 * 1024, 0x61), path = "large-evidence.json";
+    writeFileSync(join(f.root, path), bytes);
+    writeFileSync(join(f.root, "code.ts"), "export const changed = 2;\n");
+    const scope = resolveChangeScope(f.root, { baseRef: "HEAD" });
+    const captured = scope.records.find(record => record.path === path)!.after!;
+    assert.equal(captured.identity, `sha256:${createHash("sha256").update(bytes).digest("hex")}`);
+    assert.equal(new ValidationSubject(f.root, scope).read("code.ts").toString(), "export const changed = 2;\n");
+    assert.throws(() => worktreeBytes(f.root, path), /bounded/);
+    assert.throws(() => readSubjectSource(f.root, captured), /bounded/);
+    bytes[bytes.length - 1] = 0x62;
+    writeFileSync(join(f.root, path), bytes);
+    assert.notEqual(resolveChangeScope(f.root, { baseRef: "HEAD" }).subject_digest, scope.subject_digest);
+    assert.throws(() => readSubjectSource(f.root, captured, bytes.length), /changed after capture/);
   } finally { f.close(); }
 });
 

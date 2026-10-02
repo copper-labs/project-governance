@@ -42,6 +42,7 @@ import { projectContextMetric } from "./telemetry-projection.ts";
 import { RELEASE_VERSION } from "./release-version.ts";
 import { contextExcerptBudget } from "./checkers/context-router.ts";
 import { sessionId } from "../../harness/src/store/location.ts";
+import { declaredDocuments } from "./checkers/document-links.ts";
 
 export interface ContextRouteOptions extends DecisionOptions {
   operationStartedAt?: number;
@@ -281,7 +282,7 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
     ? subject.paths() : inventory.relevant;
   const candidateInventory = allCandidatePaths;
   const requestedOriginals = [...(values["optional-path"] ?? []), ...(values.links ?? [])].map(safeSubjectPath);
-  const catalog = contextMetadataCatalog(candidateInventory, task, [...priorityPaths, ...requestedOriginals], changedPriorities, mandatoryPaths, options.historyHints);
+  const catalog = contextMetadataCatalog(candidateInventory, task, [...priorityPaths, ...requestedOriginals], changedPriorities, mandatoryPaths, options.historyHints, declaredDocuments(subject));
   const projection = maintainContextProjection(subject, catalog.candidates.map(item => item.path), contextStateRoot(root),
     { purpose: task, exact: [...priorityPaths, ...(values.links ?? []).map(safeSubjectPath)], deadlineAt: performance.now() + 1000 });
   const priorities = new Map(projection.priority.map((path, index) => [path, index]));

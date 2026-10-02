@@ -1,6 +1,7 @@
 import { posix } from "node:path";
 import { safeSubjectPath } from "./change-subject.ts";
 import { CONTEXT_PATH_LIMIT } from "./context-limits.ts";
+import { evidenceArtifact } from "./evidence-artifacts.ts";
 
 /** Automatic retrieval never discovers credentials, dependencies or generated payloads. */
 export function localContextPath(path: string): boolean {
@@ -13,4 +14,9 @@ export function localContextPath(path: string): boolean {
       /(?:\.min\.[cm]?js|\.map|\.lock|\.pem|\.key|\.p12|\.pfx|\.keystore|\.sqlite|\.db)$/u.test(name)) return false;
   return [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs", ".vue", ".svelte", ".py", ".kt", ".kts", ".swift", ".m", ".mm", ".h", ".c", ".cpp", ".rs", ".go", ".java", ".dart", ".rb", ".sh", ".bash", ".zsh", ".md", ".mdx", ".txt", ".json", ".yaml", ".yml", ".toml", ".xml", ".html", ".css", ".scss", ".sql", ".graphql", ".proto"].includes(posix.extname(name)) ||
     ["makefile", "dockerfile", "gemfile", "podfile", "justfile"].includes(name);
+}
+
+/** Automatic retrieval prefers evidence summaries; explicit reads retain the existing safe-path gate. */
+export function automaticContextPath(path: string, declared?: ReadonlySet<string>): boolean {
+  return localContextPath(path) && !evidenceArtifact(path, declared);
 }

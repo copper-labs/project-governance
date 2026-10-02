@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-02-16
-updated: 2026-10-01
+updated: 2026-10-02
 summary: Active and completed execution plans for the current source repository.
 ---
 
@@ -15,6 +15,10 @@ Active plans are short-lived work records. Completed plans retain concise source
 Git remains the implementation history and recovery mechanism.
 
 ## Active
+
+- [RC10.4 large-evidence and review reliability](active/2026-10-02-rc10-4-evidence-capture.md)
+  separates exact source capture from body limits and excludes saved artifacts from automatic
+  context while retaining summaries and explicit-original access.
 
 - [RC10 reliable context and procedure selection](active/2026-09-29-rc10-context-use.md) is the
   published prerelease: correct entry/worktree use, visible semantic coverage, exact packet/answer

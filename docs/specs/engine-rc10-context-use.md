@@ -5,7 +5,7 @@ type: spec
 status: approved
 owner: project-governance
 created: 2026-09-29
-updated: 2026-10-01
+updated: 2026-10-02
 summary: Make context reach the correct worktree, expose semantic coverage gaps, reduce repeated selection, and select project procedures before ordinary development work.
 ---
 
@@ -161,6 +161,34 @@ For required-context overflow, separate true always-required rules from task-spe
 an authored policy revision. Never let JEV shorten mandatory instructions to fit. Keep AGENTS and
 provider files thin; route to one source of shared process. Use the existing documentation/comment
 checks and improve frequently expanded or touched modules gradually; no bulk prose rewrite.
+
+### RC10.4 saved-evidence and capture boundary
+
+An unrelated large generated artifact must not prevent native prompt context or a scoped provider
+review from preparing. Working-copy inventory captures exact hashes in a stream, independently of
+the limits for reading and delivering source bodies. This also applies before a repository's first
+commit. Preserve every inventory path, captured line ranges, symlink checks and concurrent-edit
+refusal. Actual source reads and validation materialization retain their existing limits; the
+staged first-commit body allowance remains unchanged.
+Exact working-copy identities still require two complete streaming passes for concurrent-edit
+checks. Keep bulky generated output in deliberate Git ignore rules or external evidence storage;
+constant memory does not make multi-gigabyte inventories free to read.
+
+Reuse the documentation owner's saved-evidence convention for automatic context retrieval:
+`docs/**/evidence/**` contains raw artifacts by default. Authored `README.md` and `index.md`
+summaries remain eligible; `before/` and `after/` snapshots do not. Active execution plans keep
+their live-guidance role. This is an explicit artifact classification, not a relevance filter on
+code or project guidance. Catalog-declared references and guides keep their authored exemption;
+catalog `sources` do not promote raw evidence. Record exclusions through the existing catalog receipt. Required routes,
+declared task sources and explicit original requests retain their normal delivery and disclosure
+checks. Raw artifacts stay in the validation subject and are never deleted or rewritten. Large
+originals still need a bounded reader or an authored summary rather than an unbounded model packet.
+
+Prove a scoped provider review with unrelated evidence larger than the normal content-read limit:
+required instructions and both declared documents reach native input, raw evidence does not enter
+automatic classifier requests, and summaries remain discoverable. Prove exact large-file identity,
+stale-source refusal and explicit bounded-original access. The installed greenfield suite must
+exercise the same situation through native prompt entry, not only passive doctor checks.
 
 ## C. Spend once on useful assessment
 

@@ -31,6 +31,7 @@ export async function verifyGreenfield(packageRoot, archive, { live = false } = 
     const installed = await initializeGreenfield(packageRoot, archive, { temporary, workspace, registry, cli, environment, preload, calls, invoke, write, live });
     ({ launcher, hooks } = installed);
     const { profile, saveProfile } = installed;
+    const largeEvidence = writeLargeEvidence(write);
     event = { session_id: 'greenfield-host', turn_id: 'initial-task', hook_event_name: 'UserPromptSubmit',
       cwd: workspace, prompt: 'Define the example project onboarding acceptance test. According to projects/example/brief.md, what must onboarding preserve? Use the planning skill.' };
     const submit = value => invoke('/bin/sh', ['-c', hooks.UserPromptSubmit[0].hooks[0].command], JSON.stringify(value));
@@ -58,6 +59,8 @@ export async function verifyGreenfield(packageRoot, archive, { live = false } = 
     assert.equal(compact.projection, undefined); assert.equal(compact.metadata.catalog, undefined);
     const full = invoke(launcher, ['context-route', '--entry', entry, '--json']);
     assert.ok(full.projection); assert.ok(full.metadata.catalog);
+    assert.ok(full.metadata.catalog.excluded.some(item => item.path === largeEvidence && item.reason === 'automatic-path-excluded'));
+    assert.ok(!full.optional.entries.some(item => item.id === largeEvidence));
     assert.ok(full.selection.passageAdvice.assessedUnitCount > 0);
     assert.ok(full.selection.passageAdvice.positiveCount > 0, JSON.stringify(full.selection.passageAdvice));
     assert.ok(JSON.stringify(compact).length < JSON.stringify(full).length);
@@ -70,24 +73,9 @@ export async function verifyGreenfield(packageRoot, archive, { live = false } = 
     assert.ok(boundEntry);
     assert.equal(invoke(launcher, ['context-route', '--entry', boundEntry]).selection.binding.taskId, bound.task.taskId);
     verifyExternalRead({ temporary, launcher, entry, invoke, run });
-    if (!live) {
-      delete environment.JEV_TOKEN; profile.continuity.decisions.config_revision = 'missing-token'; saveProfile();
-      const previous = status(), missing = submit({ ...event, turn_id: 'missing-token' });
-      assert.match(missing.hookSpecificOutput.additionalContext, /Retain operator authorization/);
-      assert.match(missing.hookSpecificOutput.additionalContext, /Reason: missing-token/);
-      assert.equal(status(), previous);
-      environment.JEV_TOKEN = 'greenfield-fixture-credential'; environment.GREENFIELD_HTTP_STATUS = '402';
-      profile.continuity.decisions.config_revision = 'billing-denied'; saveProfile();
-      const denied = submit({ ...event, turn_id: 'billing-denied' });
-      assert.match(denied.hookSpecificOutput.additionalContext, /billing-unavailable/);
-      assert.match(denied.hookSpecificOutput.additionalContext, /credit/);
-      assert.ok(!JSON.stringify(denied).includes('private-provider-response-marker'));
-      const health = invoke(launcher, ['doctor', '--capability', 'decisions'], undefined, 1);
-      assert.equal(health.operational.state, 'failed'); assert.equal(health.operational.httpStatus, 402);
-      delete environment.GREENFIELD_HTTP_STATUS; profile.continuity.decisions.config_revision = 'funded-recovery'; saveProfile();
-      submit({ ...event, turn_id: 'funded-recovery' });
-      assert.equal(invoke(launcher, ['doctor', '--capability', 'decisions']).operational.state, 'succeeded');
-    }
+    if (!live) verifyOfflineRecovery({ environment, profile, saveProfile, status, submit, event, invoke, launcher });
+    // The capture regression is proven; generated output is not part of the authored validation fixture.
+    rmSync(join(workspace, largeEvidence));
     const checked = invoke(launcher, ['check', '--pack', 'context-router', '--summary']);
     assert.equal(checked.status, 'passed');
     // Context assertions are finished. Convert these fixture docs only for the gate, then end the session.
@@ -98,13 +86,41 @@ export async function verifyGreenfield(packageRoot, archive, { live = false } = 
       providerProof: { metadata: full.metadata.decisions, coverage: compact.metadata.coverage,
         passages: full.selection.passageAdvice,
         optionalMethod: compact.optional.decision.method, selectedSources: compact.optional.entries.map(item => ({ id: item.id, sourceDigest: item.sourceDigest })) },
-      scopeGap: 'detected-without-widening', compactReplay: 'passed', externalRead: 'passed', documentationEvidence, cleanup: 'passed',
+      scopeGap: 'detected-without-widening', largeEvidenceCapture: 'passed', compactReplay: 'passed', externalRead: 'passed', documentationEvidence, cleanup: 'passed',
       missingToken: live ? 'offline-suite' : 'passed', billingFailure: live ? 'offline-suite' : 'passed',
       benefit: 'not-evaluated', sourceIdentity: 'synthetic fixture only' };
   } finally {
     if (hooks && event) run('/bin/sh', ['-c', hooks.SessionEnd[0].hooks[0].command], JSON.stringify({ ...event, hook_event_name: 'SessionEnd' }));
     rmSync(temporary, { recursive: true, force: true });
   }
+}
+
+/** A saved load-test log must not block the first prompt before any commit exists. */
+function writeLargeEvidence(write) {
+  const path = 'docs/evidence/context-capture/samples.json';
+  const samples = Buffer.alloc(17 * 1024 * 1024, 0x20); samples[0] = 0x5b; samples[samples.length - 1] = 0x5d;
+  write(path, samples);
+  return path;
+}
+
+/** Exercise credential and billing recovery without live inference or changing ordinary entry. */
+function verifyOfflineRecovery({ environment, profile, saveProfile, status, submit, event, invoke, launcher }) {
+  delete environment.JEV_TOKEN; profile.continuity.decisions.config_revision = 'missing-token'; saveProfile();
+  const previous = status(), missing = submit({ ...event, turn_id: 'missing-token' });
+  assert.match(missing.hookSpecificOutput.additionalContext, /Retain operator authorization/);
+  assert.match(missing.hookSpecificOutput.additionalContext, /Reason: missing-token/);
+  assert.equal(status(), previous);
+  environment.JEV_TOKEN = 'greenfield-fixture-credential'; environment.GREENFIELD_HTTP_STATUS = '402';
+  profile.continuity.decisions.config_revision = 'billing-denied'; saveProfile();
+  const denied = submit({ ...event, turn_id: 'billing-denied' });
+  assert.match(denied.hookSpecificOutput.additionalContext, /billing-unavailable/);
+  assert.match(denied.hookSpecificOutput.additionalContext, /credit/);
+  assert.ok(!JSON.stringify(denied).includes('private-provider-response-marker'));
+  const health = invoke(launcher, ['doctor', '--capability', 'decisions'], undefined, 1);
+  assert.equal(health.operational.state, 'failed'); assert.equal(health.operational.httpStatus, 402);
+  delete environment.GREENFIELD_HTTP_STATUS; profile.continuity.decisions.config_revision = 'funded-recovery'; saveProfile();
+  submit({ ...event, turn_id: 'funded-recovery' });
+  assert.equal(invoke(launcher, ['doctor', '--capability', 'decisions']).operational.state, 'succeeded');
 }
 
 /** End native ownership and prove that neither a reader nor a maintenance reservation survives. */

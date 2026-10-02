@@ -9,7 +9,7 @@ import { PROJECT_DEFAULTS } from "../src/runtime-project-defaults.ts";
 import { contextRouteCommand } from "../src/context-route-command.ts";
 import { ContextRouteError } from "../src/context-route-errors.ts";
 import { routeContext } from "../src/context-routing.ts";
-import { localContextPath } from "../src/context-path-policy.ts";
+import { localContextPath, automaticContextPath } from "../src/context-path-policy.ts";
 
 test("first-commit subjects preserve staged bytes, untracked text, stale checks and invalid-base refusal", () => {
   const root = mkdtempSync(join(tmpdir(), "unborn-context-"));
@@ -71,6 +71,36 @@ test("root routing uses the same recursive matcher and automatic paths exclude p
   assert.equal(routeContext({ routes: [{ id: "typescript", match: { path_globs: ["**/*.ts"] } }] }, "edit", ["index.ts"]).outcome, "matched");
   for (const path of [".env", ".env.local", "credentials.json", "secrets/prod.yaml", "node_modules/pkg/index.ts", "build/generated.ts", "video.mp4", "key.pem", "a/../b.ts"]) assert.equal(localContextPath(path), false, path);
   assert.equal(localContextPath("src/answer.ts"), true);
+});
+
+test("raw evidence is excluded from automatic retrieval while summaries and live guidance remain eligible", () => {
+  for (const path of ["docs/implementation/evidence/load-test/samples.json", "docs/evidence/run/output.txt",
+    "docs/evidence/run/review.md", "docs/evidence/run/before/index.md", "docs/evidence/run/after/README.md"])
+    assert.equal(automaticContextPath(path), false, path);
+  for (const path of ["docs/evidence/run/README.md", "docs/implementation/evidence/run/index.md",
+    "docs/exec-plans/active/evidence/plan.md", "src/evidence/collector.ts", "docs/specs/evidence.md"])
+    assert.equal(automaticContextPath(path), true, path);
+  assert.equal(localContextPath("docs/evidence/run/review.md"), true, "Explicit read observations retain their prior eligibility");
+  assert.equal(automaticContextPath("docs/evidence/run/review.md", new Set(["docs/evidence/run/review.md"])), true);
+  assert.equal(automaticContextPath("docs/evidence/run/secret.key", new Set(["docs/evidence/run/secret.key"])), false);
+});
+
+test("large first-task evidence retains exact source identity without blocking the source inventory", () => {
+  const root = mkdtempSync(join(tmpdir(), "unborn-large-evidence-"));
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: root, stdio: "pipe" });
+    mkdirSync(join(root, "docs/evidence"), { recursive: true });
+    writeFileSync(join(root, "docs/evidence/samples.json"), Buffer.alloc(17 * 1024 * 1024, 0x61));
+    writeFileSync(join(root, "first.ts"), "export const first = true;\n");
+    const scope = resolveChangeScope(root, { baseRef: "HEAD" }), subject = new ValidationSubject(root, scope);
+    assert.equal(scope.unborn, true);
+    assert.deepEqual(subject.paths(), ["docs/evidence/samples.json", "first.ts"]);
+    assert.deepEqual(scope.records.find(record => record.path === "docs/evidence/samples.json")?.changed_ranges, [{ start: 1, end: 1 }]);
+    assert.equal(subject.read("first.ts").toString(), "export const first = true;\n");
+    assert.throws(() => subject.read("docs/evidence/samples.json"), /bounded/);
+    writeFileSync(join(root, "first.ts"), "changed after capture\n");
+    assert.throws(() => subject.read("first.ts"), /changed after capture/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 test("unborn inventories without ignore rules refuse excessive capture before loading bodies", () => {

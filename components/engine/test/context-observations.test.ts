@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, realpathSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { digest, durableJson } from "../src/core.ts";
@@ -10,6 +10,29 @@ import { readContextProjection } from "../src/telemetry-projection.ts";
 import { Store } from "../../harness/src/store/store.ts";
 import { defaultDbPath, workContext } from "../../harness/src/store/location.ts";
 import { execFileSync } from "node:child_process";
+
+test("explicit external evidence reads remain observable while credential paths stay refused", () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "context-explicit-evidence-"))), old = process.env.XDG_STATE_HOME;
+  const sibling = join(root, "sibling"), path = "docs/evidence/run/review.md", entryId = "d".repeat(64);
+  process.env.XDG_STATE_HOME = join(root, "state");
+  try {
+    mkdirSync(join(sibling, "docs/evidence/run"), { recursive: true });
+    execFileSync("git", ["init", "-q"], { cwd: sibling, stdio: "pipe" });
+    writeFileSync(join(sibling, path), "Retained original review evidence.\n");
+    writeFileSync(join(sibling, ".env"), "FIXTURE=not-eligible\n");
+    durableJson(join(contextStateRoot(root), "prompt-entries", `${entryId}.json`), { version: 1, entryId,
+      workspace: root, worktreeLocator: workContext(root).locator, session: "thread", turn: "turn", scopeKind: "provisional", status: "prepared" });
+    assert.doesNotThrow(() => recordContextObservation(root, entryId, { kind: "expansion", path, sourceWorkspace: sibling }));
+    const names = readdirSync(join(contextStateRoot(root), "context-observations"));
+    const observation = JSON.parse(readFileSync(join(contextStateRoot(root), "context-observations", names[0]!), "utf8"));
+    assert.equal(observation.source.path, path); assert.equal(observation.source.worktreeLocator, workContext(sibling).locator);
+    assert.match(observation.source.digest, /^sha256:[a-f0-9]{64}$/u);
+    assert.throws(() => recordContextObservation(root, entryId, { kind: "expansion", path: ".env", sourceWorkspace: sibling }), /eligible relative source path/);
+  } finally {
+    if (old === undefined) delete process.env.XDG_STATE_HOME; else process.env.XDG_STATE_HOME = old;
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 test("native response usage joins exact prompt identity, excludes cumulative counters and deduplicates", () => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "context-observations-"))), old = process.env.XDG_STATE_HOME;

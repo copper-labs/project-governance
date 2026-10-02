@@ -137,6 +137,8 @@ are complete; live synthetic proof does not establish accepted development or to
 The [RC10.3 documentation correction](exec-plans/completed/2026-10-01-rc10-3-documentation-evidence.md)
 separates saved evidence from live documents and accepts established lifecycle labels. Its immutable
 prerelease passed independent source/installed proof and exact published-asset readback.
+The [RC10.4 evidence-capture repair](exec-plans/active/2026-10-02-rc10-4-evidence-capture.md)
+prevents unrelated large logs from blocking scoped provider reviews and native prompt context.
 RC9 is published as an immutable prerelease. Frozen development cases confirm a corrected ranking
 regression, while fresh cases expose remaining coverage and passage limits. Adopters remain on
 their pinned runtimes until deliberately upgraded. The
