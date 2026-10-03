@@ -1,12 +1,48 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import { mkdtempSync, rmSync, symlinkSync, truncateSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DecisionRuntime, type DecisionAsk } from "../src/decision-runtime.ts";
 import { profileDecisionSettings } from "../src/decision-settings.ts";
 import { digest } from "../src/core.ts";
-import { contextBudgetScope, readDecisionBudget } from "../src/decision-budget.ts";
+import { contextBudgetScope, readDecisionBudget, DECISION_BUDGET_FILE } from "../src/decision-budget.ts";
+import { SQLITE_STORE_MAX_BYTES } from "../src/sqlite-store-capacity.ts";
+import { LEGACY_STORE_MAX_BYTES, seedClosedBudgetHistory } from "./fixtures/sqlite-store-capacity.ts";
+
+test("JEV dispatch survives accumulated history and physical capacity failures retain a precise receipt", async t => {
+  const root = mkdtempSync(join(tmpdir(), "decision-runtime-capacity-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  let calls = 0;
+  const settings = profileDecisionSettings({ continuity: { decisions: { mode: "auto", allowed_data_classes: ["source"],
+    allowed_source_paths: ["src/**"], consumers: { DL03: { mode: "auto" } } } } });
+  const runtime = new DecisionRuntime(settings, root, { coordinationRoot: root, token: "fixture-only", fetch: async () => {
+    calls++; return Response.json({ model: settings.legacy.model, answers: { q: { type: "noul", noul: 0.9 } } });
+  } });
+  const ask: DecisionAsk = { consumerId: "DL03", eventId: "first", scope: { workspace: root, taskId: "current-task", taskRevision: "1" },
+    subject: { digest: digest("source"), revision: "1", environment: "fixture" },
+    evidence: [{ id: "source", text: "current source", sourceDigest: digest("current source"), provenance: "captured", trust: "untrusted" }],
+    coverage: { captured: 1, omitted: [], truncated: false, unavailable: [], limits: [] },
+    questions: [{ name: "q", definitionId: "context.relevance/1", consumerId: "DL03", evidenceIds: ["source"] }],
+    sourcePaths: ["src/example.ts"], policyDigest: settings.configDigest };
+  assert.equal((await runtime.ask(ask)).reason, "answered");
+  const path = join(root, DECISION_BUDGET_FILE), history = seedClosedBudgetHistory(path, root);
+  assert.ok(history.bytes > LEGACY_STORE_MAX_BYTES);
+  const second = await runtime.ask({ ...ask, eventId: "second" });
+  assert.equal(second.reason, "answered"); assert.equal(second.providerCalled, true);
+  assert.equal(second.transport?.dispatched, true); assert.equal(second.budget.calls, 2);
+  assert.equal((await runtime.ask(ask)).reason, "repeated-observation"); assert.equal(calls, 2);
+  const originalSize = statSync(path).size, previous = readDecisionBudget(root, ask.scope!);
+  truncateSync(path, SQLITE_STORE_MAX_BYTES + 1);
+  const blocked = await runtime.ask({ ...ask, eventId: "blocked" });
+  assert.equal(blocked.reason, "budget-store-capacity"); assert.equal(blocked.failureStage, "budget");
+  assert.equal(blocked.budget.unavailableReason, "store-capacity");
+  assert.equal(blocked.providerCalled, false); assert.equal(blocked.transport?.dispatched, false); assert.equal(calls, 2);
+  truncateSync(path, originalSize);
+  assert.deepEqual(readDecisionBudget(root, ask.scope!), previous);
+  const recovered = await runtime.ask({ ...ask, eventId: "after-capacity-restored" });
+  assert.equal(recovered.reason, "answered"); assert.equal(recovered.budget.calls, 3); assert.equal(calls, 3);
+});
 
 test("larger context defaults stay in isolated scopes and explicit budgets still constrain both", async t => {
   const root = mkdtempSync(join(tmpdir(), "decision-scopes-"));

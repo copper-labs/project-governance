@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { canonical, digest } from "./core.ts";
 import type { RunMetric } from "./check-telemetry.ts";
 import { RELEASE_VERSION } from "./release-version.ts";
+import { SQLITE_STORE_MAX_BYTES, setSqliteStoreCapacity } from "./sqlite-store-capacity.ts";
 const MAX_RECORDS = 1000, MAX_BYTES = 1024 * 1024;
 const fields = ["version", "run_id", "workspace", "stage", "runtime_version", "status", "termination_reason", "duration_ms", "started_at", "ended_at", "pack_count", "command_count", "blocked_pack_count", "result_digest"];
 
@@ -35,7 +36,7 @@ function location(root: string, workspace: string, create: boolean): string {
   const stat = lstatSync(directory);
   if (!stat.isDirectory() || stat.isSymbolicLink() || realpathSync(directory) !== directory) throw new Error("Invalid telemetry directory");
   const path = join(directory, `${digest(workspace).slice(7)}.sqlite`);
-  try { const file = lstatSync(path); if (!file.isFile() || file.isSymbolicLink() || file.size > 8 * 1024 * 1024) throw new Error("Invalid telemetry database"); }
+  try { const file = lstatSync(path); if (!file.isFile() || file.isSymbolicLink() || file.size > SQLITE_STORE_MAX_BYTES) throw new Error("Invalid telemetry database"); }
   catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
   return path;
 }
@@ -70,7 +71,7 @@ export function projectContextMetric(root: string, value: Omit<ContextMetric, "v
     const metric: ContextMetric = { ...value, version: 1, runtimeVersion: RELEASE_VERSION }, encoded = contextValue(metric);
     if (realpathSync(metric.workspace) !== metric.workspace) throw new Error("Noncanonical metric workspace");
     database = new DatabaseSync(location(root, metric.workspace, true));
-    database.exec("PRAGMA busy_timeout=0; PRAGMA max_page_count=1024; BEGIN IMMEDIATE;");
+    database.exec("PRAGMA busy_timeout=0"); setSqliteStoreCapacity(database); database.exec("BEGIN IMMEDIATE");
     const version = Number(database.prepare("PRAGMA user_version").get()!.user_version);
     if (version !== 0 && version !== 1) throw new Error("Unsupported telemetry schema");
     if (version === 0) {
@@ -136,7 +137,7 @@ export function projectRunMetric(root: string, value: RunMetric): boolean {
     if (realpathSync(value.workspace) !== value.workspace) throw new Error("Telemetry workspace must be canonical");
     const path = location(root, value.workspace, true);
     database = new DatabaseSync(path);
-    database.exec("PRAGMA busy_timeout=0; PRAGMA max_page_count=1024;");
+    database.exec("PRAGMA busy_timeout=0"); setSqliteStoreCapacity(database);
     database.exec("BEGIN IMMEDIATE");
     const version = Number(database.prepare("PRAGMA user_version").get()!.user_version);
     if (version !== 0 && version !== 1) throw new Error("Unsupported telemetry schema");

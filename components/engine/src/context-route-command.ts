@@ -43,6 +43,7 @@ import { RELEASE_VERSION } from "./release-version.ts";
 import { contextExcerptBudget } from "./checkers/context-router.ts";
 import { sessionId } from "../../harness/src/store/location.ts";
 import { declaredDocuments } from "./checkers/document-links.ts";
+import { SOURCE_CAPTURE_MAX_BYTES, SOURCE_CAPTURE_BATCH_MAX_BYTES } from "./source-capture-limits.ts";
 
 export interface ContextRouteOptions extends DecisionOptions {
   operationStartedAt?: number;
@@ -64,18 +65,22 @@ type CapturedScope = ReturnType<typeof resolveChangeScope>;
 
 /** Optional source capture keeps explicit failures visible and records automatic misses. */
 function readOptionalCandidates(subject: ValidationSubject, paths: string[], explicit: Set<string>,
-  automatic: ReturnType<typeof automaticContextCandidates>, readCaptured: (path: string, limit: number) => Buffer): Candidate[] {
+  automatic: ReturnType<typeof automaticContextCandidates>, readCaptured: (path: string, limit: number) => Buffer, deadlineAt: number): Candidate[] {
   const candidates: Candidate[] = [];
+  let remaining = SOURCE_CAPTURE_BATCH_MAX_BYTES;
   for (const path of paths) {
     try {
       if (Buffer.byteLength(path) > CONTEXT_PATH_LIMIT || subject.source(path)?.file_type !== "regular") throw new Error("Optional source unavailable");
-      const bytes = readCaptured(path, 1024 * 1024);
+      if (performance.now() >= deadlineAt) throw new ContextRouteError("source-capture-deadline", "Source capture reached the context operation deadline; current originals remain available.");
+      if (remaining === 0) throw new ContextRouteError("source-capture-byte-limit", "Selected originals exceed the 32 MiB local capture allowance; use fewer explicit originals in a declared expansion.");
+      const bytes = readCaptured(path, Math.min(SOURCE_CAPTURE_MAX_BYTES, remaining));
+      remaining -= bytes.length;
       if (bytes.includes(0)) throw new Error("Binary optional source");
       candidates.push({ id: path, excerpt: new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes),
         sourceDigest: `sha256:${createHash("sha256").update(bytes).digest("hex")}` });
     } catch (error) {
       if (explicit.has(path)) throw error;
-      automatic.excluded.push({ path, reason: "source-unavailable-or-not-bounded-text" }); automatic.excludedCount++;
+      automatic.excluded.push({ path, reason: error instanceof ContextRouteError ? error.code : "source-unavailable-or-not-bounded-text" }); automatic.excludedCount++;
     }
   }
   return candidates;
@@ -338,7 +343,7 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
     procedurePaths, automatic.paths, metadata?.order ?? catalog.candidates.map(item => item.path));
   const optionalPaths = combinedPaths.slice(0, 64);
   for (const path of combinedPaths.slice(64)) { automatic.excluded.push({ path, reason: "candidate-limit" }); automatic.excludedCount++; }
-  const candidates = readOptionalCandidates(subject, optionalPaths, explicitOptional, automatic, readCaptured);
+  const candidates = readOptionalCandidates(subject, optionalPaths, explicitOptional, automatic, readCaptured, timing.deadline);
   const capturedFacts = passageEnabled ? capturedSourceSpans(candidates, projection.facts, selectionDeadline) : null;
   const sourceSpans = capturedFacts?.spans ?? Object.fromEntries(candidates.flatMap(candidate => {
     const fact = projection.facts.get(candidate.id);
@@ -405,7 +410,7 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
   const staleSources: string[] = [];
   // Re-read every captured candidate, including omitted sources, after optional advice returns.
   for (const path of [...capturedSubjectPaths, ...packet.entries.map(entry => entry.path)]) {
-    try { subject.read(path, 1024 * 1024); } catch { staleSources.push(path); }
+    try { subject.read(path, SOURCE_CAPTURE_MAX_BYTES); } catch { staleSources.push(path); }
   }
   for (const [path, expected] of localSkillDigests) {
     try {

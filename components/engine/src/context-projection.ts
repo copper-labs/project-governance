@@ -9,6 +9,7 @@ import { extractSourceFacts, resolveSourceLink, SOURCE_EXTRACTOR, type SourceFac
 import { ProjectionStore, projectionIdentity, sourceFactId, type ProjectionFile } from "./context-projection-store.ts";
 import { documentationConfig, documentationCatalog } from "./checkers/document-catalog.ts";
 import { CONTEXT_SELECTION_MS } from "./context-timing.ts";
+import { SOURCE_CAPTURE_MAX_BYTES, SOURCE_CAPTURE_BATCH_MAX_BYTES } from "./source-capture-limits.ts";
 
 export interface ProjectionOptions { deadlineAt?: number; byteLimit?: number; factByteLimit?: number; rebuild?: boolean; extractor?: string; purpose?: string; exact?: string[] }
 
@@ -53,7 +54,7 @@ function pendingSourceOrder(pending: string[], previous: ReturnType<ProjectionSt
 }
 
 export function maintainContextProjection(subject: ValidationSubject, paths: string[], stateRoot: string, options: ProjectionOptions = {}) {
-  const started = performance.now(), deadlineAt = options.deadlineAt ?? started + CONTEXT_SELECTION_MS, byteLimit = Math.min(options.byteLimit ?? 32 * 1024 * 1024, 32 * 1024 * 1024);
+  const started = performance.now(), deadlineAt = options.deadlineAt ?? started + CONTEXT_SELECTION_MS, byteLimit = Math.min(options.byteLimit ?? SOURCE_CAPTURE_BATCH_MAX_BYTES, SOURCE_CAPTURE_BATCH_MAX_BYTES);
   const declared = declaredDocuments(subject);
   const inventory = [...new Set(paths.filter(path => automaticContextPath(path, declared)))].sort(), locator = projectionIdentity(subject.root), extractor = options.extractor ?? SOURCE_EXTRACTOR;
   const identified = performance.now();
@@ -70,6 +71,8 @@ export function maintainContextProjection(subject: ValidationSubject, paths: str
   const opened = performance.now();
   try {
   const pending: string[] = [];
+  // Only oversized omissions depend on capture policy; valid facts keep their existing source key.
+  const oversizedKey = (key: string) => `${key}:capture-limit:${SOURCE_CAPTURE_MAX_BYTES}`;
   const priorKeys = new Map<string, SourceFacts>();
   if (previous?.extractor === extractor) for (const file of previous.files.values()) {
     const fact = file.factId && previous.facts.get(file.factId);
@@ -81,8 +84,8 @@ export function maintainContextProjection(subject: ValidationSubject, paths: str
   for (const path of inventory) {
     const observed = observation.sources.get(path), fact = observed && observed.freshness !== "unverified" && priorKeys.get(`${observed.key}:${posix.extname(path)}`);
     if (fact) { byPath.set(path, fact); facts.set(sourceFactId(fact, extractor), fact); reused++; }
-    else if (!options.rebuild && previous?.extractor === extractor && observed?.freshness !== "unverified" &&
-      previous?.files.get(path)?.key === observed?.key &&
+    else if (!options.rebuild && previous?.extractor === extractor && observed && observed.freshness !== "unverified" &&
+      previous?.files.get(path)?.key === (previous?.files.get(path)?.disposition === "source-over-limit" ? oversizedKey(observed.key) : observed.key) &&
       ["index-capacity", "source-over-limit"].includes(previous?.files.get(path)?.disposition ?? ""))
       unavailable.push({ path, reason: previous!.files.get(path)!.disposition });
     else if (observed) pending.push(path);
@@ -92,11 +95,14 @@ export function maintainContextProjection(subject: ValidationSubject, paths: str
   // Warm Git-verified requests avoid body reads; uncertain bytes are revalidated within these limits.
   for (let offset = 0; offset < pending.length; offset += 63) {
     if (performance.now() >= deadlineAt || capturedBytes >= byteLimit) break;
-    const batch = pending.slice(offset, offset + 63), limit = Math.min(4 * 1024 * 1024, byteLimit - capturedBytes);
+    const batch = pending.slice(offset, offset + 63), limit = byteLimit - capturedBytes;
     // A small remaining invocation budget cannot turn a valid file into a cached oversized blob.
-    for (const [path, bytes] of subject.readBatch(batch, 256 * 1024, limit, deadlineAt)) {
+    const captured = new Set<Buffer>();
+    for (const [path, bytes] of subject.readBatch(batch, SOURCE_CAPTURE_MAX_BYTES, limit, deadlineAt)) {
       if (typeof bytes === "string") { unavailable.push({ path, reason: bytes }); continue; }
-      capturedBytes += bytes.length;
+      // Git returns one buffer for a shared blob; count those captured bytes only once.
+      if (!captured.has(bytes)) { capturedBytes += bytes.length; captured.add(bytes); }
+      if (performance.now() >= deadlineAt) { unavailable.push({ path, reason: "index-deadline" }); continue; }
       let fact: SourceFacts;
       const byteKey = `bytes:sha256:${createHash("sha256").update(bytes).digest("hex")}:${posix.extname(path)}`;
       const retained = priorKeys.get(byteKey);
@@ -128,7 +134,8 @@ export function maintainContextProjection(subject: ValidationSubject, paths: str
       const id = sourceFactId(priorFact, extractor), bytes = retainedFacts.has(id) ? 0 : Buffer.byteLength(JSON.stringify(priorFact));
       if (factBytes + bytes <= factLimit) { factBytes += bytes; retainedFacts.add(id); retainedId = id; facts.set(id, priorFact); }
     }
-    files.push({ path, key: observed?.key ?? null, freshness: retainedId ? "unverified-pending" : observed?.freshness ?? "unverified", factId: fact ? sourceFactId(fact, extractor) : retainedId, disposition });
+    files.push({ path, key: observed ? disposition === "source-over-limit" ? oversizedKey(observed.key) : observed.key : null,
+      freshness: retainedId ? "unverified-pending" : observed?.freshness ?? "unverified", factId: fact ? sourceFactId(fact, extractor) : retainedId, disposition });
     if (fact?.descriptor) entries.set(path, { text: JSON.stringify({ path, ...JSON.parse(fact.descriptor) }), sourceDigest: fact.digest });
   }
   const generation = digest({ locator, view: observation.view, extractor, files }), complete = byPath.size === inventory.length;

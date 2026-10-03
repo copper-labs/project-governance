@@ -2,10 +2,32 @@ import { join } from "node:path";
 import { contextStateRoot } from "./context-command.ts";
 import type { RoutedContextPacket } from "./context-route-command.ts";
 
+/** Delivery readiness is separate from whether semantic selection answered the inventory. */
+export function contextSelectionStatus(packet: RoutedContextPacket) {
+  const metadataReason = packet.metadata?.reason ?? packet.metadata?.coverage.reason;
+  const inactiveMetadata = ["metadata-question-disabled", "metadata-scope-disabled"].includes(metadataReason ?? "");
+  const coverage = inactiveMetadata ? undefined : packet.metadata?.coverage, decision = packet.optional?.decision;
+  const reason = (inactiveMetadata ? undefined : metadataReason) ?? decision?.reason ?? packet.optional?.reason ?? metadataReason ?? packet.selection?.reason ?? "not-attempted";
+  const answered = coverage?.answeredCount ?? 0, permitted = coverage?.permittedCount ?? null;
+  const mode = answered > 0 ? coverage?.mode === "shadow" ? "shadow" : "jev"
+    : !coverage && decision?.method === "jev" ? "jev" : "local";
+  const completeness = coverage ? answered > 0 ? coverage.complete ? "complete" : "partial" : "none"
+    : inactiveMetadata && mode === "local" ? "none" : "unknown";
+  const applied = coverage ? coverage.applied === true : decision?.method === "jev";
+  const advice = mode === "shadow" ? `JEV shadow assessment answered ${answered}/${permitted}; results were not applied.`
+    : mode === "jev" && coverage ? `JEV answered ${answered}/${permitted} permitted items; coverage is ${completeness}${completeness === "partial" ? "; remaining items use local fallback" : ""}.`
+    : mode === "jev" ? "JEV advice is available; full-inventory coverage is unknown."
+    : `JEV selection was not applied; local fallback is shown.`;
+  return { delivery: packet.ready ? "ready" : "blocked", mode, coverage: completeness, applied, reason,
+    answeredCount: coverage ? answered : null, permittedCount: permitted,
+    summary: `${packet.ready ? "Context is ready" : "Context delivery is blocked"}. ${advice} Reason: ${reason}.` };
+}
+
 /** Keep paid selection and native replay identical; only the command's presentation changes. */
 export function presentContextRoute(packet: RoutedContextPacket & { reuse?: unknown }) {
   const selection = packet.selection, metadata = packet.metadata;
   return { version: 1, presentation: "selected-context", ready: packet.ready, receiptId: packet.receiptId,
+    selectionStatus: contextSelectionStatus(packet),
     receipt: packet.receiptPersisted ? join(contextStateRoot(packet.execution.workspace), "routes", `${packet.receiptId}.json`) : null,
     execution: packet.execution, inputDigest: packet.inputDigest, revision: packet.revision, source: packet.source,
     route: packet.route, entries: packet.entries, skills: packet.skills, blockers: packet.blockers,

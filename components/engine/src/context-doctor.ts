@@ -15,10 +15,15 @@ import { contextStateRoot } from "./context-command.ts";
 import { inspectStartupHookSource } from "./startup-hook-source.ts";
 import { contextBudgetReadiness } from "./context-budget-readiness.ts";
 import { contextScopeCoverage } from "./context-scope-coverage.ts";
+import { contextWorkspaceIdentity, contextWorkspaceAlignmentMessage } from "./context-workspace-identity.ts";
+import { SOURCE_CAPTURE_MAX_BYTES, SOURCE_CAPTURE_BATCH_MAX_BYTES } from "./source-capture-limits.ts";
 
 /** Passive readiness, not host trust or successful first-read qualification. */
 export function contextDoctor(workspace: string) {
   const findings: Array<{ id: string; message: string }> = [];
+  const workspaceIdentity = contextWorkspaceIdentity(workspace);
+  const alignmentMessage = contextWorkspaceAlignmentMessage(workspaceIdentity);
+  if (alignmentMessage) findings.push({ id: "context.session-workspace-alignment", message: alignmentMessage });
   let requiredGuidance: Array<{ path: string; bytes: number | null }> = [];
   let budgets: ReturnType<typeof contextBudgetReadiness> | null = null;
   let metadata = { enabled: false, disclosure: false }, hook = "unavailable";
@@ -49,6 +54,7 @@ export function contextDoctor(workspace: string) {
       passageQuestionsEnabled: passageEnabled,
       procedureSources: profile.context_router?.procedure_sources ?? [], descriptorPermissionAlsoPermitsBodies: true,
       limits: { requestBytes: settings.contextBudget.maxRequestBytes, calls: settings.contextBudget.maxCalls, operationMs: CONTEXT_OPERATION_MS,
+        localSourceBytes: SOURCE_CAPTURE_MAX_BYTES, localSourceAggregateBytes: SOURCE_CAPTURE_BATCH_MAX_BYTES,
         sourceCandidates: settings.legacy.maxCandidates, optionalExcerptBytes: optionalExcerptBytes ?? (passageEnabled ? 3072 : 2048),
         passagePreparation: "remaining-family-bytes-and-operation" } };
     if (metadata.enabled && metadata.disclosure && !settings.legacy.allowedDataClasses.includes("source"))
@@ -91,7 +97,7 @@ export function contextDoctor(workspace: string) {
   return { version: 1, capability: "context", status: findings.length ? "needs-attention" : "configured", findings, metadata, inference, requiredGuidance,
     budgets: budgets ? { routes: budgets.routes, coverage: budgets.coverage } : null,
     localRetrieval: "provider-independent", promptHook: hook, promptHookSource: hookSource, hostTrust: "not-observable", beforeFirstRead: "requires-installed-host-evidence",
-    projection, scopeCoverage, repositoryContext: { indexObservation, overviewFiles: projectOverview, purposeQuality: "not-established",
+    projection, scopeCoverage, workspaceIdentity, repositoryContext: { indexObservation, overviewFiles: projectOverview, purposeQuality: "not-established",
       next: projectOverview.length ? "Confirm the overview describes current purpose and authoritative guidance; improve touched or repeatedly missed areas."
         : "For a new project, write a short purpose and point to its authoritative guidance. An empty index is not itself a runtime failure." },
     documentation: documentationReadiness(workspace), observations: contextObservationStatus(workspace), network: "not-attempted", mutations: "none" };

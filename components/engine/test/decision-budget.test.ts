@@ -1,12 +1,14 @@
 import { test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, symlinkSync, writeFileSync, statSync, truncateSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
 import { reserveDecisionCall, readDecisionBudget, closeDecisionScope, decisionBudgetStoreStatus, DECISION_BUDGET_FILE } from "../src/decision-budget.ts";
 import { profileDecisionSettings } from "../src/decision-settings.ts";
+import { SQLITE_STORE_MAX_BYTES, setSqliteStoreCapacity } from "../src/sqlite-store-capacity.ts";
+import { LEGACY_STORE_MAX_BYTES, seedClosedBudgetHistory } from "./fixtures/sqlite-store-capacity.ts";
 
 function fixture(t: TestContext) {
   const root = mkdtempSync(join(tmpdir(), "decision-budget-"));
@@ -103,11 +105,49 @@ test("prompt scope capacity cannot displace ordinary decision scopes", t => {
 });
 
 
-test("oversized budget stores visibly fail closed without resetting previous spending", t => {
+test("sustained closed retrieval history beyond eight MiB preserves spending and admits new work", t => {
   const { root, scope, limits } = fixture(t);
-  const bytes = Buffer.alloc(8 * 1024 * 1024 + 1);
-  writeFileSync(join(root, DECISION_BUDGET_FILE), bytes);
-  assert.equal(decisionBudgetStoreStatus(root).status, "capacity-exceeded");
-  assert.equal(decisionBudgetStoreStatus(root).bytes, bytes.length);
-  assert.equal(reserveDecisionCall(root, scope, "new-event", 10, limits).state, "unavailable");
+  const first = reserveDecisionCall(root, scope, "first", 60, limits);
+  const history = seedClosedBudgetHistory(join(root, DECISION_BUDGET_FILE), root);
+  assert.ok(history.bytes > LEGACY_STORE_MAX_BYTES);
+  assert.equal(decisionBudgetStoreStatus(root).status, "present");
+  assert.equal(decisionBudgetStoreStatus(root).maxBytes, 512 * 1024 * 1024);
+  assert.deepEqual(readDecisionBudget(root, scope), { calls: 1, bytes: 60, reservations: 1 });
+  assert.equal(reserveDecisionCall(root, scope, "first", 60, limits).reservationId, first.reservationId);
+  assert.equal(reserveDecisionCall(root, scope, "too-large", 41, limits).state, "exhausted");
+  assert.equal(reserveDecisionCall(root, scope, "second", 40, limits).state, "reserved");
+  assert.deepEqual(readDecisionBudget(root, history.scope), { calls: 256, bytes: 25600, reservations: 256 });
+  assert.equal(reserveDecisionCall(root, history.scope, history.eventId, 100, limits).state, "duplicate");
+  assert.equal(reserveDecisionCall(root, history.scope, "late-new-event", 1, limits).state, "unavailable");
+  assert.equal(closeDecisionScope(root, scope), true);
+  assert.equal(reserveDecisionCall(root, scope, "late-current-event", 1, limits).state, "unavailable");
+  assert.deepEqual(readDecisionBudget(root, scope), { calls: 2, bytes: 100, reservations: 2 });
+});
+
+test("the enlarged physical cap reports its cause and never resets existing accounting", t => {
+  const { root, scope, limits } = fixture(t), path = join(root, DECISION_BUDGET_FILE);
+  const first = reserveDecisionCall(root, scope, "first", 60, limits), originalSize = statSync(path).size;
+  // Sparse extension exercises the guard without allocating a half-GiB buffer or erasing the header.
+  truncateSync(path, SQLITE_STORE_MAX_BYTES + 1);
+  const status = decisionBudgetStoreStatus(root);
+  assert.equal(status.status, "capacity-exceeded"); assert.equal(status.bytes, SQLITE_STORE_MAX_BYTES + 1);
+  const rejected = reserveDecisionCall(root, scope, "new-event", 10, limits);
+  assert.equal(rejected.state, "unavailable"); assert.equal(rejected.unavailableReason, "store-capacity");
+  assert.equal(closeDecisionScope(root, scope), false);
+  assert.equal(statSync(path).size, SQLITE_STORE_MAX_BYTES + 1);
+  truncateSync(path, originalSize);
+  assert.deepEqual(readDecisionBudget(root, scope), { calls: 1, bytes: 60, reservations: 1 });
+  assert.equal(reserveDecisionCall(root, scope, "first", 60, limits).reservationId, first.reservationId);
+});
+
+test("SQLite write ceilings follow the shared byte capacity for different page sizes", () => {
+  for (const pageSize of [1024, 4096, 65536]) {
+    const database = new DatabaseSync(":memory:");
+    try {
+      database.exec(`PRAGMA page_size=${pageSize}; CREATE TABLE fixture(value INTEGER)`);
+      setSqliteStoreCapacity(database);
+      assert.equal(Number(database.prepare("PRAGMA page_size").get()?.page_size), pageSize);
+      assert.equal(Number(database.prepare("PRAGMA max_page_count").get()?.max_page_count) * pageSize, SQLITE_STORE_MAX_BYTES);
+    } finally { database.close(); }
+  }
 });

@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import { sourceClues } from "./context-source-index.ts";
 import { localDocumentLinks } from "./checkers/document-links.ts";
 import type { Candidate } from "./decisions.ts";
+import { SOURCE_CAPTURE_MAX_BYTES, SOURCE_CAPTURE_BATCH_MAX_BYTES } from "./source-capture-limits.ts";
 
 export const SOURCE_EXTRACTOR = "literal-syntax-12";
 export interface SourceSpan { kind: string; name: string; signature: string; start: number; end: number; level?: number; ancestry?: string[] }
@@ -20,12 +21,15 @@ export function capturedSourceSpans(candidates: Candidate[], cached: ReadonlyMap
   if (candidates.length > 64) throw new Error("Too many captured sources for bounded syntax extraction");
   const started = performance.now(), spans: Record<string, SourceSpan[]> = {};
   const limitations: Array<{ path: string; reason: string }> = [];
-  let reusedCount = 0, extractedCount = 0;
+  let reusedCount = 0, extractedCount = 0, capturedBytes = 0;
   for (const candidate of candidates) {
     const existing = cached.get(candidate.id);
     if (existing?.digest === candidate.sourceDigest) { spans[candidate.id] = existing.spans; reusedCount++; continue; }
     if (performance.now() >= deadlineAt) { limitations.push({ path: candidate.id, reason: "facts-deadline" }); continue; }
-    if (Buffer.byteLength(candidate.excerpt) > 256 * 1024) { limitations.push({ path: candidate.id, reason: "facts-size-limit" }); continue; }
+    const bytes = Buffer.byteLength(candidate.excerpt);
+    if (bytes > SOURCE_CAPTURE_MAX_BYTES) { limitations.push({ path: candidate.id, reason: "facts-size-limit" }); continue; }
+    if (capturedBytes + bytes > SOURCE_CAPTURE_BATCH_MAX_BYTES) { limitations.push({ path: candidate.id, reason: "facts-byte-limit" }); continue; }
+    capturedBytes += bytes;
     try {
       const facts = extractSourceFacts(candidate.id, Buffer.from(candidate.excerpt));
       if (facts.digest !== candidate.sourceDigest) { limitations.push({ path: candidate.id, reason: "facts-source-mismatch" }); continue; }

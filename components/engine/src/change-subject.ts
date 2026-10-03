@@ -4,6 +4,7 @@ import { closeSync, constants, fstatSync, lstatSync, openSync, readSync, readlin
 import { isAbsolute, join, posix, relative } from "node:path";
 import { canonical } from "./core.ts";
 import { workingSourceUncertainty } from "./context-source-observation.ts";
+import { SOURCE_CAPTURE_MAX_BYTES, SOURCE_CAPTURE_BATCH_MAX_BYTES } from "./source-capture-limits.ts";
 
 export interface SubjectSource { kind: "git" | "index" | "worktree"; path: string; ref?: string; identity: string; file_type: "regular" | "symlink" }
 export interface ChangeRecord {
@@ -112,7 +113,7 @@ function worktreeChunks(root: string, path: string, limit: number, consume: (chu
   } finally { closeSync(fd); }
 }
 
-export function worktreeBytes(root: string, path: string, limit = 16 * 1024 * 1024): { bytes: Buffer; type: "regular" | "symlink" } {
+export function worktreeBytes(root: string, path: string, limit = SOURCE_CAPTURE_MAX_BYTES): { bytes: Buffer; type: "regular" | "symlink" } {
   const chunks: Buffer[] = [];
   const type = worktreeChunks(root, path, limit, chunk => chunks.push(chunk));
   return { bytes: Buffer.concat(chunks), type };
@@ -165,7 +166,7 @@ function entries(root: string, kind: "git" | "index", paths: string[], ref?: str
 }
 
 /** Captured object IDs survive later index changes; live inputs must still match their captured digest. */
-export function readSubjectSource(root: string, source: SubjectSource, limit = 16 * 1024 * 1024): Buffer {
+export function readSubjectSource(root: string, source: SubjectSource, limit = SOURCE_CAPTURE_MAX_BYTES): Buffer {
   safeSubjectPath(source.path);
   if (source.kind === "worktree") {
     const current = worktreeBytes(root, source.path, limit);
@@ -316,7 +317,7 @@ export class ValidationSubject {
     return structuredClone(this.baseSources()?.get(path) ?? entry(this.root, "git", path, this.#scope.base_ref!));
   }
 
-  read(path: string, limit = 16 * 1024 * 1024): Buffer {
+  read(path: string, limit = SOURCE_CAPTURE_MAX_BYTES): Buffer {
     if (this.#projectionUnverified.has(path)) {
       const current = worktreeBytes(this.root, path, limit);
       if (current.type !== "regular") throw new Error("working source is not regular");
@@ -362,9 +363,9 @@ export class ValidationSubject {
   }
 
   /** Bulk immutable reads for a disposable source index; every omitted description keeps its path. */
-  readBatch(paths: string[], perFile = 256 * 1024, totalLimit = 32 * 1024 * 1024, deadlineAt = performance.now() + 5000): Map<string, Buffer | string> {
-    if (!Number.isSafeInteger(perFile) || perFile < 1 || perFile > 1024 * 1024 ||
-      !Number.isSafeInteger(totalLimit) || totalLimit < 1 || totalLimit > 32 * 1024 * 1024) throw new Error("Invalid batch source limits");
+  readBatch(paths: string[], perFile = SOURCE_CAPTURE_MAX_BYTES, totalLimit = SOURCE_CAPTURE_BATCH_MAX_BYTES, deadlineAt = performance.now() + 5000): Map<string, Buffer | string> {
+    if (!Number.isSafeInteger(perFile) || perFile < 1 || perFile > SOURCE_CAPTURE_MAX_BYTES ||
+      !Number.isSafeInteger(totalLimit) || totalLimit < 1 || totalLimit > SOURCE_CAPTURE_BATCH_MAX_BYTES) throw new Error("Invalid batch source limits");
     const results = new Map<string, Buffer | string>(), blobs = new Map<string, string[]>();
     let remaining = totalLimit;
     for (const path of [...new Set(paths)]) {

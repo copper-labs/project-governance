@@ -65,7 +65,7 @@ export interface DecisionOutcome {
   model: string | null; latencyMs: number; usage: { inputTokens: number | null; outputTokens: number | null };
   failureStage?: DecisionFailureStage;
   coverage: DecisionCoverage;
-  budget: { state: BudgetReservation["state"] | "not-required"; reservationId: string | null; calls: number | null; bytes: number | null; limits: { maxCalls: number; maxRequestBytes: number }; partition?: "context-selection"; invocationId?: string };
+  budget: { state: BudgetReservation["state"] | "not-required"; reservationId: string | null; calls: number | null; bytes: number | null; limits: { maxCalls: number; maxRequestBytes: number }; partition?: "context-selection"; invocationId?: string; unavailableReason?: BudgetReservation["unavailableReason"] };
   tokenEstimate: number | null;
   transport?: TransportTiming;
   receiptId: string | null;
@@ -254,6 +254,7 @@ export class DecisionRuntime {
       { requestIdentity: identity, payloadDigest: payloadDigestValue, tokenEstimate: request.budget.tokenEstimate,
         failureStage: transport.ok ? "budget" : transport.failureStage });
     const budget = { state: reservation.state, reservationId: reservation.reservationId, calls: reservation.calls, bytes: reservation.bytes, limits: base.budget.limits,
+      ...(reservation.unavailableReason ? { unavailableReason: reservation.unavailableReason } : {}),
       ...(ask.budgetPartition ? { partition: ask.budgetPartition, invocationId: ask.budgetInvocationId } : {}) };
     if (reservation.state === "duplicate") {
       const retained = this.#retained(key);
@@ -262,7 +263,8 @@ export class DecisionRuntime {
         : fallback("repeated-observation-unavailable", { budget, requestIdentity: identity });
     }
     if (reservation.state === "exhausted") return fallback("budget-exhausted", { budget, requestIdentity: identity, failureStage: "budget", tokenEstimate: request.budget.tokenEstimate });
-    if (reservation.state === "unavailable") return fallback("budget-unavailable", { budget, requestIdentity: identity, failureStage: "budget", tokenEstimate: request.budget.tokenEstimate });
+    if (reservation.state === "unavailable") return fallback(reservation.unavailableReason === "store-capacity" ? "budget-store-capacity" : "budget-unavailable",
+      { budget, requestIdentity: identity, failureStage: "budget", tokenEstimate: request.budget.tokenEstimate });
 
     const prepared: Partial<DecisionOutcome> = { requestIdentity: identity, payloadDigest: payloadDigestValue, budget, tokenEstimate: request.budget.tokenEstimate };
     if (!transport.ok) return fallback(transport.reason, { ...prepared, failureStage: transport.failureStage });

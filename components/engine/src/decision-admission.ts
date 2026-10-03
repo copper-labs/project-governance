@@ -5,6 +5,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { CONTEXT_OPERATION_MS } from "./context-timing.ts";
+import { SQLITE_STORE_MAX_BYTES, setSqliteStoreCapacity } from "./sqlite-store-capacity.ts";
 
 export const PROVIDER_CONCURRENCY = 4;
 export const PROVIDER_TOKENS_PER_SECOND = 200_000;
@@ -28,10 +29,12 @@ export class ProviderPool {
     try { closeSync(openSync(path, "wx", 0o600)); }
     catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error; }
     const stat = lstatSync(path);
-    if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 8 * 1024 * 1024) throw new Error("provider-coordination-unavailable");
+    if (!stat.isFile() || stat.isSymbolicLink() || stat.size > SQLITE_STORE_MAX_BYTES) throw new Error("provider-coordination-unavailable");
     this.#db = new DatabaseSync(path);
     try {
-      this.#db.exec("PRAGMA busy_timeout=0; PRAGMA max_page_count=2048; BEGIN IMMEDIATE");
+      this.#db.exec("PRAGMA busy_timeout=0");
+      setSqliteStoreCapacity(this.#db);
+      this.#db.exec("BEGIN IMMEDIATE");
       const version = Number(this.#db.prepare("PRAGMA user_version").get()!.user_version);
       if (version !== 0 && version !== 1) throw new Error("provider-coordination-schema");
       if (!version) {

@@ -227,11 +227,19 @@ spent after a crash, including uncertain delivery. Recovery never guesses that t
 called. Retain event identities for the same scope lifetime as counters; bounded pruning applies
 only after the owner closes a scope, without making an old identity spendable again.
 
-First-RC implementation uses a conservative 8 MiB database cap and 512 active scopes. Closed
-identities remain retained; automatic compaction is not yet implemented. Doctor exposes store bytes,
-capacity and the retention policy. Exceeding the cap returns ordinary `budget-unavailable` fallback.
-Do not delete the store as routine recovery: that would erase spending history. Safe retention must
-preserve closed identity tombstones and duplicate-event guarantees before adoption at higher volume.
+The persistent decision-budget, provider-admission and telemetry-projection databases allow
+512 MiB each. One source owner defines this physical file ceiling and SQLite's write ceiling;
+the page count uses the database's actual page size. This replaces the initial 8 MiB file guards
+and smaller fixed page ceilings. It does not allocate 512 MiB at creation or renew any paid allowance.
+The decision-budget store still permits 512 active scopes per ordinary/context-selection pool.
+Closed identities remain retained; automatic compaction is not yet implemented. Doctor exposes
+store bytes, capacity and the retention policy. An oversized budget file returns
+`budget-store-capacity`, with `budget.unavailableReason: store-capacity` and failure stage `budget`,
+without provider dispatch. Other unavailable storage keeps `budget-unavailable`. Telemetry's
+rolling record/payload retention remains unchanged. Existing schemas and spending history need
+no migration or reset to use the larger capacity. Do not delete the store as routine recovery:
+that would erase spending history. Safe retention must preserve closed identity tombstones and
+duplicate-event guarantees before further adoption at higher volume.
 
 On exhaustion return ordinary delivery with `budget-exhausted`; on busy/corrupt/unavailable storage
 return `budget-unavailable` without transport. Record these when telemetry storage is available;

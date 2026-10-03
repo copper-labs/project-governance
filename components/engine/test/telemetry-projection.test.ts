@@ -1,15 +1,42 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
-import { mkdtempSync, realpathSync, rmSync, readdirSync, writeFileSync, readFileSync } from "node:fs";
+import { mkdtempSync, realpathSync, rmSync, readdirSync, writeFileSync, readFileSync, statSync, truncateSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 import type { RunMetric } from "../src/check-telemetry.ts";
-import { projectRunMetric, readRunProjection } from "../src/telemetry-projection.ts";
+import { projectRunMetric, readRunProjection, projectContextMetric, readContextProjection } from "../src/telemetry-projection.ts";
+import { SQLITE_STORE_MAX_BYTES } from "../src/sqlite-store-capacity.ts";
+import { LEGACY_STORE_MAX_BYTES, growStorePastLegacyLimit } from "./fixtures/sqlite-store-capacity.ts";
 const metric = (workspace: string, index = 0): RunMetric => ({ version: 1, run_id: randomUUID(), workspace, stage: "pre-commit", runtime_version: "3.0.0-preview.1",
   status: "passed", termination_reason: "completed", duration_ms: 100, started_at: new Date(1789896000000 + index * 1000).toISOString(),
   ended_at: new Date(1789896000100 + index * 1000).toISOString(), pack_count: 1, command_count: 1, blocked_pack_count: 0, result_digest: "sha256:" + "a".repeat(64) });
+
+test("both telemetry writers reuse large allocated stores and preserve prior metrics", () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "projection-large-store-")));
+  try {
+    const first = metric(root), second = metric(root, 1);
+    assert.equal(projectRunMetric(root, first), true);
+    const path = join(root, "telemetry", readdirSync(join(root, "telemetry"))[0]!);
+    assert.ok(growStorePastLegacyLimit(path) > LEGACY_STORE_MAX_BYTES);
+    assert.equal(projectRunMetric(root, second), true);
+    const context = { id: "context-large-store", workspace: root, capturedAt: first.ended_at, kind: "route" as const,
+      entryId: null, routeId: null, familyId: null, taskId: null, taskRevision: null, status: "delivered", reason: null, counts: { files: 2 } };
+    assert.equal(projectContextMetric(root, context), true);
+    assert.deepEqual(readRunProjection(root, root).metrics.map(value => value.run_id), [second.run_id, first.run_id]);
+    assert.equal(readContextProjection(root, root).records[0]?.id, context.id);
+    const originalSize = statSync(path).size;
+    truncateSync(path, SQLITE_STORE_MAX_BYTES + 1);
+    assert.equal(projectRunMetric(root, metric(root, 2)), false);
+    assert.equal(projectContextMetric(root, { ...context, id: "blocked" }), false);
+    assert.equal(readRunProjection(root, root).state, "unavailable");
+    assert.equal(statSync(path).size, SQLITE_STORE_MAX_BYTES + 1);
+    truncateSync(path, originalSize);
+    assert.equal(readRunProjection(root, root).metrics.length, 2);
+    assert.equal(readContextProjection(root, root).records.length, 1);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
 
 test("rolling projection deduplicates retained identities, bounds history and leaves operational proof intact", () => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "projection-retention-")));

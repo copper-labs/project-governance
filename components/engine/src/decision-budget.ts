@@ -3,10 +3,12 @@ import { existsSync, lstatSync, mkdirSync, realpathSync, unlinkSync } from "node
 import { join } from "node:path";
 import { digest } from "./core.ts";
 import type { DecisionBudgetLimits } from "./decision-settings.ts";
+import { SQLITE_STORE_MAX_BYTES, setSqliteStoreCapacity } from "./sqlite-store-capacity.ts";
 
 export const DECISION_BUDGET_FILE = "decision-budgets.sqlite";
-const MAX_SCOPES = 512, MAX_DATABASE_BYTES = 8 * 1024 * 1024;
+const MAX_SCOPES = 512;
 const FAMILY_LIFETIME = 15 * 60_000;
+class BudgetStoreCapacityError extends Error {}
 
 export interface BudgetScope { workspace: string; taskId: string; taskRevision: string }
 /** One retrieval invocation has its own bounded allowance; real task identity stays in receipts. */
@@ -23,6 +25,7 @@ export type ReservationState = "reserved" | "duplicate" | "exhausted" | "unavail
 export interface BudgetReservation {
   state: ReservationState; reservationId: string | null; eventId: string;
   calls: number | null; bytes: number | null; limits: DecisionBudgetLimits;
+  unavailableReason?: "store-capacity";
 }
 
 export function budgetScopeId(scope: BudgetScope): string {
@@ -35,14 +38,18 @@ function budgetPath(stateRoot: string, create: boolean): string {
   const path = join(canonical, DECISION_BUDGET_FILE);
   try {
     const stat = lstatSync(path);
-    if (!stat.isFile() || stat.isSymbolicLink() || stat.size > MAX_DATABASE_BYTES) throw new Error("Invalid decision budget store");
+    if (!stat.isFile() || stat.isSymbolicLink()) throw new Error("Invalid decision budget store");
+    if (stat.size > SQLITE_STORE_MAX_BYTES) throw new BudgetStoreCapacityError("Decision budget store capacity exceeded");
   } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
   return path;
 }
 function open(path: string, busyTimeoutMs: number, readOnly = false): DatabaseSync {
   const database = new DatabaseSync(path, readOnly ? { readOnly: true } : {});
-  database.exec(`PRAGMA busy_timeout=${busyTimeoutMs}; PRAGMA foreign_keys=ON; PRAGMA synchronous=FULL;`);
-  return database;
+  try {
+    database.exec(`PRAGMA busy_timeout=${busyTimeoutMs}; PRAGMA foreign_keys=ON; PRAGMA synchronous=FULL;`);
+    if (!readOnly) setSqliteStoreCapacity(database);
+    return database;
+  } catch (error) { database.close(); throw error; }
 }
 function migrate(database: DatabaseSync): void {
   const version = Number(database.prepare("PRAGMA user_version").get()!["user_version"]);
@@ -206,7 +213,7 @@ export function reserveDecisionCall(stateRoot: string, scope: BudgetScope, event
       try { database.exec("ROLLBACK"); } catch { /* An aborted transaction reserves nothing and dispatches nothing. */ }
       throw error;
     }
-  } catch { return base; }
+  } catch (error) { return error instanceof BudgetStoreCapacityError ? { ...base, unavailableReason: "store-capacity" } : base; }
   finally { try { database?.close(); } catch { /* Accounting cannot interrupt native work. */ } }
 }
 
@@ -248,7 +255,7 @@ export function closeDecisionScope(stateRoot: string, scope: BudgetScope): boole
 export function decisionBudgetStoreStatus(stateRoot: string) {
   try {
     const stat = lstatSync(join(stateRoot, DECISION_BUDGET_FILE));
-    const status = !stat.isFile() || stat.isSymbolicLink() ? "invalid" : stat.size > MAX_DATABASE_BYTES ? "capacity-exceeded" : "present";
+    const status = !stat.isFile() || stat.isSymbolicLink() ? "invalid" : stat.size > SQLITE_STORE_MAX_BYTES ? "capacity-exceeded" : "present";
     let activeScopes: { contextSelection: number; ordinary: number } | null = null;
     if (status === "present") {
       let database: DatabaseSync | undefined;
@@ -259,11 +266,11 @@ export function decisionBudgetStoreStatus(stateRoot: string) {
         for (const row of rows) activeScopes[Number(row["contextual"]) ? "contextSelection" : "ordinary"] = Number(row["total"]);
       } catch { /* Unknown capacity remains explicit. */ } finally { database?.close(); }
     }
-    return { status, bytes: stat.size, maxBytes: MAX_DATABASE_BYTES, activeScopeLimit: MAX_SCOPES, activeScopes, scopeCapacity: "per context-selection and ordinary pool; shared database byte limit",
+    return { status, bytes: stat.size, maxBytes: SQLITE_STORE_MAX_BYTES, activeScopeLimit: MAX_SCOPES, activeScopes, scopeCapacity: "per context-selection and ordinary pool; shared database byte limit",
       retention: "ordinary identities retained; context family accounting and cursors expire after 15 minutes; audit receipts retained" };
   } catch (error) {
     return { status: (error as NodeJS.ErrnoException).code === "ENOENT" ? "absent" : "unavailable",
-      bytes: null, maxBytes: MAX_DATABASE_BYTES, activeScopeLimit: MAX_SCOPES, activeScopes: null, scopeCapacity: "per context-selection and ordinary pool; shared database byte limit",
+      bytes: null, maxBytes: SQLITE_STORE_MAX_BYTES, activeScopeLimit: MAX_SCOPES, activeScopes: null, scopeCapacity: "per context-selection and ordinary pool; shared database byte limit",
       retention: "ordinary identities retained; context family accounting and cursors expire after 15 minutes; audit receipts retained" };
   }
 }

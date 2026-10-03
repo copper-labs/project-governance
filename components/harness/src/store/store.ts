@@ -612,6 +612,22 @@ export class Store {
         } | undefined;
         return r ? this.readAttempt(r.attempt_id) : null;
     }
+    /** Diagnose a host session's explicit bindings without choosing or changing its workspace. */
+    sessionBindings(session: string, limit = 64) {
+        if (!session.trim() || !Number.isInteger(limit) || limit < 1 || limit > 64)
+            throw new Error("invalid session binding inspection");
+        const rows = this.#db.prepare(`SELECT a.attempt_id AS attemptId,a.task_id AS taskId,
+          a.task_version AS taskVersion,a.worktree,w.locator,w.path,t.version AS currentTaskVersion,
+          t.status AS taskStatus,t.worktree AS taskWorktree
+          FROM binding b JOIN attempt a ON a.attempt_id=b.attempt_id
+          JOIN workspace w ON w.workspace_id=b.workspace_id
+          JOIN task t ON t.task_id=a.task_id AND t.version=(SELECT MAX(v.version) FROM task v WHERE v.task_id=a.task_id)
+          WHERE b.session=? ORDER BY b.workspace_id LIMIT ?`).all(session, limit + 1) as unknown as Array<{
+            attemptId: string; taskId: string; taskVersion: number; worktree: string; locator: string; path: string;
+            currentTaskVersion: number; taskStatus: TaskStatus; taskWorktree: string | null;
+        }>;
+        return { bindings: rows.slice(0, limit), truncated: rows.length > limit };
+    }
     checkpoint(taskId: string, input: {
         summary: string;
         next: string;

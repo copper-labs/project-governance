@@ -1,9 +1,33 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, truncateSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ProviderPool, PROVIDER_REQUESTS_PER_MINUTE } from "../src/decision-admission.ts";
+import { ProviderPool, PROVIDER_REQUESTS_PER_MINUTE, providerDatabasePath } from "../src/decision-admission.ts";
+import { SQLITE_STORE_MAX_BYTES } from "../src/sqlite-store-capacity.ts";
+import { LEGACY_STORE_MAX_BYTES, growStorePastLegacyLimit } from "./fixtures/sqlite-store-capacity.ts";
+
+test("provider coordination reopens a large valid store without forgetting dispatched rate cost", t => {
+  const root = mkdtempSync(join(tmpdir(), "provider-large-store-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const first = new ProviderPool(root);
+  try {
+    const entry = first.acquire("key", 150000, 100000, 2000);
+    assert.equal(entry.state, "admitted"); if (entry.state !== "admitted") return;
+    assert.equal(first.dispatch(entry.id, "key", 100000, 2000), true); first.release(entry.id, true);
+  } finally { first.close(); }
+  const path = providerDatabasePath(root);
+  assert.ok(growStorePastLegacyLimit(path) > LEGACY_STORE_MAX_BYTES);
+  const reopened = new ProviderPool(root);
+  try {
+    assert.equal(reopened.acquire("key", 60000, 100000, 2000).state, "wait");
+    const entry = reopened.acquire("key", 60000, 101000, 2000);
+    assert.equal(entry.state, "admitted"); if (entry.state === "admitted") reopened.release(entry.id, false);
+  } finally { reopened.close(); }
+  truncateSync(path, SQLITE_STORE_MAX_BYTES + 1);
+  assert.throws(() => new ProviderPool(root), /provider-coordination-unavailable/u);
+  assert.equal(statSync(path).size, SQLITE_STORE_MAX_BYTES + 1);
+});
 
 test("rolling rate windows retain dispatched spending and release unused admission", t => {
   const root = mkdtempSync(join(tmpdir(), "provider-rate-")), pool = new ProviderPool(root);

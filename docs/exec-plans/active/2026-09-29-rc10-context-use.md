@@ -5,7 +5,7 @@ type: exec-plan
 status: active
 owner: project-governance
 created: 2026-09-29
-updated: 2026-10-02
+updated: 2026-10-03
 summary: Repair entry identity and semantic coverage, reduce duplicate assessment, connect procedure selection, qualify real repository cases and adopt in one verified worktree first.
 ---
 
@@ -430,3 +430,66 @@ retained only the CLI's generic error, so that exact CI cause remains an inferen
 accepts the exact spawned supervisor's recorded acknowledgment after process reaping only with the
 existing bound cleanup proof. Missing proof, request mismatch and a reused live PID still refuse.
 The failed `3.0.0-rc.10.5` tag remains immutable; the corrected candidate is `3.0.0-rc.10.6`.
+
+## Persistent store capacity patch — 2026-10-03
+
+Sustained retrieval can grow a valid accounting database beyond the old 8 MiB physical guard
+while its current scope remains below both call and request-byte allowances. The runtime then
+falls back before dispatch and also cannot read or close accounting through the same guard.
+The operator authorized substantially larger file limits. Preserve all spending and replay
+identities; source qualification does not reset stores, run paid probes or upgrade active adopters.
+
+- [x] Amend the physical storage contract to 512 MiB per decision-budget, provider-admission and
+  telemetry-projection database. Keep one source constant and derive SQLite write page counts
+  from actual page size. Keep task allowances, active-scope bounds and rolling telemetry retention.
+- [x] Distinguish an oversized budget file with `budget-store-capacity` and a typed reservation
+  reason, retaining ordinary fallback without dispatch. Do not reset, vacuum or prune accounting.
+- [x] Add valid historical accounting beyond 8 MiB: preserve counters, duplicates and closed
+  tombstones while admitting current work. Exercise provider rate-history retention and both
+  telemetry writers with allocated databases larger than the old guard.
+- [x] Run focused storage/runtime/family/transport tests, typecheck and the source build. Prove
+  the new physical guard without a half-GiB allocation; prove page ceilings for several page sizes
+  and a provider-free runtime dispatch after historical growth. Reconcile a narrow independent
+  candidate review once at this boundary. Keep exact proof externally.
+- [x] Report the reviewed source patch and its limits. Publication and installation remain
+  separate steps; larger capacity provides headroom rather than indefinite retention.
+
+The focused boundary passes 50 tests across seven files, typecheck, build and affected documentation
+validation. One context-family file was restarted with the verified Git after the system launcher
+stalled; its seven-case recheck passes. The narrow independent source review is clear. An isolated
+copy of the real oversized accounting store reproduces rejection in the installed baseline and
+admits a reservation with the patched owner, preserving previous history, duplicates and closure.
+That proof makes no provider call and writes no adopter state. At that source boundary, the patch
+had not been published or installed in adopters. The following release batch carries it forward.
+
+## Capacity and workspace diagnosis release batch — 2026-10-03
+
+The operator authorized resolving the remaining capture, native-workspace diagnosis and fallback
+visibility issues, proving them locally and publishing a dot release. Keep adopter activity and
+private evidence outside source. Host alignment is an adoption action, not transparent routing.
+
+- [x] Raise local source capture to 16 MiB per file and 32 MiB aggregate across indexing and
+  passage preparation. Remove stacked older capture bounds, retry older oversized omissions once,
+  reuse valid facts, and retain the operation deadline, disclosure and provider/packet allowances.
+- [x] Diagnose exact inherited-session bindings in a different verified worktree through the
+  existing read-only shared continuity store. Report both locations and host alignment before
+  paid selection; keep local required guidance, avoid task retargeting and sibling packet lookup.
+  Do not confuse normal shared hook definitions with a different execution workspace.
+- [x] Put semantic-selection status beside delivery readiness in ordinary command and native
+  prompt output. Distinguish partial/full/shadow answers from local fallback and retain the reason.
+- [x] Prove large original capture/delivery/freshness, cache omission refresh, aggregate limits,
+  exact/ambiguous/stale binding diagnosis, no paid wrong-worktree selection and clear fallback.
+  Run consolidated source tests, typecheck/build, documentation and offline installed archive proof.
+- [x] Reconcile one narrow completed-candidate independent review. Its two preparation-deadline
+  findings now inherit the existing operation clock and pass focused regression tests.
+- [ ] Publish the immutable dot prerelease and read back tag, artifact and metadata identity under
+  the operator's authorization.
+  Do not update active adopters in this source batch or claim accepted-task efficiency gains.
+
+The completed source boundary includes engine, continuity and packaging-script tests, both
+typechecks, the build, retained Python-runtime tests and clean engine/wheel installation proof.
+An engine summary assertion exposed disabled metadata masking the active legacy fallback reason;
+the corrected status and native-prompt recheck passes. The native workspace cause is confirmed
+from existing scalar binding evidence without changing the shared database. Exact private
+readbacks and qualification logs remain external. Publication and host reattachment are separate
+steps; source proof does not establish ordinary accepted-task savings.

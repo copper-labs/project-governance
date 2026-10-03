@@ -5,7 +5,7 @@ type: spec
 status: approved
 owner: project-governance
 created: 2026-09-29
-updated: 2026-10-02
+updated: 2026-10-03
 summary: Make context reach the correct worktree, expose semantic coverage gaps, reduce repeated selection, and select project procedures before ordinary development work.
 ---
 
@@ -41,8 +41,9 @@ cumulative request bytes. Ordinary task consumers retain their 16-call/128-KiB d
 project budgets remain authoritative; upgrading does not silently replace a smaller declaration.
 The settings owner permits a deliberate allowance up to 1,024 calls and 16 MiB. Per-request
 payload limits, sharing permissions, provider rate/concurrency, family lifetime, duplicate reuse
-and already-spent accounting remain separate existing boundaries. The budget store's 8 MiB file
-capacity is not an 8 MiB provider-input allowance. Preflight reports required aggregate bytes and
+and already-spent accounting remain separate existing boundaries. The budget store's 512 MiB file
+capacity is separate from provider-input allowances; retained history does not spend the current
+request's allowance. Preflight reports required aggregate bytes and
 calls against the effective declaration, with the supported ceiling taken from the settings owner.
 
 Maintain the per-worktree index before each fresh selection. Reuse unchanged verified facts,
@@ -105,6 +106,14 @@ RC10 does not introduce transparent cross-worktree prompt redirection, a last-ac
 or another session-target registry. Existing explicit continuity bindings remain authoritative within
 their workspace. Doctor may report observed sibling activity and missing native-entry linkage; it
 must not use that activity to choose a target or rewrite a binding.
+
+When the inherited session has a verified active explicit binding in another worktree and none in
+the native execution worktree, report the native and bound locations before paid selection. Keep
+required local guidance available without JEV; do not claim it belongs to the external task. Inspect
+only bounded binding identities from the existing read-only shared continuity store, not sibling
+prompt packets or task prose. Ambiguous or unverifiable bindings do not select a destination.
+The operator must align the host chat to the intended existing checkout at a pause seam. Shared
+hook definitions alone are normal and must not trigger a mismatch.
 
 An entry from another worktree must not be consumed as local context. Report distinct typed reasons
 for an unavailable entry in the current workspace, explicit workspace/locator mismatch, stale task,
@@ -257,6 +266,14 @@ Repeated reports can only increase the known count. Unknown usage retains the es
 does not remove a request from the rolling minute, release an execution lease, refund family bytes or
 calls, or change the operation clock. This avoids treating wire bytes as measured tokens indefinitely.
 
+The index captures an individual source of up to 16 MiB within a 32 MiB aggregate extraction
+allowance and the original operation deadline. One local capture declaration serves immutable
+blob reads, working source reads and passage syntax preparation. Bounded descriptors and provider
+request/packet allowances remain separate; the larger local read does not transmit whole files.
+Former verified oversized omissions retry once when this capture declaration changes, while
+unchanged valid extracted facts remain reusable. Truly oversized sources retain their eligible
+paths and explicit omission reasons.
+
 The index retains up to 32 MiB of extracted facts within its existing 64 MiB SQLite envelope.
 Version the extractor when changing this capacity so entries suppressed by the older fact limit can
 be revisited. Distinguish capacity-suppressed facts from truly unavailable extraction; paths remain
@@ -327,10 +344,16 @@ units or raise confidence, disclosure or packet limits.
 Prepare procedure/source units lazily in alternating, per-file rounds. Bound retained prepared
 evidence bytes by remaining family bytes; the existing exact serialized request fitting owner
 enforces the stricter complete wire/call allocation before dispatch. Source capture still bounds
-the operation to 64 files of at most 1 MiB each, and extraction retains its declared limits. Check
+the operation to 64 files, at most 16 MiB per original and 32 MiB in aggregate; extraction retains
+the same capture declaration. Revalidate large captured originals at the same per-file bound. Check
 the original operation deadline during preparation. Remove the separate 256-unit allocation;
 unused approved capacity must not strand a decisive later unit. Record eligible, prepared and
 answered counts, preparation/packing time and real budget/deadline omissions.
+
+Normal command and native prompt presentation distinguish context delivery readiness from semantic
+selection. Report local fallback, partial/full answered coverage, shadow advice and whether answers
+changed ordering, with the owning reason. A ready baseline packet must not imply successful JEV
+selection. Optional selection failures do not block otherwise valid mandatory guidance.
 
 The existing passage questions must be explicitly enabled in the DL03 configuration. The new
 declaration identifies local candidates; existing source/metadata permissions control hosting. Plain

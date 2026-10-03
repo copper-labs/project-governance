@@ -9,6 +9,7 @@ import { ValidationSubject, resolveChangeScope } from "../src/change-subject.ts"
 import { maintainContextProjection } from "../src/context-projection.ts";
 import { extractSourceFacts, resolveSourceLink } from "../src/context-source-facts.ts";
 import { ProjectionStore, PROJECTION_FILE, PROJECTION_MAX_BYTES, projectionIdentity, projectionStatus } from "../src/context-projection-store.ts";
+import { SOURCE_CAPTURE_MAX_BYTES, SOURCE_CAPTURE_BATCH_MAX_BYTES } from "../src/source-capture-limits.ts";
 
 function fixture(t: { after: (fn: () => void) => void }) {
   const base = mkdtempSync(join(tmpdir(), "maintained-context-")), root = join(base, "repo"), state = join(base, "state"); mkdirSync(root);
@@ -32,6 +33,18 @@ test("failed source extraction closes the projection connection", t => {
     assert.throws(() => maintainContextProjection(subject, ["broken.ts"], f.state), /fixture extraction failed/);
     assert.equal(closes, 1);
   } finally { ProjectionStore.prototype.close = originalClose; }
+});
+
+test("captured batches cannot keep parsing after the shared operation deadline", t => {
+  const f = fixture(t); f.write("one.ts", "export function first() {}\n"); f.write("two.ts", "export function second() {}\n");
+  const subject = f.subject(), capture = subject.readBatch.bind(subject), now = performance.now.bind(performance);
+  const deadlineAt = now() + 5000; let expired = false;
+  t.mock.method(performance, "now", () => expired ? deadlineAt + 1 : now());
+  subject.readBatch = (...args) => { const result = capture(...args); expired = true; return result; };
+  const projection = maintainContextProjection(subject, subject.paths(), f.state, { deadlineAt });
+  assert.equal(projection.status.extractedCount, 0); assert.equal(projection.status.pendingCount, 2);
+  assert.deepEqual(projection.unavailable.map(item => item.reason), ["index-deadline", "index-deadline"]);
+  assert.equal(projection.entries.size, 0, "Captured-but-unprocessed sources remain deferred, never asserted current facts");
 });
 
 test("cold/warm source facts, one-file change, rename/delete, FTS and extractor replacement", t => {
@@ -90,7 +103,7 @@ test("path-only diagnostics separate unsupported clues, binary content and pendi
 });
 
 test("verified oversized sources avoid repeated capture but byte-budget deferrals resume", t => {
-  const f = fixture(t); f.write("large.json", JSON.stringify({ description: "x".repeat(270000) })); f.write("small.ts", "export const useful = true;\n");
+  const f = fixture(t); f.write("large.json", JSON.stringify({ description: "x".repeat(SOURCE_CAPTURE_MAX_BYTES + 1) })); f.write("small.ts", "export const useful = true;\n");
   f.git("add", "."); f.git("-c", "user.name=Fixture", "-c", "user.email=f@example.invalid", "commit", "-qm", "sources");
   const cold = f.run(); assert.equal(cold.status.quality.pathOnlyReasons["source-over-limit"], 1);
   const subject = f.subject(), readBatch = subject.readBatch.bind(subject); let requests: string[] = [];
@@ -102,6 +115,56 @@ test("verified oversized sources avoid repeated capture but byte-budget deferral
   const deferred = f.run({ rebuild: true, byteLimit: 10 });
   assert.ok(deferred.status.quality.pathOnlyCount > 0);
   assert.equal(f.run().status.quality.pathOnlyCount, 0, "A total-byte deferral must not become a cached oversized-file result");
+});
+
+test("multi-megabyte source capture retains compact facts, warm reuse and changed-source freshness", t => {
+  const f = fixture(t), padding = "/*" + " ".repeat(5 * 1024 * 1024) + "*/\n";
+  f.write("src/large.ts", "/** Shared lifecycle owner. */\n" + padding + "export function closeSession() { return true; }\n");
+  f.git("add", "."); f.git("-c", "user.name=Fixture", "-c", "user.email=f@example.invalid", "commit", "-qm", "large source");
+  const cold = f.run(); assert.equal(cold.status.extractedCount, 1); assert.ok(cold.capturedBytes > 4 * 1024 * 1024);
+  assert.match(cold.entries.get("src/large.ts")!.text, /closeSession/);
+  assert.ok(Buffer.byteLength(cold.entries.get("src/large.ts")!.text) < 2048, "Local source capacity does not enlarge metadata disclosure");
+  assert.ok(Buffer.byteLength(JSON.stringify(cold.facts.get("src/large.ts"))) < 4096);
+  const warm = f.run(); assert.equal(warm.status.reusedCount, 1); assert.equal(warm.capturedBytes, 0);
+  f.write("src/large.ts", "/** Shared lifecycle owner. */\n" + padding + "export function changedSession() { return false; }\n");
+  const changed = f.run(); assert.equal(changed.status.extractedCount, 1); assert.equal(changed.status.reusedCount, 0);
+  assert.match(changed.entries.get("src/large.ts")!.text, /changedSession/);
+  assert.notEqual(changed.facts.get("src/large.ts")!.digest, cold.facts.get("src/large.ts")!.digest);
+});
+
+test("capture policy revisits old oversized omissions without invalidating healthy cached facts", t => {
+  const f = fixture(t); f.write("large.ts", "/** Large source. */\n/*" + " ".repeat(350000) + "*/\nexport function restored() {}\n");
+  f.write("small.ts", "export function retained() {}\n"); f.git("add", ".");
+  f.git("-c", "user.name=Fixture", "-c", "user.email=f@example.invalid", "commit", "-qm", "sources");
+  const seeded = f.run(), smallDigest = seeded.facts.get("small.ts")!.digest;
+  // The former runtime stored an unchanged source key with no capture-policy marker for an omission.
+  const db = new DatabaseSync(join(f.state, PROJECTION_FILE));
+  db.exec("BEGIN; PRAGMA defer_foreign_keys=ON; UPDATE file SET generation='legacy-capture-generation'; UPDATE generation SET id='legacy-capture-generation'; UPDATE descriptors SET generation='legacy-capture-generation';");
+  db.prepare("UPDATE file SET fact_id=NULL, disposition='source-over-limit' WHERE path='large.ts'").run(); db.exec("COMMIT"); db.close();
+  const recovered = f.run(); assert.equal(recovered.status.extractedCount, 1); assert.equal(recovered.status.reusedCount, 1);
+  assert.match(recovered.entries.get("large.ts")!.text, /restored/);
+  assert.equal(recovered.facts.get("small.ts")!.digest, smallDigest);
+  const warm = f.run(); assert.equal(warm.capturedBytes, 0); assert.equal(warm.status.reusedCount, 2);
+});
+
+test("large shared Git blobs consume one original while every path stays visible", t => {
+  const f = fixture(t), source = "/** Shared contract. */\n/*" + " ".repeat(5 * 1024 * 1024) + "*/\nexport function sharedContract() {}\n";
+  for (const name of ["a", "b", "c", "d", "e", "f", "g"]) f.write(`${name}.ts`, source);
+  f.git("add", "."); f.git("-c", "user.name=Fixture", "-c", "user.email=f@example.invalid", "commit", "-qm", "shared sources");
+  const result = f.run(); assert.equal(result.status.inventoryCount, 7); assert.equal(result.status.pendingCount, 0);
+  assert.equal(result.capturedBytes, Buffer.byteLength(source)); assert.equal(result.status.extractedCount, 7);
+  assert.equal(result.status.reusedCount, 0); assert.equal(result.entries.size, 7);
+});
+
+test("large distinct sources respect the aggregate window and deferred originals resume", t => {
+  const f = fixture(t), padding = "/*" + " ".repeat(11 * 1024 * 1024) + "*/\n";
+  for (const name of ["a", "b", "c"]) f.write(`${name}.ts`, padding + `export function item${name}() {}\n`);
+  f.git("add", "."); f.git("-c", "user.name=Fixture", "-c", "user.email=f@example.invalid", "commit", "-qm", "distinct large sources");
+  const cold = f.run(); assert.ok(cold.capturedBytes <= SOURCE_CAPTURE_BATCH_MAX_BYTES);
+  assert.equal(cold.status.extractedCount, 2); assert.equal(cold.status.inventoryCount, 3);
+  assert.equal(cold.status.quality.pathOnlyReasons["index-byte-limit"], 1);
+  const warm = f.run(); assert.equal(warm.status.reusedCount, 2); assert.equal(warm.status.extractedCount, 1);
+  assert.equal(warm.status.complete, true); assert.equal(warm.status.describedCount, 3);
 });
 
 test("SQLite writer contention, compare/publish race, schema failure and explicit rebuild are bounded", t => {

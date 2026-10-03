@@ -52,6 +52,15 @@ function fixture() {
   return { root, write, git, bind, cleanup: () => { process.env = before; rmSync(root, { recursive: true, force: true }); } };
 }
 
+test("task identity inherits an expired operation deadline without falling back to an unbounded Git read", () => {
+  const f = fixture();
+  try {
+    f.bind();
+    const result = resolveTaskContext(f.root, { session: "session-one", deadlineAt: performance.now() - 1 });
+    assert.equal(result.context, null); assert.equal(result.status, "task-context-deadline");
+  } finally { f.cleanup(); }
+});
+
 test("normal commands resolve the existing session task without writes, mixing sessions or accepting stale intent", () => {
   const f = fixture();
   try {
