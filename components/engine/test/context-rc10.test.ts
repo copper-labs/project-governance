@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { digest, durableJson } from "../src/core.ts";
+import { digest, durableJson, fileDigest } from "../src/core.ts";
 import { promptContext } from "../src/prompt-context.ts";
 import { contextRouteCommand } from "../src/context-route-command.ts";
 import { ContextRouteError } from "../src/context-route-errors.ts";
@@ -42,6 +42,18 @@ test("native packet reuse isolates two chats and sibling worktrees, with no fres
   assert.match((first as any).hookSpecificOutput.additionalContext, /Execution workspace:/);
   const entries = () => readdirSync(join(contextStateRoot(root), "prompt-entries")).map(name => JSON.parse(readFileSync(join(contextStateRoot(root), "prompt-entries", name), "utf8")));
   const entry = entries().find(value => value.turn === "a1");
+  const packetPath = join(contextStateRoot(root), "prompt-packets", `${entry.entryId}.json`);
+  const cached = JSON.parse(readFileSync(packetPath, "utf8"));
+  const retained = JSON.parse(readFileSync(cached.validation.receipt, "utf8"));
+  // A large retained inventory must not make a small delivered packet appear stale.
+  retained.routingPaths = Array.from({ length: 10_825 }, (_, i) => `docs/implementation/evidence/${"retained-result/".repeat(8)}${i}.md`);
+  durableJson(cached.validation.receipt, retained);
+  cached.validation.receiptDigest = fileDigest(cached.validation.receipt);
+  cached.route.retainedDiagnostics = retained.routingPaths;
+  durableJson(packetPath, cached);
+  entry.replayValidationDigest = digest(cached.validation); entry.routePacketDigest = digest(cached.route);
+  durableJson(join(contextStateRoot(root), "prompt-entries", `${entry.entryId}.json`), entry);
+  assert.ok(readFileSync(packetPath).length > 1024 * 1024);
   let dispatches = 0;
   const provider = { async decide() { dispatches++; throw new Error("replay must not select again"); } };
   const replay = await contextRouteCommand(["--entry", entry.entryId], root, assets, provider, { session: "chat-a" });

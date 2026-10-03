@@ -5,7 +5,7 @@ import { readPromptEntry, latestSessionPrompt, promptEntryTaskBinding } from "./
 import { ContextRouteError } from "./context-route-errors.ts";
 import { resolveTaskContext } from "./decision-task-binding.ts";
 import { sessionId } from "../../harness/src/store/location.ts";
-import { narrativeFile } from "./narrative-inputs.ts";
+import { readContextRecord } from "./context-records.ts";
 import { validateProviderContext } from "./provider-context.ts";
 import { LEGACY_PROMPT_BYTES, promptPacketLimit } from "./prompt-context-budget.ts";
 import type { RoutedContextPacket } from "./context-route-command.ts";
@@ -22,7 +22,7 @@ export function readPreparedPrompt(root: string, entryId: string, assetRoot: str
   if (historical && (historical.taskId !== current?.taskId || historical.revision !== current?.revision) || !historical && current)
     throw new ContextRouteError("entry-task-changed", "Task changed; refresh context through the normal route within the same allowance.");
   let packet: Record<string, unknown>;
-  try { packet = object(JSON.parse(narrativeFile(contextStateRoot(root), join("prompt-packets", `${entryId}.json`)))); }
+  try { packet = readContextRecord(contextStateRoot(root), join("prompt-packets", `${entryId}.json`)); }
   catch { throw new ContextRouteError("entry-packet-unavailable", "The prepared packet is unavailable. Inspect current required originals; no selection was repeated."); }
   if (packet.version !== 1 || packet.entryId !== entryId || typeof packet.text !== "string" ||
       digest(packet.text) !== entry.packetDigest || digest(packet.validation) !== entry.replayValidationDigest)
@@ -34,7 +34,7 @@ export function readPreparedPrompt(root: string, entryId: string, assetRoot: str
       throw new ContextRouteError("entry-runtime-changed", "The packet's runtime assets changed. Refresh explicitly against the current runtime.");
     try {
       if (typeof validation.receipt !== "string" || fileDigest(validation.receipt) !== validation.receiptDigest) throw new Error("receipt changed");
-      const receipt = object(JSON.parse(narrativeFile(contextStateRoot(root), validation.receipt)));
+      const receipt = readContextRecord(contextStateRoot(root), validation.receipt);
       if (receipt.contextBudget !== undefined) limit = promptPacketLimit(receipt.contextBudget, object(receipt.contextBudgetAuthority ?? {}).nativePacketBytes);
       validateProviderContext(root, validation, packet.text);
     } catch { throw new ContextRouteError("entry-source-stale", "The packet's captured sources or policy changed. Refresh explicitly within the same allowance."); }

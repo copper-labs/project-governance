@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-09-25
-updated: 2026-09-30
+updated: 2026-10-03
 summary: A practical workflow for owning changes, using Codex worktrees, integrating reviewed commits, adopting governance and cleaning up without disturbing other agents.
 ---
 
@@ -233,3 +233,28 @@ Next action and work that must be preserved:
 
 The next owner verifies this against the checkout before acting. Folder names, old chat messages and
 previous adoption receipts are useful leads, not proof of the current worktree or installed runtime.
+
+## Keep an existing conversation usable after an upgrade
+
+A runtime upgrade changes the installation and managed hooks. It does not change a Codex chat's
+working directory. A chat started in the main checkout can still run shell commands in a linked
+worktree; that does not move its prompt hook or its default file access to that worktree.
+
+Before resuming the upgraded task, compare the chat's actual directory with the intended task
+checkout and the context packet's execution workspace. If they differ, use the host's supported
+workspace operation for that conversation at its pause seam. If the host cannot attach it to the
+existing directory, continue a saved checkpoint in a chat attached to that directory. Reuse the
+existing Git worktree and branch; a runtime upgrade does not need another copy of the repository.
+
+For a CLI fork, verify the returned new conversation id and its actual working directory before
+continuing. Sending another message to the original desktop chat does not address the fork. A
+read-only resume owned by another host is a conversation-ownership issue, not evidence that all
+other agents must stop. Do not recommend quitting the whole app to repair one task.
+The [official conversation API](https://learn.chatgpt.com/docs/app-server#start-or-resume-a-thread)
+distinguishes resume from fork and permits explicit directory configuration; the available desktop
+controls remain host-dependent. Governance diagnoses identity and never edits the host's session
+database to simulate reattachment.
+
+Then verify the exact runtime pin, local task binding and normal context entry in that directory.
+Keep the prior receipts and spending intact. A passing focused check does not clear an unrelated
+full-hook failure, and an expired project proof record needs evidence-backed project maintenance.

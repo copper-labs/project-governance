@@ -5,7 +5,7 @@ type: spec
 status: current
 owner: project-governance
 created: 2026-09-06
-updated: 2026-10-02
+updated: 2026-10-03
 summary: Defines optional Gemini, Claude, and Codex delegation with full native capabilities, durable jobs, and observable progress.
 ---
 
@@ -69,6 +69,37 @@ job handles. It reports verified outcomes, duration and selected native usage fi
 raw logs or returning assignments/answers. Codex cumulative and per-turn values remain separate;
 missing values remain unknown. Gemini usage mapping is currently unqualified. The bounded selected
 sample does not establish accepted-work benefit or avoided-token savings.
+
+## Compiled consultation reliability
+
+Consultation skills supply the review method and reconciliation guidance. An adopter's required
+compiled provider route owns execution unless the operator explicitly selects another route.
+It uses native `claude` with the authorized model and effort. Global text wrappers are not native
+provider executables: their fallback, permission and output transformations do not satisfy the
+runner's identity and completion contract. Skill discovery succeeding does not prove worker launch.
+
+Retained route receipts and cached prompt records use one 32 MiB local write/read allowance.
+Full inventory diagnostics remain local; this does not enlarge model input, JEV disclosure,
+request spending or context delivery. A record that cannot fit is refused before publication as
+`context-record-byte-limit`. Ordinary narrative/configuration reads retain their 1 MiB default.
+Allocate read buffers from the opened file size, detect changes during reading and refuse
+non-ordinary files and final symlinks.
+
+Native launch and prompt replay revalidate optional original bytes through the existing source
+capture owner, including its 16 MiB per-source bound and repository-relative symlink protection.
+Preserve receipt/content identity, current configuration, required guidance and captured source
+hashes, including considered optional candidates. Do not replace a failed check with raw model
+launch or a silent empty context packet.
+
+A prelaunch authority refusal retains `guarded-admission-changed`; a context refusal uses
+`provider-context-invalid`. Both record no native exit code, zero native log bytes and confirmed
+cleanup when the owner releases its claims. Neither is native model failure evidence or invalidates
+a previously qualified model. Diagnostics must not copy prompts, credentials or source bodies.
+
+Native follow-up retains its parent's captured source packet. If code or guidance changes, the
+caller submits a fresh current-context review with the same authorized model, effort, scope and
+restrictions. Earlier findings may be background; an old generated packet must not be presented as
+current. Automatic context rebinding or an alternate consult execution path is outside this fix.
 
 ## Purpose And Release Boundary
 

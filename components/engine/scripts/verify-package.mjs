@@ -2,6 +2,7 @@ import { verifyDecisionExperiments } from "./verify-decision-experiments.mjs";
 import { verifyRc6Prompt } from "./verify-rc6-prompt.mjs";
 import { verifyPythonParser } from "./verify-python-parser.mjs";
 import { verifyGreenfield } from "./verify-greenfield.mjs";
+import { verifyCheckRecovery } from "./verify-check-recovery.mjs";
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
@@ -61,5 +62,6 @@ async function verifyExplicitStaging(pkg, archive, manifest, root) {
   assert.equal(result.lock.version, manifest.version);
   assert.throws(() => stageRuntimeArchive(archive, { ...lock, version: '3.0.0-rc.999999' }, join(root, 'mismatch')), error => /identity differs from lock/.test(error.cause?.message ?? ''));
   assert.throws(() => stageRuntimeArchive(archive, { ...lock, artifact: { ...lock.artifact, integrity: 'sha512-' + Buffer.alloc(64).toString('base64') } }, join(root, 'bad-hash')), /integrity mismatch/);
-  return { status: 'passed', activation: 'not-performed', sourceIdentity: 'synthetic fixture only; not release provenance' };
+  const checkRecovery = await verifyCheckRecovery(pkg, result.directory, lock, root);
+  return { status: 'passed', activation: 'isolated recovery fixture only', checkRecovery, sourceIdentity: 'synthetic fixture only; not release provenance' };
 }

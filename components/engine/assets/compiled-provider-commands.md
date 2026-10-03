@@ -23,6 +23,11 @@ Delegate only an assignment authorized by the parent. Preserve the operator's pr
 effort, scope and restrictions. Do not silently select another provider or global wrapper. Native
 agents retain their own tools and authentication; workspace declarations are not a sandbox.
 
+A consultation skill supplies review and reconciliation guidance. Where this repository requires
+the governed route, execute that review through these commands. The Claude executable is native
+`claude`, not `codex-ask-claude` or another text wrapper. Wrapper model defaults, fallback,
+permission flags and filtered output do not implement this runner's fixed native protocol.
+
 1. Run `provider-doctor --provider <claude|codex|gemini> --model <model> --effort <effort>` to
    inspect the binding. Optional `--config` and `--executable` select explicit local configuration.
    This does not test authentication or model availability.
@@ -94,6 +99,13 @@ To continue a verified session, write a private JSON file containing new `id`, `
 `directory` (omit it to use the managed workspace store), then call `provider-follow-up --directory <parent-job> --digest <parent-digest>
 --request <follow-up-file>`. Model, effort, runtime identity, scope and restrictions remain bound
 to the parent. A different assignment authority requires a new submission rather than an override.
+
+Follow-up also retains the parent's captured source packet. After correcting code or guidance,
+submit a fresh review job with the same authorized model, effort, restrictions and current scope.
+Include the earlier findings as review background, not the old generated packet. A
+`provider-context-invalid` receipt means the context check refused before native launch; inspect
+the captured route and current originals. `guarded-admission-changed` identifies authority refusal.
+Neither result means Claude is unavailable or authorizes bypassing required guidance.
 
 Explicit wait/inspect works without host notification. On a queue-capable Codex host, submission may
 add `--completion-executable <absolute-codex-path>`. It probes queue support and binds the initiating

@@ -219,13 +219,15 @@ async function execute(directory: string, expectedDigest: string): Promise<void>
     }
   }
   if (request.decisionBinding || request.provider?.guard) {
+    let refusalReason = "guarded-admission-changed";
     try {
       if (request.provider?.guard || request.decisionBinding?.admission) (await import("./provider-dispatch-guard.ts")).validateGuardedDispatch(request, directory);
+      refusalReason = "provider-context-invalid";
       if (request.decisionBinding) (await import("./provider-context.ts")).validateProviderContext(request.operation.cwd, request.decisionBinding.context, request.assignment?.context ?? "");
     }
     catch {
       durableJson(join(directory, "result.json"), { version: 1, requestDigest: expectedDigest, state: "failed",
-        exitCode: null, signal: null, reason: "guarded-admission-changed", cleanup: "confirmed",
+        exitCode: null, signal: null, reason: refusalReason, cleanup: "confirmed",
         startedAt, endedAt: new Date().toISOString(), durationMs: Date.now() - started, log, logBytes: 0 });
       if (registry) { try { registry.release(leases, digest({ requestDigest: expectedDigest, admission: "refused-before-launch" })); } finally { registry.close(); } }
       releaseRuntimeReader(generation, true);
@@ -349,11 +351,19 @@ async function execute(directory: string, expectedDigest: string): Promise<void>
     } catch { reason = "provider-stream-invalid"; }
   }
   let cleanup: "unknown" | "confirmed" = "unknown";
-  try {
-    const recorded = recordedCommandMembers(directory, expectedDigest, group);
-    const rows = commandProcesses();
-    if (!rows.some(row => row.group === group || recorded.pids.includes(row.pid))) cleanup = "confirmed";
-  } catch { /* Incomplete process inventory cannot confirm cleanup. */ }
+  // Recorded descendants can finish outside the original group after native exit.
+  // Observe their shutdown within the existing grace; absence finishes immediately.
+  const cleanupUntil = performance.now() + (request.operation.terminationGraceMs ?? 1000);
+  while (true) {
+    try {
+      const recorded = recordedCommandMembers(directory, expectedDigest, group);
+      const rows = commandProcesses();
+      if (!rows.some(row => row.group === group || recorded.pids.includes(row.pid))) { cleanup = "confirmed"; break; }
+    } catch { break; } // Invalid records or incomplete inventory never prove cleanup.
+    const remaining = cleanupUntil - performance.now();
+    if (remaining <= 0) break;
+    await new Promise(resolve => setTimeout(resolve, Math.min(50, remaining)));
+  }
   const success = reason === "provider-completed" || (reason === "exit" && exitCode !== null && request.operation.expectedExitCodes.includes(exitCode));
   const receipt: CommandReceipt = { version: 1, requestDigest: expectedDigest,
     state: cleanup === "unknown" ? "unknown" : reason === "cancelled" ? "cancelled" : success ? "succeeded" : "failed",

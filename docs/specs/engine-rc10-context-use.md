@@ -279,6 +279,15 @@ Version the extractor when changing this capacity so entries suppressed by the o
 be revisited. Distinguish capacity-suppressed facts from truly unavailable extraction; paths remain
 eligible in either case. Cold index preparation and warm selection remain separate measurements.
 
+Retained routing receipts and cached prompt records use the same 32 MiB local allowance when
+written and read. This accommodates full path inventories independently of the much smaller
+delivered context packet. Provider launch and entry replay use this record owner and revalidate
+optional originals under the 16 MiB capture declaration, rather than a narrative-message default.
+Unchanged large records and originals must not appear stale merely because they exceed 1 MiB.
+Changed source, policy, identity and required guidance still refuse. The
+[provider specification](provider-agent-skills.md#compiled-consultation-reliability) owns native
+refusal classification and the fresh-review recovery path.
+
 Read-only reuse uses `context-route --entry <id>` without expansion flags. The reference comes from
 the native packet. Session identity comes from the explicit runtime caller, `HARNESS_SESSION`, or
 `CODEX_THREAD_ID`, in that order; absence means `entry-session-unavailable`. The entry must match

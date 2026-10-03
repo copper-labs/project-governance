@@ -22,6 +22,7 @@ import { providerFailureAction } from "./decision-operational-health.ts";
 import { contextWorkspaceIdentity, contextWorkspaceAlignmentMessage } from "./context-workspace-identity.ts";
 import { contextSelectionStatus } from "./context-route-presentation.ts";
 import { CONTEXT_OPERATION_MS } from "./context-timing.ts";
+import { writeContextRecord } from "./context-records.ts";
 
 type Route = Awaited<ReturnType<typeof contextRouteCommand>>;
 
@@ -197,7 +198,7 @@ async function preparePromptContext(provider: string, eventValue: unknown, works
     ...receipt, preparationMs: Date.now() - startedAt,
     usageCollection: "session-end-or-explicit-import", delivery: "prepared-for-hook-stdout", confirmedModelUse: null };
   if (reservation === "acquired") try {
-    durableJson(packetPath, { version: 1, entryId, text: output, validation, route: capturedRoute });
+    writeContextRecord(packetPath, { version: 1, entryId, text: output, validation, route: capturedRoute });
     publishContextObservation(path, observation);
     indexPromptEntry(root, entryId, session, turn, new Date(startedAt).toISOString());
     projectContextMetric(contextStateRoot(root), { id: entryId, workspace: root, capturedAt: observation.createdAt,

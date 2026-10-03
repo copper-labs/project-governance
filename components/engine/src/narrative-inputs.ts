@@ -5,15 +5,15 @@ import type { BuiltinCheckRequest } from "./builtin-checks.ts";
 
 /** Hook messages may live outside the worktree; read a bounded ordinary file without following its final symlink. */
 export function narrativeFile(root: string, path: string, maximumBytes = 1024 * 1024): string {
-  if (!Number.isSafeInteger(maximumBytes) || maximumBytes < 1 || maximumBytes > 8 * 1024 * 1024) throw new Error("Invalid bounded narrative allowance");
+  if (!Number.isSafeInteger(maximumBytes) || maximumBytes < 1 || maximumBytes > 32 * 1024 * 1024) throw new Error("Invalid bounded narrative allowance");
   const fd = openSync(resolve(root, path), constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   try {
     const before = fstatSync(fd), limit = maximumBytes;
     if (!before.isFile() || before.size > limit) throw new Error("Narrative input must be a bounded ordinary file");
-    const buffer = Buffer.alloc(limit + 1); let length = 0;
-    while (length <= limit) { const read = readSync(fd, buffer, length, buffer.length - length, null); if (!read) break; length += read; }
+    const buffer = Buffer.alloc(before.size + 1); let length = 0;
+    while (length < buffer.length) { const read = readSync(fd, buffer, length, buffer.length - length, null); if (!read) break; length += read; }
     const after = fstatSync(fd);
-    if (length > limit || before.size !== after.size || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs) throw new Error("Narrative input changed during read");
+    if (length !== before.size || before.size !== after.size || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs) throw new Error("Narrative input changed during read");
     return new TextDecoder("utf-8", { fatal: true }).decode(buffer.subarray(0, length));
   } finally { closeSync(fd); }
 }

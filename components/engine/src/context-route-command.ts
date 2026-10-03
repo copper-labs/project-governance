@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { randomUUID, createHash } from "node:crypto";
 import { parse } from "yaml";
 import { resolveChangeScope, safeSubjectPath, ValidationSubject, worktreeBytes } from "./change-subject.ts";
-import { object, text, digest, durableJson } from "./core.ts";
+import { object, text, digest } from "./core.ts";
 import { routeContext } from "./context-routing.ts";
 import { materializeRoutedContext } from "./routed-context.ts";
 import { loadSkillCatalog, type CatalogSkill } from "./skill-catalog.ts";
@@ -44,6 +44,7 @@ import { contextExcerptBudget } from "./checkers/context-router.ts";
 import { sessionId } from "../../harness/src/store/location.ts";
 import { declaredDocuments } from "./checkers/document-links.ts";
 import { SOURCE_CAPTURE_MAX_BYTES, SOURCE_CAPTURE_BATCH_MAX_BYTES } from "./source-capture-limits.ts";
+import { writeContextRecord } from "./context-records.ts";
 
 export interface ContextRouteOptions extends DecisionOptions {
   operationStartedAt?: number;
@@ -485,7 +486,7 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
       decision: optional.decision, measurement: optional.measurement, reason: optional.reason } : null,
     relevanceAdvice, metadata: metadataSummary, workflowAdvice: workflowRecommendation, discovery, staleSources, outcome: staleSources.length ? "refused-stale-source" : packet.ready ? "delivered" : "blocked" };
   let receiptPersisted = true;
-  try { durableJson(join(contextStateRoot(root), "routes", `${receiptId}.json`), receipt); }
+  try { writeContextRecord(join(contextStateRoot(root), "routes", `${receiptId}.json`), receipt); }
   catch (error) { if (!options.localOnly || !options.promptEntry) throw error; receiptPersisted = false; }
   if (receiptPersisted) projectContextMetric(contextStateRoot(root), { id: receiptId, workspace: root, capturedAt: receipt.createdAt,
     kind: "route", entryId: options.family?.id ?? null, familyId: options.family?.id ?? null, routeId: receiptId,

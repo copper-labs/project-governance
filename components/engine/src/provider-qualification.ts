@@ -47,8 +47,8 @@ export function qualifiedProviderPair(directory: string, requestDigest: string, 
         later.operation.cwd !== roots[0] || digest(later.provider.guard) !== digest(guard)) continue;
     const next = observeCommand(candidate, digest(later)).receipt;
     if (!next || Date.parse(next.endedAt) <= ended || next.state === "succeeded" || next.state === "cancelled") continue;
-    // Only bound native policy refusals are exempt; an arbitrary blocked answer cannot qualify itself.
-    if (["guarded-admission-changed", "resource-admission-failed"].includes(next.reason)) continue;
+    // Prelaunch refusals and bound native policy denials do not test model capability.
+    if (["guarded-admission-changed", "provider-context-invalid", "resource-admission-failed"].includes(next.reason)) continue;
     if (verifiedPolicyRefusal(candidate, later, next)) continue;
     throw new Error("qualification-invalidated-by-later-failure");
   }

@@ -9,6 +9,8 @@ import { digest, fileDigest, object } from "./core.ts";
 import { narrativeFile } from "./narrative-inputs.ts";
 import { contextStateRoot } from "./context-command.ts";
 import { currentTaskPromptEntry } from "./context-observations.ts";
+import { readContextRecord } from "./context-records.ts";
+import { worktreeBytes } from "./change-subject.ts";
 
 /** Deliver the existing context packet before provider dispatch; no second context selector. */
 export async function providerContext(workspace: string, context: DecisionTaskContext | undefined, options: DecisionOptions = {}, assetRoot?: string) {
@@ -49,17 +51,21 @@ export function validateProviderContext(workspace: string, context: Record<strin
       typeof context.deliveredBytes !== "number" || !Number.isSafeInteger(context.deliveredBytes) || context.deliveredBytes < 0) throw new Error("Prepared context identity changed");
   const bytes = Buffer.from(assembled), content = bytes.subarray(Math.max(0, bytes.length - context.deliveredBytes)).toString("utf8");
   if (digest(content) !== context.contentDigest) throw new Error("Prepared context was not delivered intact");
-  const receipt = object(JSON.parse(narrativeFile(dirname(context.receipt), context.receipt)));
+  const receipt = readContextRecord(dirname(context.receipt), context.receipt);
   if (receipt.inputDigest !== context.inputDigest || receipt.ready !== true) throw new Error("Prepared context receipt changed");
   for (const [path, hash] of Object.entries(object(receipt.configDigests))) {
     if (digest(Buffer.from(narrativeFile(workspace, path)).toString("base64")) !== hash) throw new Error("Context configuration changed before dispatch");
   }
   const sources = [...(receipt.context as unknown[]).map(raw => ({ raw, root: workspace })),
-    ...(receipt.skills as unknown[]).map(raw => ({ raw, root: String(object(raw).path).startsWith(".governance/") ? workspace : String(context.skillAssetRoot) })),
-    ...(receipt.optionalSources as unknown[]).map(raw => ({ raw, root: workspace }))];
+    ...(receipt.skills as unknown[]).map(raw => ({ raw, root: String(object(raw).path).startsWith(".governance/") ? workspace : String(context.skillAssetRoot) }))];
   for (const { raw, root } of sources) {
     const source = object(raw), path = String(source.path ?? source.id);
     const current = narrativeFile(root, path);
     if (`sha256:${createHash("sha256").update(current).digest("hex")}` !== source.sourceDigest) throw new Error("Prepared source changed before dispatch");
+  }
+  for (const raw of receipt.optionalSources as unknown[]) {
+    const source = object(raw), current = worktreeBytes(workspace, String(source.id));
+    if (current.type !== "regular" || `sha256:${createHash("sha256").update(current.bytes).digest("hex")}` !== source.sourceDigest)
+      throw new Error("Prepared source changed before dispatch");
   }
 }

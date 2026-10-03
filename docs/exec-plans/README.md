@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-02-16
-updated: 2026-10-02
+updated: 2026-10-03
 summary: Active and completed execution plans for the current source repository.
 ---
 
@@ -15,6 +15,10 @@ Active plans are short-lived work records. Completed plans retain concise source
 Git remains the implementation history and recovery mechanism.
 
 ## Active
+
+- [RC10.8 Claude consultation reliability](active/2026-10-03-rc10-8-consult-reliability.md)
+  repairs large retained context receipts at native launch and distinguishes context refusal from
+  approval refusal. Candidate qualification precedes publication and deliberate adopter updates.
 
 - [RC10 reliable context and procedure selection](active/2026-09-29-rc10-context-use.md) is the
   published prerelease: correct entry/worktree use, visible semantic coverage, exact packet/answer

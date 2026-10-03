@@ -69,7 +69,7 @@ export async function verifyProviderSelection({ packageRoot, repo, temporary, ru
   writeFileSync(requestPath, JSON.stringify({ ...continuation, admission: continuationPath }));
   const continued = run(['provider-follow-up', '--directory', directory, '--digest', submitted.requestDigest, '--request', requestPath]);
   const refused = run(['provider-wait', '--directory', continuation.directory, '--digest', continued.requestDigest, '--milliseconds', '30000'], 1);
-  assert.equal(refused.receipt.reason, 'guarded-admission-changed'); assert.equal(refused.receipt.cleanup, 'confirmed');
+  assert.equal(refused.receipt.reason, 'provider-context-invalid'); assert.equal(refused.receipt.cleanup, 'confirmed');
   assert.equal(existsSync(join(continuation.directory, 'launch.json')), false);
   const resources = new ResourceRegistry(registry);
   try { assert.ok(resources.inspect().every(item => item.state === 'released')); } finally { resources.close(); }

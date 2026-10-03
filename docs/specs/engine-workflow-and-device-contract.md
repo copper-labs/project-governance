@@ -5,7 +5,7 @@ type: spec
 status: draft
 owner: project-governance
 created: 2026-09-20
-updated: 2026-09-20
+updated: 2026-10-03
 summary: Approved workflow execution with explicit resource ownership, RN iOS simulator then physical-device proof, and bounded recovery.
 ---
 
@@ -312,3 +312,15 @@ reference, proven command-worker absence and the original guardian/process ident
 requires independently observed process absence. Reconcile binds existing evidence. None replays
 ordinary work. A workflow failed-verification state may contain a stage with `commandOutcome: unknown`;
 consumers must inspect stage evidence and must not infer that no external or local effect occurred.
+
+`check-reconcile --run <id>` also uses managed write admission. It releases only the stopped
+check's verified runtime reservation after confirmed native command cleanup. Preserve workspace,
+reader, request and process identity checks, unrelated reservations and the original failed result.
+Recovery does not execute skipped packs or turn that incomplete check into a passing commit gate.
+
+At normal native exit, a recorded descendant may still be finishing outside the original process
+group. Observe the group and all recorded descendant PIDs within the command's existing termination
+grace before declaring cleanup uncertain. Finish immediately when full enumeration proves absence;
+do not add an unconditional delay or another retry. A live or reused recorded PID, invalid membership
+record or failed enumeration keeps cleanup unknown. This observation grants no new signaling
+authority. The guardian retains its existing independently verified owner-loss recovery path.

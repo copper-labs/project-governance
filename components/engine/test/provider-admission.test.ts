@@ -188,6 +188,14 @@ test("routing applies only confident qualified categories; shadow, advice, uncer
   assert.throws(() => qualifiedProviderPair(baselineDir, baseline.requestDigest, qualification.guard, qualification.roots,
     qualification.requiredTools, qualification.jobRoot), /later-failure/);
   rmSync(denied, { recursive: true });
+  // A context refusal happens before the provider starts and cannot revoke native capability proof.
+  const contextRefused = join(f.trusted, "later-context-refusal"); mkdirSync(contextRefused);
+  const contextRequest = JSON.parse(readFileSync(join(baselineDir, "request.json"), "utf8")); contextRequest.id = "context-refused";
+  writeFileSync(join(contextRefused, "request.json"), JSON.stringify(contextRequest));
+  writeFileSync(join(contextRefused, "result.json"), JSON.stringify({ version: 1, requestDigest: digest(contextRequest), state: "failed", cleanup: "confirmed",
+    endedAt: new Date(Date.now() + 1).toISOString(), reason: "provider-context-invalid" }));
+  assert.equal(qualifiedProviderPair(baselineDir, baseline.requestDigest, qualification.guard, qualification.roots,
+    qualification.requiredTools, qualification.jobRoot).model, "fixture-baseline");
   // A later failed native receipt for the same capability invalidates the earlier successful proof.
   const later = join(f.trusted, "later-failure"); mkdirSync(later);
   const retained = JSON.parse(readFileSync(join(baselineDir, "request.json"), "utf8")); retained.id = "later-failure";

@@ -1,13 +1,56 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { providerContext, validateProviderContext } from "../src/provider-context.ts";
 import { decisionTaskContext, readDecisionTaskContext } from "../src/decision-task-context.ts";
 import { resolveChangeScope, ValidationSubject } from "../src/change-subject.ts";
 import { contextRouteCommand } from "../src/context-route-command.ts";
+import { fileDigest } from "../src/core.ts";
+
+test("provider launch accepts retained inventory receipts and originals larger than one MiB", async () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "provider-context-capacity-")));
+  const previousState = process.env.XDG_STATE_HOME, previousToken = process.env.JEV_TOKEN;
+  process.env.XDG_STATE_HOME = join(root, "state"); delete process.env.JEV_TOKEN;
+  try {
+    const git = (...args: string[]) => execFileSync("git", args, { cwd: root, stdio: "pipe" });
+    git("init", "-q");
+    mkdirSync(join(root, "config/governance"), { recursive: true });
+    mkdirSync(join(root, "docs"));
+    writeFileSync(join(root, ".gitignore"), "state/\n");
+    writeFileSync(join(root, "config/governance/profile.yaml"), JSON.stringify({ profile_id: "fixture",
+      context_router: { default_route: "review", routes: [{ id: "review", match: { prompt_terms: ["review"] }, primary_context: ["rules.md"] }] } }));
+    writeFileSync(join(root, "config/governance/facts.lock.yaml"), JSON.stringify({ profile_id: "fixture", facts: {} }));
+    writeFileSync(join(root, "rules.md"), "MANDATORY: retain source identity and required checks.\n");
+    const original = "# Review target\n\n" + "Preserve cleanup ownership and saved results.\n".repeat(30_000);
+    writeFileSync(join(root, "docs/review.md"), original);
+    git("add", "."); git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "fixture");
+    const task = decisionTaskContext({ version: 1, workspace: root, taskId: "review", revision: "1",
+      requirement: "Review cleanup ownership", acceptance: ["Identify actionable defects"], sourcePaths: ["docs/review.md"] }, root);
+    const prepared = await providerContext(root, task, {}, resolve("src/project_governance_runtime/assets/skills"));
+    assert.ok("receipt" in prepared.delivery);
+    assert.ok(Buffer.byteLength(original) > 1024 * 1024 && prepared.delivery.deliveredBytes < 24_000);
+    // Inventory diagnostics are retained locally, independently of the compact model input.
+    const receipt = JSON.parse(readFileSync(prepared.delivery.receipt, "utf8"));
+    receipt.routingPaths = Array.from({ length: 10_825 }, (_, i) => `docs/implementation/evidence/${"retained-result/".repeat(8)}${i}.md`);
+    writeFileSync(prepared.delivery.receipt, JSON.stringify(receipt));
+    prepared.delivery.receiptDigest = fileDigest(prepared.delivery.receipt);
+    assert.ok(readFileSync(prepared.delivery.receipt).length > 1024 * 1024);
+    validateProviderContext(root, prepared.delivery, prepared.text);
+    writeFileSync(join(root, "docs/review.md"), original + "Changed review evidence.\n");
+    assert.throws(() => validateProviderContext(root, prepared.delivery, prepared.text), /changed before dispatch/);
+    rmSync(join(root, "docs/review.md")); symlinkSync(join(root, "rules.md"), join(root, "docs/review.md"));
+    assert.throws(() => validateProviderContext(root, prepared.delivery, prepared.text), /changed before dispatch/);
+    rmSync(join(root, "docs/review.md")); writeFileSync(join(root, "docs/review.md"), Buffer.alloc(16 * 1024 * 1024 + 1));
+    assert.throws(() => validateProviderContext(root, prepared.delivery, prepared.text), /bounded regular file/);
+  } finally {
+    if (previousState === undefined) delete process.env.XDG_STATE_HOME; else process.env.XDG_STATE_HOME = previousState;
+    if (previousToken === undefined) delete process.env.JEV_TOKEN; else process.env.JEV_TOKEN = previousToken;
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 test("large unrelated test evidence cannot block a governed review or enter automatic inference", async () => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "provider-large-evidence-")));
