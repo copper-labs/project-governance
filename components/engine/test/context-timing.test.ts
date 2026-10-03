@@ -7,37 +7,38 @@ test("slow local preparation leaves a remaining provider window within the origi
   let now = 0;
   const clock = new ContextTiming(undefined, () => now);
   now = 5500;
-  assert.equal(clock.beginSelection(), 29500);
+  assert.equal(clock.beginSelection(), 44500);
   now += 1150; clock.endSelection(); now += 150;
   const measured = clock.snapshot(1100, 120);
   assert.deepEqual([measured.preparationMs, measured.selectionMs, measured.providerCallMs, measured.deliveryMs, measured.totalMs],
     [5500, 1150, 1100, 150, 6800]);
   assert.equal(measured.limitReason, null);
+  assert.equal(measured.operationBudgetMs, 45000);
   now = 8000;
-  assert.equal(clock.beginSelection(), 29500, "Starting selection again must not renew its allowance");
+  assert.equal(clock.beginSelection(), 44500, "Starting selection again must not renew its allowance");
 });
 
 test("overall exhaustion cannot renew a selection deadline and differs from provider exhaustion", () => {
   let now = 0;
   const late = new ContextTiming(undefined, () => now);
-  now = 29900; assert.equal(late.beginSelection(), 29500);
-  now = 30005; late.endSelection("cancelled"); assert.equal(late.snapshot(205, 0).limitReason, "operation-deadline");
+  now = 44900; assert.equal(late.beginSelection(), 44500);
+  now = 45005; late.endSelection("cancelled"); assert.equal(late.snapshot(205, 0).limitReason, "operation-deadline");
   const fresh = new ContextTiming(undefined, () => now);
-  assert.equal(fresh.beginSelection(), now + 29500);
-  now += 29501; fresh.endSelection("cancelled"); assert.equal(fresh.snapshot(29500, 0).limitReason, "selection-deadline");
+  assert.equal(fresh.beginSelection(), now + 44500);
+  now += 44501; fresh.endSelection("cancelled"); assert.equal(fresh.snapshot(44500, 0).limitReason, "selection-deadline");
 });
 
 test("terminal transport deadlines and late delivery keep their actual causes", () => {
   let now = 0;
   const selection = new ContextTiming(undefined, () => now); selection.beginSelection();
-  now = 29499; selection.endSelection("deadline", undefined, true);
+  now = 44499; selection.endSelection("deadline", undefined, true);
   assert.equal(selection.snapshot().limitReason, "selection-deadline", "Transport timers round to milliseconds");
   const provider = new ContextTiming(undefined, () => now); provider.beginSelection();
   now += 1000; provider.endSelection("deadline"); assert.equal(provider.snapshot().limitReason, "provider-deadline");
   const cancelled = new ContextTiming(undefined, () => now); cancelled.beginSelection();
   cancelled.endSelection("cancelled", AbortSignal.abort()); assert.equal(cancelled.snapshot().limitReason, "caller-cancelled");
   const successful = new ContextTiming(undefined, () => now); successful.beginSelection();
-  now += 150; successful.endSelection("answered"); now += 30000;
+  now += 150; successful.endSelection("answered"); now += 45000;
   assert.equal(successful.snapshot().limitReason, null); assert.equal(successful.snapshot().operationOverrunMs, 150);
 });
 

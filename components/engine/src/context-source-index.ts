@@ -1,6 +1,7 @@
 import { extname } from "node:path";
 import { sourceFamilies } from "./checkers/comment-registry.ts";
 import { structuredDocument } from "./structured-document.ts";
+import { isMap, isScalar, parseDocument } from "yaml";
 
 const bounded = (text: string, bytes: number) => Buffer.from(text).subarray(0, bytes).toString("utf8").replace(/\uFFFD$/u, "");
 function firstMatches(text: string, expression: RegExp, count: number, bytes: number): string[] {
@@ -11,6 +12,7 @@ function firstMatches(text: string, expression: RegExp, count: number, bytes: nu
 /** Inspect a small preamble, not arbitrary comments or executable string literals in the file body. */
 function leadingDocumentation(path: string, text: string): string {
   const python = /\.py$/iu.test(path);
+  const hashComments = python || /\.(?:sh|bash|zsh|ya?ml|toml)$/iu.test(path) || /(?:^|\/)(?:Makefile|Dockerfile|Gemfile|Podfile|justfile)$/iu.test(path);
   let rest = text.slice(0, 4096).replace(/^\uFEFF/u, "");
   const useful = (comment: string) => comment.replace(/^\s*\*\s?/gmu, " ").split("\n")
     .filter(line => !/^\s*(?:copyright|SPDX|licensed under|eslint[- ]|@ts-|noinspection|noqa\b|type:\s*ignore|pylint|ruff:|flake8|coding\s*[:=]|-\*-|region\b|endregion\b|swiftlint|sourceMappingURL)/iu.test(line))
@@ -28,11 +30,11 @@ function leadingDocumentation(path: string, text: string): string {
     }
     const shebang = rest.match(/^#!\s*\/[^\n]*(?:\n|$)/u);
     if (shebang) { rest = rest.slice(shebang[0].length); continue; }
-    const lines = rest.match(python ? /^(?:#[^\n]*(?:\n|$))+/u : /^(?:\/\/[^\n]*(?:\n|$))+/u);
+    const lines = rest.match(hashComments ? /^(?:#[^\n]*(?:\n|$))+/u : /^(?:\/\/[^\n]*(?:\n|$))+/u);
     if (lines) {
       rest = rest.slice(lines[0].length);
       if (/copyright|SPDX|licensed under|permission is hereby granted/iu.test(lines[0])) continue;
-      const value = useful(lines[0].replace(python ? /^#\s?/gmu : /^\/\/[/!]?\s?/gmu, ""));
+      const value = useful(lines[0].replace(hashComments ? /^#\s?/gmu : /^\/\/[/!]?\s?/gmu, ""));
       if (value) return value; continue;
     }
     // Preamble declarations/directives are not prose. A later literal doc comment may still be useful.
@@ -41,6 +43,32 @@ function leadingDocumentation(path: string, text: string): string {
     break;
   }
   return "";
+}
+
+/** Read literal configuration labels without resolving aliases or exposing arbitrary field values. */
+function configurationClues(path: string, text: string) {
+  const keys: string[] = [], purpose: string[] = [];
+  const keepKey = (key: string) => /^[A-Za-z_][A-Za-z0-9_.-]{0,63}$/u.test(key);
+  if (/\.(?:json|ya?ml)$/iu.test(path)) {
+    try {
+    if (/\.json$/iu.test(path)) JSON.parse(text);
+    const document = parseDocument(text, { schema: "core", uniqueKeys: true });
+    if (document.errors.length || document.warnings.length || !isMap(document.contents)) return { keys, purpose };
+    for (const pair of document.contents.items) {
+      if (!isScalar(pair.key) || typeof pair.key.value !== "string") continue;
+      const key = pair.key.value;
+      if (keys.length < 16 && keepKey(key)) keys.push(key);
+      if (["name", "title", "description", "summary"].includes(key) && isScalar(pair.value) && typeof pair.value.value === "string")
+        purpose.push(bounded(pair.value.value.replace(/\s+/gu, " ").trim(), 320));
+    }
+    } catch { /* Invalid or unsupported configuration remains a path, never invented prose. */ }
+  } else if (/\.toml$/iu.test(path)) {
+    for (const match of text.matchAll(/^\s*([A-Za-z_][A-Za-z0-9_.-]{0,63})\s*=/gmu)) {
+      if (keys.length === 16) break;
+      keys.push(match[1]!);
+    }
+  }
+  return { keys: [...new Set(keys)], purpose };
 }
 
 /** Literal source clues improve misleading filenames without inventing a second description owner. */
@@ -72,7 +100,8 @@ export function sourceClues(path: string, bytes: Buffer) {
   } catch { metadataStatus = "invalid"; }
   if (markdown && text.startsWith("---\n") && frontmatter === undefined) metadataStatus = "incomplete-or-over-limit";
   const summary = typeof metadata.summary === "string" ? metadata.summary.replace(/\s+/gu, " ").trim() : undefined;
-  const documentation = bounded(summary ?? (markdown ? "" : leadingDocumentation(path, text)), 320);
+  const configuration = configurationClues(path, text);
+  const documentation = bounded(summary ?? (markdown ? "" : leadingDocumentation(path, text) || configuration.purpose.join("; ")), 320);
   const lifecycle: Record<string, string | string[]> = {};
   for (const key of ["status", "supersedes", "superseded_by", "replaced_by"]) {
     const value = metadata[key];
@@ -80,8 +109,9 @@ export function sourceClues(path: string, bytes: Buffer) {
     else if (Array.isArray(value)) lifecycle[key] = value.filter((item): item is string => typeof item === "string").slice(0, 8).map(item => bounded(item, 256));
   }
   // All text remains untrusted quoted source. It is never promoted to policy or factual proof.
-  return { text: headings.length || symbols.length || documentation || Object.keys(lifecycle).length
-    ? JSON.stringify({ path, headings, symbols: [...new Set(symbols)], documentation, ...(markdown ? { lifecycle, metadataStatus } : {}) }) : null,
+  return { text: headings.length || symbols.length || documentation || configuration.keys.length || Object.keys(lifecycle).length
+    ? JSON.stringify({ path, headings, symbols: [...new Set(symbols)], documentation,
+      ...(configuration.keys.length ? { configurationKeys: configuration.keys } : {}), ...(markdown ? { lifecycle, metadataStatus } : {}) }) : null,
     overviewObserved: Boolean(documentation.trim() && !/^(?:["']?\s*["']?|[|>][+-]?|["']?(?:todo|tbd|null)["']?)$/iu.test(documentation)),
     documentationApplicable: markdown || Boolean(sourceFamilies[extname(path).toLowerCase()]) };
 }

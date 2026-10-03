@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, realpathSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { providerCommand } from "../src/provider-command.ts";
+import { providerCommand, providerOutputRetention, DEFAULT_PROVIDER_OUTPUT_LIMIT } from "../src/provider-command.ts";
 
 test("all native invocation plans retain exact selection and keep assignment out of argv", () => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "provider-plan-")));
@@ -34,5 +34,20 @@ test("invocation planning refuses uncarried scope and invalid owner limits befor
     assert.throws(() => providerCommand({ ...base, additionalRoots: [realpathSync(tmpdir())] }, root), /structured assignment/);
     assert.throws(() => providerCommand({ ...base, conversationId: "--other" }, root), /conversation/);
     assert.throws(() => providerCommand({ ...base, requiredTools: Array(129).fill("command") }, root), /required provider tools/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("omitted worker-stream allowance uses four MiB while explicit small allowances remain visible", () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "provider-output-default-")));
+  try {
+    const base = { id: "job", provider: "codex" as const, workspace: root, executable: process.execPath,
+      model: "explicit-model", effort: "high", prompt: "Return a concise review", deadlineMs: 1000 };
+    assert.equal(providerCommand(base, root).outputLimit, DEFAULT_PROVIDER_OUTPUT_LIMIT);
+    assert.deepEqual(providerOutputRetention(), { limitBytes: 4 * 1024 * 1024, source: "default",
+      scope: "whole-native-stream", summary: "separately-bounded", warning: null });
+    assert.equal(providerCommand({ ...base, outputLimit: 6000 }, root).outputLimit, 6000);
+    assert.equal(providerOutputRetention(6000).warning, "small-worker-stream-allowance");
+    for (const limit of [0, NaN, 64 * 1024 * 1024 + 1]) assert.throws(() => providerOutputRetention(limit), /output/i);
+    assert.throws(() => providerOutputRetention(null as unknown as number), /output/i);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

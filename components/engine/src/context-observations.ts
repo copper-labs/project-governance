@@ -305,13 +305,15 @@ export function importContextUsage(workspace: string, entryId: string, transcrip
 }
 
 /** A host-supplied transcript links turns on session end; never on the prompt's critical path. */
-export function collectContextHostUsage(workspace: string, session: string, transcript: string) {
+export function collectContextHostUsage(workspace: string, session: string, transcript: string,
+  options: { turn?: string; captured?: ReturnType<typeof readHostUsageWindow> } = {}) {
   try {
-    const started = Date.now(), window = readHostUsageWindow(transcript), directory = join(contextStateRoot(workspace), "prompt-session-index", digest(session).slice(7));
+    const started = Date.now(), window = options.captured ?? readHostUsageWindow(transcript), directory = join(contextStateRoot(workspace), "prompt-session-index", digest(session).slice(7));
     if (!window.records.length) return { state: "format-unrecognized", missingUsage: "unknown" };
     const turns = new Set(window.records.flatMap(raw => {
       const payload = object(object(raw).payload);
-      return payload.thread_id === session ? [String(payload.root_turn_id ?? payload.turn_id)] : [];
+      const turn = String(payload.root_turn_id ?? payload.turn_id);
+      return payload.thread_id === session && (options.turn === undefined || turn === options.turn) ? [turn] : [];
     }));
     const turnPrefixes = new Set([...turns].map(turn => digest(turn).slice(7)));
     const matching = readdirSync(directory).flatMap(name => {
@@ -330,6 +332,30 @@ export function collectContextHostUsage(workspace: string, session: string, tran
       invalid: results.reduce((sum, value) => sum + value.invalid, 0), ambiguous: entries.length - unique.length,
       truncated: names.length > 128 || window.truncated || unique.length < entries.length || results.length < unique.length, missingUsage: "unknown" };
   } catch { return { state: "unavailable", reason: "native-transcript-or-entry-unavailable", missingUsage: "unknown" }; }
+}
+
+/** A neutral end-of-turn observation cannot reserve, release, accept or continue developer work. */
+export function observeContextHostUsage(workspace: string, event: Record<string, unknown>) {
+  const session = event.session_id, turn = event.turn_id;
+  if (typeof session !== "string" || !session.trim() || session.length > 128 || /[\x00-\x1f]/u.test(session) ||
+      typeof turn !== "string" || !turn.trim() || turn.length > 256 || /[\x00-\x1f]/u.test(turn))
+    return { state: "missing-native-identity", missingUsage: "unknown" };
+  let window: ReturnType<typeof readHostUsageWindow> | undefined;
+  let result: ReturnType<typeof collectContextHostUsage>;
+  try {
+    if (typeof event.transcript_path !== "string") throw new Error("missing-transcript");
+    window = readHostUsageWindow(event.transcript_path);
+    result = collectContextHostUsage(workspace, session, event.transcript_path, { turn, captured: window });
+  } catch { result = { state: "unavailable", reason: "native-transcript-or-entry-unavailable", missingUsage: "unknown" }; }
+  const id = digest({ kind: "usage-collection", session, turn, source: window?.source ?? null, state: result.state }).slice(7);
+  try {
+    publishContextObservation(join(contextStateRoot(workspace), "context-observations", `${id}.json`), {
+      version: 1, kind: "usage-collection", workspace: realpathSync(workspace), session, turn, createdAt: new Date().toISOString(),
+      status: result.state, reason: result.state === "observed" ? null : result.state, collection: result,
+      source: window?.source ?? null, acceptance: "unknown", originalReadCoverage: "unknown", provenance: "codex-stop-observer",
+    });
+  } catch { /* Analytics failure must not prevent the host's ordinary stop. */ }
+  return result;
 }
 
 /** Explicit observations never rewrite the prepared entry or infer acceptance from a passing check. */

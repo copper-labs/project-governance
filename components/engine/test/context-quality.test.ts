@@ -42,6 +42,31 @@ test("deep native paths and source variants remain eligible without admitting un
   assert.equal(extractSourceFacts("src/view.svelte", Buffer.from("<h1>Session</h1>\n")).coverage, "heuristic");
 });
 
+test("literal shell and configuration clues recover purpose without arbitrary values or alias expansion", () => {
+  const shell = sourceClues("scripts/ios-runtime.sh", Buffer.from("#!/usr/bin/env bash\n# Build the iOS sample and collect owned runtime logs.\nTOKEN='PRIVATE_CANARY'\n"))!;
+  assert.match(JSON.parse(shell.text!).documentation, /Build the iOS sample/);
+  assert.ok(!shell.text!.includes("PRIVATE_CANARY"));
+  const yaml = sourceClues(".github/actions/setup-linux-validation/action.yml", Buffer.from("name: Setup Linux Validation\ndescription: Prepare local validation tools.\non: [push]\ninputs:\n  token:\n    default: PRIVATE_CANARY\n"))!;
+  const descriptor = JSON.parse(yaml.text!);
+  assert.match(descriptor.documentation, /Prepare local validation tools/);
+  assert.deepEqual(descriptor.configurationKeys, ["name", "description", "on", "inputs"]);
+  assert.ok(!yaml.text!.includes("PRIVATE_CANARY"));
+  const json = sourceClues("tsconfig.json", Buffer.from(JSON.stringify({ compilerOptions: { secret: "PRIVATE_CANARY" }, scripts: { test: "PRIVATE_COMMAND" } })))!;
+  assert.deepEqual(JSON.parse(json.text!).configurationKeys, ["compilerOptions", "scripts"]);
+  assert.ok(!json.text!.includes("PRIVATE_"));
+  assert.equal(sourceClues("invalid.yaml", Buffer.from("description: first\ndescription: duplicate\n"))!.text, null);
+  const alias = sourceClues("alias.yaml", Buffer.from("other: &purpose PRIVATE_CANARY\ndescription: *purpose\n"))!;
+  assert.equal(JSON.parse(alias.text!).documentation, "");
+  assert.ok(!alias.text!.includes("PRIVATE_CANARY"));
+  assert.equal(sourceClues("unlabelled.txt", Buffer.from("Ordinary text has no declared purpose or source symbols.\n"))!.text, null);
+});
+
+test("Kotlin expect, actual and data modifiers retain literal declaration names", () => {
+  const facts = extractSourceFacts("src/BlockingLoad.kt", Buffer.from("package example\ninternal expect fun runBlockingLoad(block: suspend () -> Unit)\ninternal actual fun assertBlockingUploadCallAllowed() {}\ndata class UploadState(val active: Boolean)\n"));
+  assert.deepEqual(facts.spans.map(span => span.name), ["runBlockingLoad", "assertBlockingUploadCallAllowed", "UploadState"]);
+  assert.deepEqual(JSON.parse(facts.descriptor!).symbols, ["runBlockingLoad", "assertBlockingUploadCallAllowed", "UploadState"]);
+});
+
 test("separate requested sections fit one bounded packet with exact source ranges", () => {
   const lines = ["# Current implementation\n", "The current code uses one dependency.\n", ...Array(100).fill("unrelated historical detail\n"),
     "# Proposed boundaries\n", "The proposed product would split dependencies.\n", ...Array(100).fill("unrelated future detail\n")];

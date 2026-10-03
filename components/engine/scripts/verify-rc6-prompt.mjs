@@ -263,7 +263,7 @@ function verifyTaskSwitch({ invoke, launcher, workspace, environment, session, c
   assert.equal(refreshed.selection.binding.taskId, second.task.taskId);
   assert.equal(refreshed.expansion.entry, first.contextEntry.entryId);
   assert.ok(refreshed.expansion.transitionId);
-  assert.equal(refreshed.timing.operationBudgetMs, 30000);
+  assert.equal(refreshed.timing.operationBudgetMs, 45000);
   assert.equal(refreshed.metadata.reason, 'answered');
   assert.equal(readFileSync(calls, 'utf8').trim().split('\n').length, 2);
   delete environment.HARNESS_SESSION;
@@ -346,6 +346,17 @@ function verifyRc10Delivery({ invoke, hooks, workspace, launcher, environment, t
   }
 }
 
+/** End-of-turn usage must survive installed transport without ending the startup session. */
+function verifyStopUsage({ temporary, event, invoke, hooks, launcher }) {
+  const transcript = join(temporary, 'host-usage.jsonl');
+  writeFileSync(transcript, JSON.stringify({ type: 'token_usage_record', payload: { thread_id: event.session_id,
+    root_turn_id: event.turn_id, response_id: 'installed-response', usage: { input_tokens: 100, output_tokens: 20 } } }) + '\n');
+  const stop = { ...event, hook_event_name: 'Stop', transcript_path: transcript };
+  for (let replay = 0; replay < 2; replay++)
+    assert.deepEqual(invoke('/bin/sh', ['-c', hooks.hooks.Stop[0].hooks[0].command], JSON.stringify(stop)), {});
+  assert.deepEqual(invoke(launcher, ['telemetry', 'context', 'status']).usage, { responses: 1, inputTokens: 100, outputTokens: 20 });
+}
+
 export async function verifyRc6Prompt(packageRoot, archive) {
   const temporary = realpathSync(mkdtempSync(join(tmpdir(), 'rc6-installed-prompt-'))), workspace = join(temporary, 'repo');
   mkdirSync(workspace);
@@ -375,12 +386,15 @@ export async function verifyRc6Prompt(packageRoot, archive) {
     assert.equal(hooks.hooks.UserPromptSubmit.length, 1);
     const handler = hooks.hooks.UserPromptSubmit[0].hooks[0];
     assert.equal(handler.additionalContextLimit, 0);
-    assert.equal(handler.timeout, 40);
+    assert.equal(handler.timeout, 55);
+    assert.equal(hooks.hooks.Stop.length, 1);
+    assert.equal(hooks.hooks.Stop[0].hooks[0].timeout, 3);
     const event = { session_id: 'installed-host', turn_id: 'turn-one', hook_event_name: 'UserPromptSubmit', cwd: workspace, prompt: 'Fix the app launch.' };
     const output = invoke('/bin/sh', ['-c', handler.command], JSON.stringify(event));
     assert.equal(output.hookSpecificOutput.hookEventName, 'UserPromptSubmit');
     assert.match(output.hookSpecificOutput.additionalContext, /app.ts/);
     const launcher = join(workspace, '.governance/runtime/bin/project-governance');
+    verifyStopUsage({ temporary, event, invoke, hooks, launcher });
     const help = spawnSync(launcher, ['--help'], { cwd: workspace, env: environment, encoding: 'utf8', timeout: 5000 });
     assert.equal(help.status, 0, help.stderr);
     assert.match(help.stdout, /context-route/);

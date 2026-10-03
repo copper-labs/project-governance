@@ -269,7 +269,7 @@ test("budget-fitted breadth preserves the next file and omits excess units befor
   ].map(item => ({ ...item, sourceDigest: digest(item.excerpt) }));
   const spans = Object.fromEntries(candidates.map(item => [item.id, extractSourceFacts(item.id, Buffer.from(item.excerpt)).spans]));
   const scope = { workspace: root, taskId: "task", taskRevision: "1" }, invocationId = "c".repeat(64);
-  assert.equal(reserveDecisionCall(root, contextBudgetScope(scope, invocationId), "earlier-metadata", 5000, settings.budget).state, "reserved");
+  assert.equal(reserveDecisionCall(root, contextBudgetScope(scope, invocationId), "earlier-metadata", 5000, settings.contextBudget).state, "reserved");
   const deliveredPaths = new Set<string>();
   const runtime = new DecisionRuntime(settings, root, { coordinationRoot: root, token: "fixture", fetch: async (_url, init) => {
     const wire = JSON.parse(String(init?.body));
@@ -308,7 +308,7 @@ test("uncertain roles and unavailable passage advice preserve the metadata order
     invocationId, policyDigest: settings.configDigest, deadlineAt: performance.now() + 5000, excerptBytes: 1024 };
   const noToken = await selectContextPassages(new DecisionRuntime(settings, root, { token: "", fetch: async () => { throw Error("must stay local"); } }), candidates, input);
   assert.equal(noToken.reason, "provider-unavailable");
-  reserveDecisionCall(root, contextBudgetScope(scope, invocationId), "spent", settings.budget.maxRequestBytes, settings.budget);
+  reserveDecisionCall(root, contextBudgetScope(scope, invocationId), "spent", settings.contextBudget.maxRequestBytes, settings.contextBudget);
   const exhausted = await selectContextPassages(new DecisionRuntime(settings, root, { token: "fixture", fetch: async () => { throw Error("no budget"); } }), candidates, input);
   assert.equal(exhausted.reason, "passage-budget"); assert.equal(exhausted.decisions.length, 0);
   for (const advice of [noToken, exhausted]) {

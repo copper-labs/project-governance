@@ -394,7 +394,7 @@ test("the shared byte allowance can assess more than 256 captured units without 
     deadlineAt: performance.now() + 5000, excerptBytes: 1024, sourceSpans });
   assert.equal(advice.assessedUnitCount, 351); assert.equal(advice.eligibleUnitCount, 351);
   assert.equal(advice.judgments[candidates[4]!.id]?.preferredSpans[0]?.name, "preserve");
-  assert.ok(requestBytes <= settings.budget.maxRequestBytes); assert.ok(advice.packingMs >= 0 && advice.preparationMs >= 0);
+  assert.ok(requestBytes <= settings.contextBudget.maxRequestBytes); assert.ok(advice.packingMs >= 0 && advice.preparationMs >= 0);
 });
 
 test("procedure selection preserves parent constraints and a shared prelude while competing with source proof", async t => {
@@ -516,7 +516,7 @@ test("several relevant guide sections cannot crowd out implementation and assert
   assert.ok(packet.omittedJudgedUnits.some(item => item.path === guide.id)); assert.ok(packet.bytes <= 2300);
 });
 
-test("a large descriptor catalog reaches every permitted file within the declared family allowance", { timeout: 30000 }, async t => {
+test("a large descriptor catalog reaches every permitted file within the default family allowance", { timeout: 45000 }, async t => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "rc10-large-catalog-"))); t.after(() => rmSync(root, { recursive: true, force: true }));
   const paths = Array.from({ length: 8255 }, (_, index) => `src/module-${String(index % 47).padStart(2, "0")}/long-component-${String(index).padStart(5, "0")}.ts`);
   const subject = { root, source: () => ({ file_type: "regular" }),
@@ -524,7 +524,7 @@ test("a large descriptor catalog reaches every permitted file within the declare
     readBatch: (names: string[]) => new Map(names.map(path => [path, Buffer.from("export function recoverOwner() { return 'retain queue'; }\n")])),
   } as unknown as ValidationSubject;
   const configured = profileDecisionSettings({ continuity: { decisions: { mode: "auto", allowed_data_classes: ["metadata", "source"], allowed_metadata_paths: ["src/**"], allowed_source_paths: ["src/**"],
-    budget: { max_calls: 1024, max_request_bytes: 8388608 }, consumers: { DL03: { mode: "auto", questions: ["context.metadata-relevance/1"] } } } } });
+    consumers: { DL03: { mode: "auto", questions: ["context.metadata-relevance/1"] } } } } });
   const seen = new Set<string>(); let wireBytes = 0;
   const runtime = new DecisionRuntime(configured, root, { coordinationRoot: root, token: "fixture", fetch: async (_url, init) => {
     const body = String(init?.body), wire = JSON.parse(body); wireBytes += Buffer.byteLength(body);
@@ -535,9 +535,9 @@ test("a large descriptor catalog reaches every permitted file within the declare
     })) });
   } });
   const selection = await selectContextMetadata(subject, contextMetadataCatalog(paths, "Prevent losing pending work", [], [], new Set()), "Prevent losing pending work",
-    runtime, { workspace: root, taskId: "task", taskRevision: "1" }, digest("large"), "large", undefined, performance.now() + 30000);
+    runtime, { workspace: root, taskId: "task", taskRevision: "1" }, digest("large"), "large", undefined, performance.now() + 45000);
   assert.equal(selection.coverage.complete, true, JSON.stringify(selection.coverage)); assert.equal(seen.size, paths.length);
-  assert.equal(selection.order[0], paths.at(-1)); assert.ok(wireBytes <= 8388608);
+  assert.equal(selection.order[0], paths.at(-1)); assert.ok(wireBytes <= configured.contextBudget.maxRequestBytes);
   assert.equal(selection.sourceIndex.descriptorCoverage.descriptorAnsweredCount, paths.length);
   assert.equal(selection.budgetFinalized, true);
 });

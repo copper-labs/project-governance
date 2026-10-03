@@ -263,6 +263,19 @@ dispositions:
     an active reader through one deliberate cutover. Native hook invocation and installation
     requests already have helpers. Keeping the scenario together preserves its before-and-after
     ownership assertions without duplicating expensive installed setup or hiding preserved state.
+- finding: quality.large-function
+  path: components/engine/scripts/verify-rc6-prompt.mjs
+  symbol: verifyRc6Prompt
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex source cohesion review and Claude Opus 5.5 medium completed-candidate review
+  approved_on: '2026-10-02'
+  responsibility: Qualify one installed native prompt lifecycle using a shared disposable installation.
+  rationale: Initialization, prompt delivery, task rebinding and final release carry the same installed
+    launcher, host environment and reader identity. Turn-end usage, source delivery, reader recovery,
+    owner rollover, native envelopes and worktree cutover already have separate scenario helpers.
+    Keeping the remaining installation-to-cleanup sequence together preserves ownership and no-call
+    assertions without duplicating the installed fixture or adding a mutable scenario-state abstraction.
 - finding: quality.large-file
   path: components/engine/test/context-rc10.test.ts
   symbol: <file>

@@ -4,7 +4,7 @@ import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { submitProviderJob, submitProviderFollowUp } from "../src/provider-job.ts";
-import { submitCommand, waitCommand } from "../src/process-owner.ts";
+import { processLiveFingerprint, submitCommand, waitCommand } from "../src/process-owner.ts";
 import { reconcileCommandClaims } from "../src/command-claim-recovery.ts";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -13,8 +13,20 @@ import { providerCommand } from "../src/provider-command.ts";
 import { Store } from "../../harness/src/store/store.ts";
 import { defaultDbPath, workContext } from "../../harness/src/store/location.ts";
 
+async function settleFixtureOwners(directories: string[]) {
+  const owners = directories.flatMap(directory => ["owner.json", "guardian.json"].map(name =>
+    JSON.parse(readFileSync(join(directory, name), "utf8")) as { pid: number; fingerprint: string }));
+  const until = Date.now() + 5000;
+  // A terminal native receipt can precede its supervisor's final inspection/write.
+  while (owners.some(owner => processLiveFingerprint(owner.pid) === owner.fingerprint)) {
+    assert.ok(Date.now() < until, "fixture owners must exit before their evidence is removed");
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+}
+
 test("explicit provider submission and follow-up use one owner, preserve constraints and never repeat an acknowledged job", async () => {
   const root = mkdtempSync(join(tmpdir(), "provider-job-")), previousEnvironment = { ...process.env };
+  const directories: string[] = [];
   process.env.XDG_STATE_HOME = join(root, "private-state");
   delete process.env.GOVERNANCE_DECISION_CONTEXT; delete process.env.HARNESS_SESSION; delete process.env.CODEX_THREAD_ID;
   try {
@@ -34,6 +46,7 @@ console.log(JSON.stringify({type:'result',subtype:'success',structured_output:{o
       registry: join(root, "registry.sqlite"), deadlineMs: 3000, outputLimit: 10000 };
     const requestFile = join(root, "request.json"); writeFileSync(requestFile, JSON.stringify(options));
     const first = JSON.parse(execFileSync(process.execPath, [fileURLToPath(new URL("../src/cli.ts", import.meta.url)), "provider-submit", "--request", requestFile], { cwd: root, encoding: "utf8" }));
+    directories.push(first.directory);
     const handleArgs = ["--directory", first.directory, "--digest", first.requestDigest];
     assert.equal((await providerJobCommand("provider-wait", [...handleArgs, "--milliseconds", "5000"])).exitCode, 0);
     const listing = (await providerJobCommand("provider-list", ["--workspace", root])).result as { jobs: Array<{ directory: string; requestDigest: string; state: string }> };
@@ -63,17 +76,20 @@ console.log(JSON.stringify({type:'result',subtype:'success',structured_output:{o
     assert.equal(JSON.parse(readFileSync(join(first.directory, "request.json"), "utf8")).decisionBinding.task, null);
     const boundOptions = { ...options, id: "ambient-job" };
     const bound = await submitProviderJob(join(root, "ambient-job"), boundOptions);
+    directories.push(bound.directory);
     assert.equal((await waitCommand(bound.directory, bound.requestDigest, 5000)).receipt?.state, "succeeded");
     bind("Replacement task intent");
     assert.equal((await submitProviderJob(bound.directory, boundOptions)).submitted, false);
     assert.equal(JSON.parse(readFileSync(join(bound.directory, "request.json"), "utf8")).decisionBinding.task.taskId, ambient.taskId);
     const legacyOptions = { ...options, id: "legacy-job" }, legacyDirectory = join(root, "legacy-job");
     const legacy = submitCommand(legacyDirectory, { ...providerCommand(legacyOptions, legacyDirectory), runtime: null });
+    directories.push(legacy.directory);
     assert.equal((await waitCommand(legacy.directory, legacy.requestDigest, 5000)).receipt?.state, "succeeded");
     assert.equal((await submitProviderJob(legacy.directory, legacyOptions)).submitted, false);
     const follow = { id: "second", prompt: "Inspect again", directory: join(root, "second") };
     const followFile = join(root, "follow.json"); writeFileSync(followFile, JSON.stringify({ id: follow.id, prompt: follow.prompt }));
     const second = (await providerJobCommand("provider-follow-up", [...handleArgs, "--request", followFile])).result as { directory: string; requestDigest: string };
+    directories.push(second.directory);
     assert.equal((await waitCommand(second.directory, second.requestDigest, 5000)).receipt?.state, "succeeded");
     assert.equal(submitProviderFollowUp(first.directory, first.requestDigest, { ...follow, directory: second.directory }).submitted, false);
     const recorded = JSON.parse(readFileSync(join(second.directory, "request.json"), "utf8"));
@@ -86,6 +102,7 @@ console.log(JSON.stringify({type:'result',subtype:'success',structured_output:{o
     assert.equal(completedJobs.jobs.length, 2, "the managed list excludes explicitly placed external fixture jobs");
   } finally {
     process.env = previousEnvironment;
+    await settleFixtureOwners(directories);
     rmSync(root, { recursive: true, force: true });
   }
 });

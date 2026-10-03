@@ -1,4 +1,5 @@
 import { performance } from "node:perf_hooks";
+import { CONTEXT_OPERATION_MS } from "./context-timing.ts";
 import { digest } from "./core.ts";
 import { decisionNativeUsage, type DecisionFailureStage } from "./decision-schema.ts";
 import { ProviderPool, PROVIDER_LEASE_CLEANUP_MS, PROVIDER_CONCURRENCY, PROVIDER_TOKENS_PER_SECOND, PROVIDER_REQUESTS_PER_MINUTE } from "./decision-admission.ts";
@@ -79,7 +80,7 @@ export class JevDecisionClient {
       return { ...outcome, timing };
     };
     if (signal?.aborted) return done({ ok: false, reason: decisionCancellationReason(signal), failureStage: "transport" });
-    if (!Number.isSafeInteger(deadlineMs) || deadlineMs < 1 || deadlineMs > 30000 || !Number.isFinite(operationDeadline))
+    if (!Number.isSafeInteger(deadlineMs) || deadlineMs < 1 || deadlineMs > CONTEXT_OPERATION_MS || !Number.isFinite(operationDeadline))
       return done({ ok: false, reason: "invalid-deadline", failureStage: "transport" });
     if (!this.#token) return done({ ok: false, reason: "missing-token", failureStage: "transport" });
     const credential = digest({ endpoint: DECISION_ENDPOINT, token: this.#token });

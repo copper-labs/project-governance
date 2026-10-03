@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-09-25
-updated: 2026-10-01
+updated: 2026-10-02
 summary: Enable prompt delivery and optional metadata selection, then inspect actual usage without inferring savings.
 ---
 
@@ -137,6 +137,24 @@ an old cached body current. Each file is limited to 256 KiB, each read window to
 invocation to 32 MiB. TS/JS syntax facts and Markdown clues are bounded; other languages may have
 only literal or heuristic clues. A missing link in a partial index is not proof that no dependency exists.
 
+The approved operational repair uses the same 45-second clock for preparation and selection;
+extraction no longer receives a separate one-second allowance. Explicit index refresh also has
+45 seconds. Unchanged facts are reused. Literal shell comments, configuration purpose fields and
+key names, and Kotlin `expect`/`actual` declarations improve descriptors without generated prose.
+The extractor version changes so an older empty descriptor is re-examined once.
+
+Projection quality reports `pathOnlyReasons` with bounded examples. `no-supported-literal-clues`
+means the file was read but this extractor found no supported labels. It is not automatically a
+documentation defect. Binary content, oversized files, extraction failures and deadline deferrals
+remain separate causes. A verified unchanged oversized blob is not repeatedly read; an edited or
+smaller file is re-examined. Every eligible path remains available to selection.
+
+Maintenance happens before a fresh context selection or through explicit `context-index refresh`;
+there is no background watcher. An already-delivered packet remains a captured snapshot. Replay
+and provider dispatch revalidate its selected sources and policy, and reject stale input. The local
+catalog is cached, but a new prompt ordinarily asks JEV to assess relevance again. Each worktree
+has its own disposable index, so another branch cannot replace its facts.
+
 ## Opt in to bounded metadata selection
 
 Merge this fragment into the existing `continuity.decisions` declaration, choosing stable project
@@ -152,12 +170,12 @@ continuity:
     evidence_bytes: 16384
     max_candidates: 64
     budget:
-      max_calls: 256
-      max_request_bytes: 4194304
+      max_calls: 512
+      max_request_bytes: 10485760
     consumers:
       DL03:
         mode: auto
-        questions: [context.metadata-relevance/1]
+        questions: [context.metadata-relevance/1, context.passage-evidence/1, context.passage-role/1]
 ```
 
 Set `JEV_TOKEN` in the host's inherited environment. Never place its value in agent instructions or
@@ -169,6 +187,18 @@ data class permits literal titles, symbols and short documentation extracted fro
 The example opts into both. Omit source approval for paths-only mode; it is weaker for misleading
 filenames. Full raw files and historical prose are not sent by this index consumer. Existing DL03 profiles do not acquire the new question
 or metadata permission merely by upgrading. Keep unrelated enabled consumer settings when merging.
+
+The example deliberately enables both metadata and passage selection. Metadata assesses files;
+the two passage questions assess relevant sections inside the captured source window. Upgrading
+preserves an existing project's explicit questions and allowances. Context doctor warns when source
+sharing is approved but passage selection remains disabled; this warning does not grant consent.
+
+The approved operational repair adds a neutral Codex `Stop` observer to collect supported native
+response usage at each turn's end. `SessionEnd` remains a catch-up path. Exact session, turn and
+response identities prevent cross-task attribution and duplicate counting. The observer never accepts
+a task, continues the turn, discovers updates or changes startup ownership. Unsupported transcripts,
+unobserved extra reads and task acceptance remain unknown. Review the changed managed hook hash in
+Codex after adopting it. See [the host Stop contract](https://learn.chatgpt.com/docs/hooks#stop).
 
 The catalog keeps the complete eligible inventory. Through RC8, JEV visits it in batches of up to
 63 questions through the serialized provider-health owner. The accepted RC9 changes are described
@@ -187,6 +217,13 @@ spent budget preserves the local fallback. Partial coverage remains useful but i
 packet: answered, unanswered, outside-sharing-scope and unavailable counts are distinct. It must not
 be described as a complete search or no-match proof. Descriptions are clues, not full summaries.
 
+The source capacity amendment uses 512 calls and 10 MiB for isolated context metadata/passage scopes
+when a budget is omitted. Ordinary task consumers retain 16 calls and 128 KiB. The settings owner supports
+explicit allowances up to 1,024 calls and 16 MiB. This fragment targets that next source candidate;
+older published runtimes retain their earlier ceilings. Existing explicit budgets are preserved
+and need a deliberate profile edit if they remain too small. Use preflight and actual coverage to
+check whether the complete permitted catalog and approved passage work fit.
+
 The example budget is an experiment allowance, not a claim that every repository fits. A native
 prompt entry and up to two requested expansions share one metadata allowance keyed to the entry ID.
 Calls and bytes already spent remain spent when the purpose changes or a provisional entry gains a
@@ -194,9 +231,10 @@ task binding. An exact duplicate can replay a retained answer within the origina
 A newer root turn, the completed second expansion, or 15 minutes closes the family to new calls.
 Missing-token or off-mode entry uses local fallback without allocating paid-family accounting.
 This allowance cannot spend review/CI capacity or the ordinary active-scope pool.
-Both pools retain the shared 8 MiB budget-store safety limit. Inspect actual coverage and budget
-receipts before changing these limits. Context preparation, selection and delivery use one
-30-second operation with a 40-second managed host envelope. There is no per-request context
+Both pools retain the shared 8 MiB budget-store file capacity; that is not a request-byte allowance.
+Inspect actual coverage and budget receipts before changing these limits. Context preparation,
+selection and delivery use one 45-second operation with a 55-second managed host envelope under
+the capacity amendment. There is no per-request context
 timeout. Overall cutoff does not trigger provider cooldown; a provider's own timeout still does.
 The native prompt path runs the enabled metadata and passage questions. Workflow advice remains
 on its deliberate command path. No provider is required for local routing.
@@ -337,7 +375,7 @@ passage stage checks the actual source and uses its answered scores to choose qu
 supported source/test roles. Uncertain quotes keep their ordinary limit and visible label. Shadow or
 unavailable advice keeps the local order.
 
-Metadata, passage assessment and delivery share one 30-second operation envelope, with a 40-second
+Metadata, passage assessment and delivery share one 45-second operation envelope, with a 55-second
 managed host timeout to return fallback and settle ownership. There is no per-request timeout.
 Provider admission still enforces the shared rate/concurrency limits. Verified measured input usage
 settles a conservative rate estimate; unknown usage remains reserved. Paid family calls and bytes

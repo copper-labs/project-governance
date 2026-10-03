@@ -26,8 +26,36 @@ A configured classifier or an answered relevance question does not establish tha
 
 RC10 concentrates on this path. Preserve the fixed coding model, optional JEV, the complete
 eligible inventory, explicit disclosure, mandatory guidance and deterministic fallback. Retain
-RC9.1's one 30-second retrieval envelope and 40-second managed host hook. Do not reintroduce a
+one 45-second retrieval envelope and 55-second managed host hook under the capacity amendment below. Do not reintroduce a
 per-request timer, a narrower lexical discovery list or a second paid allowance.
+
+## Capacity amendment — 2026-10-02
+
+Large permitted catalogs must not inherit a small first-pilot allowance by default. The next
+source candidate uses one 45-second operation, including preparation, admission, selection and
+delivery. The managed prompt hook allows 55 seconds so host setup and fallback can complete;
+the additional host time does not extend provider selection or create a per-call timer.
+
+Omitted budgets for isolated context metadata/passage scopes resolve to 512 calls and 10 MiB of
+cumulative request bytes. Ordinary task consumers retain their 16-call/128-KiB defaults. Explicit
+project budgets remain authoritative; upgrading does not silently replace a smaller declaration.
+The settings owner permits a deliberate allowance up to 1,024 calls and 16 MiB. Per-request
+payload limits, sharing permissions, provider rate/concurrency, family lifetime, duplicate reuse
+and already-spent accounting remain separate existing boundaries. The budget store's 8 MiB file
+capacity is not an 8 MiB provider-input allowance. Preflight reports required aggregate bytes and
+calls against the effective declaration, with the supported ceiling taken from the settings owner.
+
+Maintain the per-worktree index before each fresh selection. Reuse unchanged verified facts,
+reconcile additions/deletions and re-extract changed or uncertain sources within the existing
+local maintenance allowance. There is no background watcher and no implicit claim that a delivered
+packet follows subsequent edits. Revalidate captured sources before packet replay/provider dispatch;
+stale or unverified information cannot silently become current. An explicit refresh or the next
+fresh context request observes the changed worktree. Partial extraction stays visible.
+
+Cached descriptions avoid repeated local extraction. New prompts ordinarily require a new JEV
+relevance assessment; exact valid entry/family replay avoids duplicate provider work. Increasing
+this allowance does not establish cold-only spending, full coverage or measured savings. Published
+older runtimes and adopter pins retain their previous behavior until deliberate release/adoption.
 
 ## Current owners and gaps
 
@@ -215,11 +243,12 @@ and withheld source-backed expectations before selecting one production layout.
 Keep the existing bounded concurrency, shared admission and provider constraints. Report per-call
 HTTP time, admission/rate wait and operation wall time separately. Estimate whether the prepared
 catalog fits the configured family budget; show an explicit budget recommendation when it cannot.
-The existing decision-budget schema caps the family request allowance at 8 MB. The measured large
-and web catalog shapes depend on compact framing to qualify within that ceiling. If the compact
+The original RC10 decision-budget schema capped the family request allowance at 8 MB. The measured large
+and web catalog shapes depended on compact framing to qualify within that ceiling. The capacity
+amendment above permits an explicit allowance through 16 MiB using the same settings owner. If the compact
 layout loses decisive evidence or cannot fit the complete fully approved generated case, stop release
 qualification and report the failing constraint; do not silently expand authority or switch to a
-smaller inventory. An operator-approved allowance change within 8 MB uses the current budget owner. Do not open an unlimited
+smaller inventory. An operator-approved allowance change uses the current budget owner. Do not open an unlimited
 retry loop or hide the shortfall with a smaller candidate set.
 
 The shared rate owner reserves a conservative token estimate before dispatch. When a valid provider
@@ -433,6 +462,49 @@ not duplicate DL04's executable recipe selection, add automatic model routing, l
 or load all skill/runbook bodies into every prompt.
 
 ## E. Measure actual use and avoid the five demonstrated traps
+
+### Approved operational repair batch (2026-10-02)
+
+An indexed path without a descriptor is not automatically a documentation defect. Separate a
+successful read with no supported literal clues from unavailable bytes, extraction failure,
+deadline exhaustion and index capacity. Report reason totals and bounded examples in the existing
+index/route receipts. Keep every eligible path visible; richer clues cannot narrow JEV eligibility.
+
+Extend the existing literal extractor to read leading shell/configuration comments, declared
+configuration purpose fields and bounded field names, and Kotlin `expect`/`actual` declarations.
+Do not infer prose, execute configuration or transmit arbitrary data values. Configurations remain
+untrusted source; existing descriptor/body sharing permissions still apply. Bump the extractor
+identity so old empty facts cannot conceal newly supported clues. Actual missing overviews remain
+an incremental documentation task, owned by the existing documentation/comment checks.
+
+Remove the independent one-second automatic index-extraction window. Normal routing passes its
+original operation deadline, including the delivery reserve, into local preparation and selection.
+Explicit index refresh uses the same 45-second allowance. A cold index may consume that allowance;
+receipts must expose pending files and remaining selection time, never renew the clock. Unchanged
+verified facts and stable oversized-source exclusions are reusable; changed or uncertain sources
+must be observed again. No watcher, new background service or bulk model-generated descriptions.
+
+Optional source passage questions remain deliberately enabled per adopter, not inferred from a
+runtime update. An enabled metadata consumer with approved source paths but disabled passage
+questions needs an actionable passive readiness finding. Deliberate adoption raises previously
+explicit small family allowances and enables the approved passage questions without expanding
+disclosure paths or changing the fixed coding model. Required guidance allowance repairs must be
+based on measured route bytes; no mandatory document may be silently dropped.
+
+Native provider output retention is separate from the final completion summary. Supply a useful
+default retention allowance for an omitted provider `outputLimit`; preserve explicit limits and
+make small whole-stream limits visible in assignment preflight. Explain this distinction in the
+packaged command guide. Never change a retained request or silently retry a paid review.
+
+Collect supported native token records at the Codex `Stop` observation seam as well as `SessionEnd`.
+OpenAI's [hook contract](https://learn.chatgpt.com/docs/hooks#stop) supplies a turn identity and
+transcript reference; the transcript format itself is not stable. Reuse the exact response adapter,
+bounded reader and immutable usage receipts. A repeated stop deduplicates response measurements;
+unsupported, missing or truncated evidence stays visible. Return neutral JSON without blocking or
+continuing a turn, releasing its reservation, discovering an update, or calling a model. Never infer
+task acceptance from a stop, commit, passing check or a provider's claim. Acceptance requires an
+explicit evidence reference. Project proof expiry and dependency-policy failures remain project-owned
+repairs, not runtime waivers.
 
 | Lesson | RC10 response | Boundary |
 | --- | --- | --- |

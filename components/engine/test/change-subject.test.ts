@@ -138,7 +138,8 @@ test("bulk source descriptions use captured staged bytes and retain per-file exc
     assert.equal(batch.get("code.ts")?.toString(), "export function stagedSymbol() {}\n");
     assert.equal(batch.get("rename.txt")?.toString(), "retained content\n");
     assert.equal(batch.get("missing.ts"), "source-not-regular");
-    assert.equal(subject.readBatch(["code.ts"], 1).get("code.ts"), "source-unavailable-or-over-limit");
+    assert.equal(subject.readBatch(["code.ts"], 1).get("code.ts"), "source-over-limit");
+    assert.equal(subject.readBatch(["code.ts"], 256 * 1024, 1).get("code.ts"), "index-byte-limit");
   } finally { f.close(); }
 });
 

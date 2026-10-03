@@ -1,6 +1,6 @@
 import { loadProfileDecisionSettings, resolveConsumerMode } from "./decision-settings.ts";
 import { legacyProviderPolicy, readProviderAdmission, qualifiedProviderPair } from "./provider-admission.ts";
-import { providerCommand } from "./provider-command.ts";
+import { providerCommand, providerOutputRetention } from "./provider-command.ts";
 import { providerBinding, ProviderBindingError, type NativeProvider } from "./provider-binding.ts";
 
 /** Inspect explicit selection and local executability only. No authentication, model or network probes. */
@@ -39,7 +39,7 @@ export function providerAssignmentDoctor(request: import("./provider-job.ts").Pr
     const baseline = admission?.binding.baseline ?? base;
     const baselineQualified = qualified(String(baseline.model), String(baseline.effort));
     const categories = Object.entries(mapping?.categories ?? {}).map(([id, pair]) => ({ id, ...pair, qualified: qualified(pair.model, pair.effort) }));
-    return { ...base, routing: { mode: activation.mode, effect: activation.effect, baselineQualified, categories, proofs,
+    return { ...base, outputRetention: providerOutputRetention(request.outputLimit), routing: { mode: activation.mode, effect: activation.effect, baselineQualified, categories, proofs,
       status: admission && activation.mode === "auto" && activation.effect === "route-model" && baselineQualified && categories.some(item => item.qualified)
         ? "eligible-subject-to-decision-and-dispatch-recheck" : "baseline-only",
       override: admission?.binding.operatorOverride ?? null },

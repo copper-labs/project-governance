@@ -102,14 +102,14 @@ test("provider total-input and state-plus-largest-question limits are enforced s
   const ask: any = { ...request, evidenceLayout: "shared-v1", evidence: [{ ...request.evidence[0]!, id: "purpose", text: "p" },
     { ...request.evidence[0]!, text: "x".repeat(32000) }],
     questions: [{ name: "file-0", definitionId: "context.metadata-relevance/1", consumerId: "DL03", evidenceIds: ["purpose", "e"] }] };
-  const tooMuchState = prepareDecisionRequest(ask, settings, ["DL03"], "state-limit");
+  const tooMuchState = prepareDecisionRequest(ask, settings, ["DL03"], "state-limit", settings.budget);
   assert.equal(tooMuchState.ok, false);
   if (!tooMuchState.ok) { assert.equal(tooMuchState.reason, "input-budget"); assert.ok(tooMuchState.tokenEstimate! < 64000); }
   ask.evidence[1].text = "x".repeat(25000); ask.evidenceLayout = "per-question-v1";
   ask.questions.push({ ...ask.questions[0], name: "file-1" });
-  assert.equal(prepareDecisionRequest(ask, settings, ["DL03"], "within-both").ok, true);
+  assert.equal(prepareDecisionRequest(ask, settings, ["DL03"], "within-both", settings.budget).ok, true);
   ask.questions.push({ ...ask.questions[0], name: "file-2" });
-  const tooMuchTotal = prepareDecisionRequest(ask, settings, ["DL03"], "total-limit");
+  const tooMuchTotal = prepareDecisionRequest(ask, settings, ["DL03"], "total-limit", settings.budget);
   assert.equal(tooMuchTotal.ok, false);
   if (!tooMuchTotal.ok) { assert.equal(tooMuchTotal.reason, "input-budget"); assert.ok(tooMuchTotal.tokenEstimate! > 64000); }
 });

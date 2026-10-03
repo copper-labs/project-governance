@@ -141,8 +141,8 @@ export async function selectContextPassages(runtime: DecisionRuntime, candidates
   const purpose: EvidenceItem = { id: "purpose", text: input.purpose, sourceDigest: digest(input.purpose), provenance: "supplied", trust: "untrusted" };
   const spent = readDecisionBudget(runtime.stateRoot, input.family
     ? contextFamilyScope(input.scope.workspace, input.invocationId) : contextBudgetScope(input.scope, input.invocationId));
-  const remainingBytes = Math.max(0, runtime.settings.budget.maxRequestBytes - (spent?.bytes ?? 0));
-  const remainingCalls = Math.max(0, runtime.settings.budget.maxCalls - (spent?.calls ?? 0));
+  const remainingBytes = Math.max(0, runtime.settings.contextBudget.maxRequestBytes - (spent?.bytes ?? 0));
+  const remainingCalls = Math.max(0, runtime.settings.contextBudget.maxCalls - (spent?.calls ?? 0));
   const preparationStarted = performance.now();
   const preparation = preparePassages(runtime, candidates, input, remainingBytes, classificationBytes);
   preparationMs = performance.now() - preparationStarted;
@@ -168,7 +168,7 @@ export async function selectContextPassages(runtime: DecisionRuntime, candidates
       policyDigest: input.policyDigest, deadlineAt: input.deadlineAt, ...(input.signal ? { signal: input.signal } : {}) };
   };
   const size = (items: PreparedPassage[]) => {
-    const request = prepareDecisionRequest(makeAsk(items), runtime.settings, ["DL03"], "packing");
+    const request = prepareDecisionRequest(makeAsk(items), runtime.settings, ["DL03"], "packing", runtime.settings.contextBudget);
     return request.ok ? request.requestBytes : null;
   };
   const packingStarted = performance.now();

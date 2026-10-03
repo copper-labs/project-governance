@@ -8,13 +8,16 @@ import {startupHooks} from "../src/startup-hooks.ts";
 import {startupCommand} from "../src/startup-command.ts";
 
 test("startup hook proposal preserves authored settings and repeats without duplicates",()=>{
- const original={custom:{enabled:true},hooks:{SessionStart:[{matcher:"resume",hooks:[{type:"command",command:"authored-hook",timeout:5}]}]}};
+ const original={custom:{enabled:true},hooks:{SessionStart:[{matcher:"resume",hooks:[{type:"command",command:"authored-hook",timeout:5}]}],Stop:[{hooks:[{type:"command",command:"authored-stop",timeout:5}]}]}};
  const before=JSON.stringify(original),plan=startupHooks(original,"/project","/external/tasks.sqlite");
  assert.equal(JSON.stringify(original),before);
  assert.deepEqual(plan.configuration.custom,original.custom);
  const hooks=plan.configuration.hooks as typeof original.hooks;
  assert.deepEqual(hooks.SessionStart[0],original.hooks.SessionStart[0]);
  assert.equal(hooks.SessionStart.length,2);
+ assert.deepEqual(hooks.Stop[0],original.hooks.Stop[0]);
+ assert.equal(hooks.Stop.length,2);
+ assert.equal(hooks.Stop[1]!.hooks[0]!.timeout,3);
  assert.deepEqual(startupHooks(plan.configuration,"/project","/external/tasks.sqlite"),plan);
 });
 test("startup hook proposal refuses conflicting, legacy and malformed configuration",()=>{
@@ -34,16 +37,18 @@ test("prompt hooks preserve complete bounded output and reconcile only the exact
  const config=plan.configuration as {hooks:Record<string,{hooks:Record<string,unknown>[]}[]>};
  const prompt=config.hooks.UserPromptSubmit![0]!.hooks[0]!;
  assert.equal(prompt.additionalContextLimit,0);
- assert.equal(prompt.timeout,40);
+ assert.equal(prompt.timeout,55);
  prompt.timeout=10;
  assert.equal(config.hooks.SessionStart![0]!.hooks[0]!.additionalContextLimit,undefined);
  delete prompt.additionalContextLimit;
  const original=JSON.stringify(config),updated=startupHooks(config,"/project","/external/tasks.sqlite");
  assert.equal(JSON.stringify(config),original);
  assert.equal((updated.configuration as typeof config).hooks.UserPromptSubmit![0]!.hooks[0]!.additionalContextLimit,0);
- assert.equal((updated.configuration as typeof config).hooks.UserPromptSubmit![0]!.hooks[0]!.timeout,40);
- prompt.timeout=20;prompt.additionalContextLimit=0;
- assert.equal((startupHooks(config,"/project","/external/tasks.sqlite").configuration as typeof config).hooks.UserPromptSubmit![0]!.hooks[0]!.timeout,40);
+ assert.equal((updated.configuration as typeof config).hooks.UserPromptSubmit![0]!.hooks[0]!.timeout,55);
+ for(const timeout of [20,40]) {
+  prompt.timeout=timeout;prompt.additionalContextLimit=0;
+  assert.equal((startupHooks(config,"/project","/external/tasks.sqlite").configuration as typeof config).hooks.UserPromptSubmit![0]!.hooks[0]!.timeout,55);
+ }
  prompt.additionalContextLimit=1200;
  assert.throws(()=>startupHooks(config,"/project","/external/tasks.sqlite"),/differs/);
 });

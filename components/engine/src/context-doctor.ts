@@ -48,12 +48,15 @@ export function contextDoctor(workspace: string) {
       descriptorPaths: settings.legacy.allowedSourcePaths ?? [], metadataPaths: settings.allowedMetadataPaths ?? [],
       passageQuestionsEnabled: passageEnabled,
       procedureSources: profile.context_router?.procedure_sources ?? [], descriptorPermissionAlsoPermitsBodies: true,
-      limits: { requestBytes: settings.budget.maxRequestBytes, calls: settings.budget.maxCalls, operationMs: CONTEXT_OPERATION_MS,
+      limits: { requestBytes: settings.contextBudget.maxRequestBytes, calls: settings.contextBudget.maxCalls, operationMs: CONTEXT_OPERATION_MS,
         sourceCandidates: settings.legacy.maxCandidates, optionalExcerptBytes: optionalExcerptBytes ?? (passageEnabled ? 3072 : 2048),
         passagePreparation: "remaining-family-bytes-and-operation" } };
     if (metadata.enabled && metadata.disclosure && !settings.legacy.allowedDataClasses.includes("source"))
       findings.push({ id: "context.path-only-disclosure", message: "Metadata is approved, but source-derived descriptions are not. JEV sees paths only; approve intended descriptions/body paths explicitly if appropriate." });
     if (metadata.enabled && !metadata.disclosure) findings.push({ id: "context.metadata-not-approved", message: "Metadata selection is enabled but needs explicit metadata data class and allowed_metadata_paths. Local retrieval still works." });
+    if (metadata.enabled && metadata.disclosure && settings.legacy.allowedDataClasses.includes("source") &&
+      settings.legacy.allowedSourcePaths?.length && !passageEnabled) findings.push({ id: "context.passage-not-enabled", message:
+        "Source descriptions are approved, but passage selection is disabled. Explicitly enable context.passage-evidence/1 and context.passage-role/1 in DL03 to assess selected source sections; retain the intended sharing paths." });
   } catch { findings.push({ id: "context.configuration-unavailable", message: "Inspect the project profile, default route and its required files." }); }
   try {
     hookSource = inspectStartupHookSource(workspace);

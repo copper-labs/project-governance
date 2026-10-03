@@ -5,14 +5,15 @@ type: exec-plan
 status: active
 owner: project-governance
 created: 2026-09-29
-updated: 2026-09-30
+updated: 2026-10-02
 summary: Repair entry identity and semantic coverage, reduce duplicate assessment, connect procedure selection, qualify real repository cases and adopt in one verified worktree first.
 ---
 
 # RC10 implementation and adoption plan
 
 Owner: [RC10 specification](../../specs/engine-rc10-context-use.md).
-Baseline: published RC9.1; retain its one 30-second operation envelope without a per-call cutoff.
+Baseline: published RC9.1 used one 30-second operation envelope without a per-call cutoff.
+The capacity amendment below raises that single envelope to 45 seconds.
 The operator approved implementation and local simulation after the Opus 5.5 medium design review,
 reconciliation and simplification. Runtime changes are implemented and undergoing integrated
 qualification. Publication and adopter upgrades are not complete.
@@ -363,3 +364,62 @@ Exit: source, package and publication agree. Actual development efficiency remai
 
 Implementation must flag any new requirement that cannot fit these owners before adding a service,
 another authority or another mandatory developer step.
+
+## Capacity amendment — 2026-10-02
+
+The operator authorized 45 seconds, at least 10 MiB of provider input and at least 500 calls.
+Keep one existing budget declaration and operation clock. This batch changes source defaults and
+supported bounds; it does not edit active adopters or declare another release published.
+
+- [x] Amend the contract and guide with isolated context 512-call/10-MiB defaults, explicit allowances through
+  1,024 calls/16 MiB, and the difference between cached extraction and repeated prompt assessment.
+- [x] Raise the shared operation clock, transport admission and provider lease validation together.
+  Extend the managed host to 55 seconds and reconcile the exact old 40-second managed hook shape.
+  Keep authored/customized hooks, shared rate/concurrency and spending boundaries intact.
+- [x] Preserve explicitly declared smaller project budgets. Take preflight's supported byte ceiling
+  from the settings owner instead of another literal. Reuse existing freshness checks and tests;
+  add no watcher or another cache.
+- [x] Run deterministic default/explicit-budget, aggregate-byte, clock/admission, managed-hook and
+  maintained-index/replay proof. Confirm the existing large-catalog fixture completes with defaults.
+- [ ] Run the integrated source suite/typecheck/build and affected documentation checks at the
+  completed boundary. Retain private proof outside source, report any unresolved seam and keep
+  release/adopter adoption separate from source verification.
+
+## Operational repair batch — 2026-10-02
+
+The operator authorized the catalogue, passage activation, context blockers, provider-log and
+measurement repairs. Diagnose real causes first. This batch extends the capacity amendment;
+private adopter examples and readbacks stay outside source.
+
+- [x] Extract authored shell/configuration purpose and bounded configuration keys; recognize
+  Kotlin expect/actual declarations. Bump the extractor identity and prove old empty facts refresh.
+- [x] Share the original routing deadline with index preparation. Give explicit index refresh the
+  same 45-second ceiling. Reuse unchanged verified oversize omissions; retain changed-file checks.
+- [x] Report path-only reason totals and bounded examples without calling all of them missing docs.
+  Preserve every eligible path and existing provider-sharing permissions.
+- [x] Diagnose metadata-only profiles in passive doctor. Prepare a deliberate 512-call/10-MiB,
+  metadata-plus-passage adoption patch, keeping disclosure paths and the coding model unchanged.
+- [x] Default an omitted provider stream allowance to 4 MiB, preserve explicit limits, and expose a
+  small whole-stream allowance in passive preflight. Explain independent completion-summary limits.
+- [x] Add a neutral Codex Stop observer using the existing exact native usage adapter. Retain
+  collection coverage/reasons, deduplicate response counters and preserve unknown acceptance/reads.
+- [x] Prove supported extraction, safe omission, old-cache replacement, cold/warm freshness,
+  expired operation, configured-off passages, output caps, neutral Stop behavior and mixed-task
+  usage attribution with focused fixtures. Run integrated source and installed-package proof at
+  the completed boundary; no adopter builds or paid calls are implied by source tests.
+- [ ] At verified adopter pause seams, apply the capture fix, measured required-guidance allowances,
+  approved passage questions and larger explicit budgets. Preserve unrelated dirty/staged files,
+  use supported upgrade ownership, and read back actual pins and effective settings.
+- [ ] Identify project-owned expired/source-mismatched proofs and dependency findings with exact
+  evidence. Repair only from valid proof or the project's intended boundary; do not invent proof,
+  bulk-extend expiry, waive findings, or launch an unrelated device qualification.
+- [ ] Publish the qualified dot release under standing operator authorization. Report source,
+  publication, installation and ordinary accepted-task effectiveness as separate claims.
+
+The source repair review completed on Opus 5.5 medium. Its ordinary-scope budget finding is
+corrected and the focused independent recheck is clear. Source fixtures, typecheck and the exact
+offline installed archive pass. One integrated provider fixture exposed an evidence-teardown race;
+its corrected teardown waits for the exact owned worker/supervisor identities to exit, and the
+affected recheck passes. Remaining release checks and real adopter safe seams stay explicit.
+Raw operational receipt retention and synchronous index finalization remain measured limitations,
+not hidden successful-use claims. No additional background service or per-file paid summary is added.

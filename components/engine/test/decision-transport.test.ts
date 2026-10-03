@@ -21,6 +21,18 @@ test("pre-cancelled calls do not touch transport or coordination state", async t
   assert.equal(calls, 0); assert.equal(existsSync(providerDatabasePath(root)), false);
 });
 
+test("the forty-five-second operation is admitted without renewing an expired caller deadline", async t => {
+  let calls = 0;
+  const { client } = fixture(t, async () => { calls++; return Response.json({}); });
+  const admitted = await client.ask("{}", 45000, undefined, undefined, undefined, "caller", performance.now() + 45000);
+  assert.equal(admitted.ok, true);
+  assert.equal(calls, 1);
+  const expired = await client.ask("{}", 45000, undefined, undefined, undefined, "caller", performance.now() - 1);
+  assert.equal(expired.ok, false);
+  if (!expired.ok) assert.equal(expired.reason, "admission-deadline");
+  assert.equal(calls, 1, "An exhausted umbrella cannot dispatch another request");
+});
+
 test("provider timeout bounds ignored cancellation and retains scoped cooldown", { timeout: 2000 }, async t => {
   let calls = 0;
   const { client } = fixture(t, () => { calls++; return new Promise(() => {}); });

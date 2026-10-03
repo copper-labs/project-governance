@@ -6,7 +6,7 @@ import { sourceClues } from "./context-source-index.ts";
 import { localDocumentLinks } from "./checkers/document-links.ts";
 import type { Candidate } from "./decisions.ts";
 
-export const SOURCE_EXTRACTOR = "literal-syntax-11";
+export const SOURCE_EXTRACTOR = "literal-syntax-12";
 export interface SourceSpan { kind: string; name: string; signature: string; start: number; end: number; level?: number; ancestry?: string[] }
 export interface SourceLink { kind: "import" | "export" | "require" | "reference" | "dynamic-import" | "document"; target: string; line: number }
 export interface SourceFacts {
@@ -156,7 +156,7 @@ function extractHeuristicFacts(path: string, text: string, facts: SourceFacts): 
   const lines = text.split(/\r?\n/u);
   let firstOmittedBoundary: number | undefined;
   for (const [index, value] of lines.entries()) {
-    const declaration = value.match(/^\s*(?:(?:public|private|protected|internal|open|final|override|suspend|static|async|export)\s+)*(?:enum\s+class|fun|func|def|fn|class|struct|interface|protocol|enum)\s+([\p{L}_$][\p{L}\p{N}_$]*|`[^`\r\n]+`)/u);
+    const declaration = value.match(/^\s*(?:(?:public|private|protected|internal|open|final|override|suspend|expect|actual|inline|tailrec|operator|infix|external|data|sealed|annotation|static|async|export)\s+)*(?:enum\s+class|fun|func|def|fn|class|struct|interface|protocol|enum)\s+([\p{L}_$][\p{L}\p{N}_$]*|`[^`\r\n]+`)/u);
     if (declaration && facts.spans.length < 96) {
       let start = index;
       // An attached test/behavior annotation belongs to this declaration, not its predecessor.

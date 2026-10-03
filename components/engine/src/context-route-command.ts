@@ -284,7 +284,7 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
   const requestedOriginals = [...(values["optional-path"] ?? []), ...(values.links ?? [])].map(safeSubjectPath);
   const catalog = contextMetadataCatalog(candidateInventory, task, [...priorityPaths, ...requestedOriginals], changedPriorities, mandatoryPaths, options.historyHints, declaredDocuments(subject));
   const projection = maintainContextProjection(subject, catalog.candidates.map(item => item.path), contextStateRoot(root),
-    { purpose: task, exact: [...priorityPaths, ...(values.links ?? []).map(safeSubjectPath)], deadlineAt: performance.now() + 1000 });
+    { purpose: task, exact: [...priorityPaths, ...(values.links ?? []).map(safeSubjectPath)], deadlineAt: timing.deadline - CONTEXT_DELIVERY_RESERVE_MS });
   const priorities = new Map(projection.priority.map((path, index) => [path, index]));
   catalog.candidates.sort((a, b) => Number(b.pinned) - Number(a.pinned) ||
     (priorities.get(a.path) ?? Infinity) - (priorities.get(b.path) ?? Infinity) || b.matches - a.matches || a.path.localeCompare(b.path));
@@ -497,7 +497,7 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
       procedureAssessed: passageAdvice?.procedures.assessedUnits ?? null, deliveredFiles: optional?.entries.length ?? 0,
       deliveredBytes: optional?.bytes ?? 0, totalMs: receipt.timing.totalMs, httpWorkMs: metadata?.httpTotalMs ?? null,
       admissionWorkMs: metadata?.admissionTotalMs ?? null, replayedBatches: metadata?.coverage.replayedBatches ?? 0,
-      familyByteLimit: settings.budget.maxRequestBytes, familyCallLimit: settings.budget.maxCalls,
+      familyByteLimit: settings.contextBudget.maxRequestBytes, familyCallLimit: settings.contextBudget.maxCalls,
       operationBudgetMs: receipt.timing.operationBudgetMs,
     } });
   // The route receipt owns per-path diagnostics. Repeating its preview in every immutable

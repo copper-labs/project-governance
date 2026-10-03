@@ -4,6 +4,7 @@ import { closeSync, lstatSync, mkdirSync, openSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
+import { CONTEXT_OPERATION_MS } from "./context-timing.ts";
 
 export const PROVIDER_CONCURRENCY = 4;
 export const PROVIDER_TOKENS_PER_SECOND = 200_000;
@@ -61,7 +62,7 @@ export class ProviderPool {
   }
 
   acquire(credential: string, tokens: number, now: number, leaseMs: number, failureScope = credential): ProviderAdmission {
-    if (!Number.isSafeInteger(tokens) || tokens < 0 || tokens > PROVIDER_TOKENS_PER_SECOND || !Number.isFinite(now) || leaseMs < 1 || leaseMs > 31000)
+    if (!Number.isSafeInteger(tokens) || tokens < 0 || tokens > PROVIDER_TOKENS_PER_SECOND || !Number.isFinite(now) || leaseMs < 1 || leaseMs > CONTEXT_OPERATION_MS + PROVIDER_LEASE_CLEANUP_MS)
       throw new Error("provider-admission-invalid");
     return this.#transaction(() => {
       this.#db.prepare("DELETE FROM leases WHERE expires<=?").run(now);

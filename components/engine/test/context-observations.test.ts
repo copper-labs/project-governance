@@ -3,9 +3,12 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { pathToFileURL } from "node:url";
+import { resolve } from "node:path";
 import { digest, durableJson } from "../src/core.ts";
 import { contextStateRoot } from "../src/context-command.ts";
-import { codexUsageRecord, importContextUsage, contextObservationStatus, recordContextObservation, collectContextHostUsage, indexPromptEntry, publishContextObservation } from "../src/context-observations.ts";
+import { codexUsageRecord, importContextUsage, contextObservationStatus, recordContextObservation, collectContextHostUsage, observeContextHostUsage, indexPromptEntry, publishContextObservation } from "../src/context-observations.ts";
+import { startupObserveCommand } from "../src/startup-observe-command.ts";
 import { readContextProjection } from "../src/telemetry-projection.ts";
 import { Store } from "../../harness/src/store/store.ts";
 import { defaultDbPath, workContext } from "../../harness/src/store/location.ts";
@@ -96,6 +99,61 @@ test("recent status retains native rollover and binding observations without pri
     assert.equal(JSON.stringify(projection).includes("receipt-only private detail"), false);
     assert.ok(projection.records.every(item => item.taskId === "task" && item.taskRevision === "1"));
     assert.deepEqual(report.usage, { inputTokens: null, outputTokens: null, responses: 0 });
+  } finally {
+    if (old === undefined) delete process.env.XDG_STATE_HOME; else process.env.XDG_STATE_HOME = old;
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("Stop collects only its exact turn and stays neutral without touching startup ownership", async () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "context-stop-usage-"))), old = process.env.XDG_STATE_HOME;
+  process.env.XDG_STATE_HOME = join(root, "state");
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: root, stdio: "pipe" });
+    const transcript = join(root, "host.jsonl"), state = contextStateRoot(root);
+    const row = (turn: string) => ({ type: "token_usage_record", payload: { thread_id: "thread", root_turn_id: turn,
+      response_id: `response-${turn}`, usage: { input_tokens: 100, output_tokens: 20 }, thread_token_usage: { input_tokens: 90000 } } });
+    for (const turn of ["current", "earlier"]) {
+      const entryId = digest(turn).slice(7);
+      durableJson(join(state, "prompt-entries", `${entryId}.json`), { version: 1, entryId, workspace: root,
+        worktreeLocator: workContext(root).locator, session: "thread", turn, scopeKind: "provisional-session", status: "prepared" });
+      indexPromptEntry(root, entryId, "thread", turn);
+    }
+    writeFileSync(transcript, [{ type: "response_item", payload: { text: "PRIVATE_PROMPT_CANARY" } }, row("earlier"), row("current")]
+      .map(value => JSON.stringify(value)).join("\n") + "\n");
+    const event = { hook_event_name: "Stop", session_id: "thread", turn_id: "current", cwd: root, transcript_path: transcript };
+    const eventFile = join(root, "event.json"); writeFileSync(eventFile, JSON.stringify(event));
+    const moduleUrl = pathToFileURL(resolve("components/engine/src/startup-observe-command.ts")).href;
+    const commandInput = { provider: "codex", eventStdin: true, workspace: root, registry: join(root, "never-created.sqlite"),
+      receipts: join(root, "never-created-receipts"), installedScope: true };
+    const neutral = execFileSync(process.execPath, ["--input-type=module", "--eval",
+      `import {startupObserveCommand} from ${JSON.stringify(moduleUrl)}; console.log(JSON.stringify(await startupObserveCommand(${JSON.stringify(commandInput)})));`],
+      { cwd: root, input: JSON.stringify(event), encoding: "utf8", stdio: ["pipe", "pipe", "pipe"], timeout: 10000 });
+    assert.deepEqual(JSON.parse(neutral), {}, "The native Stop response cannot ask the host to continue or block");
+    const originalCwd = process.cwd(); process.chdir(root);
+    try {
+      const result = await startupObserveCommand({ provider: "codex", eventFile: "event.json", eventStdin: false, workspace: root,
+        registry: join(root, "never-created.sqlite"), receipts: join(root, "never-created-receipts"), installedScope: true });
+      assert.ok(result && typeof result === "object");
+      assert.equal("action" in result && result.action, "observe");
+      assert.equal("discover" in result && result.discover, false);
+      assert.equal("decision" in result, false);
+    } finally { process.chdir(originalCwd); }
+    assert.equal(readdirSync(root).includes("never-created.sqlite"), false);
+    const report = contextObservationStatus(root);
+    assert.deepEqual(report.usage, { responses: 1, inputTokens: 100, outputTokens: 20 });
+    const replay = observeContextHostUsage(root, event);
+    assert.equal("recorded" in replay && replay.recorded, 0);
+    for (const name of readdirSync(join(state, "context-observations"))) {
+      const content = readFileSync(join(state, "context-observations", name), "utf8");
+      assert.ok(!content.includes("PRIVATE_PROMPT_CANARY"));
+      const receipt = JSON.parse(content);
+      if (receipt.kind === "usage-collection") assert.equal(receipt.acceptance, "unknown");
+    }
+    writeFileSync(transcript, '{"type":"unsupported-format"}\n');
+    assert.equal(observeContextHostUsage(root, event).state, "format-unrecognized");
+    assert.equal(observeContextHostUsage(root, { ...event, transcript_path: join(root, "missing") }).state, "unavailable");
+    assert.equal(observeContextHostUsage(root, { ...event, turn_id: null }).state, "missing-native-identity");
   } finally {
     if (old === undefined) delete process.env.XDG_STATE_HOME; else process.env.XDG_STATE_HOME = old;
     rmSync(root, { recursive: true, force: true });

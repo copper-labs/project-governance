@@ -8,6 +8,7 @@ import { declaredDocuments } from "./checkers/document-links.ts";
 import { extractSourceFacts, resolveSourceLink, SOURCE_EXTRACTOR, type SourceFacts, type ResolvedSourceLink } from "./context-source-facts.ts";
 import { ProjectionStore, projectionIdentity, sourceFactId, type ProjectionFile } from "./context-projection-store.ts";
 import { documentationConfig, documentationCatalog } from "./checkers/document-catalog.ts";
+import { CONTEXT_SELECTION_MS } from "./context-timing.ts";
 
 export interface ProjectionOptions { deadlineAt?: number; byteLimit?: number; factByteLimit?: number; rebuild?: boolean; extractor?: string; purpose?: string; exact?: string[] }
 
@@ -52,7 +53,7 @@ function pendingSourceOrder(pending: string[], previous: ReturnType<ProjectionSt
 }
 
 export function maintainContextProjection(subject: ValidationSubject, paths: string[], stateRoot: string, options: ProjectionOptions = {}) {
-  const started = performance.now(), deadlineAt = options.deadlineAt ?? started + 1500, byteLimit = Math.min(options.byteLimit ?? 32 * 1024 * 1024, 32 * 1024 * 1024);
+  const started = performance.now(), deadlineAt = options.deadlineAt ?? started + CONTEXT_SELECTION_MS, byteLimit = Math.min(options.byteLimit ?? 32 * 1024 * 1024, 32 * 1024 * 1024);
   const declared = declaredDocuments(subject);
   const inventory = [...new Set(paths.filter(path => automaticContextPath(path, declared)))].sort(), locator = projectionIdentity(subject.root), extractor = options.extractor ?? SOURCE_EXTRACTOR;
   const identified = performance.now();
@@ -81,7 +82,9 @@ export function maintainContextProjection(subject: ValidationSubject, paths: str
     const observed = observation.sources.get(path), fact = observed && observed.freshness !== "unverified" && priorKeys.get(`${observed.key}:${posix.extname(path)}`);
     if (fact) { byPath.set(path, fact); facts.set(sourceFactId(fact, extractor), fact); reused++; }
     else if (!options.rebuild && previous?.extractor === extractor && observed?.freshness !== "unverified" &&
-      previous?.files.get(path)?.key === observed?.key && previous?.files.get(path)?.disposition === "index-capacity") unavailable.push({ path, reason: "index-capacity" });
+      previous?.files.get(path)?.key === observed?.key &&
+      ["index-capacity", "source-over-limit"].includes(previous?.files.get(path)?.disposition ?? ""))
+      unavailable.push({ path, reason: previous!.files.get(path)!.disposition });
     else if (observed) pending.push(path);
     else unavailable.push({ path, reason: "source-unverified" });
   }
@@ -90,7 +93,8 @@ export function maintainContextProjection(subject: ValidationSubject, paths: str
   for (let offset = 0; offset < pending.length; offset += 63) {
     if (performance.now() >= deadlineAt || capturedBytes >= byteLimit) break;
     const batch = pending.slice(offset, offset + 63), limit = Math.min(4 * 1024 * 1024, byteLimit - capturedBytes);
-    for (const [path, bytes] of subject.readBatch(batch, Math.min(256 * 1024, limit), limit, deadlineAt)) {
+    // A small remaining invocation budget cannot turn a valid file into a cached oversized blob.
+    for (const [path, bytes] of subject.readBatch(batch, 256 * 1024, limit, deadlineAt)) {
       if (typeof bytes === "string") { unavailable.push({ path, reason: bytes }); continue; }
       capturedBytes += bytes.length;
       let fact: SourceFacts;
@@ -147,7 +151,14 @@ export function maintainContextProjection(subject: ValidationSubject, paths: str
   for (const link of links) if (link.resolved) { if (seeds.has(link.source)) related.add(link.resolved); if (seeds.has(link.resolved)) related.add(link.source); }
   for (const link of catalogLinks) if (seeds.has(link.source)) related.add(link.resolved);
   const documentation = documentationObservation(byPath);
+  const pathOnlyReasons: Record<string, number> = {}, pathOnlyExamples: Array<{ path: string; reason: string }> = [];
+  for (const file of files) if (!entries.has(file.path)) {
+    const fact = byPath.get(file.path), reason = fact ? fact.coverage === "unavailable" ? "binary-or-non-utf8" : "no-supported-literal-clues" : file.disposition;
+    pathOnlyReasons[reason] = (pathOnlyReasons[reason] ?? 0) + 1;
+    if (pathOnlyExamples.length < 16) pathOnlyExamples.push({ path: file.path, reason });
+  }
   const quality = { descriptorCount: entries.size, pathOnlyCount: inventory.length - entries.size,
+    pathOnlyReasons, pathOnlyExamples, pathOnlyExamplesTruncated: inventory.length - entries.size > pathOnlyExamples.length,
     withoutAuthoredOverviewCount: [...byPath.values()].filter(fact => fact.descriptor && !fact.overviewObserved).length,
     partialSyntaxCount: [...byPath.values()].filter(fact => fact.coverage === "syntax-partial").length,
     unavailableExtractionCount: [...byPath.values()].filter(fact => fact.coverage === "unavailable").length,

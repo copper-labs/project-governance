@@ -11,6 +11,7 @@ import { prepareDecisionRequest } from "./decision-request-preparation.ts";
 import { PROVIDER_CONCURRENCY } from "./decision-admission.ts";
 import { DECISION_QUESTIONS } from "./decision-catalog.ts";
 import { maintainContextProjection } from "./context-projection.ts";
+import { MAX_DECISION_BUDGET } from "./decision-settings.ts";
 
 const BATCH_SIZE = METADATA_MAX_QUESTIONS;
 import { contextTerms } from "./context-terms.ts";
@@ -80,7 +81,7 @@ export async function selectContextMetadata(subject: ValidationSubject, catalog:
     catch { excluded.push({ path, reason: "source-unavailable" }); }
   }
   const invocationId = family?.id ?? digest({ eventId, scope, subjectDigest, catalog: digest(baseline), purpose, configuration: runtime.settings.configDigest }).slice(7);
-  projection ??= maintainContextProjection(subject, baseline, runtime.stateRoot, { purpose, deadlineAt: Math.min(deadlineAt, performance.now() + 1000) });
+  projection ??= maintainContextProjection(subject, baseline, runtime.stateRoot, { purpose, deadlineAt });
   const detailAllowed = enabled && runtime.settings.mode !== "off" && runtime.settings.consumers.DL03.mode !== "off" &&
     !runtime.eligibility("DL03").reasons.includes("missing-token") && runtime.settings.legacy.allowedDataClasses.includes("metadata") && runtime.settings.legacy.allowedDataClasses.includes("source");
   const descriptionOmissions: string[] = [], unfittable: string[] = [];
@@ -92,7 +93,7 @@ export async function selectContextMetadata(subject: ValidationSubject, catalog:
   const purposeItem: EvidenceItem = { id: "purpose", text: purpose, sourceDigest: digest(purpose), provenance: "supplied", trust: "untrusted" };
   const purposeBytes = Buffer.byteLength(purpose), limit = runtime.settings.legacy.evidenceBytes;
   const definition = DECISION_QUESTIONS["context.metadata-relevance/1"]!;
-  const wireLimit = Math.min(65536, runtime.settings.budget.maxRequestBytes), baseWire = 1000 + Buffer.byteLength(JSON.stringify(purposeItem)) + (layout === "compact-v1" ? Buffer.byteLength(definition.instructions) : 0);
+  const wireLimit = Math.min(65536, runtime.settings.contextBudget.maxRequestBytes), baseWire = 1000 + Buffer.byteLength(JSON.stringify(purposeItem)) + (layout === "compact-v1" ? Buffer.byteLength(definition.instructions) : 0);
   const itemWire = (item: EvidenceItem) => layout === "compact-v1"
     ? Buffer.byteLength(JSON.stringify(compactMetadataItem(item))) + 150
     : Buffer.byteLength(JSON.stringify(item)) + Buffer.byteLength(JSON.stringify({ instructions: { question: definition.instructions, evidenceIds: ["purpose", item.id] }, type: "noul" })) + 32;
@@ -138,10 +139,10 @@ export async function selectContextMetadata(subject: ValidationSubject, catalog:
     .map(path => ({ path, hash: digest({ eventId: family?.id ?? eventId, path }) })).sort((a, b) => a.hash.localeCompare(b.hash)).map(item => item.path);
   let priorityAssessed = 0, generalAssessed = 0;
   const reserveCalls = evaluation.reservePassageBudget && runtime.eligibility("DL03", "context.metadata-relevance/1").providerUse === "eligible"
-    ? Math.min(2, runtime.settings.budget.maxCalls - 1) : 0;
-  const reserveBytes = reserveCalls ? Math.min(65_536, Math.floor(runtime.settings.budget.maxRequestBytes / 4)) : 0;
-  const metadataByteCeiling = Math.max(0, runtime.settings.budget.maxRequestBytes - reserveBytes);
-  const metadataCallCeiling = runtime.settings.budget.maxCalls - reserveCalls;
+    ? Math.min(2, runtime.settings.contextBudget.maxCalls - 1) : 0;
+  const reserveBytes = reserveCalls ? Math.min(65_536, Math.floor(runtime.settings.contextBudget.maxRequestBytes / 4)) : 0;
+  const metadataByteCeiling = Math.max(0, runtime.settings.contextBudget.maxRequestBytes - reserveBytes);
+  const metadataCallCeiling = runtime.settings.contextBudget.maxCalls - reserveCalls;
   const spent = scope ? readDecisionBudget(runtime.stateRoot, family
     ? contextFamilyScope(scope.workspace, invocationId) : contextBudgetScope(scope, invocationId)) : null;
   // Receipt counters are cumulative. The store also includes earlier passage calls in a family.
@@ -163,7 +164,7 @@ export async function selectContextMetadata(subject: ValidationSubject, catalog:
       policyDigest: runtime.settings.configDigest };
   };
   const fits = (batch: string[]) => prepareDecisionRequest({ ...askFor(batch),
-    scope: scope ?? { workspace: subject.root, taskId: "unbound", taskRevision: "unbound" } }, runtime.settings, ["DL03"], "packing").ok;
+    scope: scope ?? { workspace: subject.root, taskId: "unbound", taskRevision: "unbound" } }, runtime.settings, ["DL03"], "packing", runtime.settings.contextBudget).ok;
   const forecastPriorities = [...priorities], forecastGeneral = [...general];
   let forecastBytes = 0, forecastCalls = 0, forecastUnrepresentable = 0;
   while (forecastPriorities.length || forecastGeneral.length) {
@@ -172,18 +173,18 @@ export async function selectContextMetadata(subject: ValidationSubject, catalog:
     forecastUnrepresentable += packed.unfittable.length;
     let offset = 0;
     while (offset < packed.batch.length) {
-      let size = packed.batch.length - offset, request = prepareDecisionRequest({ ...askFor(packed.batch.slice(offset)), scope: scope ?? { workspace: subject.root, taskId: "unbound", taskRevision: "unbound" } }, runtime.settings, ["DL03"], "forecast");
-      while (!request.ok && size > 1) request = prepareDecisionRequest({ ...askFor(packed.batch.slice(offset, offset + --size)), scope: scope ?? { workspace: subject.root, taskId: "unbound", taskRevision: "unbound" } }, runtime.settings, ["DL03"], "forecast");
+      let size = packed.batch.length - offset, request = prepareDecisionRequest({ ...askFor(packed.batch.slice(offset)), scope: scope ?? { workspace: subject.root, taskId: "unbound", taskRevision: "unbound" } }, runtime.settings, ["DL03"], "forecast", runtime.settings.contextBudget);
+      while (!request.ok && size > 1) request = prepareDecisionRequest({ ...askFor(packed.batch.slice(offset, offset + --size)), scope: scope ?? { workspace: subject.root, taskId: "unbound", taskRevision: "unbound" } }, runtime.settings, ["DL03"], "forecast", runtime.settings.contextBudget);
       if (request.ok) { forecastBytes += request.requestBytes; forecastCalls++; } else forecastUnrepresentable++;
       offset += size;
     }
   }
   const preflight = { remainingInventoryCount: priorities.length + general.length, requestBytes: forecastBytes, requestCalls: forecastCalls,
-    alreadySpentBytes: claimedBytes, alreadySpentCalls: claimedCalls, familyByteLimit: runtime.settings.budget.maxRequestBytes,
+    alreadySpentBytes: claimedBytes, alreadySpentCalls: claimedCalls, familyByteLimit: runtime.settings.contextBudget.maxRequestBytes,
     metadataByteCeiling, metadataCallCeiling, fitsBytes: claimedBytes + forecastBytes <= metadataByteCeiling,
     fitsCalls: claimedCalls + forecastCalls <= metadataCallCeiling, unrepresentableCount: forecastUnrepresentable,
     operationRemainingMs: Math.max(0, deadlineAt - performance.now()), latencyQualification: "not-established",
-    recommendation: claimedBytes + forecastBytes > metadataByteCeiling ? "explicit-byte-allowance-required-within-8388608-ceiling" : null };
+    recommendation: claimedBytes + forecastBytes > metadataByteCeiling ? `explicit-byte-allowance-required-within-${MAX_DECISION_BUDGET.maxRequestBytes}-ceiling` : null };
   const requeue = (paths: string[]) => {
     priorities.unshift(...paths.filter(path => prioritySet.has(path)));
     general.unshift(...paths.filter(path => !prioritySet.has(path)));
@@ -219,7 +220,7 @@ export async function selectContextMetadata(subject: ValidationSubject, catalog:
       if (!batch.length) { reason = "input-budget"; continue; }
       if (controller.signal.aborted || performance.now() >= deadlineAt) { requeue(batch); stop = true; break; }
       if (reserveBytes) {
-        const prepared = prepareDecisionRequest(askFor(batch), runtime.settings, ["DL03"], "budget-planning");
+        const prepared = prepareDecisionRequest(askFor(batch), runtime.settings, ["DL03"], "budget-planning", runtime.settings.contextBudget);
         if (!prepared.ok || claimedBytes + prepared.requestBytes > metadataByteCeiling || claimedCalls + 1 > metadataCallCeiling) {
           requeue(batch); reason = "passage-reserved-budget"; stop = true; break;
         }

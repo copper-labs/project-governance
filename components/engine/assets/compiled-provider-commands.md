@@ -27,11 +27,16 @@ agents retain their own tools and authentication; workspace declarations are not
    inspect the binding. Optional `--config` and `--executable` select explicit local configuration.
    This does not test authentication or model availability.
 2. Write a private JSON request file. Include `id`, `provider`, canonical `workspace`, `model`,
-   `effort`, `prompt`, `deadlineMs`, `outputLimit`, and `assignment` containing `role`, `constraints`
+   `effort`, `prompt`, `deadlineMs`, and `assignment` containing `role`, `constraints`
    and `context`. Use `additionalRoots` for separately authorized directories, `requiredTools` for
    required observed tool names/categories, and `access` for `reader`, `writer`, or `exclusive`.
    Exclusive access is the default. Optional `idleTimeoutMs` bounds silence. Zero disables either
    timeout; cancellation remains available. Finite timeouts may not exceed seven days.
+   Optional `outputLimit` bounds the entire native stream, including tools and progress. Omit it
+   for the 4 MiB default. A short requested answer does not justify a 6,000-byte worker log;
+   ask for a concise completion in `prompt` instead. Explicit smaller limits remain enforced,
+   and assignment preflight reports a small stream allowance. Public completion output is bounded
+   separately and retains the original result reference when shortened.
 3. Run `provider-submit --request <request-file>`. By default the workspace and request ID
    select a stable private job directory. `--directory <new-private-job-directory>` overrides it.
    Reusing the same ID with different request contents is an identity conflict, not a new job.

@@ -10,11 +10,20 @@ import { workspaceClaim } from "./workspace-claims.ts";
 import { providerAssignment, type ProviderAssignment } from "./provider-assignment.ts";
 import type { ProviderGuard } from "./provider-guard.ts";
 
+/** Retain a native worker's tool stream independently of its bounded public completion summary. */
+export const DEFAULT_PROVIDER_OUTPUT_LIMIT = 4 * 1024 * 1024;
+export function providerOutputRetention(outputLimit?: number) {
+  const limitBytes = outputLimit === undefined ? DEFAULT_PROVIDER_OUTPUT_LIMIT : outputLimit;
+  if (!Number.isSafeInteger(limitBytes) || limitBytes < 1 || limitBytes > 64 * 1024 * 1024) throw new Error("Invalid provider output limit");
+  return { limitBytes, source: outputLimit === undefined ? "default" : "explicit", scope: "whole-native-stream",
+    summary: "separately-bounded", warning: limitBytes < 64 * 1024 ? "small-worker-stream-allowance" : null };
+}
+
 /** Plan native transport only. The job admission layer must establish assignment authority and workspace claims. */
 export function providerCommand(request: {
   id: string; provider: NativeProvider; workspace: string; additionalRoots?: string[];
   prompt: string; model?: string; effort?: string; executable?: string; config?: string;
-  conversationId?: string; requiredTools?: string[]; deadlineMs: number; outputLimit: number;
+  conversationId?: string; requiredTools?: string[]; deadlineMs: number; outputLimit?: number;
   access?: "reader" | "writer" | "exclusive"; registry?: string;
   idleTimeoutMs?: number;
   assignment?: { role: string; constraints: string; context: string };
@@ -24,7 +33,7 @@ export function providerCommand(request: {
   if (Buffer.byteLength(request.prompt) > 500000) throw new Error("Provider assignment exceeds 500 KB");
   if (!Number.isSafeInteger(request.deadlineMs) || request.deadlineMs < 0 || request.deadlineMs > 604800000) throw new Error("Invalid provider deadline");
   if (request.idleTimeoutMs !== undefined && (!Number.isSafeInteger(request.idleTimeoutMs) || request.idleTimeoutMs < 0 || request.idleTimeoutMs > 604800000)) throw new Error("Invalid provider idle timeout");
-  if (!Number.isSafeInteger(request.outputLimit) || request.outputLimit < 1 || request.outputLimit > 64 * 1024 * 1024) throw new Error("Invalid provider output limit");
+  const outputRetention = providerOutputRetention(request.outputLimit);
   const canonicalDirectory = (path: string) => {
     const canonical = realpathSync(text(path, "provider workspace"));
     if (!statSync(canonical).isDirectory()) throw new Error("Provider workspace must be a directory");
@@ -52,7 +61,7 @@ export function providerCommand(request: {
   const prompt = assignment ? providerAssignment(assignment) : request.prompt;
   return {
     id: request.id, operation: { argv, cwd: workspace, env: { ...guard?.environment }, expectedExitCodes: [0], effect: "local" },
-    deadlineMs: request.deadlineMs, outputLimit: request.outputLimit,
+    deadlineMs: request.deadlineMs, outputLimit: outputRetention.limitBytes,
     ...(request.idleTimeoutMs !== undefined ? { idleTimeoutMs: request.idleTimeoutMs } : {}),
     stdin: request.provider === "gemini" ? geminiInput(prompt) : prompt,
     ...(assignment ? { assignment } : {}),

@@ -4,6 +4,7 @@ import { ValidationSubject, resolveChangeScope } from "./change-subject.ts";
 import { contextStateRoot } from "./context-command.ts";
 import { maintainContextProjection } from "./context-projection.ts";
 import { projectionStatus } from "./context-projection-store.ts";
+import { CONTEXT_OPERATION_MS } from "./context-timing.ts";
 export function contextIndexCommand(args: string[], workspace: string) {
   const { values, positionals } = parseArgs({ args, allowPositionals: true, strict: true, options: {
     staged: { type: "boolean" }, rebuild: { type: "boolean" }, purpose: { type: "string" }, "cache-root": { type: "string" },
@@ -17,7 +18,7 @@ export function contextIndexCommand(args: string[], workspace: string) {
   if (values["cache-root"]) throw new Error("Only passive status can inspect an explicit cache root");
   const scope = resolveChangeScope(workspace, values.staged ? { staged: true } : { baseRef: "HEAD" });
   const subject = new ValidationSubject(workspace, scope, { workingTree: !values.staged });
-  const projection = maintainContextProjection(subject, subject.paths(), state, { rebuild: values.rebuild ?? false, purpose: values.purpose ?? "", deadlineAt: performance.now() + 3500 });
+  const projection = maintainContextProjection(subject, subject.paths(), state, { rebuild: values.rebuild ?? false, purpose: values.purpose ?? "", deadlineAt: performance.now() + CONTEXT_OPERATION_MS });
   return { ...projection.status, generation: projection.generation, priority: projection.priority.slice(0, 64),
     unavailable: projection.unavailable.slice(0, 64), mutation: "disposable-source-index-only" };
 }

@@ -164,6 +164,22 @@ test("doctor identifies a host preview limit without claiming hook trust", () =>
   } finally { f.cleanup(); }
 });
 
+test("passive doctor reveals source consent with passage selection disabled", () => {
+  const f = fixture();
+  try {
+    const profilePath = join(f.root, "config/governance/profile.yaml");
+    const decisions = { mode: "auto", allowed_data_classes: ["metadata", "source"], allowed_metadata_paths: ["**"],
+      allowed_source_paths: ["parser.ts"], consumers: { DL03: { mode: "auto", questions: ["context.metadata-relevance/1"] } } };
+    writeFileSync(profilePath, JSON.stringify({ context_router: { default_route: "base", routes: [{ id: "base" }] }, continuity: { decisions } }));
+    const disabled = contextDoctor(f.root);
+    assert.ok(disabled.findings.some(item => item.id === "context.passage-not-enabled"));
+    assert.equal(disabled.network, "not-attempted"); assert.equal(disabled.mutations, "none");
+    decisions.consumers.DL03.questions.push("context.passage-evidence/1", "context.passage-role/1");
+    writeFileSync(profilePath, JSON.stringify({ context_router: { default_route: "base", routes: [{ id: "base" }] }, continuity: { decisions } }));
+    assert.ok(!contextDoctor(f.root).findings.some(item => item.id === "context.passage-not-enabled"));
+  } finally { f.cleanup(); }
+});
+
 test("long sessions bind the newest prompt and duplicate index pointers do not lose usage", async () => {
   const f = fixture();
   try {

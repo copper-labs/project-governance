@@ -6,7 +6,7 @@ import {narrativeFile} from "./narrative-inputs.ts";
 import {observeStartup} from "./startup-observation.ts";
 import {nativeOwnerRolloverResult} from "./startup-prompt-rollover.ts";
 import {promptContext} from "./prompt-context.ts";
-import {collectContextHostUsage} from "./context-observations.ts";
+import {collectContextHostUsage,observeContextHostUsage} from "./context-observations.ts";
 import {ContextRouteError,recordContextFailure} from "./context-route-errors.ts";
 import {startupHookOutput} from "./startup-hook-output.ts";
 
@@ -37,6 +37,11 @@ export async function startupObserveCommand(input:{provider:string;eventFile:str
  const nativeEvent=event && typeof event==="object" && !Array.isArray(event) ? event as Record<string,unknown> : {};
  if(installedScope && eventStdin && provider==="codex" && nativeEvent.cwd!==undefined &&
    (typeof nativeEvent.cwd!=="string" || !sameNativeWorktree(workspace,nativeEvent.cwd)))return {};
+ if(provider==="codex" && nativeEvent.hook_event_name==="Stop") {
+  if(nativeEvent.agent_id || process.env.HARNESS_AGENT_ANCESTRY || process.env.GOVERNANCE_PARENT_TASK || process.env.GOVERNANCE_PARENT_LOCK_DIGEST)return {};
+  const usage=observeContextHostUsage(workspace,nativeEvent);
+  return eventStdin?{}:{action:"observe",discover:false,usage};
+ }
  const token=process.env.GH_TOKEN||process.env.GITHUB_TOKEN;
  let receipt;
  try { receipt=await observeStartup({provider,event,workspace,registry,receipts},token?{token}:{}); }

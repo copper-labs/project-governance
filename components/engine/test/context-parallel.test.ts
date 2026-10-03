@@ -63,7 +63,7 @@ test("one rejected sibling stops new work but preserves other completed answers"
 });
 
 test("concurrent siblings respect a smaller paid allowance without discarding admitted answers", async t => {
-  const f = fixture(t); f.settings.budget.maxCalls = 2;
+  const f = fixture(t); f.settings.contextBudget.maxCalls = 2;
   let calls = 0;
   const runtime = new DecisionRuntime(f.settings, f.root, { coordinationRoot: f.root, token: "fixture", fetch: async (_url, init) => {
     calls++; const wire = JSON.parse(String(init?.body));

@@ -364,7 +364,7 @@ export class ValidationSubject {
   /** Bulk immutable reads for a disposable source index; every omitted description keeps its path. */
   readBatch(paths: string[], perFile = 256 * 1024, totalLimit = 32 * 1024 * 1024, deadlineAt = performance.now() + 5000): Map<string, Buffer | string> {
     if (!Number.isSafeInteger(perFile) || perFile < 1 || perFile > 1024 * 1024 ||
-      !Number.isSafeInteger(totalLimit) || totalLimit < perFile || totalLimit > 32 * 1024 * 1024) throw new Error("Invalid batch source limits");
+      !Number.isSafeInteger(totalLimit) || totalLimit < 1 || totalLimit > 32 * 1024 * 1024) throw new Error("Invalid batch source limits");
     const results = new Map<string, Buffer | string>(), blobs = new Map<string, string[]>();
     let remaining = totalLimit;
     for (const path of [...new Set(paths)]) {
@@ -397,7 +397,9 @@ export class ValidationSubject {
         const [id, type, sizeText] = line.split(" "), size = Number(sizeText);
         if (!id || !blobs.has(id)) throw new Error("Invalid batch identity");
         if (type !== "blob" || !Number.isSafeInteger(size) || size < 0 || size > perFile || size > remaining) {
-          for (const path of blobs.get(id)!) results.set(path, "source-unavailable-or-over-limit");
+          const reason = type !== "blob" || !Number.isSafeInteger(size) || size < 0 ? "source-unavailable-or-over-limit"
+            : size > perFile ? "source-over-limit" : "index-byte-limit";
+          for (const path of blobs.get(id)!) results.set(path, reason);
         } else { selected.push({ id, size }); remaining -= size; }
       }
       if (selected.length) {

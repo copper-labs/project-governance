@@ -6,7 +6,39 @@ import { join } from "node:path";
 import { DecisionRuntime, type DecisionAsk } from "../src/decision-runtime.ts";
 import { profileDecisionSettings } from "../src/decision-settings.ts";
 import { digest } from "../src/core.ts";
-import { readDecisionBudget } from "../src/decision-budget.ts";
+import { contextBudgetScope, readDecisionBudget } from "../src/decision-budget.ts";
+
+test("larger context defaults stay in isolated scopes and explicit budgets still constrain both", async t => {
+  const root = mkdtempSync(join(tmpdir(), "decision-scopes-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  for (const [name, declared, ordinaryCalls, contextCalls] of [
+    ["default", undefined, 16, 17], ["explicit", { max_calls: 2, max_request_bytes: 4096 }, 2, 2],
+  ] as const) {
+    const settings = profileDecisionSettings({ continuity: { decisions: { mode: "auto",
+      ...(declared ? { budget: declared } : {}), allowed_data_classes: ["source", "metadata"],
+      allowed_source_paths: ["src/**"], allowed_metadata_paths: ["src/**"],
+      consumers: { DL03: { mode: "auto", questions: ["context.relevance/1", "context.metadata-relevance/1"] } } } } });
+    const runtime = new DecisionRuntime(settings, root, { coordinationRoot: root, token: "test-only",
+      fetch: async () => Response.json({ model: settings.legacy.model, answers: { q1: { type: "noul", noul: 0.9 } } }) });
+    const scope = { workspace: root, taskId: name, taskRevision: "r1" }, invocation = digest(name).slice(7);
+    for (const context of [false, true]) {
+      const expectedCalls = context ? contextCalls : ordinaryCalls;
+      const ask: DecisionAsk = { consumerId: "DL03", eventId: "first", scope,
+        subject: { digest: digest(name), revision: "r1", environment: "test" }, policyDigest: digest("policy"),
+        evidence: [{ id: "source", text: "example", sourceDigest: digest("example"), provenance: "captured", trust: "untrusted" }],
+        coverage: { captured: 1, omitted: [], truncated: false, unavailable: [], limits: [] },
+        questions: [{ name: "q1", definitionId: context ? "context.metadata-relevance/1" : "context.relevance/1", consumerId: "DL03", evidenceIds: ["source"] }],
+        ...(context ? { metadataPaths: ["src/example.ts"], budgetPartition: "context-selection", budgetInvocationId: invocation } : { sourcePaths: ["src/example.ts"] }) };
+      for (let index = 0; index < expectedCalls; index++) {
+        const outcome = await runtime.ask({ ...ask, eventId: `${context}-${index}` });
+        assert.equal(outcome.delivered, true);
+        assert.deepEqual(outcome.budget.limits, context ? settings.contextBudget : settings.budget);
+      }
+      if (!context || declared) assert.equal((await runtime.ask({ ...ask, eventId: `${context}-overflow` })).reason, "budget-exhausted");
+      assert.equal(readDecisionBudget(root, context ? contextBudgetScope(scope, invocation) : scope)?.calls, expectedCalls);
+    }
+  }
+});
 
 test("repeat reuse binds evidence and configuration, and disabled polls cannot destroy receipts", async t => {
   const root = mkdtempSync(join(tmpdir(), "decision-runtime-"));

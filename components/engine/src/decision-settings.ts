@@ -17,6 +17,8 @@ export interface DecisionSettings {
   legacy: DecisionConfig;
   consumers: Record<DecisionConsumerId, ConsumerSetting>;
   budget: DecisionBudgetLimits;
+  /** Larger retrieval defaults apply only to isolated context scopes; explicit YAML limits still own both. */
+  contextBudget: DecisionBudgetLimits;
   migration: { notes: string[] };
   /** Explicit opt-in to new questions is separate from legacy context-ranking permission. */
   questionIds: Record<DecisionConsumerId, string[]>;
@@ -26,7 +28,10 @@ export interface DecisionSettings {
   allowedMetadataPaths?: string[];
 }
 
-export const DEFAULT_DECISION_BUDGET: DecisionBudgetLimits = { maxCalls: 16, maxRequestBytes: 131_072 };
+export const DEFAULT_DECISION_BUDGET: DecisionBudgetLimits = { maxCalls: 16, maxRequestBytes: 128 * 1024 };
+export const DEFAULT_CONTEXT_BUDGET: DecisionBudgetLimits = { maxCalls: 512, maxRequestBytes: 10 * 1024 * 1024 };
+/** One configuration ceiling also owns the allowance suggested by metadata preflight. */
+export const MAX_DECISION_BUDGET: DecisionBudgetLimits = { maxCalls: 1024, maxRequestBytes: 16 * 1024 * 1024 };
 const ORDER: Record<DecisionMode, number> = { off: 0, shadow: 1, auto: 2 };
 const LEGACY_CONTEXT_QUESTION = "rank_optional_context";
 
@@ -42,14 +47,14 @@ function consumerSetting(raw: unknown, id: DecisionConsumerId): ConsumerSetting 
   return { mode: mode as DecisionMode, effect: effect as DecisionEffect, effectSource: "declared" };
 }
 
-function budgetLimits(raw: unknown): DecisionBudgetLimits {
-  if (raw === undefined) return { ...DEFAULT_DECISION_BUDGET };
+function budgetLimits(raw: unknown, defaults = DEFAULT_DECISION_BUDGET): DecisionBudgetLimits {
+  if (raw === undefined) return { ...defaults };
   const entry = object(raw, "continuity.decisions.budget");
   for (const key of Object.keys(entry)) if (!["max_calls", "max_request_bytes"].includes(key)) throw new Error(`Unknown decision budget key: ${key}`);
-  const maxCalls = entry["max_calls"] ?? DEFAULT_DECISION_BUDGET.maxCalls;
-  const maxRequestBytes = entry["max_request_bytes"] ?? DEFAULT_DECISION_BUDGET.maxRequestBytes;
-  if (!Number.isSafeInteger(maxCalls) || (maxCalls as number) < 1 || (maxCalls as number) > 1024 ||
-      !Number.isSafeInteger(maxRequestBytes) || (maxRequestBytes as number) < 1024 || (maxRequestBytes as number) > 8 * 1024 * 1024) throw new Error("Invalid decision budget bounds");
+  const maxCalls = entry["max_calls"] ?? defaults.maxCalls;
+  const maxRequestBytes = entry["max_request_bytes"] ?? defaults.maxRequestBytes;
+  if (!Number.isSafeInteger(maxCalls) || (maxCalls as number) < 1 || (maxCalls as number) > MAX_DECISION_BUDGET.maxCalls ||
+      !Number.isSafeInteger(maxRequestBytes) || (maxRequestBytes as number) < 1024 || (maxRequestBytes as number) > MAX_DECISION_BUDGET.maxRequestBytes) throw new Error("Invalid decision budget bounds");
   return { maxCalls: maxCalls as number, maxRequestBytes: maxRequestBytes as number };
 }
 
@@ -81,6 +86,7 @@ export function profileDecisionSettings(profile: unknown): DecisionSettings {
     if (question !== LEGACY_CONTEXT_QUESTION) notes.push(`Legacy allowed_questions:${question} is baseline-only; it enables no first-RC consumer.`);
   }
   const budget = budgetLimits(settings["budget"]);
+  const contextBudget = budgetLimits(settings["budget"], DEFAULT_CONTEXT_BUDGET);
   const mode = legacy.mode;
   const questionIds = Object.fromEntries(DECISION_CONSUMER_IDS.map(id => {
     if (!Object.hasOwn(declared, id)) return [id, id === "DL03" && legacyContext ? ["legacy.context-rank/1"] : []];
@@ -99,11 +105,11 @@ export function profileDecisionSettings(profile: unknown): DecisionSettings {
       path.startsWith("/") || /[\x00-\x1f\\]/u.test(path) || path.split("/").some((part: string) => part === ".." || part === ".")))
     throw new Error("Invalid metadata disclosure paths");
   const allowedMetadataPaths = [...new Set(metadata as string[])];
-  const resolved: Omit<DecisionSettings, "configDigest"> = { mode, legacy, consumers, questionIds, budget, modelRouting, allowedMetadataPaths, migration: { notes } };
+  const resolved: Omit<DecisionSettings, "configDigest"> = { mode, legacy, consumers, questionIds, budget, contextBudget, modelRouting, allowedMetadataPaths, migration: { notes } };
   return { ...resolved, configDigest: digest({ mode, model: legacy.model, revision: legacy.revision,
     allowedDataClasses: legacy.allowedDataClasses, allowedSourcePaths: legacy.allowedSourcePaths ?? [],
     deadlineMs: legacy.deadlineMs, evidenceBytes: legacy.evidenceBytes, maxCandidates: legacy.maxCandidates,
-    consumers, questionIds, budget, modelRouting, allowedMetadataPaths }) };
+    consumers, questionIds, budget, contextBudget, modelRouting, allowedMetadataPaths }) };
 }
 
 export function loadProfileDecisionSettings(root: string): DecisionSettings {

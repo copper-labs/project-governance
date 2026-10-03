@@ -157,6 +157,8 @@ export class DecisionRuntime {
     const signal = signals.length ? AbortSignal.any(signals) : undefined;
     const metadata = metadataQuestionGroup(ask.consumerId, ask.questions);
     const passage = passageQuestionGroup(ask.consumerId, ask.questions);
+    const limits = ask.budgetPartition === "context-selection" && (metadata || passage)
+      ? this.settings.contextBudget : this.settings.budget;
     const resolved = this.eligibility(ask.consumerId, metadata ? "context.metadata-relevance/1" : undefined);
     const consumer = resolved.consumer;
     const requestId = randomUUID();
@@ -174,7 +176,7 @@ export class DecisionRuntime {
       scopeState: ask.scope ? "bound" : "unavailable", scope: ask.scope,
       answers: {}, method: "baseline", reason: "off", delivered: false, providerCalled: false,
       model: null, latencyMs: 0, usage: { inputTokens: null, outputTokens: null }, coverage: ask.coverage,
-      budget: { state: "not-required", reservationId: null, calls: null, bytes: null, limits: { maxCalls: this.settings.budget.maxCalls, maxRequestBytes: this.settings.budget.maxRequestBytes } },
+      budget: { state: "not-required", reservationId: null, calls: null, bytes: null, limits: { ...limits } },
       tokenEstimate: null, receiptId: null,
     };
     const fallback = (reason: string, extra: Partial<DecisionOutcome> = {}): DecisionOutcome => {
@@ -223,7 +225,7 @@ export class DecisionRuntime {
     if (!this.#client.tokenPresent) return fallback("missing-token");
     if (!ask.scope) return fallback("scope-unavailable");
 
-    const preparation = prepareDecisionRequest(ask, this.settings, participants, requestId);
+    const preparation = prepareDecisionRequest(ask, this.settings, participants, requestId, limits);
     if (!preparation.ok) return fallback(preparation.reason, { tokenEstimate: preparation.tokenEstimate });
     const { request, body, payloadDigestValue, requestBytes } = preparation;
 
@@ -242,7 +244,7 @@ export class DecisionRuntime {
     const transport = await this.#client.ask(body, providerDeadline, signal, () => {
       const budgetScope = ask.budgetFamily ? contextFamilyScope(ask.scope!.workspace, ask.budgetInvocationId!)
         : ask.budgetPartition ? contextBudgetScope(ask.scope!, ask.budgetInvocationId!) : ask.scope!;
-      admittedReservation = reserveDecisionCall(this.stateRoot, budgetScope, key, requestBytes, this.settings.budget,
+      admittedReservation = reserveDecisionCall(this.stateRoot, budgetScope, key, requestBytes, limits,
         { ...(ask.budgetFamily ? { familyId: ask.budgetInvocationId! } : {}), busyTimeoutMs: Math.max(0, Math.min(1000, this.#options.busyTimeoutMs ?? 250, Math.floor(deadlineAt - performance.now()))) });
       return admittedReservation.state === "reserved";
     }, () => { base.providerCalled = true; }, "provider", ask.deadlineAt);

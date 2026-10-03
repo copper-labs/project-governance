@@ -86,6 +86,19 @@ test("trusted admission rejects unbound overrides and policy drift; fixed native
   await assert.rejects(() => submitProviderJob(directory, request), /changed/);
 });
 
+test("assignment preflight distinguishes default worker retention from an explicit small stream cap", t => {
+  const f = fixture(t), { outputLimit: _outputLimit, ...request } = f.request;
+  for (const [id, extra, expected] of [["default", {}, null], ["small", { outputLimit: 6000 }, "small-worker-stream-allowance"]] as const) {
+    const candidate = { ...request, id, ...extra }, path = join(f.trusted, `${id}-admission.json`);
+    authorizeProviderAssignment({ store: f.storePath, taskId: f.task.taskId, path, request: candidate });
+    const result = providerAssignmentDoctor({ ...candidate, admission: path }, join(f.trusted, `${id}-preview`));
+    assert.equal(result.status, "passed");
+    assert.ok("outputRetention" in result);
+    assert.equal(result.outputRetention.warning, expected);
+    assert.equal(result.outputRetention.limitBytes, id === "default" ? 4 * 1024 * 1024 : 6000);
+  }
+});
+
 test("routing applies only confident qualified categories; shadow, advice, uncertainty and explicit review preserve the fixed pair", async t => {
   const f = fixture(t), baselinePath = join(f.trusted, "baseline-admission.json"), baselineDir = join(f.trusted, "baseline");
   authorizeProviderAssignment({ store: f.storePath, taskId: f.task.taskId, path: baselinePath, request: f.request,

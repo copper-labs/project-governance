@@ -215,6 +215,10 @@ caller deadline; unavailable/incompatible storage returns ordinary fallback with
 reset. Reuse storage helpers where useful; no second persistence implementation is needed.
 Proposed pilot defaults are 16 calls and 131072 request bytes per scope, configurable through
 the same validated owner. Per-request deadline, byte, candidate and cancellation limits still apply.
+The [RC10 capacity amendment](engine-rc10-context-use.md#capacity-amendment--2026-10-02) retains these
+ordinary defaults and gives isolated context metadata/passage scopes 512 calls and 10 MiB when
+omitted. The existing budget declaration supports explicit values through 1,024 calls and 16 MiB;
+each explicit field remains authoritative for both kinds of scope.
 Shadow calls and failed/timed-out dispatched calls consume the reservation. An ambiguous/crashed
 reservation is not refunded automatically. Repeated observations of the same decision event reuse
 its retained receipt or baseline; polling does not issue another request or reset the counter.

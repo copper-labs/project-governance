@@ -1,7 +1,7 @@
 import {isAbsolute,join} from "node:path";
 import {CONTEXT_HOOK_SECONDS} from "./context-timing.ts";
 
-const events={SessionStart:90,SubagentStart:90,SessionEnd:3,UserPromptSubmit:CONTEXT_HOOK_SECONDS} as const;
+const events={SessionStart:90,SubagentStart:90,SessionEnd:3,Stop:3,UserPromptSubmit:CONTEXT_HOOK_SECONDS} as const;
 export const MANAGED_CODEX_STARTUP_COMMAND='root="$(git rev-parse --show-toplevel)" && "$root/.governance/runtime/bin/project-governance" startup observe --provider codex --event-stdin';
 const record=(value:unknown):value is Record<string,unknown>=>Boolean(value && typeof value==="object" && !Array.isArray(value));
 
@@ -28,7 +28,7 @@ export function startupHooks(configuration:unknown,workspace:string,receipts:str
     if(handler.command.includes("startup observe") && handler.command.includes("project-governance")) {
      const timeout=events[name as keyof typeof events];
      const completePrompt=name==="UserPromptSubmit" && handler.additionalContextLimit===0;
-     const previousPromptTimeout=name==="UserPromptSubmit" && [10,15,20].includes(Number(handler.timeout)) && typeof handler.timeout==="number";
+     const previousPromptTimeout=name==="UserPromptSubmit" && [10,15,20,40].includes(Number(handler.timeout)) && typeof handler.timeout==="number";
      if(!timeout || handler.command!==command || handler.type!=="command" || handler.timeout!==timeout && !previousPromptTimeout ||
        Object.keys(handler).length!==(completePrompt?4:3) ||
        (handler.additionalContextLimit!==undefined && !completePrompt) || Object.keys(group).length!==1)

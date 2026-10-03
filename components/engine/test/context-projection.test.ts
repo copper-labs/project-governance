@@ -77,6 +77,33 @@ test("partial refresh retains all paths and resumes; unsafe and binary paths nev
   const complete = f.run(); assert.equal(complete.status.pendingCount, 0); assert.equal(complete.entries.has("binary.ts"), false);
 });
 
+test("path-only diagnostics separate unsupported clues, binary content and pending extraction", t => {
+  const f = fixture(t); f.write("plain.txt", "ordinary text\n"); f.write("binary.ts", "\0binary"); f.write("a.ts", "export const useful = true;\n");
+  const result = f.run();
+  assert.deepEqual(result.status.quality.pathOnlyReasons, { "binary-or-non-utf8": 1, "no-supported-literal-clues": 1 });
+  assert.equal(result.status.quality.pathOnlyCount, 2);
+  assert.equal(result.status.quality.pathOnlyExamples.length, 2);
+  assert.equal(result.status.quality.pathOnlyExamplesTruncated, false);
+  const expired = f.run({ rebuild: true, deadlineAt: performance.now() - 1 });
+  assert.equal(expired.status.extractedCount, 0, "An expired shared clock cannot renew the extraction allowance");
+  assert.equal(expired.status.quality.pathOnlyReasons["index-deadline"], 3);
+});
+
+test("verified oversized sources avoid repeated capture but byte-budget deferrals resume", t => {
+  const f = fixture(t); f.write("large.json", JSON.stringify({ description: "x".repeat(270000) })); f.write("small.ts", "export const useful = true;\n");
+  f.git("add", "."); f.git("-c", "user.name=Fixture", "-c", "user.email=f@example.invalid", "commit", "-qm", "sources");
+  const cold = f.run(); assert.equal(cold.status.quality.pathOnlyReasons["source-over-limit"], 1);
+  const subject = f.subject(), readBatch = subject.readBatch.bind(subject); let requests: string[] = [];
+  subject.readBatch = (paths, ...args) => { requests.push(...paths); return readBatch(paths, ...args); };
+  const warm = maintainContextProjection(subject, subject.paths(), f.state);
+  assert.deepEqual(requests, []); assert.equal(warm.status.quality.pathOnlyReasons["source-over-limit"], 1);
+  f.write("large.json", '{"description":"Now a small literal description"}\n');
+  assert.match(f.run().entries.get("large.json")!.text, /Now a small/);
+  const deferred = f.run({ rebuild: true, byteLimit: 10 });
+  assert.ok(deferred.status.quality.pathOnlyCount > 0);
+  assert.equal(f.run().status.quality.pathOnlyCount, 0, "A total-byte deferral must not become a cached oversized-file result");
+});
+
 test("SQLite writer contention, compare/publish race, schema failure and explicit rebuild are bounded", t => {
   const f = fixture(t); f.write("a.ts", "export const a=1;\n"); f.run();
   const db = new DatabaseSync(join(f.state, PROJECTION_FILE)); db.exec("BEGIN IMMEDIATE");

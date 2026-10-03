@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { spawn } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
 import { reserveDecisionCall, readDecisionBudget, closeDecisionScope, decisionBudgetStoreStatus, DECISION_BUDGET_FILE } from "../src/decision-budget.ts";
+import { profileDecisionSettings } from "../src/decision-settings.ts";
 
 function fixture(t: TestContext) {
   const root = mkdtempSync(join(tmpdir(), "decision-budget-"));
@@ -33,6 +34,16 @@ test("closed scopes preserve duplicate identities but cannot admit new events", 
   const unusedScope = { ...scope, taskRevision: "unused" };
   assert.equal(closeDecisionScope(root, unusedScope), true);
   assert.equal(reserveDecisionCall(root, unusedScope, "late", 10, limits).state, "unavailable");
+});
+
+test("the default allowance funds more than eight MiB without renewing or losing byte accounting", t => {
+  const { root, scope } = fixture(t), limits = profileDecisionSettings({}).contextBudget;
+  for (let index = 0; index < 160; index++)
+    assert.equal(reserveDecisionCall(root, scope, `batch-${index}`, 65536, limits).state, "reserved");
+  assert.deepEqual(readDecisionBudget(root, scope), { calls: 160, bytes: 10 * 1024 * 1024, reservations: 160 });
+  assert.equal(reserveDecisionCall(root, scope, "overflow", 1, limits).state, "exhausted");
+  assert.equal(reserveDecisionCall(root, scope, "batch-128", 65536, limits).state, "duplicate");
+  assert.equal(readDecisionBudget(root, scope)?.bytes, 10 * 1024 * 1024);
 });
 
 test("corrupt, incompatible and busy stores fail closed", t => {

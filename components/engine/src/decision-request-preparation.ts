@@ -2,10 +2,10 @@ import { canonical, digest } from "./core.ts";
 import { DECISION_CONSUMERS, DECISION_QUESTIONS } from "./decision-catalog.ts";
 import { DECISION_SCHEMA_VERSION, decisionPayload, estimateTokens, validateDecisionRequest, METADATA_MAX_QUESTIONS, metadataQuestionGroup, type DecisionConsumerId, type DecisionRequest2 } from "./decision-schema.ts";
 import type { DecisionAsk } from "./decision-runtime.ts";
-import type { DecisionSettings } from "./decision-settings.ts";
+import type { DecisionBudgetLimits, DecisionSettings } from "./decision-settings.ts";
 
 /** Prepare and bound one immutable payload before its operational budget can be reserved. */
-export function prepareDecisionRequest(ask: DecisionAsk, settings: DecisionSettings, participants: DecisionConsumerId[], requestId: string) {
+export function prepareDecisionRequest(ask: DecisionAsk, settings: DecisionSettings, participants: DecisionConsumerId[], requestId: string, limits: DecisionBudgetLimits) {
     const request: DecisionRequest2 = {
       schemaVersion: DECISION_SCHEMA_VERSION, requestId, consumerId: ask.consumerId, consumers: participants, consumerVersion: DECISION_CONSUMERS[ask.consumerId].version,
       ...(ask.evidenceLayout ? { evidenceLayout: ask.evidenceLayout } : {}),
@@ -14,7 +14,7 @@ export function prepareDecisionRequest(ask: DecisionAsk, settings: DecisionSetti
       subject: ask.subject, evidence: ask.evidence, coverage: ask.coverage, questions: ask.questions,
       eligibilityDigest: ask.eligibilityDigest ?? null, policyDigest: ask.policyDigest, configDigest: settings.configDigest,
       budget: { deadlineMs: settings.legacy.deadlineMs, maxQuestions: metadataQuestionGroup(ask.consumerId, ask.questions) ? METADATA_MAX_QUESTIONS : 64,
-        maxRequestBytes: Math.min(settings.budget.maxRequestBytes, 65_536), maxCandidates: participants.every(id => id === "DL03") ? Math.max(2, settings.legacy.maxCandidates + 1) : 65,
+        maxRequestBytes: Math.min(limits.maxRequestBytes, 65_536), maxCandidates: participants.every(id => id === "DL03") ? Math.max(2, settings.legacy.maxCandidates + 1) : 65,
         tokenEstimate: 0, tokenMethod: "UTF-8 bytes upper estimate" },
     };
     let body: string, payloadDigestValue: string, requestBytes: number;
