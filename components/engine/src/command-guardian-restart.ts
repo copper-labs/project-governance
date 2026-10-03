@@ -39,7 +39,10 @@ export async function restartCommandGuardian(directory: string, requestDigest: s
     recordedCommandMembers(directory, requestDigest, object(launch.child).processGroup);
     durableJson(join(directory, "guardian-restart.json"), { version: 1, requestDigest, authority,
       previousGuardian: guardian, launchDigest: digest(launch), requestedAt: new Date().toISOString() });
-    await startCommandGuardian(directory, requestDigest);
+    await startCommandGuardian(directory, requestDigest, true);
+    const completed = observeCommand(directory, requestDigest);
+    if (completed.receipt && hasConfirmedCommandCleanup(directory, completed.receipt))
+      return { state: "reconciled", reconciliation: reconcileCommand(directory, requestDigest) };
     return { state: "guardian-running", requestDigest };
   } finally { rmdirSync(lock); }
 }

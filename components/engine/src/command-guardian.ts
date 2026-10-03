@@ -5,16 +5,34 @@ import { join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { digest, durableJson, object } from "./core.ts";
 import { narrativeFile } from "./narrative-inputs.ts";
-import { commandProcesses, recordedCommandMembers, recoverCommandOwner } from "./command-owner-recovery.ts";
+import { commandProcesses, hasConfirmedCommandCleanup, recordedCommandMembers, recoverCommandOwner } from "./command-owner-recovery.ts";
 import { reconcileCommand } from "./command-recovery.ts";
 import { deliverCommandCompletion } from "./completion-delivery.ts";
-import { processFingerprint, processLiveFingerprint } from "./process-owner.ts";
+import { observeCommand, processFingerprint, processLiveFingerprint } from "./process-owner.ts";
 
 const SELF = fileURLToPath(import.meta.url);
 const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+/** Fast cleanup can finish before startup is observed; only exact bound proof substitutes for a live identity. */
+export function confirmCommandGuardianAcknowledgement(directory: string, requestDigest: string, pid: number,
+  allowCompletedCleanup = false): boolean {
+  const record = object(JSON.parse(narrativeFile(directory, "guardian.json")));
+  if (record.pid !== pid) return false;
+  if (record.requestDigest !== requestDigest || typeof record.fingerprint !== "string" || !record.fingerprint)
+    throw new Error("Guardian acknowledgment mismatch");
+  const fingerprint = processFingerprint(pid);
+  if (fingerprint === record.fingerprint) return true;
+  if (allowCompletedCleanup && fingerprint === null) {
+    // A failed identity lookup is not evidence of absence; full inspection must also succeed.
+    if (commandProcesses().some(row => row.pid === pid)) throw new Error("Guardian acknowledgment mismatch");
+    const completed = observeCommand(directory, requestDigest);
+    if (completed.receipt && hasConfirmedCommandCleanup(directory, completed.receipt)) return true;
+  }
+  throw new Error("Guardian acknowledgment mismatch");
+}
+
 /** A detached guardian must acknowledge ownership before the worker may launch native work. */
-export async function startCommandGuardian(directory: string, requestDigest: string): Promise<void> {
+export async function startCommandGuardian(directory: string, requestDigest: string, allowCompletedCleanup = false): Promise<void> {
   const guardian = spawn(process.execPath, [SELF, "--guardian", directory, requestDigest], {
     detached: true, stdio: "ignore", env: { PATH: process.env.PATH, HOME: process.env.HOME },
   });
@@ -23,14 +41,7 @@ export async function startCommandGuardian(directory: string, requestDigest: str
   const until = Date.now() + 5000;
   while (Date.now() < until && !failed) {
     const path = join(directory, "guardian.json");
-    if (existsSync(path)) {
-      const record = object(JSON.parse(narrativeFile(directory, "guardian.json")));
-      if (record.pid === guardian.pid) {
-        if (record.requestDigest !== requestDigest || !record.fingerprint ||
-            processFingerprint(Number(record.pid)) !== record.fingerprint) throw new Error("Guardian acknowledgment mismatch");
-        return;
-      }
-    }
+    if (existsSync(path) && guardian.pid && confirmCommandGuardianAcknowledgement(directory, requestDigest, guardian.pid, allowCompletedCleanup)) return;
     await pause(20);
   }
   throw new Error("Command guardian did not acknowledge startup");

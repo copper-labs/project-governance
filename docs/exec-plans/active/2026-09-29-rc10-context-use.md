@@ -423,3 +423,10 @@ its corrected teardown waits for the exact owned worker/supervisor identities to
 affected recheck passes. Remaining release checks and real adopter safe seams stay explicit.
 Raw operational receipt retention and synchronous index finalization remain measured limitations,
 not hidden successful-use claims. No additional background service or per-file paid summary is added.
+
+The first patch publication stopped at a Linux cleanup-recovery fixture. A controlled slow-requester
+simulation reproduced lost supervisor acknowledgment after completed cleanup; the original CI log
+retained only the CLI's generic error, so that exact CI cause remains an inference. The correction
+accepts the exact spawned supervisor's recorded acknowledgment after process reaping only with the
+existing bound cleanup proof. Missing proof, request mismatch and a reused live PID still refuse.
+The failed `3.0.0-rc.10.5` tag remains immutable; the corrected candidate is `3.0.0-rc.10.6`.

@@ -1,7 +1,9 @@
 import { workflowOperation } from "../src/workflow-operation.ts";
+import { confirmCommandGuardianAcknowledgement } from "../src/command-guardian.ts";
+import { durableJson } from "../src/core.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, existsSync, readFileSync } from "node:fs";
+import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Store } from "../../harness/src/store/store.ts";
@@ -11,6 +13,23 @@ import { WorkflowStore } from "../src/workflow-store.ts";
 import { ResourceRegistry } from "../src/resources.ts";
 import { parseRecipe, recipeDigest } from "../src/workflow-types.ts";
 import { executeWorkflow } from "../src/workflow-executor.ts";
+
+async function assertCompletedRecoveryAcknowledgement(directory: string, requestDigest: string, guardianPid: number) {
+  const { processFingerprint } = await import("../src/process-owner.ts"), reapedBy = Date.now() + 5000;
+  while (processFingerprint(guardianPid) !== null && Date.now() < reapedBy)
+    await new Promise(resolve => setTimeout(resolve, 20));
+  assert.equal(processFingerprint(guardianPid), null);
+  assert.equal(confirmCommandGuardianAcknowledgement(directory, requestDigest, guardianPid, true), true);
+  const proofPath = join(directory, "owner-recovery.json"), proofBytes = readFileSync(proofPath), proof = JSON.parse(proofBytes.toString("utf8"));
+  try {
+    rmSync(proofPath);
+    assert.throws(() => confirmCommandGuardianAcknowledgement(directory, requestDigest, guardianPid, true), /mismatch/);
+    for (const field of ["receiptDigest", "launchDigest", "membersDigest"]) {
+      durableJson(proofPath, { ...proof, [field]: "different-evidence" });
+      assert.throws(() => confirmCommandGuardianAcknowledgement(directory, requestDigest, guardianPid, true), /mismatch/, field);
+    }
+  } finally { writeFileSync(proofPath, proofBytes); }
+}
 
 function fixture(fails: boolean, resources = ["fixture:device"], captureEnvironment = false, loseSupervisor = false) {
   const dir = mkdtempSync(join(tmpdir(), "engine-execute-")), path = join(dir, "ledger.sqlite");
@@ -260,6 +279,9 @@ test("public command recovery releases workflow resources after worker and guard
     assert.equal(existsSync(join(f.dir, "cleaned")), true);
     assert.equal(f.registry.inspect()[0]!.state, "released");
     assert.equal(f.registry.inspect()[0]!.observation, observation);
+    const replacement = read("guardian.json");
+    records.push(replacement);
+    await assertCompletedRecoveryAcknowledgement(commandDirectory, digest(request), replacement.pid);
   } finally {
     for (const record of records) if (processLiveFingerprint(record.pid) === record.fingerprint) process.kill(record.pid, "SIGKILL");
     if (execution) await execution.catch(() => {});

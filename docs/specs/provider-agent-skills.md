@@ -5,7 +5,7 @@ type: spec
 status: current
 owner: project-governance
 created: 2026-09-06
-updated: 2026-09-21
+updated: 2026-10-02
 summary: Defines optional Gemini, Claude, and Codex delegation with full native capabilities, durable jobs, and observable progress.
 ---
 
@@ -221,6 +221,13 @@ Jobs move from queued to running, then exactly one terminal state: succeeded, bl
 cancelled, or timed_out. The state records whether the provider is still initializing or actively
 working. A detached worker owns each job. A guardian cleans up its recorded provider descendants
 if the worker disappears. Signals use checked process identities, not a PID alone.
+
+A restarted guardian's acknowledgment stays valid when fast cleanup finishes before the caller
+observes it. Recovery accepts an absent guardian only when full process inspection succeeds, the
+spawned PID and recorded request identity match, and the existing command receipt confirms bound
+cleanup. It reports reconciliation when cleanup has already finished. The original worker's
+pre-launch gate stays strict. Missing proof or a different live identity still refuses acknowledgment;
+recovery never invents command success.
 
 Both worker startup and native execution wait behind a pipe gate until their process identity is
 durably recorded. Parent death or failed publication closes the gate without starting that work.
