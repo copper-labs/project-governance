@@ -5,7 +5,7 @@ type: spec
 status: active
 owner: project-governance
 created: 2026-09-23
-updated: 2026-09-27
+updated: 2026-10-04
 summary: Automatic prompt entry, a rebuildable SQLite repository index, source-backed relationships, bounded JEV selection with expansion and real-task qualification.
 ---
 
@@ -51,15 +51,20 @@ explicit governed commands until independently qualified. A registered hook, a C
 or an answered JEV request alone cannot satisfy the native-host release gate.
 
 A resumed Codex session may run under a new native process while the previous process's startup
-reader is still recorded. If the old process is proven absent and the exact active runtime still
-matches the pinned lock, the new prompt may prepare advisory context under a recoverable
+reader is still recorded. RC10.9 permits a verified submitted prompt to prepare advisory context
+when the exact active runtime matches the pinned lock, even if the prior process remains live.
+The same host, session, worktree and installation must match the recorded reservation. The
+current native ancestor must be verified. Context runs under a separate recoverable
 observation reader. It is held through bounded selection and released on normal completion; an
 abruptly terminated hook leaves an exact reader that observation recovery can clear after proving
-process absence. A resumed SessionStart may return without discovery or update authority; the
-subsequent submitted-prompt hook supplies context. It must not transfer or retire the old
+process absence. A resumed SessionStart still requires prior-host absence and may return without
+discovery or update authority; the subsequent submitted-prompt hook supplies context. It must not
+transfer or retire the old
 startup/update owner, enable an automatic update, or claim
-the old observation completed. If process absence or runtime identity cannot be proved, retain
-the explicit lifecycle-unavailable output. Session-end or deliberate owner recovery remains the
+the old observation completed. Maintenance, unverified native identity, foreign hosts/workspaces
+and runtime mismatch retain explicit refusal. The failure receipt includes a safe originating
+cause code, stage and digested session/turn identity; raw exception and prompt text stay out.
+Session-end or deliberate owner recovery remains the
 cleanup path for the old reader.
 
 ## One flow and clear ownership

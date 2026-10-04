@@ -5,7 +5,7 @@ type: spec
 status: current
 owner: project-governance
 created: 2026-09-22
-updated: 2026-09-25
+updated: 2026-10-04
 summary: Reuses session-bound continuity intent and bounded discovery for ordinary context and check delivery.
 ---
 
@@ -73,6 +73,18 @@ task/action binding; observation reads that binding, not an ambient session over
 
 RC10 `context-route` requires `--task <current request>` for fresh selection, or `--entry <id>` for
 validated reuse of this prompt's native packet. Other flags cannot substitute for current intent.
+
+Replay uses the exact entry reference supplied by the native packet. Keep normal session, latest
+turn, task, source and runtime validation; do not infer a turn, search sibling trees, choose an older
+completed turn or perform new selection. Missing or incomplete native entry remains an explicit
+refusal. RC10.9 distinguishes malformed caller references from malformed stored identities with
+safe diagnostic reasons; record their reference digest and byte length, not the supplied raw value.
+
+Fresh commands record an inherited session when that session owns their task binding. Their
+execution receipt distinguishes a native entry link from an explicit request outside the native
+packet, a missing native preparation or a binding not owned by that session. Linkage diagnostics
+cannot interrupt completed selection. A known session is not evidence that a native packet was
+delivered, and explicit task input must not manufacture a turn link.
 Revision may be inherited from the resolved binding. An explicit task description can narrow the
 retrieval query without changing the stored requirement used by task advice. A check's
 `--decision-purpose` adds focus to the bound requirement; it never replaces it or invalidates the check.

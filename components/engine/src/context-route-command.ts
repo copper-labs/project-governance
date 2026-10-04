@@ -469,8 +469,23 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
   const expansion = options.family ? { entry: options.family.id, step: options.family.step, status: admission?.status ?? "local-only", completed: familyCompleted,
     transitionId: options.family.transitionId ?? null,
     nextStep: options.family.step < 2 ? options.family.step + 1 : null, sharedAllowance: true, originalReadsAvailable: true } : null;
+  const ambientSession = options.session ?? sessionId();
+  const nativeSession = options.session ?? (binding.source === "session" ? ambientSession : null);
+  let promptLink: { status: string; reason: string; entryId: string | null } = options.family
+    ? { status: "linked", reason: "native-entry", entryId: options.family.id }
+    : { status: "unlinked", reason: ambientSession ? "binding-not-session-owned" : "session-unavailable", entryId: null };
+  if (!options.family && binding.source === "session" && nativeSession) {
+    try {
+      const latest = latestSessionPrompt(root, nativeSession);
+      promptLink.reason = latest.entry ? "explicit-request-outside-native-packet" : latest.reason;
+    }
+    catch (error) {
+      promptLink.reason = error instanceof ContextRouteError && /^[a-z][a-z0-9-]{0,79}$/u.test(error.code)
+        ? error.code : "native-entry-inspection-unavailable";
+    }
+  }
   const execution = { workspace: root, worktreeLocator: workContext(root).locator,
-    nativeSession: options.session ?? null, entryId: options.family?.id ?? null,
+    nativeSession, entryId: options.family?.id ?? null, promptLink,
     definitionSource: inspectStartupHookSource(root).definitionRoot };
   const receipt = { version: 1, runtimeVersion: RELEASE_VERSION, workspace: root, receiptId, execution, createdAt: new Date().toISOString(), ...identity, selection, expansion,
     timing: timing.snapshot(metadata?.providerCallMs ?? 0, projection.status.elapsedMs),

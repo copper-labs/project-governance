@@ -55,9 +55,10 @@ async function verifyOwnerRollover({ packageRoot, temporary, workspace, environm
     assert.equal(task.action, 'reserve');
     const generations = new RuntimeGenerations(registry);
     const reader = generations.reserveStartupTask(task.taskId);
-    tasks.bindOwner(task.taskId, { provider: 'codex', host: hostname(), pid, fingerprint: `prior-${session}` }, { registry, ...reader });
+    const host = { provider: 'codex', host: hostname(), pid, fingerprint: `prior-${session}` };
+    tasks.bindOwner(task.taskId, host, { registry, ...reader });
     generations.close(); tasks.close();
-    return { receipts, prompt, reader };
+    return { receipts, prompt, reader, host, taskId: task.taskId };
   };
   const invokeNativePrompt = (receipts, nativeEvent) => {
     // A titled parent exercises the real native-ancestor check and installed command path.
@@ -92,9 +93,24 @@ async function verifyOwnerRollover({ packageRoot, temporary, workspace, environm
   const rolloverStatus = invoke(launcher, ['telemetry', 'context', 'status']);
   assert.equal(rolloverStatus.counts['context-observations:startup-owner-rollover'], 1);
   const present = seedPriorHost('present-host', process.pid);
-  const refusedRollover = invokeNativePrompt(present.receipts, present.prompt);
-  assert.match(refusedRollover.hookSpecificOutput.additionalContext, /lifecycle is unavailable/);
-  assert.equal(invoke(launcher, ['telemetry', 'context', 'status']).counts['context-observations:startup-owner-rollover'], 1);
+  const beforeTasks = new StartupTasks(present.receipts);
+  const beforeOwner = beforeTasks.owner(present.taskId); beforeTasks.close();
+  assert.deepEqual(beforeOwner, { host: present.host, reader: { registry, ...present.reader } });
+  const liveContinuation = invokeNativePrompt(present.receipts, present.prompt);
+  assert.match(liveContinuation.hookSpecificOutput.additionalContext, /app.ts/);
+  const afterTasks = new StartupTasks(present.receipts);
+  assert.deepEqual(afterTasks.owner(present.taskId), beforeOwner, 'A live prior owner must remain unchanged');
+  afterTasks.close();
+  assert.equal(invoke(launcher, ['telemetry', 'context', 'status']).counts['context-observations:startup-owner-rollover'], 2);
+  const entryId = /Governance prompt context\. Entry ([a-f0-9]{64});/u.exec(liveContinuation.hookSpecificOutput.additionalContext)?.[1];
+  assert.ok(entryId, 'A submitted prompt must return its concrete entry reference');
+  const replay = spawnSync(launcher, ['context-route', '--entry', entryId], { cwd: workspace,
+    env: { ...environment, HARNESS_SESSION: present.prompt.session_id }, encoding: 'utf8', timeout: 10000 });
+  assert.equal(replay.status, 0, replay.stderr);
+  const reused = JSON.parse(replay.stdout);
+  assert.equal(reused.reuse.status, 'validated-entry-replay');
+  assert.equal(reused.execution.nativeSession, present.prompt.session_id);
+  assert.equal(reused.execution.promptLink.status, 'linked');
   invokeNativePrompt(departed.receipts, { ...departed.prompt, hook_event_name: 'SessionEnd' });
   assert.equal(readers().length, beforeReaders + 1, 'Only the departed owner was retired');
   // The deliberately live owner belongs to this fixture, so tear its exact row down locally.
@@ -455,6 +471,6 @@ export async function verifyRc6Prompt(packageRoot, archive) {
       assert.deepEqual(refused, {});
     }
     await verifyWorktreeCutover({ packageRoot, archive, temporary, workspace, environment, lock });
-    return { status: 'passed', scope: 'Exact installed package, initial and linked-worktree hooks, stale sibling hook refusal, merged pin cutover, unborn prompt stdin, no-token fallback, compact metadata/procedure/source/assertion delivery through the native hook, exact no-dispatch replay, recoverable prompt reader, synthetic native-parent rollover admission and lifecycle failure. Real native host trust/use not tested.', sourceIdentity: 'synthetic fixture only' };
+    return { status: 'passed', scope: 'Exact installed package, initial and linked-worktree hooks, stale sibling hook refusal, merged pin cutover, unborn prompt stdin, no-token fallback, compact metadata/procedure/source/assertion delivery through the native hook, exact no-dispatch packet replay, recoverable prompt reader, synthetic native-parent continuation with departed or live retained owners and lifecycle failure. Real native host trust/use not tested.', sourceIdentity: 'synthetic fixture only' };
   } finally { rmSync(temporary, { recursive: true, force: true }); }
 }

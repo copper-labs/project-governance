@@ -16,6 +16,7 @@ import { contextDoctor } from "../src/context-doctor.ts";
 import { startupHooks } from "../src/startup-hooks.ts";
 import { Store } from "../../harness/src/store/store.ts";
 import { defaultDbPath } from "../../harness/src/store/location.ts";
+import { contextRouteCommand } from "../src/context-route-command.ts";
 
 const assets = resolve("src/project_governance_runtime/assets/skills"), cli = resolve("components/engine/src/cli.ts");
 function fixture() {
@@ -65,6 +66,102 @@ test("normal task create links its provisional prompt without rewriting intent; 
     const stale = await promptContext("codex", f.event, f.root, { environment: {}, assetRoot: assets });
     assert.match((stale as any).hookSpecificOutput.additionalContext, /No selection was repeated/);
     assert.equal(readFileSync(path, "utf8"), bytes);
+  } finally { f.cleanup(); }
+});
+
+test("exact packet replay preserves native linkage and rejects another session without provider dispatch", async () => {
+  const f = fixture(), fetch = globalThis.fetch;
+  try {
+    await promptContext("codex", f.event, f.root, { environment: {}, assetRoot: assets });
+    f.run("task", "create", "--outcome", "Correct parser");
+    const id = f.entryId(), before = readdirSync(join(contextStateRoot(f.root), "routes"));
+    globalThis.fetch = async () => { throw new Error("Replay must not dispatch"); };
+    const replay = await contextRouteCommand(["--entry", id], f.root, assets);
+    assert.equal(replay.execution.entryId, id);
+    assert.equal(replay.execution.nativeSession, f.event.session_id);
+    assert.equal(replay.reuse?.status, "validated-entry-replay");
+    assert.deepEqual(readdirSync(join(contextStateRoot(f.root), "routes")), before);
+    process.env.HARNESS_SESSION = "other-session";
+    await assert.rejects(contextRouteCommand(["--entry", id], f.root, assets), /another chat/i);
+  } finally { globalThis.fetch = fetch; f.cleanup(); }
+});
+
+test("ordinary context records an inherited session and explicitly reports a missing native prompt", async () => {
+  const f = fixture();
+  try {
+    f.run("task", "create", "--outcome", "Correct parser");
+    const packet = await contextRouteCommand(["--task", f.event.prompt], f.root, assets);
+    assert.equal(packet.execution.nativeSession, f.event.session_id);
+    assert.equal(packet.execution.entryId, null);
+    assert.equal(packet.execution.promptLink.reason, "session-entry-unavailable");
+    assert.equal(packet.execution.promptLink.status, "unlinked");
+  } finally { f.cleanup(); }
+});
+
+test("malformed references distinguish supplied format from stored identity without retaining the reference", async () => {
+  const f = fixture();
+  try {
+    const supplied = "PRIVATE-invalid-reference";
+    await assert.rejects(contextRouteCommand(["--entry", supplied], f.root, assets), (error: any) => {
+      const receipt = JSON.parse(readFileSync(error.receiptPath, "utf8"));
+      assert.equal(receipt.diagnostic.causeCode, "entry-reference-format");
+      assert.equal(receipt.diagnostic.referenceDigest, digest(supplied));
+      assert.equal(receipt.diagnostic.referenceBytes, Buffer.byteLength(supplied));
+      assert.ok(!JSON.stringify(receipt).includes(supplied)); return true;
+    });
+    await promptContext("codex", f.event, f.root, { environment: {}, assetRoot: assets });
+    const id = f.entryId(), path = join(contextStateRoot(f.root), "prompt-entries", `${id}.json`);
+    const entry = JSON.parse(readFileSync(path, "utf8")); entry.entryId = "corrupt";
+    writeFileSync(path, JSON.stringify(entry));
+    await assert.rejects(contextRouteCommand(["--entry", id], f.root, assets), (error: any) => {
+      assert.equal(JSON.parse(readFileSync(error.receiptPath, "utf8")).diagnostic.causeCode, "entry-record-identity");
+      return true;
+    });
+  } finally { f.cleanup(); }
+});
+
+test("a corrupt native entry stays a linkage gap instead of failing a completed explicit route", async () => {
+  const f = fixture();
+  try {
+    execFileSync("git", ["add", "."], { cwd: f.root, stdio: "pipe" });
+    f.run("task", "create", "--outcome", "Correct parser");
+    await promptContext("codex", f.event, f.root, { environment: {}, assetRoot: assets });
+    const id = f.entryId(), path = join(contextStateRoot(f.root), "prompt-entries", `${id}.json`);
+    const entry = JSON.parse(readFileSync(path, "utf8")); entry.entryId = "corrupt";
+    const corruptBytes = JSON.stringify(entry); writeFileSync(path, corruptBytes);
+    const before = readdirSync(join(contextStateRoot(f.root), "routes")).length;
+    const packet = await contextRouteCommand(["--task", f.event.prompt, "--staged"], f.root, assets);
+    assert.equal(packet.execution.nativeSession, f.event.session_id);
+    assert.equal(packet.execution.promptLink.status, "unlinked");
+    assert.equal(packet.execution.promptLink.reason, "entry-malformed");
+    assert.equal(packet.execution.entryId, null);
+    assert.equal(readdirSync(join(contextStateRoot(f.root), "routes")).length, before + 1);
+    assert.equal(readFileSync(path, "utf8"), corruptBytes);
+  } finally { f.cleanup(); }
+});
+
+test("explicit task context reports an ambient session that does not own its binding", async () => {
+  const f = fixture();
+  try {
+    f.run("task", "create", "--outcome", "Correct parser");
+    writeFileSync(join(f.root, "task-context.json"), JSON.stringify(resolveTaskContext(f.root).context));
+    const packet = await contextRouteCommand(["--task", f.event.prompt, "--decision-context", "task-context.json"], f.root, assets);
+    assert.equal(packet.execution.nativeSession, null);
+    assert.equal(packet.execution.promptLink.status, "unlinked");
+    assert.equal(packet.execution.promptLink.reason, "binding-not-session-owned");
+  } finally { f.cleanup(); }
+});
+
+test("a fresh explicit request does not claim delivery of an existing native packet", async () => {
+  const f = fixture();
+  try {
+    f.run("task", "create", "--outcome", "Correct parser");
+    await promptContext("codex", f.event, f.root, { environment: {}, assetRoot: assets });
+    const packet = await contextRouteCommand(["--task", f.event.prompt], f.root, assets);
+    assert.equal(packet.execution.nativeSession, f.event.session_id);
+    assert.equal(packet.execution.promptLink.status, "unlinked");
+    assert.equal(packet.execution.promptLink.reason, "explicit-request-outside-native-packet");
+    assert.equal(packet.execution.entryId, null);
   } finally { f.cleanup(); }
 });
 

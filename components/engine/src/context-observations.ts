@@ -61,7 +61,9 @@ export function publishContextObservation(path: string, value: unknown, workspac
 
 /** Read explicit entry identities; a current ambient task cannot retarget historical observations. */
 export function readPromptEntry(workspace: string, id: string) {
-  if (!ID.test(id)) throw new ContextRouteError("entry-malformed", "Use the 64-character entry reference from the native context packet.");
+  const reference = { referenceDigest: digest(id), referenceBytes: Buffer.byteLength(id) };
+  if (!ID.test(id)) throw new ContextRouteError("entry-malformed", "Use the exact 64-character entry reference from the native context packet. No selection was repeated.",
+    { stage: "entry-reference", causeCode: "entry-reference-format", ...reference });
   let entry: Record<string, unknown>;
   try { entry = read(join(contextStateRoot(workspace), "prompt-entries"), `${id}.json`); }
   catch (error) {
@@ -73,7 +75,8 @@ export function readPromptEntry(workspace: string, id: string) {
   if (entry.workspace !== realpathSync(workspace))
     throw new ContextRouteError("entry-workspace-mismatch", `The recorded workspace differs from execution workspace ${realpathSync(workspace)}. Align the host at a pause seam.`);
   if (entry.entryId !== id || typeof entry.session !== "string" || typeof entry.turn !== "string")
-    throw new ContextRouteError("entry-malformed", "The local entry identity is malformed; inspect the current packet reference.");
+    throw new ContextRouteError("entry-malformed", "The local entry identity is malformed; inspect the current packet reference.",
+      { stage: "entry-record", causeCode: "entry-record-identity", ...reference });
   if (entry.worktreeLocator !== workContext(workspace).locator)
     throw new ContextRouteError("entry-worktree-identity-changed", "The checkout identity changed. Use a native prompt in the verified execution worktree.");
   return entry;

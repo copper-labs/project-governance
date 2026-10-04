@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-07-05
-updated: 2026-10-01
+updated: 2026-10-04
 summary: Entry point for the reusable, package-based project governance runtime.
 ---
 
@@ -65,6 +65,10 @@ repository. Publishing a wheel requires an operator decision. An adopter may aut
 startup updates through its tracked profile; major releases and integration changes remain deliberate.
 
 ## Unified development direction
+
+The [RC10.9 prompt-entry repair](exec-plans/active/2026-10-04-rc10-9-prompt-entry.md) separates
+advisory context preparation from retained startup ownership, records safe failure causes and
+verifies exact packet-reference replay. Local qualification precedes manual publication.
 
 For the next delivery sequence, start with the
 [decision-layer delivery, release and pilot measurement plan](exec-plans/active/2026-09-21-major-adoption-and-measurement.md).

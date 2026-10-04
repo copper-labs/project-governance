@@ -5,6 +5,8 @@ import { existsSync, lstatSync, mkdirSync } from "node:fs";
 import { inspectRuntimeGeneration } from "./runtime-inspection.ts";
 import { digest, text } from "./core.ts";
 
+export const RUNTIME_MAINTENANCE_MESSAGE = "Runtime admission stopped for maintenance";
+
 /** Installation coordination only; task state and execution authority remain in their existing ledgers. */
 export class RuntimeGenerations {
   readonly #db: DatabaseSync;
@@ -76,7 +78,7 @@ export class RuntimeGenerations {
     text(owner, "runtime reader owner");
     return this.#transaction(() => {
       const state = this.state();
-      if (state.maintenance && state.maintenance.token !== maintenanceToken) throw new Error("Runtime admission stopped for maintenance");
+      if (state.maintenance && state.maintenance.token !== maintenanceToken) throw new Error(RUNTIME_MAINTENANCE_MESSAGE);
       if (!state.directory) throw new Error("No active generation");
       if(expected && (expected.revision!==state.revision || expected.directory!==state.directory))throw new Error("Planned startup generation changed");
       if(reuse) {
@@ -104,7 +106,7 @@ export class RuntimeGenerations {
     return this.#transaction(() => {
       const parent = this.#db.prepare("SELECT revision FROM readers WHERE token=? AND owner=?").get(parentToken, parentOwner);
       const state = this.state();
-      if (state.maintenance && state.maintenance.token !== maintenanceToken) throw new Error("Runtime admission stopped for maintenance");
+      if (state.maintenance && state.maintenance.token !== maintenanceToken) throw new Error(RUNTIME_MAINTENANCE_MESSAGE);
       if (!parent || parent.revision !== state.revision || !state.directory) throw new Error("Current parent reader required");
       const token = randomUUID();
       this.#db.prepare("INSERT INTO readers VALUES(?,?,?)").run(token, state.revision, owner);

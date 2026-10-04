@@ -5,10 +5,17 @@ import { join } from "node:path";
 import { durableJson } from "./core.ts";
 import { contextStateRoot } from "./context-command.ts";
 
+interface ContextFailureDiagnostic {
+    stage: string; causeCode: string; sessionDigest?: string; turnDigest?: string;
+    referenceDigest?: string; referenceBytes?: number;
+}
 export class ContextRouteError extends Error {
   readonly code: string;
+  readonly diagnostic?: ContextFailureDiagnostic;
   receiptPath: string | null = null;
-  constructor(code: string, message: string) { super(message); this.code = code; }
+  constructor(code: string, message: string, diagnostic?: ContextFailureDiagnostic) {
+    super(message); this.code = code; if (diagnostic) this.diagnostic = diagnostic;
+  }
 }
 
 /** A failed entry still has evidence, without retaining prompt text, flags or parser payloads. */
@@ -35,7 +42,8 @@ export function recordContextFailure(root: string, error: unknown): ContextRoute
     known.receiptPath = join(contextStateRoot(root), "entry-failures", `${randomUUID()}.json`);
     const capturedAt = new Date().toISOString();
     durableJson(known.receiptPath, { version: 1, createdAt: capturedAt, caller: "context-route", status: "failed",
-      code: known.code, message: known.message, providerCalled: null, providerUsage: "unknown", taskUse: "unknown" });
+      code: known.code, message: known.message, ...(known.diagnostic ? { diagnostic: known.diagnostic } : {}),
+      providerCalled: null, providerUsage: "unknown", taskUse: "unknown" });
     projectContextMetric(contextStateRoot(root), { id: known.receiptPath.split("/").at(-1)!.replace(".json", ""), workspace: realpathSync(root), capturedAt,
       kind: "failure", entryId: null, routeId: null, familyId: null, taskId: null, taskRevision: null,
       status: "failed", reason: known.code, counts: { providerCalled: null } });

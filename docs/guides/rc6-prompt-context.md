@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-09-25
-updated: 2026-10-02
+updated: 2026-10-04
 summary: Enable prompt delivery and optional metadata selection, then inspect actual usage without inferring savings.
 ---
 
@@ -292,6 +292,8 @@ selection or provider call. It returns the served turn and age. A bare `context-
 which native turn you mean and returns `entry-turn-unobserved`; supply the hook's reference. An
 explicit reference is declared reuse, not independent evidence of the current native turn. A stale
 or superseded entry has a named reason and supported refresh action; no automatic paid retry occurs.
+RC10.9 distinguishes an incorrectly supplied reference from a malformed stored identity and points
+to a safe failure receipt. Copy the concrete entry ID from the packet; do not infer another turn.
 
 RC10.2 returns selected evidence and compact status by default. Add `--json` to the same command
 when full index and selection diagnostics are needed. The normal result includes the retained
