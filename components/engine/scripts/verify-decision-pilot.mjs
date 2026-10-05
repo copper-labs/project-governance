@@ -112,7 +112,7 @@ export async function verifyDecisionPilot(packageRoot) {
     const providerSelection = await verifyProviderSelection({ packageRoot, repo, temporary, run, write, environment, callsPath });
     const taskEntry = await verifyTaskContextEntry({ repo, temporary, run, write, git, environment });
     finished = true;
-    return { status: 'passed', taskEntry, providerSelection, consumers: ['DL01', 'DL02', 'DL07', ...observers].sort(), native_checks: 'passed', native_check_authority_unchanged: true, provider: 'fixture' };
+    return { status: 'passed', taskEntry, providerSelection, logPilot: observers.logPilot, consumers: ['DL01', 'DL02', 'DL07', ...observers.consumers].sort(), native_checks: 'passed', native_check_authority_unchanged: true, provider: 'fixture' };
   } finally {
     await cleanupPilot(packageRoot, temporary, state, finished);
   }

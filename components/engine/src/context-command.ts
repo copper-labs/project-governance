@@ -13,7 +13,7 @@ import { buildContextPacket } from "./context-packet.ts";
 import { checkRunRoot } from "./check-run.ts";
 import { digest, durableJson } from "./core.ts";
 import { evaluateContext, type ContextEvaluationCase } from "./context-evaluation.ts";
-import { RELEASE_VERSION } from "./release-version.ts";
+import { runtimeExecutionIdentity } from "./runtime-execution-identity.ts";
 
 export function contextStateRoot(root: string): string {
   return join(checkRunRoot(), "..", "context", digest(realpathSync(root)).slice(7));
@@ -86,7 +86,7 @@ export async function contextCommand(args: string[], root: string, suppliedProvi
     catch { return true; }
   }).map(candidate => candidate.id);
   durableJson(join(stateRoot, "receipts", `${receiptId}.json`), {
-    version: 1, runtimeVersion: RELEASE_VERSION, receiptId, workspace: canonicalRoot, createdAt: new Date().toISOString(), inputDigest: packet.inputDigest,
+    version: 1, ...runtimeExecutionIdentity(), receiptId, workspace: canonicalRoot, createdAt: new Date().toISOString(), inputDigest: packet.inputDigest,
     taskRevision: packet.taskRevision, sources: [...required, ...optional].map(({ id, sourceDigest }) => ({ id, sourceDigest })),
     selected: packet.entries.map(entry => entry.id), omitted: packet.omitted,
     omissionReasons: packet.omissionReasons, decision: packet.decision,

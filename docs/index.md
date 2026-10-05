@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-07-05
-updated: 2026-10-04
+updated: 2026-10-05
 summary: Entry point for the reusable, package-based project governance runtime.
 ---
 
@@ -65,6 +65,23 @@ repository. Publishing a wheel requires an operator decision. An adopter may aut
 startup updates through its tracked profile; major releases and integration changes remain deliberate.
 
 ## Unified development direction
+
+The [next major verification and semantic review specification](specs/engine-4-verification-feedback.md)
+and [delivery plan](exec-plans/active/2026-10-04-major-verification-feedback.md) define the current
+development sequence: installed workflow proof, multilingual JEV advice, focused batch checks,
+typed plan/specification links and known-fault detection. The [structured delivery guide](developer/guides/structured-delivery.md)
+explains compact batch inspection and deterministic progress updates from original check receipts.
+This source work does not replace an installed runtime or certify a release.
+
+The approved [focused linting specification](specs/engine-linting-mvp.md) and
+[delivery plan](exec-plans/active/2026-10-05-linting-mvp.md) extend the same check runner with
+captured-candidate lint adapters and visible coverage. The [adoption guide](developer/guides/focused-linting.md)
+explains reviewed setup, project-local tools and required narrow checks without model calls.
+
+The [release evaluation contract](specs/engine-release-evaluation.md) and
+[reporting workstream](exec-plans/active/2026-10-04-release-evaluation.md) define repeatable reliability,
+context-quality and whole-task comparisons. The [reporting guide](developer/guides/release-evaluation.md)
+explains evidence linkage and explicit unknown coverage. Passive observations stay separate from controlled proof.
 
 The [RC10.9 prompt-entry repair](exec-plans/active/2026-10-04-rc10-9-prompt-entry.md) separates
 advisory context preparation from retained startup ownership, records safe failure causes and

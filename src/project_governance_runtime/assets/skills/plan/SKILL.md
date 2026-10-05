@@ -47,15 +47,32 @@ multiple files, or requires validation and review evidence.
    the second. This is one batch-planning decision, not an agent quota or an extra approval.
 4. Declare a `Proof Budget`: claims to prove, cheapest sufficient evidence, normally one complete
    proof cycle, expected duration or cost, invalidation rules, and an explicit stop condition.
-   Set focused development checkpoints, expensive build points, one applicable QA review per batch,
-   and the attended acceptance milestone. The writer may adjust checks for new evidence or risk.
+   Default focused checks to completion of the planned behavior and its related source, bindings
+   and regressions. Each checkpoint names a trigger, exact command/runbook, affected scope, claim
+   and repeat reason. Include affected dependents, not just changed files. Earlier checks need a
+   named blocking uncertainty, reproducer, failed proof or new risk. Set expensive build points,
+   one applicable QA review per completed batch and the attended acceptance milestone.
    For long-running proof, include the efficient-execution resource's command, wait, and evidence
    details within this budget; reference existing runbooks rather than add new planning fields.
 5. Map changed areas to validation packs, review skills, rollback, and evidence. Treat checks that
    prove the same claim on the same digest-bound subject as substitutes, not additive ceremonies.
-6. Consolidate plan/status and explanatory documentation at batch closeout. Update governing
-   contracts earlier when dependent work needs them. Record open questions only when they block
-   safe execution; internal steps do not each require approval, QA, or a documentation update.
+   For source work, inspect the adopted lint coverage or setup gap once when defining the batch;
+   `project-governance doctor --capability lint` is passive. If setup is needed, inspect
+   `project-governance lint setup` and adopt the accepted project-owned configuration separately.
+   Neither setup inspection nor prompt entry runs lint or acquires tools.
+6. Use checkboxes that distinguish implementation, verification and closeout. Require a plan update
+   at completed batches, checkpoints, material blockers and handoffs before dependent work: checked
+   claims, unproved/failed/invalidated evidence, current/next action and deferred work. Consolidate
+   explanatory docs at closeout; update contracts earlier when needed. Plan one coherent owned local
+   commit per completed verified batch when authorized, including its plan update and normal hooks.
+   A pause or failed checkpoint may preserve uncommitted work. Internal steps do not each require
+   approval, QA, another test run or a documentation rewrite.
+   For a new or deliberately converted structured plan, retain the template's stable IDs and marked
+   slots. Bind verification items to configured stage/pack IDs and specification criteria to exact
+   source digests. Use `project-governance implementation-plan inspect --path <plan> --batch <id>`
+   to read one batch, then the typed `implementation-plan update` command to record its progress.
+   Bind the existing checkpoint with `check --implementation-plan <plan> --batch <id>` rather than
+   asking a model to parse the whole plan or decide whether a receipt passed.
 7. Keep the plan in the correct lifecycle location and link every active plan from
    `docs/exec-plans/README.md`.
 

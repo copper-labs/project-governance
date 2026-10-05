@@ -5,7 +5,7 @@ type: spec
 status: current
 owner: project-governance
 created: 2026-02-16
-updated: 2026-09-29
+updated: 2026-10-05
 summary: Active specifications for the package runtime, KMP surface validation, change narratives, and durable documentation.
 ---
 
@@ -13,6 +13,9 @@ summary: Active specifications for the package runtime, KMP surface validation, 
 
 | Specification | Purpose |
 | --- | --- |
+| [Next major verification and semantic review](engine-4-verification-feedback.md) | Accepted complete workflow proof, multilingual JEV review, early focused checks and known-fault detection through existing owners |
+| [Focused linting MVP](engine-linting-mvp.md) | Proposed deterministic tool adapters, safe setup, visible language coverage and required narrow checks without model calls |
+| [Release evaluation scorecard](engine-release-evaluation.md) | Reproducible release comparisons, passive field trends, full-chain context quality and accepted-task cost with explicit evidence gaps |
 | [Unified development engine](unified-development-engine.md) | Detailed TS engine planning baseline and category decisions |
 | [Decision layer proposal](engine-decision-layer.md) | Typed JEV judgments, bounded effects, fallback, telemetry and qualification; not yet activated |
 | [Decision use cases](engine-decision-use-cases.md) | Thirteen proposed consumers spanning tests, context/output selection, workflows, devices, CI, review, release and process learning |

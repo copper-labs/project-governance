@@ -3,10 +3,13 @@ import { canonical, digest, text } from "./core.ts";
 import { buildContextPacket, type ContextPacketRequest } from "./context-packet.ts";
 import type { DecisionOptions, DecisionProvider, DecisionResult } from "./decisions.ts";
 import { lexicalContextOrder } from "./context-ranking.ts";
+import { scoreContextQuality, validateContextQualityLabels, type ContextQualityLabels, type ContextQualityObservation, type ContextQualityScore } from "./context-evaluation-quality.ts";
 
 export interface ContextEvaluationCase {
   id: string; request: ContextPacketRequest; usefulOptionalIds: string[];
   usefulSpans?: Array<{ candidateId: string; sourceDigest: string; firstLine: number; lastLine: number }>;
+  qualityLabels?: ContextQualityLabels;
+  qualityObservation?: ContextQualityObservation;
 }
 export interface SelectionScore { usefulEvidenceSelected: number | null; usefulEvidenceMissed: number | null; usefulSelected: number; usefulMissedBySelection: string[]; recall: number | null; deliveredBytes: number }
 export interface CaseResult {
@@ -14,6 +17,7 @@ export interface CaseResult {
   decision: DecisionResult | null; fallbackReason: string;
   shadow: SelectionScore | null;
   lexical: SelectionScore;
+  quality: { baseline: ContextQualityScore; candidate: ContextQualityScore; lexical: ContextQualityScore; shadow: ContextQualityScore | null } | null;
 }
 const baseline: DecisionProvider = { async decide(request) {
   return { version: 1, kind: request.kind, inputDigest: digest(request), delivered: request.candidates.map(item => item.id),
@@ -31,6 +35,8 @@ export async function evaluateContext(cases: ContextEvaluationCase[], provider: 
     text(entry.id, "case id", 128);
     if (seen.has(entry.id)) throw new Error("duplicate evaluation case");
     seen.add(entry.id);
+    if (entry.qualityObservation && !entry.qualityLabels) throw new Error("Quality observations require frozen independent labels");
+    if (entry.qualityLabels) validateContextQualityLabels(entry.request, entry.qualityLabels, entry.qualityObservation);
     if (!Array.isArray(entry.usefulOptionalIds) || new Set(entry.usefulOptionalIds).size !== entry.usefulOptionalIds.length) throw new Error("invalid gold IDs");
     for (const id of entry.usefulOptionalIds) {
       text(id, "gold id", 4096);
@@ -78,16 +84,23 @@ export async function evaluateContext(cases: ContextEvaluationCase[], provider: 
         recall: entry.usefulOptionalIds.length ? hits.length / entry.usefulOptionalIds.length : null, deliveredBytes: packet.bytes };
     };
     let shadow: SelectionScore | null = null;
+    let shadowQuality: ContextQualityScore | null = null;
     const observed = candidate.decision;
     if (observed?.reason === "shadow" && observed.suggested) {
       // Replay only captured advice through the same validator and budget. No second provider call.
       const replay = await buildContextPacket(entry.request, { async decide() {
         return { ...observed, delivered: [...observed.suggested!], reason: "evaluation-shadow-replay" };
       } });
-      if (replay.decision) shadow = score(replay);
+      if (replay.decision) {
+        shadow = score(replay);
+        if (entry.qualityLabels) shadowQuality = scoreContextQuality(entry.request, entry.qualityLabels, replay.entries, entry.qualityObservation);
+      }
     }
     results.push({ id: entry.id, inputDigest: reference.inputDigest, omittedCandidates, oversizedUsefulCandidates, baseline: score(reference),
-      candidate: score(candidate), lexical: score(lexical), shadow, decision: candidate.decision, fallbackReason: candidate.reason });
+      candidate: score(candidate), lexical: score(lexical), shadow, decision: candidate.decision, fallbackReason: candidate.reason,
+      quality: entry.qualityLabels ? { baseline: scoreContextQuality(entry.request, entry.qualityLabels, reference.entries, entry.qualityObservation),
+        candidate: scoreContextQuality(entry.request, entry.qualityLabels, candidate.entries, entry.qualityObservation),
+        lexical: scoreContextQuality(entry.request, entry.qualityLabels, lexical.entries, entry.qualityObservation), shadow: shadowQuality } : null });
   }
   return summarizeEvaluation(cases, results);
 }
@@ -129,6 +142,10 @@ function summarizeEvaluation(cases: ContextEvaluationCase[], results: CaseResult
     evidenceLabeledCases: cases.filter(entry => entry.usefulSpans !== undefined).length,
     candidateEvidenceMisses: results.every(item => item.candidate.usefulEvidenceMissed !== null)
       ? results.reduce((total, item) => total + item.candidate.usefulEvidenceMissed!, 0) : null,
+    qualityLabeledCases: results.filter(item => item.quality !== null).length,
+    completeUnitRegressions: results.filter(item => item.quality && item.quality.candidate.essentialGroups.completeDelivered < item.quality.baseline.essentialGroups.completeDelivered).map(item => item.id),
+    completeUnitRegressionsVsLexical: results.filter(item => item.quality && item.quality.candidate.essentialGroups.completeDelivered < item.quality.lexical.essentialGroups.completeDelivered).map(item => item.id),
+    requiredEvidenceLosses: results.filter(item => item.quality?.candidate.requiredMissing.length).map(item => item.id),
     tokenSavings: null, developmentBenefit: "unqualified" as const,
   } };
 }

@@ -48,7 +48,7 @@ function commandGap(pack: Pack, stage: string): boolean {
 }
 
 /** Pure selection preserves explicit ownership, supplemental checks, dependency order and fail-closed gaps. */
-export function buildPlan(packs: Packs, options: { stage: string | null; mode: "all" | "impacted"; changedPaths: string[]; explicitPackIds?: string[] }): ValidationPlan {
+export function buildPlan(packs: Packs, options: { stage: string | null; mode: "all" | "impacted"; changedPaths: string[]; explicitPackIds?: string[]; ignoredPathMatches?: Record<string, string[]> }): ValidationPlan {
   const { stage, mode } = options, explicit = unique(options.explicitPackIds ?? []), changed = unique(options.changedPaths);
   const candidates = Object.keys(packs).filter(id => (packs[id]!["implementation_status"] ?? "active") === "active" &&
     ((stage === null && explicit.length > 0) || (stage !== null && packs[id]!.stages.includes(stage)))).sort();
@@ -73,7 +73,7 @@ export function buildPlan(packs: Packs, options: { stage: string | null; mode: "
     for (const id of candidates.filter(id => !replacements.has(id) && packs[id]!["run_when"] === "always")) select(id, "run_when:always");
     const unknown: string[] = [], gaps = new Map<string, { builtin: string; target: string; paths: string[] }>();
     for (const path of changed) {
-      const raw = candidates.filter(id => matchesPackPath(path, packs[id]!.path_globs));
+      const raw = candidates.filter(id => !options.ignoredPathMatches?.[id]?.includes(path) && matchesPackPath(path, packs[id]!.path_globs));
       const matched = raw.filter(id => !replacements.has(id)); pathMatches[path] = matched;
       let hasGap = false;
       for (const [builtin, target] of replacements) if (raw.includes(builtin) && !raw.includes(target)) {

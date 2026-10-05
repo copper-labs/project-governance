@@ -14,12 +14,18 @@ Use this skill when creating or updating a technical spec for architecture, API,
 - `AGENTS.md`
 - `CHARTER.md`
 - `docs/index.md`
-- `docs/governance/artifact-lifecycle.md`
-- target docs governance and traceability rules
+- target docs governance, lifecycle and traceability rules
 - approved discovery, PRD, decision, issue, or user intent
 - related architecture, specs, and decisions
 
 ## Workflow
+
+For a new specification or an explicitly authorized conversion, start with
+`.governance/runtime/skills/resources/specification-template.md`. Save it as a `.md` file under
+`docs`. Keep its stable criterion IDs
+and typed declaration separate from readable rationale. Plans bind the whole specification digest
+and own implementation progress, check mappings and evidence. Untouched older specifications do
+not require conversion.
 
 1. State the problem, goals, non-goals, constraints, and audience.
 2. Define the contract: ownership, data shapes, APIs, lifecycle, states, failure modes, observability, instrumentation applicability, and validation.

@@ -11,3 +11,12 @@ test("all public provider and generic recovery verbs have a managed invocation o
   for (const command of ["plan", "provider-status", "provider-wait"]) assert.equal(managedCommandEffect(command), "write", "optional decision receipts and budget counters require managed write admission");
   assert.equal(managedCommandEffect("invented-command"), null);
 });
+
+test("delivery commands enter the managed generation with their actual mutation scope", () => {
+  assert.equal(managedCommandEffect("implementation-plan", ["inspect"]), "read");
+  assert.equal(managedCommandEffect("implementation-plan", ["update"]), "write");
+  assert.equal(managedCommandEffect("lint", ["setup"]), "read");
+  assert.equal(managedCommandEffect("lint", ["setup", "--apply"]), "write");
+  assert.equal(managedCommandEffect("lint-adapter"), "write");
+  assert.equal(managedCommandEffect("release-evaluation"), "read");
+});

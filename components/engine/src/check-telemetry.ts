@@ -33,7 +33,7 @@ export function reviewCheckRun(root: string, workspace: string, runId: string, d
 }
 
 export interface RunMetric {
-  version: 1; trigger?: "manual" | "hook" | "test"; expected_status?: "passed" | "failed" | "warning" | "blocked"; run_id: string; workspace: string; stage: string | null; runtime_version: string;
+  version: 1; trigger?: "manual" | "hook" | "test"; expected_status?: "passed" | "failed" | "warning" | "blocked"; run_id: string; workspace: string; stage: string | null; runtime_version: string; archive_digest?: string | null;
   status: string; termination_reason: string; duration_ms: number; started_at: string; ended_at: string;
   pack_count: number; command_count: number; blocked_pack_count: number; result_digest: string;
 }

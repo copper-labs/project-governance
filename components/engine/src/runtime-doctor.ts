@@ -1,5 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 import { lstatSync, realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { join, resolve } from "node:path";
 import { parse } from "yaml";
 import { compiledRuntimeLock } from "./runtime-lock.ts";
@@ -11,6 +12,10 @@ import { planGitHookInstallation } from "./git-hook-installation.ts";
 import { planHostInstructions } from "./host-instruction-plan.ts";
 import { COMPILED_HOST_BLOCK } from "./provider-guidance.ts";
 import { contextDoctor } from "./context-doctor.ts";
+import { ValidationSubject, resolveChangeScope } from "./change-subject.ts";
+import { loadSubjectPacks } from "./pack-configuration.ts";
+import { lintCoverage } from "./lint-coverage.ts";
+import { lintProfile } from "./lint-configuration.ts";
 
 /** Observe without creating, migrating or taking a generation reader; usable during interrupted activation. */
 export function runtimeDoctor(workspace: string, registry: string) {
@@ -67,6 +72,14 @@ export function runtimeDoctor(workspace: string, registry: string) {
   const context = contextDoctor(workspace);
   for (const finding of context.findings.filter(value => ["context.shared-hook-source", "context.hook-source-unavailable"].includes(value.id)))
     add(finding.id, finding.message);
+  let lint: ReturnType<typeof lintCoverage> | null = null;
+  try {
+    const subject = new ValidationSubject(workspace, resolveChangeScope(workspace, { all: true }));
+    if (lintProfile(subject)) {
+      lint = lintCoverage(subject, loadSubjectPacks(subject, fileURLToPath(new URL("../assets/packs/", import.meta.url))));
+      for (const finding of lint.findings) add(String(finding.code), String(finding.message));
+    }
+  } catch { add("lint.coverage-unavailable", "Declared lint coverage could not be inspected; run lint setup and reconcile its retained requirements."); }
   return { version: 1, scope: "compiled-installation", status: findings.length ? "failed" : "passed", selection, findings,
-    context, execution_readback: "not-performed", active_readers: "reported-without-releasing", mutations: "none" };
+    context, lint, execution_readback: "not-performed", active_readers: "reported-without-releasing", mutations: "none" };
 }

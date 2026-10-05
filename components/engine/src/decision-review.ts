@@ -1,20 +1,25 @@
 import { createHash } from "node:crypto";
+import { posix } from "node:path";
 import { digest, object, text } from "./core.ts";
 import type { ChangeScope, ValidationSubject } from "./change-subject.ts";
 import type { BudgetScope } from "./decision-budget.ts";
 import { interpretChoice, interpretNoul, type DecisionOutcome, type DecisionRuntime } from "./decision-runtime.ts";
 import { contextExcerpt } from "./context-excerpts.ts";
 import { DECISION_QUESTIONS } from "./decision-catalog.ts";
-import type { DecisionCoverage, EvidenceItem, QuestionInstance } from "./decision-schema.ts";
+import type { DecisionCoverage, EvidenceItem, QuestionInstance, QuestionOutcome } from "./decision-schema.ts";
+import { isGeneratedSourcePath, isTestFile } from "./checkers/advisory.ts";
+import { SOURCE_CAPTURE_MAX_BYTES, SOURCE_CAPTURE_BATCH_MAX_BYTES } from "./source-capture-limits.ts";
 
 const MAX_TEST_HUNKS = 4, MAX_DIFF_HUNKS = 4, MAX_RULES = 2, MAX_HUNK_BYTES = 4000;
-const TEST_PATH = /(?:^|\/)(?:tests?|__tests__|spec)\/|\.(?:test|spec)\.[cm]?[jt]sx?$|_test\.py$|Test\.kt$/u;
+const REVIEW_EXTENSIONS = new Set([".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts", ".kt", ".kts", ".swift", ".py"]);
+const GENERATED_DIRECTORIES = [".build", ".gradle", ".pytest_cache", "generated", "out"];
 
 export interface ReviewRule { id: string; title: string; rationale: string; examples: string[] }
 export interface ReviewHunk { id: string; path: string; kind: "test" | "source"; status: string; diff: string; diffDigest: string; bytes: number;
   source?: { text: string; digest: string; complete: boolean } }
 export interface ReviewCapture {
   subjectDigest: string; baseRef: string | null; purpose: string; purposeSource: string;
+  changedPaths?: number;
   hunks: ReviewHunk[]; rules: ReviewRule[]; coverage: DecisionCoverage; capturePaths: string[];
 }
 
@@ -42,7 +47,8 @@ export function captureReviewEvidence(subject: ValidationSubject, scope: ChangeS
   const omitted: string[] = [], unavailable: string[] = [], limits: string[] = [];
   const hunks: ReviewHunk[] = [];
   let truncated = false;
-  const candidates = scope.records.filter(record => record.status !== "deleted");
+  const candidates = scope.records;
+  let remainingSourceBytes = SOURCE_CAPTURE_BATCH_MAX_BYTES;
   const rules = (options.rules ?? []).slice(0, MAX_RULES);
   const ruleBytes = rules.reduce((bytes, rule) => bytes + Buffer.byteLength(`${rule.title}\n${rule.rationale}\n${rule.examples.join("\n")}`), 0);
   const available = Math.max(0, (options.maximumBytes ?? 8192) - ruleBytes - Buffer.byteLength(options.purpose) -
@@ -50,17 +56,43 @@ export function captureReviewEvidence(subject: ValidationSubject, scope: ChangeS
   const hunkLimit = Math.min(MAX_HUNK_BYTES, Math.floor(available / (options.includeSource ? 2 : 1) / Math.max(1, Math.min(candidates.length, MAX_TEST_HUNKS + MAX_DIFF_HUNKS))));
   if (hunkLimit < 128) limits.push("evidence allowance cannot fit the supplied purpose, rules and a useful diff excerpt");
   for (const record of candidates) {
-    if (!/\.[cm]?[jt]sx?$/u.test(record.path)) {
-      omitted.push(record.path); limits.push(`${record.path}: first-RC review supports JS/TS source and tests only`); continue;
+    if (record.status === "deleted") {
+      omitted.push(record.path); limits.push(`${record.path}: deleted file has no captured after-image for semantic review`); continue;
+    }
+    if (!REVIEW_EXTENSIONS.has(posix.extname(record.path))) {
+      omitted.push(record.path); limits.push(`${record.path}: semantic review supports JS/TS, Kotlin, Swift and Python text only`); continue;
+    }
+    if (isGeneratedSourcePath(record.path, GENERATED_DIRECTORIES)) {
+      omitted.push(record.path); limits.push(`${record.path}: generated or dependency path is excluded from semantic review`); continue;
     }
     if (hunkLimit < 128) { omitted.push(record.path); truncated = true; continue; }
-    const kind: "test" | "source" = TEST_PATH.test(record.path) ? "test" : "source";
+    const kind: "test" | "source" = isTestFile(record.path, { extensions: REVIEW_EXTENSIONS, nativeTestDirectories: true }) ? "test" : "source";
+    if (kind === "source" && record.path.split("/").slice(0, -1).some(part => ["fixtures", "helpers", "support"].includes(part.toLowerCase())))
+      limits.push(`${record.path}: helper/fixture source is not treated as behavioral test evidence`);
     const taken = hunks.filter(hunk => hunk.kind === kind).length;
     if (taken >= (kind === "test" ? MAX_TEST_HUNKS : MAX_DIFF_HUNKS)) { omitted.push(record.path); truncated = true; continue; }
-    let diff: string;
-    try { diff = subject.hunks(record.path); }
-    catch { unavailable.push(record.path); continue; }
-    if (!diff.trim()) { unavailable.push(record.path); continue; }
+    let diff: string, sourceText: string, sourceDigest: string;
+    try {
+      if (subject.source(record.path)?.file_type !== "regular") {
+        omitted.push(record.path); limits.push(`${record.path}: nonordinary source is excluded from semantic review`); continue;
+      }
+      const bytes = subject.read(record.path, Math.min(SOURCE_CAPTURE_MAX_BYTES, remainingSourceBytes));
+      remainingSourceBytes -= bytes.length;
+      if (bytes.includes(0)) {
+        omitted.push(record.path); limits.push(`${record.path}: binary source is excluded from semantic review`); continue;
+      }
+      try { sourceText = new TextDecoder("utf8", { fatal: true }).decode(bytes); }
+      catch {
+        omitted.push(record.path); limits.push(`${record.path}: source is not UTF-8 text; semantic review is unavailable`); continue;
+      }
+      sourceDigest = `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+      diff = subject.hunks(record.path);
+    } catch {
+      unavailable.push(record.path); limits.push(`${record.path}: exact source or diff is unavailable, stale or exceeds the local capture limit`); continue;
+    }
+    if (!diff.trim() || /^(?:Binary files .* differ|GIT binary patch)$/mu.test(diff)) {
+      unavailable.push(record.path); limits.push(`${record.path}: no assessable text difference was captured`); continue;
+    }
     if (Buffer.byteLength(diff) > hunkLimit) {
       // Slice bytes, not UTF-16 code units; back off an incomplete UTF-8 character.
       const encoded = Buffer.from(diff);
@@ -73,24 +105,28 @@ export function captureReviewEvidence(subject: ValidationSubject, scope: ChangeS
       diffDigest: `sha256:${createHash("sha256").update(diff).digest("hex")}`, bytes: Buffer.byteLength(diff) };
     if (options.includeSource) {
       try {
-        const bytes = subject.read(record.path, 1024 * 1024), sourceDigest = `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
-        const candidate = contextExcerpt({ id: record.path, excerpt: new TextDecoder("utf8", { fatal: true }).decode(bytes), sourceDigest }, options.purpose, hunkLimit);
+        const candidate = contextExcerpt({ id: record.path, excerpt: sourceText, sourceDigest }, options.purpose, hunkLimit);
         if (Buffer.byteLength(candidate.excerpt) <= hunkLimit) {
           hunk.source = { text: candidate.excerpt, digest: sourceDigest, complete: !candidate.sourceRange };
           if (candidate.sourceRange) { truncated = true; limits.push(`${record.path}: source/setup excerpt incomplete; requirement support may be unknown`); }
-        } else unavailable.push(`${record.path}:source-setup`);
-      } catch { unavailable.push(`${record.path}:source-setup`); }
+        } else {
+          unavailable.push(`${record.path}:source-setup`); limits.push(`${record.path}: source/setup excerpt does not fit the evidence allowance`);
+        }
+      } catch {
+        unavailable.push(`${record.path}:source-setup`); limits.push(`${record.path}: source/setup excerpt is unavailable`);
+      }
     }
     hunks.push(hunk);
   }
   if ((options.rules ?? []).length > MAX_RULES) limits.push(`only the first ${MAX_RULES} supplied rules are assessed per request`);
   limits.push("Test runtime, fixtures and dependency behavior are not executed or independently established by diff advice.");
   if (options.includeSource) limits.push("Source/setup capture covers only the supplied file; imported fixtures and dynamic behavior may be unavailable. Semantic support is not regression proof.");
+  limits.push("Supported text capture does not establish language parsing or complete test/setup knowledge.");
   if (options.purposeSource === "unavailable") limits.push("Task-specific intent is unavailable; do not infer a requirement from the diff.");
   if (!rules.length) limits.push("no review rules supplied: DL02 assesses task relevance only");
   if (!hunks.some(hunk => hunk.kind === "test")) limits.push("no changed test file in the captured subject: DL01 has no assessable evidence");
   return { subjectDigest: scope.subject_digest ?? "none", baseRef: scope.base_ref, purpose: options.purpose,
-    purposeSource: options.purposeSource, hunks, rules, capturePaths: hunks.map(hunk => hunk.path),
+    purposeSource: options.purposeSource, changedPaths: candidates.length, hunks, rules, capturePaths: hunks.map(hunk => hunk.path),
     coverage: { captured: hunks.length, omitted, truncated, unavailable, limits } };
 }
 
@@ -102,12 +138,16 @@ export interface ReviewFinding {
 }
 export interface ConsumerAdvice {
   consumerId: "DL01" | "DL02"; mode: string; effect: string; reason: string; delivered: boolean;
-  assessed: number; findings: ReviewFinding[]; coverageLimits: string[]; summary: string;
+  /** Legacy assessed counts requested questions; answered and usable distinguish actual semantic coverage. */
+  assessed: number; answered: number; usable: number;
+  assessments: Array<{ questionId: string; path: string; status: QuestionOutcome["status"]; interpretation: string }>;
+  findings: ReviewFinding[]; coverageLimits: string[]; summary: string;
 }
 export interface ReviewAdvice {
   version: 1; kind: "project-governance-review-advice";
   authority: "advisory only: deterministic findings, checker results, required proof and exit status are unchanged";
   subjectDigest: string; purpose: string; purposeSource: string;
+  changedPaths: number | null;
   batched: boolean; coverage: DecisionCoverage;
   consumers: ConsumerAdvice[];
   decisions: Array<Pick<DecisionOutcome, "consumerId" | "consumers" | "requestId" | "receiptId" | "mode" | "effect" | "method" | "reason" | "delivered" | "providerCalled" | "model" | "usage" | "usageAllocation" | "latencyMs" | "budget" | "scopeState">>;
@@ -226,13 +266,24 @@ export async function reviewAdvice(runtime: DecisionRuntime, capture: ReviewCapt
   const decisions: ReviewAdvice["decisions"] = [];
   const advice = new Map<"DL01" | "DL02", ConsumerAdvice>();
   const record = (consumerId: "DL01" | "DL02", outcome: DecisionOutcome, prepared: Prepared | null) => {
-    const assessed = prepared ? [...prepared.index.values()].filter(entry => entry.consumerId === consumerId).length : 0;
+    const assessments: ConsumerAdvice["assessments"] = prepared ? [...prepared.index].filter(([, entry]) => entry.consumerId === consumerId).map(([name, entry]) => {
+      const answer = outcome.answers[name];
+      return { questionId: entry.definitionId, path: entry.path, status: answer?.status ?? "unavailable",
+        interpretation: entry.definitionId.endsWith("requirement-support/1") ? interpretChoice(answer).value ?? "unknown" : interpretNoul(answer).value };
+    }) : [];
+    const assessed = assessments.length;
+    const answered = assessments.filter(item => item.status === "answered" || item.status === "unknown").length;
+    const usable = assessments.filter(item => item.status === "answered" && !["unknown", "uncertain"].includes(item.interpretation)).length;
+    const unknown = assessments.filter(item => ["answered", "unknown"].includes(item.status) && item.interpretation === "unknown").length;
+    const uncertain = assessments.filter(item => item.interpretation === "uncertain").length;
+    const limited = assessments.filter(item => item.status === "unavailable" || item.status === "invalid").length;
+    const remaining = unknown || uncertain || limited ? ` ${unknown} unknown, ${uncertain} uncertain and ${limited} unavailable/invalid question result(s); remaining coverage is not established.` : "";
     const findings = prepared ? collect(prepared, outcome, consumerId) : [];
     advice.set(consumerId, { consumerId, mode: outcome.mode, effect: outcome.effect, reason: outcome.reason,
-      delivered: outcome.delivered, assessed, findings, coverageLimits: capture.coverage.limits,
-      summary: !outcome.delivered ? `No advice delivered (${outcome.reason}); the ordinary baseline applies.`
-        : findings.length ? `${findings.length} semantic concern(s) in the assessed scope.`
-        : "No concern found in the assessed scope. This is not proof of adequate coverage." });
+      delivered: outcome.delivered, assessed, answered, usable, assessments, findings, coverageLimits: capture.coverage.limits,
+      summary: (!outcome.delivered ? `No advice delivered (${outcome.reason}); the ordinary baseline applies.`
+        : findings.length ? `${findings.length} semantic concern(s) in ${usable} usable of ${assessed} requested question result(s).`
+        : `No concern found in ${usable} usable of ${assessed} requested question result(s). This is not proof of adequate coverage.`) + remaining });
   };
   // Compatible batch: identical evidence and data scope, the same resolved mode and one shared budget.
   const batched = active.length === 2 && modes.DL01.mode === modes.DL02.mode;
@@ -241,7 +292,7 @@ export async function reviewAdvice(runtime: DecisionRuntime, capture: ReviewCapt
       const eligibility = modes[consumerId];
       advice.set(consumerId, { consumerId, mode: eligibility.mode, effect: eligibility.effect,
         reason: eligibility.mode === "off" ? (eligibility.reasons[0] ?? "consumer-off") : "no-assessable-evidence",
-        delivered: false, assessed: 0, findings: [], coverageLimits: capture.coverage.limits,
+        delivered: false, assessed: 0, answered: 0, usable: 0, assessments: [], findings: [], coverageLimits: capture.coverage.limits,
         summary: "No advice delivered; the ordinary baseline applies." });
     }
   } else if (batched) {
@@ -264,13 +315,13 @@ export async function reviewAdvice(runtime: DecisionRuntime, capture: ReviewCapt
       const eligibility = modes[consumerId];
       advice.set(consumerId, { consumerId, mode: eligibility.mode, effect: eligibility.effect,
         reason: eligibility.mode === "off" ? (eligibility.reasons[0] ?? "consumer-off") : "no-assessable-evidence",
-        delivered: false, assessed: 0, findings: [], coverageLimits: capture.coverage.limits,
+        delivered: false, assessed: 0, answered: 0, usable: 0, assessments: [], findings: [], coverageLimits: capture.coverage.limits,
         summary: "No advice delivered; the ordinary baseline applies." });
     }
   }
   return { version: 1, kind: "project-governance-review-advice",
     authority: "advisory only: deterministic findings, checker results, required proof and exit status are unchanged",
-    subjectDigest: capture.subjectDigest, purpose: capture.purpose, purposeSource: capture.purposeSource,
+    subjectDigest: capture.subjectDigest, purpose: capture.purpose, purposeSource: capture.purposeSource, changedPaths: capture.changedPaths ?? null,
     batched, coverage: capture.coverage,
     consumers: (["DL01", "DL02"] as const).map(id => advice.get(id)!), decisions };
 }

@@ -207,7 +207,10 @@ resources:
     description: Frame to Plan to Work to Review to Capture dry-run stage map.
   - id: implementation-plan-template
     path: .governance/runtime/skills/resources/implementation-plan-template.md
-    description: Canonical packet-ready implementation plan slice template.
+    description: Structured implementation batches with stable progress slots and native check mappings.
+  - id: specification-template
+    path: .governance/runtime/skills/resources/specification-template.md
+    description: Readable specification rationale with stable criteria for exact plan references.
   - id: reader-first-authoring
     path: .governance/runtime/skills/resources/reader-first-authoring.md
     description: Portable reader framing, local grounding, public research, progressive explanation, and editorial review workflow.

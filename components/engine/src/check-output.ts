@@ -13,9 +13,10 @@ import { contextStateRoot } from "./context-command.ts";
 import { outputSelection, captureOutput } from "./decision-output-advice.ts";
 import { recordEntryExposure } from "./decision-episodes.ts";
 import type { DecisionOptions } from "./decisions.ts";
+import type { LongLogPilot } from "./decision-log-filter.ts";
 
 /** Explicit raw-output delivery, also reached by foreground check --summary. Status stays passive. */
-export async function checkOutput(id: string, workspace: string, options: DecisionRuntimeOptions & { root?: string } = {}) {
+export async function checkOutput(id: string, workspace: string, options: DecisionRuntimeOptions & { root?: string; pilot?: LongLogPilot } = {}) {
   const root = realpathSync(options.root ?? checkRunRoot()), directory = join(root, id);
   const observed = inspectCheckRun(id, root);
   if (observed.state !== "terminal") return observed;
@@ -52,7 +53,7 @@ export async function checkOutput(id: string, workspace: string, options: Decisi
       const selection = await outputSelection(runtime, native.receipt, scope, {
         task: task ? decisionTaskPurpose(task) : "Task context unavailable; preserve ordinary output.",
         eventId: `check-output:${id}:${command.request_digest}`, policyDigest: settings.configDigest,
-        environment: "check-output", revision: task?.revision ?? "unbound" });
+        environment: "check-output", revision: task?.revision ?? "unbound", ...(options.pilot ? { pilot: options.pilot } : {}) });
       const after = captureOutput(native.receipt.log);
       if (digest(before) !== digest(after) || digest(readCheckRecord(join(directory, "result.json"))) !== digest(result) ||
           loadProfileDecisionSettings(workspace).configDigest !== settings.configDigest) throw new Error("Check output changed during selection");

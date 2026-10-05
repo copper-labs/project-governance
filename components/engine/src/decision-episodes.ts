@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { digest, durableJson, fileDigest, object, text } from "./core.ts";
 import { boundedOutcomeReader } from "./decision-outcomes.ts";
 import type { BudgetScope } from "./decision-budget.ts";
+import { runtimeExecutionIdentity } from "./runtime-execution-identity.ts";
 
 export interface PilotAssignment {
   version: 1; id: string; episodeId: string; experiment: string; definitionVersion: string;
@@ -51,7 +52,7 @@ export function recordDecisionEpisode(stateRoot: string, capture: EpisodeCapture
   const identityDigest = digest(identity);
   const temporary = join(directory, `.${id}.${randomUUID()}.json`);
   try {
-    durableJson(temporary, { version: 1, id, ...identity, identityDigest, capturedAt: new Date().toISOString(),
+    durableJson(temporary, { version: 1, id, ...runtimeExecutionIdentity(), ...identity, identityDigest, capturedAt: new Date().toISOString(),
       decisionLinks: capture.decisions.map(receiptId => ({ receiptId })) });
     try { linkSync(temporary, path); }
     catch (error) {

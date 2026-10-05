@@ -18,10 +18,12 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { digest, durableJson, fileDigest, object, text } from "./core.ts";
 import { processHasExited } from "./process-state.ts";
 import type { CommandOperation } from "./workflow-types.ts";
+import { runtimeExecutionIdentity, type RuntimeExecutionIdentity } from "./runtime-execution-identity.ts";
 
 export interface CommandRequest {
   version: 1; id: string; operation: CommandOperation; deadlineMs: number; outputLimit: number;
   ownerDigest: string; stdin?: string;
+  executionIdentity?: RuntimeExecutionIdentity;
   idleTimeoutMs?: number;
   completion?: CompletionTarget;
   coordination?: { registry: string; resources: string[] };
@@ -37,6 +39,7 @@ export interface CommandRequest {
   provider?: { kind: "claude" | "gemini" | "codex"; model: string; effort: string; conversationId?: string; requiredTools: string[]; additionalRoots?: string[]; access?: "reader" | "writer" | "exclusive"; guard?: import("./provider-guard.ts").ProviderGuard };
 }
 export interface CommandReceipt {
+  runtimeVersion?: string; archiveDigest?: string | null;
   version: 1; requestDigest: string; state: "succeeded" | "failed" | "cancelled" | "unknown";
   exitCode: number | null; signal: string | null; reason: string; cleanup: "confirmed" | "unknown";
   startedAt: string; endedAt: string; durationMs: number; log: string; logBytes: number; stdout?: string; stderr?: string; providerResult?: string; providerResultDigest?: string; providerEvents?: string;
@@ -77,7 +80,7 @@ export function processLiveFingerprint(pid: number): string | null {
 /** Persisted submission is idempotent, including the uncertain interval before process acknowledgment. */
 export function submitCommand(directory: string, request: Omit<CommandRequest, "ownerDigest" | "version">): { directory: string; requestDigest: string; submitted: boolean } {
   directory = resolve(directory);
-  const bound: CommandRequest = { ...request, version: 1, ownerDigest: fileDigest(OWNER) };
+  const bound: CommandRequest = { ...request, version: 1, ownerDigest: fileDigest(OWNER), executionIdentity: runtimeExecutionIdentity() };
   validateCommandRequest(bound);
   const hash = digest(bound);
   const existing = () => {
@@ -165,6 +168,12 @@ export async function waitCommand(directory: string, requestDigest: string, mill
 }
 
 export function validateCommandRequest(request: CommandRequest): void {
+  if (request.executionIdentity !== undefined) {
+    const identity = object(request.executionIdentity, "command execution identity");
+    if (Object.keys(identity).some(key => !["runtimeVersion", "archiveDigest"].includes(key))) throw new Error("Invalid command execution identity fields");
+    text(identity.runtimeVersion, "execution runtime version", 128);
+    if (identity.archiveDigest !== null && (typeof identity.archiveDigest !== "string" || !/^sha256:[a-f0-9]{64}$/u.test(identity.archiveDigest))) throw new Error("Invalid command execution archive identity");
+  }
   const grace = request.operation.terminationGraceMs;
   if (grace !== undefined && (!Number.isSafeInteger(grace) || grace < 1 || grace > 30000)) throw new Error("Invalid termination grace");
   if (request.version !== 1 || !Number.isSafeInteger(request.deadlineMs) || request.deadlineMs < (request.provider ? 0 : 1) || request.deadlineMs > (request.provider ? 604_800_000 : 86_400_000)) throw new Error("invalid command deadline/version");
@@ -210,7 +219,7 @@ async function execute(directory: string, expectedDigest: string): Promise<void>
       durableJson(join(directory, "claims.json"), { requestDigest: expectedDigest, registry: registry.path, leases });
     } catch {
       registry?.close();
-      durableJson(join(directory, "result.json"), { version: 1, requestDigest: expectedDigest, state: "failed",
+      durableJson(join(directory, "result.json"), { version: 1, ...request.executionIdentity, requestDigest: expectedDigest, state: "failed",
         exitCode: null, signal: null, reason: "resource-admission-failed", cleanup: leases.length ? "unknown" : "confirmed",
         startedAt, endedAt: new Date().toISOString(), durationMs: Date.now() - started, log, logBytes: 0 });
       if (!leases.length) releaseRuntimeReader(generation, true);
@@ -226,7 +235,7 @@ async function execute(directory: string, expectedDigest: string): Promise<void>
       if (request.decisionBinding) (await import("./provider-context.ts")).validateProviderContext(request.operation.cwd, request.decisionBinding.context, request.assignment?.context ?? "");
     }
     catch {
-      durableJson(join(directory, "result.json"), { version: 1, requestDigest: expectedDigest, state: "failed",
+      durableJson(join(directory, "result.json"), { version: 1, ...request.executionIdentity, requestDigest: expectedDigest, state: "failed",
         exitCode: null, signal: null, reason: refusalReason, cleanup: "confirmed",
         startedAt, endedAt: new Date().toISOString(), durationMs: Date.now() - started, log, logBytes: 0 });
       if (registry) { try { registry.release(leases, digest({ requestDigest: expectedDigest, admission: "refused-before-launch" })); } finally { registry.close(); } }
@@ -365,7 +374,7 @@ async function execute(directory: string, expectedDigest: string): Promise<void>
     await new Promise(resolve => setTimeout(resolve, Math.min(50, remaining)));
   }
   const success = reason === "provider-completed" || (reason === "exit" && exitCode !== null && request.operation.expectedExitCodes.includes(exitCode));
-  const receipt: CommandReceipt = { version: 1, requestDigest: expectedDigest,
+  const receipt: CommandReceipt = { version: 1, ...request.executionIdentity, requestDigest: expectedDigest,
     state: cleanup === "unknown" ? "unknown" : reason === "cancelled" ? "cancelled" : success ? "succeeded" : "failed",
     exitCode, signal: exitSignal, reason, cleanup, startedAt, endedAt: new Date().toISOString(), durationMs: Date.now() - started, log, logBytes: bytes, stdout, stderr, ...(providerEvents ? { providerEvents } : {}), ...(providerResult ? { providerResult, providerResultDigest: fileDigest(providerResult) } : {}) };
   durableJson(join(directory, "result.json"), receipt);

@@ -4,19 +4,25 @@ import { statSync } from "node:fs";
 import { digest, object } from "./core.ts";
 import { narrativeFile } from "./narrative-inputs.ts";
 
+export interface ProviderTelemetryCaptureReader {
+  read: (directory: string, name: string) => { value: Record<string, unknown>; digest: string };
+}
+
 /** Explicit receipt selection, no raw-log scan and no interpretation of cumulative provider usage as per-job cost. */
-export function providerTelemetry(jobs: Array<{ directory: string; requestDigest: string }>) {
+export function providerTelemetry(jobs: Array<{ directory: string; requestDigest: string }>, captured?: ProviderTelemetryCaptureReader) {
   if (!Array.isArray(jobs) || jobs.length > 1000) throw new Error("Provider telemetry accepts at most 1000 job handles");
   const counts = { selected: jobs.length, matched: 0, invalid: 0, duplicates: 0, succeeded: 0, failed: 0, cancelled: 0, unknown: 0 };
   const samples: Array<{ provider: string; state: string; cleanup: string; durationMs: number; reportedUsage: Record<string, number>; usagePresent: boolean; requestedModel: string | null; reportedModels: Record<string, Record<string, number>> | null; additionalReportedModels: string[] | null }> = [];
   let readBytes = 0, truncated = false;
   const seen = new Set<string>();
   const read = (directory: string, name: string) => {
+    // The offline report can reuse already bounded, hash-verified captures without reopening files.
+    if (captured) return captured.read(directory, name);
     const size = statSync(join(directory, name)).size;
     if (readBytes + size > 16 * 1024 * 1024) { truncated = true; throw new Error("Telemetry read budget exceeded"); }
     readBytes += size;
     const raw = narrativeFile(directory, name);
-    return { raw, value: object(JSON.parse(raw)) };
+    return { digest: `sha256:${createHash("sha256").update(raw).digest("hex")}`, value: object(JSON.parse(raw)) };
   };
   for (const job of jobs) {
     if (truncated) break;
@@ -36,7 +42,7 @@ export function providerTelemetry(jobs: Array<{ directory: string; requestDigest
       if (receipt.providerResult !== undefined) {
         if (receipt.providerResult !== join(directory, "provider-result.json")) throw new Error("Result path mismatch");
         const result = read(directory, "provider-result.json");
-        if (`sha256:${createHash("sha256").update(result.raw).digest("hex")}` !== receipt.providerResultDigest || result.value.version !== 1 || result.value.requestDigest !== job.requestDigest) throw new Error("Result mismatch");
+        if (result.digest !== receipt.providerResultDigest || result.value.version !== 1 || result.value.requestDigest !== job.requestDigest) throw new Error("Result mismatch");
         usagePresent = result.value.usage !== null && result.value.usage !== undefined;
         const usage = usagePresent ? object(result.value.usage) : {};
         if (provider === "claude" && usage.models !== undefined && usage.models !== null) {

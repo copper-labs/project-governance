@@ -12,6 +12,8 @@ export class TaskContextError extends Error {
   readonly code: string;
   constructor(code: string, message: string) { super(message); this.code = code; }
 }
+// The task owner already holds complete intent. Admission uses one bounded envelope, not tiny per-criterion limits.
+export const TASK_CONTEXT_MAX_BYTES = 32 * 1024 * 1024;
 function boundedText(value: unknown, label: string, maximum: number, code: string) {
   try { return text(value, label, maximum); }
   catch { throw new TaskContextError(code, `${label} is missing or exceeds its ${maximum}-character bound`); }
@@ -26,17 +28,16 @@ export function decisionTaskContext(value: unknown, workspace: string): Decision
   resolveDecisionScope(workspace, {}, binding);
   if (!Array.isArray(raw.acceptance) || !Array.isArray(raw.sourcePaths))
     throw new Error("Task acceptance and source paths must be bounded lists");
-  if (raw.acceptance.length > 16) throw new TaskContextError("task-acceptance-limit", "Task acceptance exceeds 16 items");
-  if (raw.sourcePaths.length > 32) throw new TaskContextError("task-scope-limit", "Task scope exceeds 32 paths");
-  return { version: 1, ...binding, workspace: realpathSync(workspace), requirement: boundedText(raw.requirement, "task requirement", 4000, "task-requirement-limit"),
-    acceptance: raw.acceptance.map(value => boundedText(value, "acceptance criterion", 500, "task-acceptance-limit")),
-    sourcePaths: [...new Set(raw.sourcePaths.map(value => safeSubjectPath(boundedText(value, "task source path", 128, "task-path-limit"))))] };
+  const context: DecisionTaskContext = { version: 1, ...binding, workspace: realpathSync(workspace), requirement: boundedText(raw.requirement, "task requirement", TASK_CONTEXT_MAX_BYTES, "task-requirement-limit"),
+    acceptance: raw.acceptance.map(value => boundedText(value, "acceptance criterion", TASK_CONTEXT_MAX_BYTES, "task-acceptance-limit")),
+    sourcePaths: [...new Set(raw.sourcePaths.map(value => safeSubjectPath(boundedText(value, "task source path", 4096, "task-path-limit"))))] };
+  if (Buffer.byteLength(JSON.stringify(context)) > TASK_CONTEXT_MAX_BYTES) throw new TaskContextError("task-context-limit", "Task context exceeds the complete 32 MiB envelope; original task remains intact");
+  return context;
 }
 
 /** The host can bind a file for its child process; no global current-task discovery is used. */
 export function readDecisionTaskContext(path: string, workspace: string) {
-  const bytes = narrativeFile(workspace, path);
-  if (Buffer.byteLength(bytes) > 16_384) throw new Error("Decision task context exceeds its bound");
+  const bytes = narrativeFile(workspace, path, TASK_CONTEXT_MAX_BYTES);
   return decisionTaskContext(JSON.parse(bytes), workspace);
 }
 export function decisionTaskPurpose(context: DecisionTaskContext) {

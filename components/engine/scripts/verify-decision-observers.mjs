@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { verifyInstalledLogPilot } from './verify-log-pilot.mjs';
 
 /** Fixture evidence, compiled public CLI. This proves integration, never live device readiness. */
 export async function verifyDecisionObservers({ packageRoot, repo, temporary, run, write, git, environment, callsPath }) {
@@ -36,12 +37,18 @@ export async function verifyDecisionObservers({ packageRoot, repo, temporary, ru
   const observed = run(['provider-status', ...providerArgs]);
   assert.equal(observed.decisionAdvice.claims.evidenceBasis, 'reported-only');
   assert.equal(observed.decisionAdvice.claims.scope.label, 'broader-than-evidence');
-  assert.equal(observed.provider.completion.answer.includes('Routine chatter'), false);
+  assert.equal(observed.provider.completion.answer, originalAnswer);
+  assert.equal(observed.decisionAdvice.output.delivered, false);
+  assert.equal(observed.decisionAdvice.output.reason, 'completion-presentation-excluded');
+  assert.equal(observed.decisionAdvice.output.decision, null);
+  assert.deepEqual(observed.decisionAdvice.output.omitted, []);
   assert.equal(observed.provider.completion.answer.includes('Warning: device proof missing'), true);
   assert.deepEqual(readFileSync(providerPath), providerBytes); assert.deepEqual(readFileSync(join(providerDirectory, 'result.json')), nativeBytes);
-  assert.equal(run(['provider-wait', ...providerArgs, '--milliseconds', '0']).decisionAdvice.output.delivered, true);
+  assert.equal(run(['provider-wait', ...providerArgs, '--milliseconds', '0']).decisionAdvice.output.delivered, false);
 
   verifyBoundClaim({ temporary, repo, run, durableJson, digest, fileDigest, providerPath, request, providerArgs, environment });
+  const logPilot = verifyInstalledLogPilot({ packageRoot, repo, temporary, run, write, git, callsPath });
+  assert.equal(logPilot.status, 'passed');
 
   const { Store } = await load('harness/src/store/store'), { WorkflowStore } = await load('engine/src/workflow-store');
   const { proposeAction, authorizeAction } = await load('harness/src/ops/actions'), { defaultPolicy } = await load('harness/src/ops/authority');
@@ -93,7 +100,7 @@ export async function verifyDecisionObservers({ packageRoot, repo, temporary, ru
   } finally { store.close(); continuity.close(); }
   const report = run(['telemetry', 'decisions']);
   for (const id of ['DL03', 'DL04', 'DL05', 'DL09', 'DL13']) assert.ok(report.pilot.consumers[id].delivered > 0, id);
-  return ['DL03', 'DL04', 'DL05', 'DL09', 'DL13'];
+  return { consumers: ['DL03', 'DL04', 'DL05', 'DL09', 'DL13'], logPilot };
 }
 
 

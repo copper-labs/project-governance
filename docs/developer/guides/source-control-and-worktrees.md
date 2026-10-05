@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-09-25
-updated: 2026-10-03
+updated: 2026-10-04
 summary: A practical workflow for owning changes, using Codex worktrees, integrating reviewed commits, adopting governance and cleaning up without disturbing other agents.
 ---
 
@@ -154,7 +154,7 @@ An upgrade in one tree must not switch another tree's active job to a different 
 | Version pin, profile and managed instructions/hooks | Tracked source distributed through Git |
 | Installed runtime selection and active runtime readers | Owned by each worktree |
 | Native startup receipts | `startup.sqlite` beside each worktree's installation registry |
-| Codex project hook definitions in linked worktrees | Loaded from the main checkout by the host; coordinate changes across active trees |
+| Codex project hook definitions in linked worktrees | The RC8 adapter uses the observed main-checkout source; verify actual discovery for the current host/version |
 | Default task/history database | Shared by linked worktrees under the Git common directory; task/session/workspace bindings remain distinct |
 | Maintained RC6 source index | Disposable per-worktree cache; never merge or copy its database |
 
@@ -167,9 +167,11 @@ The tracked Codex hook resolves its current Git root, then calls that tree's ign
 an older managed hook still names one checkout by absolute path, reconcile it at the cutover seam;
 do not carry it into a linked worktree or share its receipt database.
 
-Codex's hook **definition source** is different from the command's execution root. For linked
-worktrees the host loads the main checkout's definitions, even if the linked `.codex/hooks.json`
-was updated. RC8 reports this source through `doctor --capability context` and the migration plan.
+Codex's hook **definition source** is different from the command's execution root. The RC8 adapter
+uses the observed main-checkout source for linked worktrees, even if the linked `.codex/hooks.json`
+was updated. This is version-qualified adapter behavior, not a guarantee about every Codex host.
+RC8 reports that expected source through `doctor --capability context` and the migration plan;
+native hook discovery must confirm what the current host actually selected.
 A stale main-checkout hook must be repaired through that checkout's backed installation first,
 with affected active agents paused at a seam. Then reconcile each active tree's own runtime.
 No extra branch is required, and an installer in one tree never implicitly edits its siblings.
@@ -240,11 +242,17 @@ A runtime upgrade changes the installation and managed hooks. It does not change
 working directory. A chat started in the main checkout can still run shell commands in a linked
 worktree; that does not move its prompt hook or its default file access to that worktree.
 
-Before resuming the upgraded task, compare the chat's actual directory with the intended task
-checkout and the context packet's execution workspace. If they differ, use the host's supported
-workspace operation for that conversation at its pause seam. If the host cannot attach it to the
-existing directory, continue a saved checkpoint in a chat attached to that directory. Reuse the
-existing Git worktree and branch; a runtime upgrade does not need another copy of the repository.
+During upgrade preparation, compare the chat's actual directory with the intended task checkout,
+its explicit continuity binding and the most recent native packet's execution workspace. Perform
+this comparison before releasing idle startup reservations; archiving and restoring a chat preserves
+its directory and does not repair a mismatch. Record the saved checkpoint and next action in the
+existing handoff. A mismatch found before installation remains a separate continuation problem.
+
+If these locations differ, use the host's supported workspace operation for that conversation at
+its pause seam. If the host cannot attach it to the existing directory, continue the saved checkpoint
+in a chat attached to that directory. Reuse the existing Git worktree and branch; a runtime upgrade
+does not need another copy of the repository. Do not run a competing reattachment attempt while
+another owner is already repairing that conversation.
 
 For a CLI fork, verify the returned new conversation id and its actual working directory before
 continuing. Sending another message to the original desktop chat does not address the fork. A
@@ -256,5 +264,10 @@ controls remain host-dependent. Governance diagnoses identity and never edits th
 database to simulate reattachment.
 
 Then verify the exact runtime pin, local task binding and normal context entry in that directory.
-Keep the prior receipts and spending intact. A passing focused check does not clear an unrelated
-full-hook failure, and an expired project proof record needs evidence-backed project maintenance.
+An installation/version/doctor pass proves installation health, not successful task continuation.
+Keep that distinction in the upgrade report until the continuing conversation produces a normal native
+prompt receipt in the intended checkout and resumes its saved task without repeating completed
+work. A direct shell context command or unchanged chat metadata does not establish this host proof;
+do not synthesize a prompt event to claim it. Keep the prior receipts and spending intact. A passing
+focused check does not clear an unrelated full-hook failure, and an expired project proof record
+needs evidence-backed project maintenance.

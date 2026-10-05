@@ -6,7 +6,9 @@ import { execFileSync } from "node:child_process";
 export const GUARDED_CLASS = "bounded-summary";
 export const GUARDED_TOOLS = ["Read", "Grep", "Glob"];
 export const GUARDED_ENVIRONMENT = Object.freeze({ CLAUDE_CODE_DISABLE_TERMINAL_TITLE: "1" });
-export const GUARDED_SETTINGS = Object.freeze({ fallbackModel: [], disableAllHooks: true, permissions: {
+// Content flags use a separate fallback path; print mode must retain the refusal.
+// https://code.claude.com/docs/en/model-config#ask-before-switching
+export const GUARDED_SETTINGS = Object.freeze({ fallbackModel: [], switchModelsOnFlag: false, disableAllHooks: true, permissions: {
   defaultMode: "dontAsk", blockReadsOutsideWorkingDirectories: true,
   deny: ["Bash", "PowerShell", "Agent", "Task", "Edit", "Write", "NotebookEdit", "WebFetch", "WebSearch", "mcp__*", "Cd",
     "Read(**/.env)", "Read(**/.env.*)", "Read(**/*.pem)", "Read(**/*.key)", "Read(**/.ssh/**)",

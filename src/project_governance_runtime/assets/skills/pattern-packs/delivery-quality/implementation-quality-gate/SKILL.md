@@ -34,6 +34,9 @@ Use this skill for any code-changing workflow before final closeout, commit, pus
 Consume the candidate's existing subject-valid quality proof. Run one target owner only for a named
 uncovered claim; do not turn the review lens into a second code-smell, comment, naming, lint,
 format, boundary, and test matrix.
+Adopted lint findings come from the configured native tools and captured candidate, without LLM or
+JEV calls. Keep missing coverage and tool failures visible. Use those original findings in the review
+instead of recreating mechanical lint judgments or launching the same check again.
 
 ## Evidence
 

@@ -134,13 +134,16 @@ test("unsupported task projections report actionable reasons without mutating th
     f.bind(["../outside"]);
     assert.equal(resolveTaskContext(f.root).status, "task-scope-outside-workspace");
     f.bind([`docs/${"a".repeat(130)}.md`]);
+    assert.equal(resolveTaskContext(f.root).status, "bound");
+    f.bind([`docs/${"a".repeat(4096)}.md`]);
     assert.equal(resolveTaskContext(f.root).status, "task-path-limit");
     const task = f.bind(), store = new Store(defaultDbPath(f.root));
     try {
       store.reviseTask(task.taskId, Array.from({ length: 16 }, (_, i) => ({ kind: "acceptance", provenance: "operator", body: `Criterion ${i}` })), { expectedVersion: task.version });
       store.bind(task.taskId, "session-one", store.workspace(workContext(f.root).locator, f.root), f.root);
     } finally { store.close(); }
-    assert.equal(resolveTaskContext(f.root).status, "task-acceptance-limit");
+    assert.equal(resolveTaskContext(f.root).status, "bound");
+    assert.equal(resolveTaskContext(f.root).context!.acceptance.length, 17);
     const closed = f.bind(), closer = new Store(defaultDbPath(f.root));
     try { closer.reviseTask(closed.taskId, [], { expectedVersion: closed.version, status: "cancelled" }); }
     finally { closer.close(); }
@@ -149,6 +152,23 @@ test("unsupported task projections report actionable reasons without mutating th
     try { old.prepare("UPDATE meta SET value='5' WHERE key='schema_version'").run(); } finally { old.close(); }
     const before = fileDigest(defaultDbPath(f.root));
     assert.equal(resolveTaskContext(f.root).status, "task-store-schema-mismatch");
+    assert.equal(fileDigest(defaultDbPath(f.root)), before);
+  } finally { f.cleanup(); }
+});
+
+test("complete large task intent remains bound without truncating acceptance or source scope", () => {
+  const f = fixture();
+  try {
+    const task = f.bind(Array.from({ length: 40 }, (_, i) => `docs/long-scope-${i}`));
+    const store = new Store(defaultDbPath(f.root)), requirement = "Full requirement. ".repeat(600), criterion = "Detailed acceptance. ".repeat(100);
+    try {
+      store.reviseTask(task.taskId, Array.from({ length: 64 }, (_, i) => ({ kind: "acceptance", provenance: "operator", body: `${i}: ${criterion}` })), { expectedVersion: task.version, outcome: requirement });
+      store.bind(task.taskId, "session-one", store.workspace(workContext(f.root).locator, f.root), f.root);
+    } finally { store.close(); }
+    const before = fileDigest(defaultDbPath(f.root)), resolution = resolveTaskContext(f.root);
+    assert.equal(resolution.status, "bound"); assert.equal(resolution.context!.requirement, requirement);
+    assert.equal(resolution.context!.sourcePaths.length, 40); assert.equal(resolution.context!.acceptance.length, 65);
+    assert.equal(resolution.context!.acceptance.at(-1), `63: ${criterion}`);
     assert.equal(fileDigest(defaultDbPath(f.root)), before);
   } finally { f.cleanup(); }
 });

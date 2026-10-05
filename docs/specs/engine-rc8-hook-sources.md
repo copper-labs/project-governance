@@ -5,7 +5,7 @@ type: spec
 status: current
 owner: project-governance
 created: 2026-09-25
-updated: 2026-09-29
+updated: 2026-10-04
 summary: Repair shared hook ownership, bounded repository preparation and required-context readiness before coordinated adoption.
 ---
 
@@ -32,6 +32,10 @@ This behavior is explicit in OpenAI's
 [linked-worktree config tests](https://github.com/openai/codex/blob/main/codex-rs/core/src/config/config_loader_tests.rs).
 The [hook guide](https://learn.chatgpt.com/docs/hooks) owns host discovery and trust. A local
 readiness report remains separate from host discovery and successful native prompt delivery.
+
+The adapter applies that observed source rule; it does not establish a universal hook-source rule
+for every host version. Native directory-specific discovery must confirm the selected definition,
+command and trust after adoption. Keep the expected adapter source and actual discovery distinct.
 
 ## One definition source, separate execution owners
 

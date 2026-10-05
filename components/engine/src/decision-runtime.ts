@@ -4,7 +4,7 @@ import { existsSync, readFileSync, statSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
 import { projectContextMetric } from "./telemetry-projection.ts";
-import { RELEASE_VERSION } from "./release-version.ts";
+import { runtimeExecutionIdentity, type RuntimeExecutionIdentity } from "./runtime-execution-identity.ts";
 import { digest, durableJson, object } from "./core.ts";
 import { matchesPackPath } from "./planning.ts";
 import { DECISION_CONSUMERS, DECISION_QUESTIONS } from "./decision-catalog.ts";
@@ -91,8 +91,10 @@ export class DecisionRuntime {
   readonly stateRoot: string;
   readonly #client: JevDecisionClient;
   readonly #options: DecisionRuntimeOptions;
+  readonly #executionIdentity: RuntimeExecutionIdentity;
   constructor(settings: DecisionSettings, stateRoot: string, options: DecisionRuntimeOptions = {}) {
     this.settings = settings; this.stateRoot = stateRoot; this.#options = options;
+    this.#executionIdentity = runtimeExecutionIdentity();
     this.#client = options.client ?? new JevDecisionClient({ ...options, healthScope: digest({ stateRoot, config: settings.configDigest }) });
   }
 
@@ -135,7 +137,7 @@ export class DecisionRuntime {
     // Telemetry storage failure never alters the decision, the budget or native execution.
     try {
       const createdAt = new Date().toISOString();
-      durableJson(this.#receiptPath(key), { version: 2, runtimeVersion: RELEASE_VERSION, configDigest: this.settings.configDigest,
+      durableJson(this.#receiptPath(key), { version: 2, ...this.#executionIdentity, configDigest: this.settings.configDigest,
         receiptId: key, createdAt, outcome });
       if (outcome.scope) projectContextMetric(this.stateRoot, { id: key, workspace: outcome.scope.workspace, capturedAt: createdAt,
         kind: "decision", entryId: null, routeId: null, familyId: outcome.budget.invocationId ?? null,

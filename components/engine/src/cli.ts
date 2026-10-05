@@ -69,6 +69,14 @@ import { PackagedCheckerAssets } from "./checker-assets.ts";
 import { checkDecisionAdvice, type CheckAdviceOptions } from "./decision-check-advice.ts";
 import { resolveTaskContext, taskBindingReceipt } from "./decision-task-binding.ts";
 import { resolveDecisionScope } from "./decision-scope.ts";
+import { implementationPlanCommand } from "./implementation-plan-command.ts";
+import { implementationPlanFindings, parseImplementationPlan } from "./implementation-plan.ts";
+import { updateImplementationProgress } from "./plan-progress.ts";
+import { worktreeBytes } from "./change-subject.ts";
+import { lintAdapterCommand } from "./lint-adapter.ts";
+import { lintCoverage, lintIgnoredPathMatches, lintPlanBlockers } from "./lint-coverage.ts";
+import { installLintSetup } from "./lint-installation.ts";
+import { readReleaseEvaluation, releaseEvaluationMarkdown } from "./release-evaluation.ts";
 
 /** Public argument parsing rejects conflicting subjects before reading a candidate. */
 export function prepareCommand(args: string[], root: string, builtinDirectory: string, command: "plan" | "check" = "plan") {
@@ -79,6 +87,7 @@ export function prepareCommand(args: string[], root: string, builtinDirectory: s
     "decision-task": { type: "string" }, "decision-revision": { type: "string" },
     "decision-context": { type: "string" },
     "compare-run": { type: "string" },
+    "implementation-plan": { type: "string" }, batch: { type: "string" },
     "decision-purpose": { type: "string" }, "review-rules": { type: "string" },
     ...(command === "check" ? { "json-output": { type: "string" as const }, "expected-status": { type: "string" as const }, trigger: { type: "string" as const }, detach: { type: "boolean" as const }, "timeout-seconds": { type: "string" as const }, "commit-message-file": { type: "string" as const }, "pr-body-file": { type: "string" as const }, "pr-title": { type: "string" as const } } : {}),
   } });
@@ -121,7 +130,22 @@ export function prepareCommand(args: string[], root: string, builtinDirectory: s
     resolveDecisionScope(root, decisionOptions, decisionOptions.context);
   }
   const workId = command === "check" ? process.env["GOVERNANCE_WORK_ID"] ?? "" : "";
-  return { plan: buildPlan(registry, { stage, mode, changedPaths: scope.records.map(record => record.path), explicitPackIds: packs }), scope, subject, registry, narrative, workId, decisionOptions, deadlineMs, ...observation, jsonOutput: typeof jsonOutput === "string" ? jsonOutput : null, summary: values.summary === true, detach: values["detach"] === true };
+  // A rename removes the old owner's path as well as adding the new owner's path.
+  const changedPaths = scope.records.flatMap(record => record.previous_path ? [record.path, record.previous_path] : [record.path]);
+  const plan = buildPlan(registry, { stage, mode, changedPaths, explicitPackIds: packs, ignoredPathMatches: lintIgnoredPathMatches(subject, scope, registry) });
+  const lint = lintPlanBlockers(subject, registry, stage, changedPaths, plan.selected_packs, scope.mode === "all", scope);
+  plan.blockers.push(...lint); if (lint.length) { plan.status = "blocked"; plan.execution_order = []; }
+  let progress: { path: string; batch: string; digest: string; items: string[] } | null = null;
+  if (Boolean(values["implementation-plan"]) !== Boolean(values.batch)) throw new Error("Implementation plan and batch must be supplied together");
+  if (values["implementation-plan"] && values.batch) {
+    const path = values["implementation-plan"], parsed = parseImplementationPlan(path, worktreeBytes(root, path).bytes.toString("utf8"));
+    const batch = parsed.declaration.batches.find(batch => batch.id === values.batch);
+    if (!batch || implementationPlanFindings(subject, path, registry).length) throw new Error("Declared implementation batch is unresolved");
+    const items = batch.items.filter(item => item.check?.stage === stage);
+    if (!items.length || items.some(item => item.check!.packs.some(id => !plan.selected_packs.includes(id)))) throw new Error("Check selection does not fulfill the batch's declared verification");
+    progress = { path, batch: batch.id, digest: parsed.digest, items: items.map(item => item.id) };
+  }
+  return { plan, progress, scope, subject, registry, narrative, workId, decisionOptions, deadlineMs, ...observation, jsonOutput: typeof jsonOutput === "string" ? jsonOutput : null, summary: values.summary === true, detach: values["detach"] === true };
 }
 
 export function planCommand(args: string[], root: string, builtinDirectory: string) {
@@ -138,6 +162,13 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
 Checks:
   plan --stage <stage> --mode impacted|all [--summary] [--compare-run <run-id>]
   check --stage <stage> --mode impacted|all [--summary] [--json-output <path>]
+    [--implementation-plan <docs/exec-plans/path.md> --batch <id>]
+  implementation-plan inspect --path <plan> --batch <id>
+  implementation-plan update --path <plan> --request <json> [--staged|--base-ref <ref>]
+  lint setup [--root <path>] [--include-dependencies] [--apply --plan-digest <digest>]
+  doctor --capability lint
+  release-evaluation report --manifest <json> [--format json|markdown]
+  check-output --run <id> [--log-pilot deterministic|jev]
   check-status --run <run-id> [--full] | check-cancel --run <run-id>
   check-output --run <run-id>
   check-reconcile --run <run-id>
@@ -167,6 +198,21 @@ Use the owning command contract for structured request fields.
     if (command === "harness") {
       // The canonical parser owns global flags and help as well as task/history operations.
       return continuityCommand(args.slice(1), {groups: ["governance", "task", "resume", "checkpoint", "context", "artifact", "budget", "paths", "status", "reconcile", "usage", "export", "import", "events"], observeBinding: associatePromptTask});
+    }
+    if (command === "implementation-plan") { console.log(JSON.stringify(implementationPlanCommand(args.slice(1), process.cwd()))); return 0; }
+    if (command === "lint-adapter") { const result = await lintAdapterCommand(args.slice(1)); console.log(JSON.stringify(result.value)); return result.exitCode; }
+    if (command === "lint" && args[1] === "setup") {
+      const { values } = parseArgs({ args: args.slice(2), strict: true, allowPositionals: false, options: {
+        root: { type: "string", multiple: true }, stage: { type: "string", multiple: true }, apply: { type: "boolean" }, "plan-digest": { type: "string" }, "include-dependencies": { type: "boolean" },
+      } });
+      console.log(JSON.stringify(installLintSetup(process.cwd(), { ...(values.root ? { roots: values.root } : {}), ...(values.stage ? { stages: values.stage } : {}), apply: values.apply ?? false,
+        ...(values["plan-digest"] ? { expectedDigest: values["plan-digest"] } : {}), includeDependencies: values["include-dependencies"] ?? false }))); return 0;
+    }
+    if (command === "release-evaluation" && args[1] === "report") {
+      const { values } = parseArgs({ args: args.slice(2), strict: true, allowPositionals: false, options: { manifest: { type: "string" }, format: { type: "string", default: "json" } } });
+      if (!values.manifest || !["json", "markdown"].includes(values.format)) throw new Error("Evaluation manifest and json or markdown format required");
+      const report = readReleaseEvaluation(contextStateRoot(process.cwd()), values.manifest);
+      console.log(values.format === "markdown" ? releaseEvaluationMarkdown(report) : JSON.stringify(report)); return 0;
     }
     if (command === "hook") return main(["check", "--trigger", "hook", ...hookCheckArguments(realpathSync(process.cwd()), args[1] ?? "", args.slice(2))]);
     if (command === "docs") {
@@ -199,9 +245,10 @@ Use the owning command contract for structured request fields.
       if (values.capability === "context" && !values.registry) {
         const result = contextDoctor(realpathSync(process.cwd())); console.log(JSON.stringify(result)); return result.status === "configured" ? 0 : 2;
       }
-      if (values.capability !== "kmp-surface-validation" || values.registry) throw new Error("Unsupported capability doctor arguments");
+      if (!["kmp-surface-validation", "lint"].includes(values.capability) || values.registry) throw new Error("Unsupported capability doctor arguments");
       const root = realpathSync(process.cwd()), subject = new ValidationSubject(root, resolveChangeScope(root, { all: true }));
       const packs = loadSubjectPacks(subject, fileURLToPath(new URL("../assets/packs/", import.meta.url)));
+      if (values.capability === "lint") { const result = lintCoverage(subject, packs); console.log(JSON.stringify(result)); return ["ready", "empty", "not-adopted"].includes(result.status) ? 0 : 2; }
       const findings = kmpDoctorFindings(subject, packs);
       console.log(JSON.stringify({ version: 1, capability: values.capability, status: findings.length ? "failed" : "passed", findings })); return findings.length ? 1 : 0;
     }
@@ -409,9 +456,11 @@ Use the owning command contract for structured request fields.
       }
     }
     if (command === "check-output") {
-      const { values } = parseArgs({ args: args.slice(1), strict: true, options: { run: { type: "string" } } });
+      const { values } = parseArgs({ args: args.slice(1), strict: true, options: { run: { type: "string" }, "log-pilot": { type: "string" } } });
       if (!values.run) throw new Error("Run ID is required");
-      const response = await withDecisionCancellation(options => checkOutput(values.run!, realpathSync(process.cwd()), options));
+      if (values["log-pilot"] && !["deterministic", "jev"].includes(values["log-pilot"])) throw new Error("Log pilot arm must be deterministic or jev");
+      const pilot = values["log-pilot"] as "deterministic" | "jev" | undefined;
+      const response = await withDecisionCancellation(options => checkOutput(values.run!, realpathSync(process.cwd()), { ...options, ...(pilot ? { pilot: { purpose: "long-log-filtering", arm: pilot } } : {}) }));
       console.log(JSON.stringify(response.value));
       return response.exitCode ?? (response.value?.status === "failed" ? 1 : response.value?.state === "terminal" ? 0 : 2);
     }
@@ -453,17 +502,25 @@ Use the owning command contract for structured request fields.
     while (true) {
       const observed = inspectCheckRun(submission.run_id);
       if (observed.state === "terminal") {
+        let progress: ReturnType<typeof updateImplementationProgress> | { status: string; reason: string } | null = null;
+        if (prepared.progress && observed.status === "passed") {
+          try {
+            progress = updateImplementationProgress({ subject: prepared.subject, scope: prepared.scope, packs: prepared.registry, path: prepared.progress.path,
+              request: { version: 1, expected_digest: prepared.progress.digest, batch: prepared.progress.batch,
+                updates: prepared.progress.items.map(id => ({ id, completed: true, run_id: submission.run_id })) } });
+          } catch { progress = { status: "refused", reason: "Plan changed, a prerequisite is incomplete or original native proof could not qualify. Inspect the selected batch and retained run; do not rerun checks automatically." }; }
+        }
         const advice = await withDecisionCancellation(options => checkDecisionAdvice(prepared, { ...prepared.decisionOptions, runId: submission.run_id }, true, options));
-        const projection = { ...observed.result, ...(advice.value ? { decisionAdvice: advice.value } : {}) };
+        const projection = { ...observed.result, ...(progress ? { planProgress: progress } : {}), ...(advice.value ? { decisionAdvice: advice.value } : {}) };
         if (prepared.jsonOutput) durableJson(prepared.jsonOutput, projection);
         let output: Awaited<ReturnType<typeof checkOutput>> | null = null;
         if (prepared.summary) {
           try { output = (await withDecisionCancellation(options => checkOutput(submission.run_id, prepared.subject.root, options))).value; }
           catch { /* Optional output delivery cannot change a native check result. */ }
         }
-        console.log(JSON.stringify(prepared.summary ? { ...checkSummary(observed.result), ...(advice.value ? { decisionAdvice: advice.value } : {}),
+        console.log(JSON.stringify(prepared.summary ? { ...checkSummary(observed.result), ...(progress ? { planProgress: progress } : {}), ...(advice.value ? { decisionAdvice: advice.value } : {}),
           outputDelivery: output && "outputs" in output ? { outputs: output.outputs, coverage: output.coverage, episode: output.episode } : { reason: "output-delivery-unavailable" } } : projection));
-        return advice.exitCode ?? (observed.status === "failed" ? 1 : 0); }
+        return progress?.status === "refused" ? 2 : advice.exitCode ?? (observed.status === "failed" ? 1 : 0); }
       if (observed.state === "incomplete" || Date.now() - submittedAt >= prepared.deadlineMs + 5000) {
         if (prepared.jsonOutput) durableJson(prepared.jsonOutput, observed);
         console.log(JSON.stringify(observed)); return 2;

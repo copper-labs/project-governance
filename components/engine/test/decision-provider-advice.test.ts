@@ -48,20 +48,18 @@ test("provider status delivers bounded output and claim advice without changing 
   const first = await providerJobCommand("provider-status", args);
   const value = first.result as any;
   assert.equal(first.exitCode, 0);
-  assert.equal(value.provider.completion.answer.includes("Routine progress chatter"), false);
+  assert.equal(value.provider.completion.answer.includes("Routine progress chatter"), true);
   assert.equal(value.provider.completion.answer.includes("Warning: missing device proof"), true);
-  assert.equal(value.decisionAdvice.output.omitted.length, 1);
-  const omitted = value.decisionAdvice.output.omitted[0];
-  assert.equal(omitted.within, "completion.answer");
-  assert.equal(originalAnswer.split("\n").slice(omitted.firstLine - 1, omitted.lastLine).join("\n"), "Routine progress chatter");
+  assert.equal(value.decisionAdvice.output.omitted.length, 0);
+  assert.equal(value.decisionAdvice.output.reason, "completion-presentation-excluded");
   assert.equal(value.decisionAdvice.claims.evidenceBasis, "reported-only");
   assert.equal(value.decisionAdvice.claims.scope.label, "broader-than-evidence");
   assert.equal(value.decisionAdvice.claims.corrections[0].label, "insufficient");
-  assert.equal(calls, 2);
+  assert.equal(calls, 1);
   assert.deepEqual(readFileSync(providerPath), original);
   assert.deepEqual(readFileSync(join(directory, "result.json")), receipt);
   const repeat = await providerJobCommand("provider-wait", [...args, "--milliseconds", "0"]);
-  assert.equal(repeat.exitCode, 0); assert.equal(calls, 2);
+  assert.equal(repeat.exitCode, 0); assert.equal(calls, 1);
   const nativeDirectory = join(root, "native-check"); mkdirSync(nativeDirectory);
   const nativeRequest = { version: 1, id: "native-check", operation: { cwd: root, env: {}, argv: [process.execPath, "--version"] }, deadlineMs: 1000, outputLimit: 1000, ownerDigest: `sha256:${"a".repeat(64)}` };
   durableJson(join(nativeDirectory, "request.json"), nativeRequest);
@@ -77,7 +75,7 @@ test("provider status delivers bounded output and claim advice without changing 
   const bound = await providerJobCommand("provider-status", [...args, "--claim-evidence", evidencePath]);
   assert.equal((bound.result as any).decisionAdvice.claims.evidenceBasis, "file-consistent");
   assert.equal((bound.result as any).decisionAdvice.claims.scope.label, "broader-than-evidence");
-  assert.equal(calls, 3);
+  assert.equal(calls, 2);
   // Known native failures need no model judgment, including when the token is absent.
   delete process.env.JEV_TOKEN;
   durableJson(join(nativeDirectory, "result.json"), { version: 1, requestDigest: digest(nativeRequest), state: "failed", exitCode: 1, cleanup: "unknown",
@@ -90,17 +88,17 @@ test("provider status delivers bounded output and claim advice without changing 
   assert.equal(failureAdvice.corrections[0].label, "native-result-not-passed");
   assert.equal(failureAdvice.boundEvidence[0].directory, nativeDirectory);
   assert.equal(failureAdvice.decision.delivered, false);
-  assert.equal(calls, 3);
+  assert.equal(calls, 2);
   rmSync(join(nativeDirectory, "owner.json"));
   const unowned = await providerJobCommand("provider-status", [...args, "--claim-evidence", evidencePath]);
   assert.equal((unowned.result as any).decisionAdvice.claimEvidence.status, "invalid");
   writeFileSync(nativeLog, "different native evidence");
   const invalid = await providerJobCommand("provider-status", [...args, "--claim-evidence", evidencePath]);
   assert.equal((invalid.result as any).decisionAdvice.claimEvidence.status, "invalid");
-  assert.equal(calls, 3);
+  assert.equal(calls, 2);
   writeFileSync(providerPath, "changed after capture");
   await assert.rejects(providerJobCommand("provider-status", args), /identity mismatch/);
-  assert.equal(calls, 3);
+  assert.equal(calls, 2);
 });
 
 

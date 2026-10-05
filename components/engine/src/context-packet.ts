@@ -4,7 +4,8 @@ import { contextExcerpt } from "./context-excerpts.ts";
 import { canonical, digest, text } from "./core.ts";
 import { CONTEXT_PATH_LIMIT, CONTEXT_PROMPT_LIMIT } from "./context-limits.ts";
 import type { Candidate, DecisionOptions, DecisionProvider, DecisionRequest, DecisionResult } from "./decisions.ts";
-import type { PassageJudgment, PassageUnitOrder } from "./context-passage-advice.ts";
+import type { PassageJudgment, PassageUnitOrder, WholeFilePassageExclusion } from "./context-passage-advice.ts";
+import { NOUL_REGIONS } from "./decision-runtime.ts";
 
 export interface ContextPacketRequest {
   taskRevision: string; purpose: string; required: Candidate[]; optional: Candidate[]; maximumBytes: number; optionalExcerptBytes?: number;
@@ -12,11 +13,12 @@ export interface ContextPacketRequest {
   sourceSpans?: Record<string, Array<{ name: string; start: number; end: number }>>;
   passageJudgments?: Record<string, PassageJudgment>;
   passageUnitOrder?: Record<string, PassageUnitOrder>;
+  passageExclusions?: Record<string, WholeFilePassageExclusion>;
   procedurePaths?: string[]; procedureBytes?: number;
   sourceLinks?: Array<{ source: string; target: string; sourceDigest: string; targetDigest: string }>;
 }
 
-/** Ranking can reorder optional evidence; it cannot remove required context or introduce source. */
+/** Source-bound advice shapes automatic optional evidence; required context and explicit pins stay intact. */
 export async function buildContextPacket(input: ContextPacketRequest, provider: DecisionProvider, options: DecisionOptions = {}) {
   input = structuredClone(input);
   text(input.taskRevision, "task revision"); text(input.purpose, "purpose", CONTEXT_PROMPT_LIMIT);
@@ -33,6 +35,20 @@ export async function buildContextPacket(input: ContextPacketRequest, provider: 
   const judgmentLimitations: Record<string, "judgment-source-mismatch" | "judgment-not-representable"> = {};
   const unitOrdering: Record<string, "uncertain-score"> = {};
   const verifiedPositive = new Set<string>();
+  const verifiedNegative = new Set<string>();
+  // Descriptions cannot exclude source. A whole-body judgment must match this captured original.
+  for (const candidate of input.optional) {
+    const exclusion = input.passageExclusions?.[candidate.id];
+    if (!exclusion || input.priorityIds?.includes(candidate.id) || input.procedurePaths?.includes(candidate.id) || options.signal?.aborted) continue;
+    if (exclusion.sourceDigest !== candidate.sourceDigest) { judgmentLimitations[candidate.id] = "judgment-source-mismatch"; continue; }
+    if (exclusion.scope !== "whole-file" || exclusion.complete !== true || exclusion.interpretation !== "negative" ||
+        !Number.isFinite(exclusion.probability) || exclusion.probability < 0 || exclusion.probability > NOUL_REGIONS.supportedNegative ||
+        exclusion.excerptDigest !== digest(candidate.excerpt) || candidate.sourceRange || candidate.sourceRanges ||
+        candidate.sourceUnits?.some(unit => !unit.complete) || input.passageJudgments?.[candidate.id] || input.passageUnitOrder?.[candidate.id]) {
+      judgmentLimitations[candidate.id] = "judgment-not-representable"; continue;
+    }
+    verifiedNegative.add(candidate.id);
+  }
   const optional = input.optional.map(candidate => {
     const judgment = input.passageJudgments?.[candidate.id];
     if (input.optionalExcerptBytes === undefined) {
@@ -76,9 +92,10 @@ export async function buildContextPacket(input: ContextPacketRequest, provider: 
     // Each adapter bounds its own wire evidence. Delivery excerpts must not prevent a smaller
     // classifier excerpt from being selected from the original captured source.
     purpose: input.purpose, candidates: input.optional.filter(candidate =>
-      !unrepresentable.has(candidate.id) && !empty.has(candidate.id)), dataClass: "source" };
+      !unrepresentable.has(candidate.id) && !empty.has(candidate.id) && !verifiedNegative.has(candidate.id)), dataClass: "source" };
   let decision: DecisionResult | null = null;
-  let reason = request.candidates.length ? "provider-unavailable" : "no-assessable-candidates";
+  let reason = request.candidates.length ? "provider-unavailable" : verifiedNegative.size > 0 && verifiedNegative.size === input.optional.length
+    ? "complete-passage-no-match" : "no-assessable-candidates";
   let order = lexicalContextOrder(request);
   if (request.candidates.length) try {
     if (options.signal?.aborted) { reason = "cancelled"; throw new Error("Context advice cancelled"); }
@@ -156,12 +173,12 @@ export async function buildContextPacket(input: ContextPacketRequest, provider: 
     order = sequence;
   }
   const selected = [...input.required], omitted = input.optional
-    .filter(candidate => unrepresentable.has(candidate.id))
+    .filter(candidate => unrepresentable.has(candidate.id) || verifiedNegative.has(candidate.id))
     .map(candidate => candidate.id);
-  const omissionReasons: Record<string, "excerpt-unrepresentable" | "packet-budget"> = {};
-  for (const id of omitted) omissionReasons[id] = "excerpt-unrepresentable";
+  const omissionReasons: Record<string, "excerpt-unrepresentable" | "packet-budget" | "whole-file-negative-passage"> = {};
+  for (const id of omitted) omissionReasons[id] = verifiedNegative.has(id) ? "whole-file-negative-passage" : "excerpt-unrepresentable";
   const deliveryOrder = [...order, ...input.optional.filter(candidate =>
-    empty.has(candidate.id) && !unrepresentable.has(candidate.id)).map(candidate => candidate.id)];
+    empty.has(candidate.id) && !unrepresentable.has(candidate.id) && !verifiedNegative.has(candidate.id)).map(candidate => candidate.id)];
   const upgrades = new Map<string, Candidate[]>();
   const firstUnits = new Map<string, Candidate>();
   for (const candidate of input.optional) {

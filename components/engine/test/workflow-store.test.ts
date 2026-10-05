@@ -1,6 +1,6 @@
 import { workflowOperation } from "../src/workflow-operation.ts";
 import { recoverStoppedWorkflow } from "../src/workflow-worker-recovery.ts";
-import { submitCommand, waitCommand, processFingerprint } from "../src/process-owner.ts";
+import { submitCommand, waitCommand, processFingerprint, processOwnerDigest } from "../src/process-owner.ts";
 import { releaseRecoveredWorkflowReader } from "../src/workflow-reader-recovery.ts";
 import { workflowCommand, workflowExitCode } from "../src/workflow-command.ts";
 import { reconcileReleasedWorkflow } from "../src/workflow-resource-recovery.ts";
@@ -278,6 +278,23 @@ test("stopped-worker observation refuses live owners and binds original command 
   const changed=JSON.parse(commandBytes.toString());changed.id="different-stage";writeFileSync(commandPath,JSON.stringify(changed));
   await assert.rejects(recoverStoppedWorkflow(directory,f.path,run.id,run.revision),/differs from workflow stage/);
   assert.equal(store.read(run.id).state,"running");writeFileSync(commandPath,commandBytes);
+  const command=JSON.parse(commandBytes.toString());
+  for (const executionIdentity of [null,{...command.executionIdentity,archiveDigest:"invalid"},
+      {...command.executionIdentity,archiveDigest:[]},{...command.executionIdentity,extra:"unowned"}]) {
+   writeFileSync(commandPath,JSON.stringify({...command,executionIdentity}));
+   await assert.rejects(recoverStoppedWorkflow(directory,f.path,run.id,run.revision),/execution/);
+   assert.equal(store.read(run.id).state,"running");
+   assert.deepEqual(readFileSync(join(commandDirectory,"result.json")),original);
+  }
+  writeFileSync(commandPath,commandBytes);
+  const receiptPath=join(commandDirectory,"result.json"),receipt=JSON.parse(original.toString());
+  for (const contradiction of [{runtimeVersion:"different-runtime"},{archiveDigest:`sha256:${"c".repeat(64)}`}]) {
+   writeFileSync(receiptPath,JSON.stringify({...receipt,...contradiction}));
+   await assert.rejects(recoverStoppedWorkflow(directory,f.path,run.id,run.revision),/execution identity differs from receipt/);
+   assert.equal(store.read(run.id).state,"running");
+   assert.deepEqual(readFileSync(commandPath),commandBytes);
+  }
+  writeFileSync(receiptPath,original);
   const response=spawnSync(process.execPath,cliArgs,{encoding:"utf8"});
   assert.equal(response.status,1,response.stderr);
   const recovered=JSON.parse(response.stdout);
@@ -288,6 +305,35 @@ test("stopped-worker observation refuses live owners and binds original command 
   const cleanup=store.claimPendingCleanup(run.id,recovered.run.revision,digest(store.stages(run.id)),{pid:process.pid,fingerprint:processFingerprint(process.pid)!});
   assert.equal(store.cleanupWorker(run.id)?.pid,process.pid);
   await assert.rejects(recoverStoppedWorkflow(directory,f.path,run.id,cleanup.revision),/Cleanup worker still present/);
+ } finally {store.close();f.close();}
+});
+
+test("legacy stopped-worker receipts retain unknown execution identity without current-runtime inference", async () => {
+ const f=fixture(),store=new WorkflowStore(f.path);
+ try {
+  const pending=store.submit(f.binding),run=store.claim(pending.id,pending.revision,"worker");
+  store.stage(run.id,"worker","test","running");
+  const directory=join(f.dir,"worker"),commands=join(directory,"commands"),commandDirectory=join(commands,`${run.id}-0`);
+  mkdirSync(commandDirectory,{recursive:true});
+  const request={version:1,database:f.path,runId:run.id,bindingDigest:digest(run.binding),commandsDirectory:commands};
+  writeFileSync(join(directory,"request.json"),JSON.stringify(request));
+  const dead=spawnSync(process.execPath,["-e",""]);
+  writeFileSync(join(directory,"owner.json"),JSON.stringify({requestDigest:digest(request),pid:dead.pid,fingerprint:"exited legacy fixture"}));
+  const command={version:1,id:`${run.id}:test`,operation:workflowOperation(run.binding.recipe,run.id,run.binding.recipe.stages[0]!,commands),
+   deadlineMs:1000,outputLimit:4096,ownerDigest:processOwnerDigest()};
+  const receipt={version:1,requestDigest:digest(command),state:"succeeded",cleanup:"confirmed",exitCode:0,signal:null,
+   reason:"exit",startedAt:"start",endedAt:"end",durationMs:1,log:"legacy-log",logBytes:0};
+  const commandPath=join(commandDirectory,"request.json"),receiptPath=join(commandDirectory,"result.json");
+  writeFileSync(commandPath,JSON.stringify(command));writeFileSync(receiptPath,JSON.stringify(receipt));
+  const commandBytes=readFileSync(commandPath),receiptBytes=readFileSync(receiptPath);
+  writeFileSync(receiptPath,JSON.stringify({...receipt,runtimeVersion:"4.0.0",archiveDigest:null}));
+  await assert.rejects(recoverStoppedWorkflow(directory,f.path,run.id,run.revision),/execution identity differs from receipt/);
+  assert.equal(store.read(run.id).state,"running");writeFileSync(receiptPath,receiptBytes);
+  const recovered=await recoverStoppedWorkflow(directory,f.path,run.id,run.revision);
+  assert.equal(recovered.observed,1);assert.equal(store.stages(run.id)[0]?.state,"succeeded");
+  assert.deepEqual(readFileSync(commandPath),commandBytes);assert.deepEqual(readFileSync(receiptPath),receiptBytes);
+  assert.equal(JSON.parse(readFileSync(receiptPath,"utf8")).runtimeVersion,undefined);
+  assert.equal(JSON.parse(readFileSync(receiptPath,"utf8")).archiveDigest,undefined);
  } finally {store.close();f.close();}
 });
 

@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-08-21
-updated: 2026-10-01
+updated: 2026-10-05
 summary: Routes evaluators, operators, contributors, and agents through the shortest useful Project Governance documentation journeys.
 ---
 
@@ -26,6 +26,28 @@ The exact runtime/adopter responsibility split remains in
 [Governance Runtime Architecture](../architecture/governance-runtime.md).
 
 ## Contribute To The Runtime
+
+Use [Get Useful Feedback Before Review](guides/batch-verification.md) to declare an early focused
+check through existing project packs and prove that a test catches an intended fault. The
+[next major delivery plan](../exec-plans/active/2026-10-04-major-verification-feedback.md) records
+installed journey and multilingual semantic-review development before release qualification.
+
+The approved [focused linting MVP specification](../specs/engine-linting-mvp.md) and
+[delivery plan](../exec-plans/active/2026-10-05-linting-mvp.md) describe installable deterministic
+adapters, visible coverage and narrow required checks. Implementation is approved for the next major;
+installed qualification and publication remain release steps. Use [Adopt Focused Deterministic Linting](guides/focused-linting.md)
+for proposal inspection, explicit setup and required batch coverage without model calls.
+
+Use [Update Delivery Plans Without Model Bookkeeping](guides/structured-delivery.md) to define
+stable batch items, bind specification criteria and record original check receipts. Compact batch
+inspection and typed updates replace checkbox editing by the model. Code validates links and
+mechanical evidence; tests and review still judge whether the behavior meets the specification.
+
+Use the [Release Evaluation contract](../specs/engine-release-evaluation.md) and
+[delivery plan](../exec-plans/active/2026-10-04-release-evaluation.md) to compare releases and diagnose
+measurement gaps. Existing receipt and manifest owners supply the evidence; unavailable results
+remain unknown. The [reporting guide](guides/release-evaluation.md) shows the public report command,
+qualified evidence links and the limits of a controlled or passive comparison.
 
 Use [Change The Runtime Safely](guides/change-the-runtime.md) to find the owning component, run its
 focused proof, cross one directly affected seam, and finish with the source checkout's governed
@@ -52,6 +74,9 @@ installed runtime returns the same reference, guides, and local sources:
 ```sh
 project-governance docs route --capability first-governed-check --json
 project-governance docs route --capability change-runtime --json
+project-governance docs route --capability structured-delivery --json
+project-governance docs route --capability focused-linting --json
+project-governance docs route --capability release-evaluation --json
 ```
 
 The catalog is a routing surface, not a second technical authority. Follow its reference before

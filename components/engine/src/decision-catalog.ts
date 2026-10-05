@@ -110,7 +110,7 @@ const DEFINITIONS: QuestionDefinition[] = [
   { id: "output.keep-block/1", shape: "noul", owner: "DL13",
     purpose: "Whether one optional output block must reach the coding model.",
     instructions: `Probability that the supplied output block contains evidence the coding model needs for the stated task. ${QUOTED} Failures, warnings, cleanup uncertainty and stack continuations are protected in code and are never assessed here. When in doubt answer high: omission costs more than length.`,
-    baseline: "unmodified original output delivery", effectCeiling: "advise", metric: "decisive-evidence recall and follow-up reads" },
+    baseline: "deterministic routine-log filtering with protected native evidence", effectCeiling: "advise", metric: "decisive-evidence recall, accepted outcomes, total cost and follow-up reads" },
 ];
 
 /** Reviewed question data plus registered code. A candidate diff cannot register a new question. */
@@ -153,8 +153,8 @@ const CONSUMERS: Record<DecisionConsumerId, Omit<ConsumerDefinition, "defaultQue
   DL09: { id: "DL09", version: "1.0.0", area: "completion-claim advice", caller: "provider completion report projection",
     questions: ["claim.support/1", "claim.completion-scope/1"], supportedEffects: ["advise"],
     baseline: "exact applicability checks and the existing review process", dataClass: "diagnostic" },
-  DL13: { id: "DL13", version: "1.0.0", area: "tool-output selection", caller: "command/provider observation presentation",
-    questions: ["output.keep-block/1"], supportedEffects: ["advise"], baseline: "unmodified original output delivery", dataClass: "diagnostic" },
+  DL13: { id: "DL13", version: "1.0.0", area: "tool-output selection", caller: "explicit long native-check log pilot",
+    questions: ["output.keep-block/1"], supportedEffects: ["advise"], baseline: "deterministic routine-log filtering with protected native evidence", dataClass: "diagnostic" },
 };
 
 // Pin the RC3 question sets before adding optional definitions. Upgrades cannot activate new questions.

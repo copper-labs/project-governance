@@ -16,6 +16,8 @@ import { checkComments } from "./checkers/comments.ts";
 import { checkMaintainability } from "./checkers/maintainability.ts";
 import { maintainabilityInputs } from "./checkers/maintainability-inputs.ts";
 import { objectValue } from "./checkers/dependency-manifests.ts";
+import { checkStructuredPlans } from "./structured-plan-check.ts";
+import type { Packs } from "./pack-configuration.ts";
 
 export const BUILTIN_CHECKS = ["format", "prose", "test-quality", "naming", "secrets", "documentation", "context-router", "commit-message", "pr-description", "dependencies", "apple-dependencies", "comments", "maintainability", "kmp-surface-validation"] as const;
 export interface CheckerAssets {
@@ -27,6 +29,9 @@ export interface BuiltinCheckRequest {
   id: string; subject: ValidationSubject; scope: ChangeScope; assets: CheckerAssets;
   packIds: ReadonlySet<string>; stage: string; asOf: string;
   managedPaths?: Set<string>; workId?: string; runFixtureProof?: boolean;
+  registry?: Packs;
+  // Detached workers retain the owning run store without inheriting ambient state configuration.
+  checkRunsRoot?: string;
   commit?: { text: string; path: string; commentMarker?: string };
   pullRequest?: { title: string; body: string; path: string };
 }
@@ -57,7 +62,10 @@ export async function runBuiltinCheck(request: BuiltinCheckRequest) {
       case "format": return checkFormat(subject, paths);
       case "prose": return checkProse(subject, paths);
       case "test-quality": return checkTestQuality(subject, paths);
-      case "documentation": return checkDocumentation(subject, scope);
+      case "documentation": {
+        const result = checkDocumentation(subject, scope), findings = [...result.findings, ...checkStructuredPlans(subject, scope, request.registry, request.checkRunsRoot)];
+        return { ...result, ...findingSummary(findings), findings };
+      }
       case "context-router": return checkContextRouter(subject, request.packIds);
       case "naming": {
         const candidates = paths.filter(path => scope.mode === "explicit" || !request.managedPaths?.has(path)).map(path => ({ path,

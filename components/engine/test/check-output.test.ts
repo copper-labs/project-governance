@@ -23,7 +23,7 @@ test("native check output selects before delivery, preserves failure and cleanup
     const profilePath = join(root, "config/governance/profile.yaml");
     const configure = (mode: string) => durableJson(profilePath, { continuity: { decisions: { mode, allowed_data_classes: ["diagnostic"], consumers: { DL13: { mode } } } } });
     configure("auto");
-    const packs = mergePacks([{ source: "fixture", origin: "target", value: { id: "fixture", enforcement: "blocking", stages: ["pre-commit"], commands: [{ run: [process.execPath, "-e", "console.log('start\\n\\nRoutine progress detail\\n\\nERROR original failure\\n\\n  at source.ts:1\\n\\ncleanup unknown\\n\\nend');process.exitCode=1"] }] } }]);
+    const packs = mergePacks([{ source: "fixture", origin: "target", value: { id: "fixture", enforcement: "blocking", stages: ["pre-commit"], commands: [{ run: [process.execPath, "-e", "console.log(['start',...Array.from({length:40},(_,i)=>'DEBUG Routine progress '+i+' '+'.'.repeat(160)),'ERROR original failure','  at source.ts:1','cleanup unknown','Result: fixture failed','end'].join('\\n\\n'));process.exitCode=1"] }] } }]);
     const plan = buildPlan(packs, { stage: "pre-commit", mode: "all", changedPaths: [] }), scope = resolveChangeScope(root, { all: true });
     const result = await runChecks(packs, plan, { scope, subject: new ValidationSubject(root, scope), assets: new PackagedCheckerAssets(resolve("src/project_governance_runtime/defaults")), packIds: new Set(["fixture"]), stage: "pre-commit", asOf: new Date().toISOString() }, { root: runs, deadlineMs: 3000 });
     const directory = result.run_directory, resultPath = join(directory, "result.json"), original = readFileSync(resultPath, "utf8");
@@ -33,7 +33,10 @@ test("native check output selects before delivery, preserves failure and cleanup
     let calls = 0;
     const transport: typeof fetch = async (_url, init) => { calls++; const body = JSON.parse(String(init?.body));
       return Response.json({ model: "jev-1.13.0", answers: Object.fromEntries(Object.keys(body.questions).map(name => [name, { type: "noul", noul: 0.01 }])) }); };
-    const selected = await checkOutput(result.run_id, root, { root: runs, token: "fixture", fetch: transport });
+    const pilot = { purpose: "long-log-filtering" as const, arm: "jev" as const };
+    const untouched = await checkOutput(result.run_id, root, { root: runs, token: "fixture", fetch: transport });
+    assert.ok("outputs" in untouched); assert.equal(untouched.outputs[0]!.reason, "log-pilot-not-requested"); assert.equal(calls, 0);
+    const selected = await checkOutput(result.run_id, root, { root: runs, token: "fixture", fetch: transport, pilot });
     assert.ok("outputs" in selected);
     assert.equal(calls, 1); assert.equal(selected.status, "failed");
     const output = selected.outputs[0]!;
@@ -41,7 +44,7 @@ test("native check output selects before delivery, preserves failure and cleanup
     assert.doesNotMatch(output.selection!.text, /Routine progress/);
     assert.match(output.selection!.text, /ERROR original failure/); assert.match(output.selection!.text, /at source.ts:1/); assert.match(output.selection!.text, /cleanup unknown/);
     assert.equal(readFileSync(resultPath, "utf8"), original);
-    await checkOutput(result.run_id, root, { root: runs, token: "fixture", fetch: transport }); assert.equal(calls, 1);
+    await checkOutput(result.run_id, root, { root: runs, token: "fixture", fetch: transport, pilot }); assert.equal(calls, 1);
     assert.equal(selected.episode.status, "recorded");
     if (selected.episode.status === "recorded") {
       const caller = JSON.parse(readFileSync(selected.episode.episode.path, "utf8")), manifest = join(temp, "manifest.json");
@@ -52,22 +55,23 @@ test("native check output selects before delivery, preserves failure and cleanup
     }
     for (const [mode, token, revision] of [["off", "fixture", "2"], ["shadow", "fixture", "3"], ["auto", "", "4"]]) {
       configure(mode!); dispatch(revision!);
-      const fallback = await checkOutput(result.run_id, root, { root: runs, token, fetch: transport });
-      assert.ok("outputs" in fallback); assert.equal(fallback.outputs[0]!.delivered, false);
-      assert.match(fallback.outputs[0]!.selection!.text, /Routine progress/);
+      const fallback = await checkOutput(result.run_id, root, { root: runs, token, fetch: transport, pilot });
+      assert.ok("outputs" in fallback); assert.equal(fallback.outputs[0]!.delivered, true);
+      assert.doesNotMatch(fallback.outputs[0]!.selection!.text, /Routine progress/);
+      assert.notEqual(fallback.outputs[0]!.decision?.delivered, true);
       if (mode === "shadow") assert.equal(fallback.outputs[0]!.decision?.providerCalled, true);
     }
     assert.equal(calls, 2);
     configure("auto"); dispatch("5", false);
-    const unbound = await checkOutput(result.run_id, root, { root: runs, token: "fixture", fetch: transport });
+    const unbound = await checkOutput(result.run_id, root, { root: runs, token: "fixture", fetch: transport, pilot });
     assert.ok("outputs" in unbound); assert.equal(unbound.outputs[0]!.reason, "scope-unavailable"); assert.equal(calls, 2);
     dispatch("6");
     const log = output.source.path, retainedLog = `${log}.retained`; renameSync(log, retainedLog); symlinkSync(retainedLog, log);
-    await assert.rejects(checkOutput(result.run_id, root, { root: runs, token: "fixture", fetch: transport }));
+    await assert.rejects(checkOutput(result.run_id, root, { root: runs, token: "fixture", fetch: transport, pilot }));
     rmSync(log); renameSync(retainedLog, log);
     durableJson(resultPath, { ...result, results: [{ ...result.results[0], commands: [{ ...result.results[0]!.commands[0], request_digest: "sha256:" + "0".repeat(64) }] }] });
-    await assert.rejects(checkOutput(result.run_id, root, { root: runs, token: "fixture", fetch: transport }), /binding/);
+    await assert.rejects(checkOutput(result.run_id, root, { root: runs, token: "fixture", fetch: transport, pilot }), /binding/);
     writeFileSync(resultPath, original);
-    await assert.rejects(checkOutput(result.run_id, root, { root: runs, token: "fixture", fetch: async (...args) => { const answer = await transport(...args); writeFileSync(log, "changed"); return answer; } }), /changed/);
+    await assert.rejects(checkOutput(result.run_id, root, { root: runs, token: "fixture", pilot, fetch: async (...args) => { const answer = await transport(...args); writeFileSync(log, "changed"); return answer; } }), /changed/);
   } finally { if (previous === undefined) delete process.env.XDG_STATE_HOME; else process.env.XDG_STATE_HOME = previous; rmSync(temp, { recursive: true, force: true }); }
 });

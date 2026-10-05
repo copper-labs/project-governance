@@ -428,16 +428,30 @@ export class ValidationSubject {
     safeSubjectPath(path);
     if (this.#scope.scope === "all" || (!this.#scope.base_ref && !this.#scope.unborn)) throw new Error("diff capture requires a compared subject");
     if (!Number.isSafeInteger(context) || context < 0 || context > 16) throw new Error("invalid diff context");
-    const captured = this.source(path) ? this.read(path, limit) : null;
+    const source = this.source(path);
+    const verifyIndex = () => {
+      if (this.#scope.mode !== "staged") return;
+      const current = entry(this.root, "index", path);
+      if (current?.identity !== source?.identity || current?.file_type !== source?.file_type)
+        throw new Error("index changed after capture; review diff is unavailable");
+      const previous = this.#scope.records.find(record => record.path === path)?.previous_path;
+      if (previous && entry(this.root, "index", previous)) throw new Error("index changed after capture; renamed source reappeared");
+    };
+    // Blob reads are immutable, but Git's staged diff still observes the current index.
+    verifyIndex();
+    const captured = source ? this.read(path, SOURCE_CAPTURE_MAX_BYTES) : null;
     const diff = this.#scope.mode === "staged" ? ["--cached", this.#scope.base_ref] : [this.#scope.base_ref];
     const bytes = this.#scope.unborn ? Buffer.alloc(0) : git(this.root, ["-c", "core.quotePath=false", "diff", `--unified=${context}`, "--no-color", "--no-ext-diff",
       "--no-textconv", "-M", ...diff as string[], "--", `:(literal)${path}`], limit);
     if (bytes.length > limit) throw new Error("captured diff exceeds read budget");
-    if (captured) this.read(path, limit);
+    verifyIndex();
+    if (captured) this.read(path, SOURCE_CAPTURE_MAX_BYTES);
     if (!bytes.length && captured && this.#scope.records.some(record => record.path === path && !record.before)) {
       const lines = decode(captured).split("\n");
       if (lines.at(-1) === "") lines.pop();
-      return `--- /dev/null\n+++ b/${path}\n@@ -0,0 +1,${lines.length} @@\n${lines.map(line => `+${line}`).join("\n")}\n`;
+      const addition = `--- /dev/null\n+++ b/${path}\n@@ -0,0 +1,${lines.length} @@\n${lines.map(line => `+${line}`).join("\n")}\n`;
+      if (Buffer.byteLength(addition) > limit) throw new Error("captured diff exceeds read budget");
+      return addition;
     }
     return decode(bytes);
   }

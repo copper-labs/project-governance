@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { commandProcesses } from "./command-owner-recovery.ts";
 import { digest, durableJson } from "./core.ts";
 import { narrativeFile } from "./narrative-inputs.ts";
-import { observeCommand, type CommandRequest } from "./process-owner.ts";
+import { observeCommand, validateCommandRequest, type CommandRequest } from "./process-owner.ts";
 import { settleWorkflowCommandCleanup } from "./workflow-command-cleanup.ts";
 import { WorkflowStore } from "./workflow-store.ts";
 import { validateInputs, type StageResult } from "./workflow-types.ts";
@@ -43,10 +43,14 @@ export async function recoverStoppedWorkflow(directory: string, database: string
       if (command.version !== 1 || command.id !== `${runId}:${stage.id}` ||
           digest(command.operation) !== digest(workflowOperation(run.binding.recipe, runId, spec, request.commandsDirectory)) ||
           !Number.isInteger(command.deadlineMs) || command.deadlineMs < 1 || command.deadlineMs > spec.deadlineMs ||
-          Object.keys(command).some(key => !["version", "id", "operation", "deadlineMs", "outputLimit", "ownerDigest"].includes(key)))
+          Object.keys(command).some(key => !["version", "id", "operation", "deadlineMs", "outputLimit", "ownerDigest", "executionIdentity"].includes(key)))
         throw new Error("Original command differs from workflow stage");
+      validateCommandRequest(command);
       const requestDigest = digest(command), observed = observeCommand(commandDirectory, requestDigest);
       if (!observed.receipt) { unresolved.push(stage.id); continue; }
+      if (observed.receipt.runtimeVersion !== command.executionIdentity?.runtimeVersion ||
+          observed.receipt.archiveDigest !== command.executionIdentity?.archiveDigest)
+        throw new Error("Original command execution identity differs from receipt");
       const settled = await settleWorkflowCommandCleanup(commandDirectory, observed.receipt,
         run.binding.recipe.operations[spec.operation]!.expectedExitCodes, 0);
       const receipt = settled.receipt;

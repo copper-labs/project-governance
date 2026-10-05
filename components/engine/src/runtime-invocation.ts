@@ -12,19 +12,22 @@ import { RuntimeGenerations } from "./runtime-generations.ts";
 import { inspectRuntimeGeneration } from "./runtime-inspection.ts";
 import { startupHookAdmission } from "./startup-hook-admission.ts";
 
-const readCommands = new Set(["resource-status", "runtime-inspect-legacy", "runtime-legacy-jobs", "runtime-migration-plan", "docs", "doctor", "--version", "source-map", "telemetry", "check-status", "runtime-inspect", "provider-list", "provider-events", "provider-doctor", "provider-help", "startup-help", "skill-read"]);
+const readCommands = new Set(["release-evaluation", "resource-status", "runtime-inspect-legacy", "runtime-legacy-jobs", "runtime-migration-plan", "docs", "doctor", "--version", "source-map", "telemetry", "check-status", "runtime-inspect", "provider-list", "provider-events", "provider-doctor", "provider-help", "startup-help", "skill-read"]);
 // Workflow store opens can migrate schema even when the requested operation only observes a run.
-const writeCommands = new Set([...COMMAND_RECOVERY_COMMANDS, "harness", "workflow-diagnose", "workflow-resume-cleanup", "workflow-recover-observation", "workflow-reconcile-cleanup", "provider-status", "provider-wait", "hooks", "hook", "plan", "context-route", "context-packet", "context-evaluate", "check-cancel", "check-reconcile", "check-output", "workflow-cancel", "check", "workflow-submit", "workflow-status", "workflow-wait", "provider-resume-cleanup", "provider-recover", "provider-deliver", "provider-submit", "provider-follow-up", "provider-cancel", "provider-reconcile", "resource-maintenance", "host-instructions"]);
+const writeCommands = new Set([...COMMAND_RECOVERY_COMMANDS, "lint-adapter", "harness", "workflow-diagnose", "workflow-resume-cleanup", "workflow-recover-observation", "workflow-reconcile-cleanup", "provider-status", "provider-wait", "hooks", "hook", "plan", "context-route", "context-packet", "context-evaluate", "check-cancel", "check-reconcile", "check-output", "workflow-cancel", "check", "workflow-submit", "workflow-status", "workflow-wait", "provider-resume-cleanup", "provider-recover", "provider-deliver", "provider-submit", "provider-follow-up", "provider-cancel", "provider-reconcile", "resource-maintenance", "host-instructions"]);
 
-export function managedCommandEffect(command: string): "read" | "write" | null {
+export function managedCommandEffect(command: string, args: readonly string[] = []): "read" | "write" | null {
   if (["--help", "-h", "help"].includes(command)) return "read";
   if (command === "context-index") return "write";
+  if (command === "implementation-plan") return args[0] === "inspect" ? "read" : "write";
+  if (command === "lint") return args[0] === "setup" && !args.includes("--apply") ? "read" : "write";
   return writeCommands.has(command) ? "write" : readCommands.has(command) ? "read" : null;
 }
 
 /** Hold the selected generation through native process close; abrupt launcher loss retains its reader. */
 export async function invokeRuntimeGeneration(registryPath: string, args: string[], workspace: string): Promise<number> {
-  if (!args[0] || managedCommandEffect(args[0]) === null) {
+  const effect = args[0] ? managedCommandEffect(args[0], args.slice(1)) : null;
+  if (!args[0] || effect === null) {
     throw new Error("Command is not supported by managed invocation");
   }
   workspace = realpathSync(workspace);
@@ -41,7 +44,7 @@ export async function invokeRuntimeGeneration(registryPath: string, args: string
     const lock = compiledRuntimeLock(parse(narrativeFile(workspace, lockPath)));
     if (digest(lock) !== installation.lockDigest) throw new Error("Project lock differs from selected installation");
     // Mark before dispatch: an uncertain write is never safe evidence for rollback.
-    if ((args[0] === "telemetry" && (args[1] === "review" || (args[1] === "decisions" && parseDecisionTelemetryArgs(args.slice(2))["classify-history"]))) || writeCommands.has(args[0]) || (args[0] === "docs" && args[1] !== "route")) generations.markWritten(reader.token, reader.owner);
+    if ((args[0] === "telemetry" && (args[1] === "review" || (args[1] === "decisions" && parseDecisionTelemetryArgs(args.slice(2))["classify-history"]))) || effect === "write" || (args[0] === "docs" && args[1] !== "route")) generations.markWritten(reader.token, reader.owner);
     return await new Promise<number>((resolve, reject) => {
       const child = spawn(process.execPath, [installation.executable as string, ...args], { cwd: workspace, stdio: "inherit",
         env: { ...process.env, GOVERNANCE_GENERATION_REGISTRY: registryPath,

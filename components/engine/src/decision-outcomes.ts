@@ -3,8 +3,13 @@ import { closeSync, constants, fstatSync, openSync, readSync, realpathSync } fro
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { digest, object, text } from "./core.ts";
 
+export interface OutcomeEvidenceReader {
+  read: (path: string, expected?: string) => Record<string, unknown>;
+  bytesRead: () => number;
+}
+
 /** Offline, explicitly selected evidence. A file identity proves its bytes, not acceptance of work. */
-export function decisionOutcomeReport(stateRoot: string, manifestPath: string, reader = boundedOutcomeReader()) {
+export function decisionOutcomeReport(stateRoot: string, manifestPath: string, reader: OutcomeEvidenceReader = boundedOutcomeReader()) {
   const read = reader.read;
   const manifest = read(resolve(manifestPath));
   if ((manifest.version !== 1 && manifest.version !== 2) || !Array.isArray(manifest.episodes) || manifest.episodes.length > 1000) throw new Error("Outcome manifest requires version 1 or 2 and at most 1000 episodes");
@@ -38,6 +43,15 @@ export function decisionOutcomeReport(stateRoot: string, manifestPath: string, r
       seenEpisodes.add(id);
       if (!Array.isArray(episode.decisions) || episode.decisions.length > 64 || (manifest.version === 1 && !episode.decisions.length) ||
           episode.decisions.some(value => typeof value !== "string" || !/^[a-f0-9]{32}$/u.test(value))) throw new Error("Invalid episode decision references");
+      const decisionEvidence = new Map<string, Record<string, unknown>>();
+      if (episode.decisionEvidence !== undefined) {
+        if (manifest.version !== 2 || !Array.isArray(episode.decisionEvidence) || episode.decisionEvidence.length > 64) throw new Error("Invalid explicit decision evidence");
+        for (const rawRef of episode.decisionEvidence) {
+          const ref = object(rawRef), receiptId = String(ref.receiptId);
+          if (!episode.decisions.includes(receiptId) || decisionEvidence.has(receiptId)) throw new Error("Explicit decision evidence identity mismatch");
+          decisionEvidence.set(receiptId, ref);
+        }
+      }
       let caller: Record<string, unknown>;
       try { caller = reference(episode.caller); }
       catch (error) { if (manifest.version === 2) counts.missing_captures++; throw error; }
@@ -81,7 +95,8 @@ export function decisionOutcomeReport(stateRoot: string, manifestPath: string, r
         if (seenDecisions.has(receiptId)) counts.duplicate_decisions++;
         if (!links.has(receiptId)) { counts.missing_decisions++; continue; }
         let receipt: Record<string, unknown>;
-        try { receipt = read(join(stateRoot, "decisions", `${receiptId}.json`)); }
+        const explicit = decisionEvidence.get(receiptId);
+        try { receipt = explicit ? reference(explicit) : read(join(stateRoot, "decisions", `${receiptId}.json`)); }
         catch { counts.missing_decisions++; continue; }
         if (receipt.version !== 2 || receipt.receiptId !== receiptId) throw new Error("Decision receipt identity mismatch");
         const outcome = object(receipt.outcome);
@@ -100,6 +115,7 @@ export function decisionOutcomeReport(stateRoot: string, manifestPath: string, r
         if (reservation !== null) pendingReservations.add(reservation);
         decisions.push({ id: receiptId, consumerIds: outcome.consumers, mode: outcome.mode, delivered: outcome.delivered, reason: outcome.reason,
           ...(manifest.version === 2 ? { reservationId: reservation, duplicateReservation, providerCalled: typeof outcome.providerCalled === "boolean" ? outcome.providerCalled : null, usage: outcome.usage ?? null } : {}) });
+        if (explicit) decisions[decisions.length - 1]!.source = { path: explicit.path, digest: explicit.digest };
         pendingIds.add(receiptId);
       }
       if (!decisions.length && (manifest.version === 1 || episode.decisions.length > 0)) { counts.no_linked_decisions++; continue; }
@@ -180,6 +196,7 @@ export function decisionOutcomeReport(stateRoot: string, manifestPath: string, r
 /** Bound all explicit references under one per-report byte allowance. */
 export function boundedOutcomeReader() {
   let bytesRead = 0;
+  const capturedDigests = new Map<string, string>();
   const read = (path: string, expected?: string): Record<string, unknown> => {
     const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
     try {
@@ -191,9 +208,12 @@ export function boundedOutcomeReader() {
       const after = fstatSync(fd);
       if (size !== before.size || before.mtimeMs !== after.mtimeMs || before.size !== after.size) throw new Error("Outcome evidence changed during read");
       const content = bytes.subarray(0, size);
-      if (expected !== undefined && `sha256:${createHash("sha256").update(content).digest("hex")}` !== expected) throw new Error("Outcome evidence digest mismatch");
-      return object(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(content)));
+      const capturedDigest = `sha256:${createHash("sha256").update(content).digest("hex")}`;
+      if (expected !== undefined && capturedDigest !== expected) throw new Error("Outcome evidence digest mismatch");
+      const value = object(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(content)));
+      capturedDigests.set(resolve(path), capturedDigest);
+      return value;
     } finally { closeSync(fd); }
   };
-  return { read, bytesRead: () => bytesRead };
+  return { read, bytesRead: () => bytesRead, digestFor: (path: string) => capturedDigests.get(resolve(path)) ?? null };
 }

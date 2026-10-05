@@ -1,5 +1,83 @@
 version: 1
 capabilities:
+  - id: structured-delivery
+    title: Update structured delivery plans from original check evidence
+    aliases: [implementation-plans, plan-progress, specification-links]
+    tasks:
+      - define stable implementation, verification and closeout items in a coherent batch
+      - inspect one batch and update marked progress slots without model bookkeeping
+      - bind specification criteria and exact native check evidence without claiming prose-to-code proof
+    symbols: [project-governance implementation-plan, inspectImplementationBatch, updateImplementationProgress, parseSpecificationDeclaration]
+    reference: docs/specs/engine-4-verification-feedback.md
+    guides:
+      - docs/developer/guides/structured-delivery.md
+      - docs/governance/validation-strategy.md
+    sources:
+      - components/engine/src/implementation-plan-command.ts
+      - components/engine/src/plan-progress.ts
+      - components/engine/src/plan-proof.ts
+      - components/engine/src/specification-contract.ts
+      - components/engine/src/structured-plan-check.ts
+  - id: focused-linting
+    title: Adopt and enforce focused deterministic linting
+    aliases: [linting-mvp-design, lint-adoption-design, lint-coverage-design, lint-coverage]
+    tasks:
+      - inspect and apply safe setup with project-owned tools and coverage declarations
+      - enforce required lint owners on captured candidate inputs at useful batch boundaries
+      - diagnose uncovered roots or unavailable tools without running lint or calling models
+    symbols: [project-governance lint setup, project-governance doctor --capability lint, lintAdapterCommand, lintCoverage]
+    reference: docs/specs/engine-linting-mvp.md
+    guides:
+      - docs/developer/guides/focused-linting.md
+      - docs/exec-plans/active/2026-10-05-linting-mvp.md
+      - docs/developer/guides/batch-verification.md
+      - docs/governance/validation-strategy.md
+    sources:
+      - components/engine/src/lint-installation.ts
+      - components/engine/src/lint-setup.ts
+      - components/engine/src/lint-adapter.ts
+      - components/engine/src/lint-coverage.ts
+      - components/engine/src/lint-inputs.ts
+  - id: release-evaluation
+    title: Compare governance and harness releases from qualified evidence
+    aliases: [scorecard, release-comparison, performance-evaluation]
+    tasks:
+      - compare runtime reliability, context quality and whole-task efficiency
+      - distinguish controlled release results from passive development trends
+      - diagnose missing denominators, outcome links and native usage coverage
+    symbols: [project-governance release-evaluation report, readReleaseEvaluation, reduceReleaseEvaluation, evaluateContext, decisionOutcomeReport]
+    reference: docs/specs/engine-release-evaluation.md
+    guides:
+      - docs/developer/guides/release-evaluation.md
+      - docs/exec-plans/active/2026-10-04-release-evaluation.md
+      - components/harness/docs/specs/measurement-and-qualification.md
+    sources:
+      - components/engine/src/release-evaluation.ts
+      - components/engine/src/release-evaluation-reader.ts
+      - components/engine/src/release-evaluation-cost.ts
+      - components/engine/src/release-evaluation-types.ts
+      - components/engine/src/context-evaluation.ts
+      - components/engine/src/decision-outcomes.ts
+      - components/engine/src/context-observations.ts
+      - components/engine/src/telemetry-receipt-reader.ts
+  - id: verification-feedback
+    title: Strengthen workflow verification and semantic review
+    aliases: [major-verification, batch-feedback, multilingual-review]
+    tasks:
+      - prove complete installed task and consultation journeys
+      - run early focused checks through project-owned validation packs
+      - inspect supported review evidence and its coverage limits
+    symbols: [captureReviewEvidence, checkDecisionAdvice, project-governance check --stage batch]
+    reference: docs/specs/engine-4-verification-feedback.md
+    guides:
+      - docs/developer/guides/batch-verification.md
+      - docs/exec-plans/active/2026-10-04-major-verification-feedback.md
+      - docs/governance/validation-strategy.md
+    sources:
+      - components/engine/src/decision-review.ts
+      - components/engine/src/decision-check-advice.ts
+      - components/engine/src/planning.ts
+      - components/engine/scripts/verify-greenfield.mjs
   - id: source-control-worktrees
     title: Coordinate source changes and Codex worktrees
     aliases: [codex-workflow, parallel-worktrees, worktree-upgrades]

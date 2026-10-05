@@ -1,12 +1,19 @@
 # Project Governance Runtime
 
-The 3.0 preview unifies governance checks, task history, deterministic workflows, device/resource
+The compiled runtime unifies governance checks, task history, deterministic workflows, device/resource
 ownership and optional JEV context assistance in `@organta/project-governance`. It ships as one
 compiled npm archive with bundled dependencies and requires Node `>=24.16.0 <25`. No JEV account
 is required: off or missing credentials use deterministic context selection.
 
+Version 4 adds deterministic implementation-plan updates, structured specification links, focused
+lint setup and enforcement, and release evaluation over original evidence. Context-quality tests and
+an explicit long-check-log filtering pilot characterize optional JEV advice. Bookkeeping, required
+checks and acceptance authority stay in code and their existing owners. See the
+[major specification](docs/specs/engine-4-verification-feedback.md) and
+[developer guides](docs/developer/index.md) for adoption and qualification limits.
+
 This is a deliberate major-version migration. Existing installations and shared startup hooks do
-not switch automatically. The preview is qualified through explicit invocation; shared automatic
+not switch automatically. The compiled runtime is qualified through explicit invocation; shared automatic
 startup cutover is a separate adoption step. Publication requires operator authorization.
 
 For source development and an offline-installable package:
@@ -14,11 +21,12 @@ For source development and an offline-installable package:
 ```sh
 npm ci --ignore-scripts
 npm ci --prefix components/harness --ignore-scripts
+python3 -m pip install -r requirements-dev.txt -r requirements-lint-dev.txt
 npm test
 npm run typecheck
 mkdir -p release-assets
 npm run pack:engine -- release-assets
-node components/engine/scripts/verify-package.mjs release-assets/*.tgz
+node components/engine/scripts/verify-package.mjs release-assets/*.tgz .
 ```
 
 Use the packaged `skills/install/SKILL.md` for the versioned installation request and migration

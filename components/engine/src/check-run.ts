@@ -17,6 +17,8 @@ import { executeChecks } from "./check-execution.ts";
 import type { BuiltinCheckRequest } from "./builtin-checks.ts";
 import type { Packs } from "./pack-configuration.ts";
 import type { ValidationPlan } from "./planning.ts";
+import { prepareLintInputs } from "./lint-inputs.ts";
+import { runtimeExecutionIdentity } from "./runtime-execution-identity.ts";
 
 /** Keep check evidence outside the source tree so subsequent scans cannot select their own output. */
 export function checkRunRoot(): string {
@@ -28,30 +30,38 @@ export function checkRunRoot(): string {
 export async function runChecks(packs: Packs, plan: ValidationPlan, request: Omit<BuiltinCheckRequest, "id">, options: { root?: string; deadlineMs?: number; deadlineAt?: number; reservedRunId?: string; } & CheckObservationContext = {}) {
   checkObservationContext(options.trigger, options.expectedStatus);
   const parent = options.root ?? checkRunRoot(); mkdirSync(parent, { recursive: true, mode: 0o700 });
+  const checkRunsRoot = realpathSync(parent);
   const id = options.reservedRunId ?? randomUUID();
   if (!/^[0-9a-f-]{36}$/u.test(id)) throw new Error("Invalid reserved check identity");
-  const directory = join(realpathSync(parent), id);
+  const directory = join(checkRunsRoot, id);
   if (!options.reservedRunId) mkdirSync(directory, { mode: 0o700 });
   const startedAt = new Date().toISOString(), deadlineMs = options.deadlineMs ?? 300_000;
+  const executionIdentity = runtimeExecutionIdentity();
   if (!Number.isSafeInteger(deadlineMs) || deadlineMs <= 0 || deadlineMs > 86_400_000) throw new Error("Invalid check timeout");
   const deadline = options.deadlineAt ?? Date.now() + deadlineMs;
   if (!Number.isSafeInteger(deadline) || deadline <= 0) throw new Error("Invalid check deadline");
-  durableJson(join(directory, "run.json"), { version: 1, id, root: request.subject.root, started_at: startedAt, ...(options.trigger ? { trigger: options.trigger } : {}), ...(options.expectedStatus ? { expected_status: options.expectedStatus } : {}), state: "running", owner: { pid: process.pid, fingerprint: processFingerprint(process.pid) }, plan, scope: request.scope, packs_digest: digest(JSON.parse(JSON.stringify(packs))) });
+  durableJson(join(directory, "run.json"), { version: 1, id, ...executionIdentity, root: request.subject.root, started_at: startedAt, ...(options.trigger ? { trigger: options.trigger } : {}), ...(options.expectedStatus ? { expected_status: options.expectedStatus } : {}), state: "running", owner: { pid: process.pid, fingerprint: processFingerprint(process.pid) }, plan, scope: request.scope, packs_digest: digest(JSON.parse(JSON.stringify(packs))) });
   try {
     const packet = materializeChangePacket(request.subject.root, request.scope, join(directory, "packet"));
     const cancelled = () => checkCancellationRequested(directory, id);
-    const result = await executeChecks(packs, plan, request, undefined, async (entry, packId, index) => {
+    const result = await executeChecks(packs, plan, { ...request, registry: packs, checkRunsRoot }, undefined, async (entry, packId, index) => {
       const packDirectory = join(directory, digest(packId).slice(7)); mkdirSync(packDirectory, { recursive: true, mode: 0o700 });
       const evidence = join(packDirectory, "evidence"); mkdirSync(evidence, { recursive: true, mode: 0o700 });
+      const lint = packs[packId]?.lint === undefined ? null : prepareLintInputs(request.subject, request.scope, packs[packId]!.lint, packId, evidence, packs[packId]!._source);
       const argv = resolveCommandArgv(entry, { stage: request.stage,
         ...(request.commit ? { commit_message_file: request.commit.path } : {}),
         ...(request.pullRequest ? { pr_body_file: request.pullRequest.path, pr_title: request.pullRequest.title } : {}) });
-      return runNativeCheckCommand({ directory: join(packDirectory, `command-${index}`), id: `${id}:${packId}:${index}`, root: request.subject.root,
-        argv, deadlineMs: Math.max(1, Math.min(deadlineMs, deadline - Date.now())), cancelled, env: { ...packet.env, GOVERNANCE_WORK_ID: request.workId ?? "", PROJECT_GOVERNANCE_RUN_ID: id, PROJECT_GOVERNANCE_EVIDENCE_ROOT: evidence } });
+      const result = await runNativeCheckCommand({ directory: join(packDirectory, `command-${index}`), id: `${id}:${packId}:${index}`, root: request.subject.root,
+        argv, deadlineMs: Math.max(1, Math.min(deadlineMs, deadline - Date.now())), cancelled, env: { ...packet.env, ...(lint?.env ?? {}), GOVERNANCE_WORK_ID: request.workId ?? "", PROJECT_GOVERNANCE_RUN_ID: id, PROJECT_GOVERNANCE_EVIDENCE_ROOT: evidence } });
+      if (!lint || result.status === "failed" && result.process_failure) return result;
+      const raw = JSON.parse(result.stdout), files = lint.value.snapshots.map(entry => ({ path: entry.path, sha256: entry.sha256 }));
+      if (raw.input_manifest?.status !== "complete" || digest(raw.input_manifest.files) !== digest(files)) throw new Error("Lint result does not cover its captured inputs");
+      return { ...result, input_manifest: raw.input_manifest, lint_evidence: raw.lint_evidence };
     }, packId => inspectEvidenceManifest(join(directory, digest(packId).slice(7), "evidence"), request.scope.subject_digest, request.assets.schema("evidence-manifest")), cancelled, () => Date.now() >= deadline);
-    const receipt = { version: 1, kind: "project-governance-check-run", ...result, duration_ms: Date.now() - Date.parse(startedAt), run_id: id, run_directory: directory, started_at: startedAt, ended_at: new Date().toISOString() };
+    const receipt = { version: 1, kind: "project-governance-check-run", ...executionIdentity, ...result, duration_ms: Date.now() - Date.parse(startedAt), run_id: id, run_directory: directory, started_at: startedAt, ended_at: new Date().toISOString() };
     durableJson(join(directory, "result.json"), receipt);
     try { const metric: RunMetric = { version: 1, ...(options.trigger ? { trigger: options.trigger } : {}), ...(options.expectedStatus ? { expected_status: options.expectedStatus } : {}), run_id: id, workspace: request.subject.root, stage: plan.stage, runtime_version: RELEASE_VERSION,
+      archive_digest: executionIdentity.archiveDigest,
       status: receipt.status, termination_reason: receipt.termination_reason ?? "completed", duration_ms: receipt.duration_ms, started_at: startedAt, ended_at: receipt.ended_at,
       pack_count: receipt.results.length, command_count: receipt.results.reduce((sum, pack) => sum + pack.commands.length, 0), blocked_pack_count: Object.keys(receipt.blocked).length,
       result_digest: fileDigest(join(directory, "result.json")) };
@@ -60,7 +70,7 @@ export async function runChecks(packs: Packs, plan: ValidationPlan, request: Omi
     catch { /* Terminal execution evidence remains authoritative; telemetry reports the missing projection. */ }
     return receipt;
   } catch {
-    durableJson(join(directory, "failure.json"), { version: 1, id, status: "failed", reason: "check-orchestration-incomplete", ended_at: new Date().toISOString() });
+    durableJson(join(directory, "failure.json"), { version: 1, id, ...executionIdentity, status: "failed", reason: "check-orchestration-incomplete", ended_at: new Date().toISOString() });
     throw new Error(`Check execution incomplete; evidence retained at ${directory}`);
   }
 }

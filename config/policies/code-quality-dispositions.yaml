@@ -288,3 +288,102 @@ dispositions:
     same delivery contract and its fallback. The underlying extraction, admission and telemetry
     owners have their own suites. Splitting solely by file size would duplicate those fixtures
     without separating a distinct runtime responsibility; individual tests remain independently runnable.
+- finding: quality.large-function
+  path: components/engine/scripts/verify-batch-review.mjs
+  symbol: verifyBatchReview
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex focused source cohesion review
+  approved_on: '2026-10-05'
+  responsibility: Prove one installed batch check gates synthetic review input while retaining the original
+    subject and result.
+  rationale: The fault and correction share a workflow, captured packet and immutable result. Checker generation
+    and the consultation matrix already have separate helpers. Splitting the remaining journey would distribute
+    the same evidence and cleanup state rather than isolate a responsibility.
+- finding: quality.large-function
+  path: components/engine/scripts/verify-consultation-journey.mjs
+  symbol: verifyConsultationJourney
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex focused source cohesion review
+  approved_on: '2026-10-05'
+  responsibility: Prove installed consultation admission requires checked context and confirmed cleanup, including
+    refusal and supported recovery.
+  rationale: Each case varies the same admission boundary and preserves its task, recipe, original check and
+    dispatch journal. Fault injection and cleanup share exact owned processes. The provider fixture and executed
+    checker already have separate owners; keeping the case sequence together exposes the refusal boundary.
+- finding: quality.large-function
+  path: components/engine/scripts/verify-continuity-upgrade.mjs
+  symbol: continuityUpgradeJourney
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex focused source cohesion review
+  approved_on: '2026-10-05'
+  responsibility: Retain distinct linked-worktree task histories across synthetic native-session generation
+    changes and isolated cleanup.
+  rationale: Returned callbacks share original process identities, immutable packet bytes, task history and
+    sibling snapshots across caller-owned updates. Entry, history, packet, host transport and cleanup already
+    have helpers. Extracting callbacks would distribute the same mutable session protocol.
+- finding: quality.large-function
+  path: components/engine/scripts/verify-greenfield.mjs
+  symbol: verifyGreenfield
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex focused source cohesion review
+  approved_on: '2026-10-05'
+  responsibility: Qualify the installed first prompt, task and context journey in an uncommitted repository
+    and release native session ownership.
+  rationale: The main sequence follows one retained context entry and call journal through binding, replay,
+    checks and SessionEnd. Installation, billing recovery and additional evidence already have helpers. Its
+    deadline wrapper and final cleanup belong to the same session lifetime.
+- finding: quality.large-function
+  path: components/engine/scripts/verify-major-delivery.mjs
+  symbol: verifyMajorDelivery
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex focused source cohesion review
+  approved_on: '2026-10-05'
+  responsibility: Prove installed first-source readiness and deterministic plan bookkeeping preserve authored
+    content and original native evidence.
+  rationale: The principal journey shares one source, specification, plan and check identity. Its second repository
+    qualifies the alternate fresh lint setup path under the same archive and no-acquisition journal. Generators
+    and invocation have helpers. A separate scenario owner would mostly move fixture state at this bounded
+    size.
+- finding: quality.large-function
+  path: components/engine/scripts/verify-review-quality.mjs
+  symbol: verifyReviewQuality
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex focused source cohesion review
+  approved_on: '2026-10-05'
+  responsibility: Capture one frozen installed review characterization across declared consumer and order conditions
+    with original receipts and explicit unknowns.
+  rationale: Fixture construction, scoring and permutation validation already have owners. The coordinator
+    freezes conditions, dispatches installed checks, captures originals and closes owned writers. The order
+    condition reuses the same source and profile; splitting its capture would scatter the experiment identity
+    and cleanup boundary.
+- finding: quality.large-function
+  path: components/engine/src/release-evaluation-reader.ts
+  symbol: readReleaseEvaluationInput
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex focused source cohesion review
+  approved_on: '2026-10-05'
+  responsibility: Capture explicit outcome evidence once through a bounded memoized reader and conservatively
+    join evaluation episodes.
+  rationale: Outcome validation, costs, acceptance, timing and quality projection already have separate owners.
+    The remaining episode fold shares hash-verified references, generation completeness, observations and failure
+    rollback. Splitting by artifact kind would distribute that capture authority without creating an independent
+    responsibility.
+- finding: quality.large-function
+  path: components/engine/scripts/verify-bound-continuation.mjs
+  symbol: verifyBoundContinuation
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex focused continuation proof review
+  approved_on: '2026-10-05'
+  responsibility: Freeze both installed task-bound arms before inference, then score and retain their native delivery and cleanup.
+  rationale: The two-phase coordinator preserves one exact archive and frozen case identity across installation,
+    task binding, native dispatch, original replay and final cleanup. Pure source labels, scoring, transport and
+    owned native parent handling already have helpers. Extracting the remaining phase loop would distribute
+    the proof identity without isolating another responsibility. This applies to the test helper only.

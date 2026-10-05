@@ -3,6 +3,26 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'n
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+/** One controlled native executable is shared by installed provider journeys; it makes no network call. */
+export function readOnlyProviderFixture(trusted, readPath = 'source.ts') {
+  mkdirSync(trusted);
+  const executable = join(trusted, 'native-fixture'), inputPath = join(trusted, 'input.txt');
+  const dispatchesPath = join(trusted, 'native-dispatches.jsonl');
+  writeFileSync(executable, `#!${process.execPath}\nconst fs=require('node:fs'),args=process.argv;
+    if(args.includes('--version')) { console.log('2.1.267 (Claude Code)'); process.exit(0); }
+    let input=''; process.stdin.on('data',part=>input+=part); process.stdin.on('end',()=> {
+      fs.writeFileSync(${JSON.stringify(inputPath)},input);
+      fs.appendFileSync(${JSON.stringify(dispatchesPath)},JSON.stringify({argv:args.slice(2),cwd:process.cwd(),inputBytes:Buffer.byteLength(input),inputDigest:'sha256:'+require('node:crypto').createHash('sha256').update(input).digest('hex')})+'\\n');
+      console.log(JSON.stringify({type:'system',subtype:'init',model:args[args.indexOf('--model')+1],effort:args[args.indexOf('--effort')+1],session_id:'installed-fixture',permissionMode:'dontAsk',tools:['Read','Grep','Glob','StructuredOutput']}));
+      console.log(JSON.stringify({type:'assistant',message:{content:[{type:'tool_use',id:'r',name:'Read',input:{file_path:${JSON.stringify(readPath)}}}]}}));
+      console.log(JSON.stringify({type:'user',message:{content:[{type:'tool_result',tool_use_id:'r',content:'fixture source'}]}}));
+      console.log(JSON.stringify({type:'result',subtype:'success',structured_output:{outcome:'completed',answer:'Read selected input',checks:[],sources:[${JSON.stringify(readPath)}],artifacts:[],remaining:[]}}));
+    });`); chmodSync(executable, 0o700);
+  const config = join(trusted, 'models.json'), storePath = join(trusted, 'authority.sqlite'), registry = join(trusted, 'resources.sqlite');
+  writeFileSync(config, JSON.stringify({ version: 1, providers: { claude: { model: 'fixture-baseline', effort: 'high', executable } } }));
+  return { executable, inputPath, dispatchesPath, config, storePath, registry };
+}
+
 /** Installed caller proof: a native fixture receives the selected packet on stdin, once per job. */
 export async function verifyProviderSelection({ packageRoot, repo, temporary, run, write, environment, callsPath }) {
   const load = path => import(pathToFileURL(join(resolve(packageRoot), 'dist', `${path}.js`)).href);
@@ -10,19 +30,8 @@ export async function verifyProviderSelection({ packageRoot, repo, temporary, ru
   const { authorizeProviderAssignment } = await load('engine/src/provider-admission');
   const { authorizeProviderContinuation } = await load('engine/src/provider-continuation');
   const { ResourceRegistry } = await load('engine/src/resources');
-  const trusted = join(temporary, 'selected-provider'); mkdirSync(trusted);
-  const executable = join(trusted, 'native-fixture'), inputPath = join(trusted, 'input.txt');
-  writeFileSync(executable, `#!${process.execPath}\nconst fs=require('node:fs'),args=process.argv;
-    if(args.includes('--version')) { console.log('2.1.267 (Claude Code)'); process.exit(0); }
-    let input=''; process.stdin.on('data',part=>input+=part); process.stdin.on('end',()=> {
-      fs.writeFileSync(${JSON.stringify(inputPath)},input);
-      console.log(JSON.stringify({type:'system',subtype:'init',model:args[args.indexOf('--model')+1],effort:args[args.indexOf('--effort')+1],session_id:'installed-fixture',permissionMode:'dontAsk',tools:['Read','Grep','Glob','StructuredOutput']}));
-      console.log(JSON.stringify({type:'assistant',message:{content:[{type:'tool_use',id:'r',name:'Read',input:{file_path:'source.ts'}}]}}));
-      console.log(JSON.stringify({type:'user',message:{content:[{type:'tool_result',tool_use_id:'r',content:'fixture source'}]}}));
-      console.log(JSON.stringify({type:'result',subtype:'success',structured_output:{outcome:'completed',answer:'Read selected input',checks:[],sources:['source.ts'],artifacts:[],remaining:[]}}));
-    });`); chmodSync(executable, 0o700);
-  const config = join(trusted, 'models.json'), storePath = join(trusted, 'authority.sqlite'), registry = join(trusted, 'resources.sqlite');
-  writeFileSync(config, JSON.stringify({ version: 1, providers: { claude: { model: 'fixture-baseline', effort: 'high', executable } } }));
+  const trusted = join(temporary, 'selected-provider');
+  const { executable, inputPath, config, storePath, registry } = readOnlyProviderFixture(trusted);
   const store = new Store(storePath), task = store.createTask('Fix the source with the supplied context', [{ kind: 'scope', body: repo, provenance: 'operator' }]); store.close();
   const profile = { profile_id: 'fixture', context_router: { routes: [{ id: 'fix', match: { prompt_terms: ['Fix'] }, primary_context: ['rules.md'], skills: ['test-execution'] }] },
     continuity: { decisions: { mode: 'auto', allowed_data_classes: ['source'], allowed_source_paths: ['source.ts'], consumers: { DL03: { mode: 'auto' } } } } };

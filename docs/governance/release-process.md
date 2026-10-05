@@ -5,13 +5,13 @@ type: governance
 status: current
 owner: project-governance
 created: 2026-08-15
-updated: 2026-10-01
+updated: 2026-10-05
 summary: Defines compiled major-release proof and deliberate publication, with retained legacy wheel guidance.
 ---
 
 # Release Process
 
-## Compiled runtime (3.x)
+## Compiled runtime (3.x and later)
 
 The coordinated major release uses `@organta/project-governance`, one bundled `.tgz` archive,
 Node `>=24.16.0 <25`, and the schema-2 runtime lock. Package and canonical dependency-lock
@@ -23,8 +23,10 @@ Release candidates publish with GitHub prerelease status and `latest: false`. Th
 is deliberate-only and pins `from_version` to the exact RC. Ordinary stable discovery excludes them.
 An operator-authorized RC may tag its qualified implementation branch before stable integration;
 this does not merge that branch or activate any adopter. Release notes must identify deferred native
-host/device qualification and experimental provider behavior. The tagged release workflow repeats
-source and installed-package proof before publishing the immutable assets.
+host/device qualification and experimental provider behavior. The tagged release workflow normally
+repeats source and installed-package proof before publishing the immutable assets. An explicitly
+authorized manual release retains exact local qualification, source/archive binding and immutable
+remote readback. Its notes name the hosted-CI exception.
 
 The source-readiness workflow runs source tests, type checking, release-metadata tests, package
 construction and offline installed-command proof on each non-draft pull request update, including
@@ -55,7 +57,7 @@ release packaging does not grant authority to change another checkout.
 ## Legacy wheel process (2.x)
 
 The following process is retained for existing wheel installations and historical release work.
-It is not the 3.x CI or publication path.
+It is not the compiled runtime CI or publication path.
 
 Stable releases use exact `MAJOR.MINOR.PATCH` tags and matching Python package versions. Examples
 are `1.0.0`, `1.1.0`, and `1.1.1`. GitHub release titles use `Project Governance <version>`.

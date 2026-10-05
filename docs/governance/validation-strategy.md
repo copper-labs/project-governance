@@ -5,7 +5,7 @@ type: governance
 status: current
 owner: project-governance
 created: 2026-07-05
-updated: 2026-09-10
+updated: 2026-10-05
 summary: Defines focused, impact-aware validation for the package runtime and its adopters.
 ---
 
@@ -32,6 +32,46 @@ making failures hard to isolate. Combine tightly related steps that share contex
 unrelated outcomes or uncertainty that needs earlier feedback. Fixed file, line, or time quotas
 are not a substitute for this judgment.
 
+### Batch cadence rules
+
+- Finish the planned behavior, its related source changes, affected bindings and regression cases
+  before the default check point. A completed helper, file, internal step or recovery commit does
+  not trigger tests, broad builds or independent QA. Author tests alongside code; their execution
+  follows the planned checkpoints.
+- Each checkpoint must name its trigger, exact command or existing runbook, affected scope and
+  claim. Select the smallest sufficient owner tests and directly affected integration coverage.
+  Include affected dependents of shared code, dependencies and configuration; narrow scope does not
+  mean changed files alone. Keep dependency analysis and caching with the project's build tools.
+- Run earlier only for a named uncertainty that blocks dependent work, a focused defect reproducer,
+  failed proof or newly discovered risk. Name the fact to resolve and the cheapest sufficient check
+  in the existing plan. Routine reassurance, elapsed time and an internal step finishing are not
+  repeat reasons. Automatic compiler/editor feedback and required Git hooks remain effective.
+- Inspect all findings, group related repairs, then rerun the failed or invalidated owners. Preserve
+  passing evidence whose relevant inputs remain valid. Widen only for a named coverage gap, changed
+  shared boundary or the broad-proof conditions below; never weaken required stage selection.
+- Group expensive native, device and cross-platform work at the declared integration boundary.
+  Independent QA consumes the completed batch's proof once when required; its corrections reopen
+  affected claims, not an automatic full testing and review cycle.
+
+### Seam progress and local commits
+
+A seam is a completed batch, planned checkpoint, material blocker or handoff. At each seam, update
+the existing plan before starting dependent work or handing it off. Use checkboxes for distinct
+implementation, verification and closeout claims. A checked implementation box does not establish
+passing verification. Leave unproved claims unchecked and label failed or invalidated proof with
+its existing evidence reference. Preserve prior results. Add a short current/next action and any
+blocker or deferred work; do not rewrite the plan after every edit or tool call. Reconcile an abrupt
+interruption on resume before relying on the recorded state.
+
+When local commits are authorized, make one coherent local commit at each completed, verified
+implementation seam, including that batch's plan update and required documentation. Inspect the
+staged diff and include only owned changes; keep normal hooks enabled and count their execution
+instead of duplicating it manually. A commit does not trigger another independent QA round or
+authorize a push. The plan records readiness for commit; Git and existing command evidence record
+commit success and identity without a second bookkeeping commit. A pause, blocker or diagnostic
+checkpoint may leave work uncommitted: preserve
+it and record the reason rather than weaken hooks, mix unrelated work or mark the batch complete.
+
 The writer completes the authorized batch without seeking approval for each internal step. Adjust
 the planned checks when a failure, changed dependency, or newly discovered risk provides a concrete
 reason. Escalate unresolved contracts or authority changes before dependent work; batching does not
@@ -44,8 +84,8 @@ at the planned checkpoints; attended user testing belongs at the agreed acceptan
 Serialize commands sharing mutable build outputs or devices; do not regenerate dependencies while
 their consumers validate. Independent jobs with isolated inputs and outputs may run concurrently.
 
-Capture command results as they occur in existing logs. Update plan checkboxes, status narratives,
-evidence summaries, and explanatory documentation once at the batch boundary. Update a governing
+Capture command results as they occur in existing logs. Update plan progress at seams as above;
+consolidate evidence summaries and explanatory documentation at the batch boundary. Update a governing
 contract or decision earlier when dependent work needs it, and keep documentation required for a
 commit or delivery current. Report completed milestones and concrete blockers rather than inferred
 completion percentages.
@@ -284,6 +324,13 @@ also needs deterministic native-protocol fixtures, process cleanup proof, and li
 evidence. It never turns a model's review into a governance-check verdict.
 
 ## Evidence
+
+For an important behavior, a small known-fault fixture can establish whether its test detects the
+intended failure. Run valid, deliberately faulty and corrected cases through the same executed
+entry, and distinguish the expected behavioral finding from infrastructure failure. Keep these
+cases with their owning tests rather than adding a generic mutation service or universal coverage
+threshold. Complete installed task/consultation journeys complement isolated checks; synthetic
+host events do not prove desktop conversation reattachment or accepted development outcomes.
 
 Report the focused test, affected seam, selected packs, any intentionally omitted proof, and
 residual risk. The JSON result contains normalized findings, status, execution duration, and

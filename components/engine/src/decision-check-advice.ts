@@ -16,6 +16,7 @@ import type { DecisionOptions } from "./decisions.ts";
 import { decisionTaskContext, decisionTaskPurpose, type DecisionTaskContext } from "./decision-task-context.ts";
 import { recordEntryExposure } from "./decision-episodes.ts";
 import type { TaskBindingReceipt } from "./decision-task-binding.ts";
+import { SOURCE_CAPTURE_MAX_BYTES } from "./source-capture-limits.ts";
 
 export interface CheckAdviceOptions {
   taskId?: string; revision?: string; purpose?: string; reviewRules?: string;
@@ -69,12 +70,12 @@ export async function checkDecisionAdvice(prepared: { subject: ValidationSubject
         purposeSource: context ? "bound-task-context" : options.purpose ? "explicit-invocation" : "unavailable", rules, maximumBytes: settings.legacy.evidenceBytes,
         includeSource: settings.questionIds.DL01.includes("test.requirement-support/1") || settings.questionIds.DL02.includes("change.requirement-support/1") });
       if (rulesPath) { sourcePaths.add(rulesPath); capture.capturePaths.push(rulesPath); }
-      for (const path of capture.capturePaths) { sourcePaths.add(path); subject.read(path, 1024 * 1024); }
+      for (const path of capture.capturePaths) { sourcePaths.add(path); subject.read(path, SOURCE_CAPTURE_MAX_BYTES); }
       review = await reviewAdvice(runtime, capture, binding, { ...common, eventId: digest({ identity, rules }) });
     }
     const validation = plan.status === "ready" && runtime.eligibility("DL07").mode !== "off"
       ? await validationAdvice(runtime, registry, plan, binding, { ...common, ...(purpose ? { requirement: purpose } : {}) }) : null;
-    for (const path of sourcePaths) if (subject.source(path)?.file_type === "regular") subject.read(path, 1024 * 1024);
+    for (const path of sourcePaths) if (subject.source(path)?.file_type === "regular") subject.read(path, SOURCE_CAPTURE_MAX_BYTES);
     let comparison = null;
     const comparisonRun = options.compareRun ?? options.runId;
     if (validation && comparisonRun) {

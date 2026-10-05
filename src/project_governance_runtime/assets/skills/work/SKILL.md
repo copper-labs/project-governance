@@ -55,7 +55,11 @@ after the work has been framed and scoped.
    completed batches.
 6. Keep source of truth changes in shared docs, skills, manifests, or generated policy before
    provider adapters.
-7. Run the planned focused checks during implementation. A narrow repair normally needs
+7. Finish the planned behavior and its related source, binding and regression work before the
+   default focused check point. A helper, file, internal step or recovery commit finishing is not
+   a test or QA trigger. Earlier checks need a named blocking uncertainty, focused reproducer,
+   failed proof or new risk recorded in the existing plan. Use its exact command/runbook and
+   affected scope, including affected dependents. A narrow repair normally needs
    one focused owner test and one directly affected seam only when it crosses that seam. Group
    shared changes before expensive builds, bringing compilation or integration forward when risk
    requires it. On the stable candidate, run one branch-aware impacted pre-push sign-off;
@@ -90,11 +94,24 @@ after the work has been framed and scoped.
 12. Before any commit or pull request handoff, write the shared change narrative from the governing
     intent: outcome, product impact, conceptual change, code areas, and why. Do not derive product
     intent from file names alone or copy machine validation evidence into the narrative.
-13. Capture command results in existing logs as work proceeds. Consolidate plan checkboxes, status,
-    evidence summaries, and explanatory docs at batch closeout. Update governing contracts earlier
-    when dependent work needs them; keep commit/delivery documentation current. Report completed
-    milestones and blockers. Note useful cost observations from existing records without adding
-    per-step bookkeeping.
+13. Capture results in existing logs. At each completed batch, checkpoint, material blocker or
+    handoff, update the existing plan before dependent work: implementation/verification/closeout
+    checkboxes, evidence references and limits, current/next action and deferred work. Leave unproved
+    claims unchecked and label failed/invalidated proof without deleting prior results. Reconcile
+    abrupt interruptions on resume. For a deliberately structured plan, inspect only its named batch
+    with `project-governance implementation-plan inspect --path <plan> --batch <id>` and use
+    typed `implementation-plan update` requests with the exact returned digest. Prefer the existing
+    checkpoint's `check --implementation-plan <plan> --batch <id>` binding for verification updates;
+    detached checks use their original run ID in the updater. A refused progress write is not a
+    reason to rerun a successful check. Code preserves evidence and qualifies mechanical results;
+    implementation completion remains a caller declaration and acceptance still needs judgment.
+    Consolidate explanatory docs at batch closeout, updating
+    governing contracts earlier when needed. These updates do not trigger another check or QA round.
+    When local commits are authorized, commit each completed verified batch and its plan update
+    locally after inspecting the staged diff for owned changes. Keep normal hooks enabled; do not
+    duplicate their checks manually. A pause or failed checkpoint may preserve uncommitted work with
+    its reason recorded. Commit creation does not authorize a push. Note useful cost observations
+    from existing records without adding per-step bookkeeping.
 
 ## Validation
 

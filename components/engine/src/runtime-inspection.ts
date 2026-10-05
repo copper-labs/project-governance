@@ -16,9 +16,10 @@ export function inspectRuntimeGeneration(directory: string) {
   if (!compatibleNodeVersion(process.versions.node)) throw new Error("Unsupported Node runtime");
   const packageRoot = join(directory, "node_modules", "@organta", "project-governance");
   if (realpathSync(packageRoot) !== packageRoot || receipt.executable !== join(packageRoot, "dist/engine/src/cli.js")) throw new Error("Staged runtime path changed");
-  verifyRuntimeArchive(join(directory, "runtime.tgz"), lock);
+  const archive = verifyRuntimeArchive(join(directory, "runtime.tgz"), lock);
   const dependencies = verifyRuntimeDependencies(packageRoot), installedTree = runtimeTree(packageRoot);
   if (digest(dependencies) !== digest(receipt.dependencies) || digest(installedTree) !== digest(receipt.installedTree)) throw new Error("Installed runtime payload differs from staging receipt");
   return { state: "verified", directory, executable: receipt.executable, lockDigest: receipt.lockDigest,
+    runtimeVersion: lock.version, archiveDigest: archive.digest,
     installedTree, activation: "not-performed" };
 }

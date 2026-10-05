@@ -31,7 +31,7 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm ci --prefix components/harness --ignore-scripts
       # Existing wheel owners remain active until deliberate adopter cutover.
-      - run: python3 -m pip install -r requirements-dev.txt
+      - run: python3 -m pip install -r requirements-dev.txt -r requirements-lint-dev.txt
       - run: python3 -m unittest discover -s tests -p 'test_runtime_*.py'
       - run: python3 -m pip wheel . --no-deps --wheel-dir wheel-proof
       - run: python3 tools/verify-runtime-wheel.py wheel-proof/project_governance_runtime-*.whl
@@ -39,7 +39,7 @@ jobs:
       - run: npm run typecheck
       - run: mkdir -p release-assets
       - run: npm run pack:engine -- release-assets
-      - run: node components/engine/scripts/verify-package.mjs release-assets/*.tgz
+      - run: node components/engine/scripts/verify-package.mjs release-assets/*.tgz .
       - name: Bind release metadata
         env:
           RELEASE_TAG: ${{ github.ref_name }}

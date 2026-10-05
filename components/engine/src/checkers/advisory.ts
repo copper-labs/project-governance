@@ -7,11 +7,19 @@ const TEST_SUFFIXES = new Set([".py", ".ts", ".tsx", ".mts", ".cts", ".js", ".mj
 const SKIP = new Set([".git", ".venv", "node_modules", "build", "dist", "__pycache__"]);
 const SUPPORT = new Set(["fixtures", "helpers", "support"]);
 
-export function isTestFile(path: string): boolean {
+export function isGeneratedSourcePath(path: string, additionalDirectories: readonly string[] = []): boolean {
+  return path.split("/").some(part => SKIP.has(part) || additionalDirectories.includes(part));
+}
+
+/** Optional semantic capture recognizes native conventions without expanding static checker selection. */
+export function isTestFile(path: string, options: { extensions?: ReadonlySet<string>; nativeTestDirectories?: boolean } = {}): boolean {
   const name = posix.basename(path), extension = posix.extname(path), stem = name.slice(0, name.length - extension.length), parts = path.split("/"), parents = parts.slice(0, -1);
   const explicit = name.includes(".test.") || name.includes(".spec.") || name.startsWith("test_") || stem.toLowerCase().endsWith("_test") || /(?:Test|Tests|TestCase)$/.test(stem);
-  return TEST_SUFFIXES.has(extension) && !parts.some(p => SKIP.has(p)) &&
-    (explicit || (parents.some(p => ["test", "tests", "__tests__"].includes(p)) && !parents.some(p => SUPPORT.has(p))));
+  const testDirectory = parents.some(part => ["test", "tests", "__tests__"].includes(part) || options.nativeTestDirectories &&
+    (["tests", "uitests", "spec"].includes(part.toLowerCase()) || extension === ".swift" && /(?:Tests|UITests)$/u.test(part) ||
+      /^(?:common|jvm|android|ios|js|wasm|native|linux|macos|mingw|tvos|watchos)(?:[A-Z][A-Za-z0-9]*)?Test$/u.test(part)));
+  return (options.extensions ?? TEST_SUFFIXES).has(extension) && !isGeneratedSourcePath(path) &&
+    (explicit || (testDirectory && !parents.some(part => SUPPORT.has(options.nativeTestDirectories ? part.toLowerCase() : part))));
 }
 
 /** Lexical signals remain advisory; they do not claim that assertions ran or that behavior is correct. */
@@ -27,7 +35,7 @@ export function testQualityFindings(path: string, text: string): Finding[] {
 
 export function checkTestQuality(subject: ValidationSubject, paths: readonly string[]) {
   const findings: Finding[] = [];
-  for (const path of [...new Set(paths)].sort().filter(isTestFile)) {
+  for (const path of [...new Set(paths)].sort().filter(path => isTestFile(path))) {
     try {
       const source = subject.source(path);
       if (!source || source.file_type !== "regular") continue;

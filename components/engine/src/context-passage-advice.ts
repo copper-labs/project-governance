@@ -14,8 +14,18 @@ export interface PassageJudgment { sourceDigest: string; excerptDigest: string; 
 export interface PassageUnitOrder { sourceDigest: string; excerptDigest: string; preferredSpans: SourceSpan[];
   basis: "uncertain-score"; kind: "source" | "procedure"; probability: number;
   role?: string | null; roleSource?: "jev" | "path" | "unknown"; policy: "passage-score-3" }
+export interface WholeFilePassageExclusion { sourceDigest: string; excerptDigest: string; probability: number;
+  interpretation: "negative"; complete: true; scope: "whole-file" }
+/** Receipt preview reflects the packet owner's applied omissions, never merely suggested exclusions. */
+export function wholeFileExclusionPreview(exclusions: Record<string, WholeFilePassageExclusion>, omissionReasons: Record<string, string>) {
+  const omitted = Object.keys(omissionReasons).filter(path => omissionReasons[path] === "whole-file-negative-passage");
+  return { excludedWholeFileCount: omitted.length,
+    wholeFileExclusions: Object.fromEntries(omitted.slice(0, 64).filter(path => exclusions[path]).map(path => [path, exclusions[path]!])),
+    wholeFileExclusionsTruncated: omitted.length > 64 };
+}
 export interface PassageAdvice {
   reason: string; judgments: Record<string, PassageJudgment>; unitOrder: Record<string, PassageUnitOrder>;
+  exclusions: Record<string, WholeFilePassageExclusion>;
   assessed: string[]; omitted: Array<{ path: string; reason: string }>;
   readings: Array<{ path: string; firstLine: number | null; lastLine: number | null; excerptDigest: string;
     probability: number | null; interpretation: string; role: string | null;
@@ -121,11 +131,12 @@ function fitPassageBatches(prepared: PreparedPassage[], size: (items: PreparedPa
 export async function selectContextPassages(runtime: DecisionRuntime, candidates: Candidate[], input: PassageInput): Promise<PassageAdvice> {
   const started = performance.now(), judgments: PassageAdvice["judgments"] = {}, assessed: string[] = [];
   const unitOrder: PassageAdvice["unitOrder"] = {};
+  const exclusions: PassageAdvice["exclusions"] = {};
   const omitted: PassageAdvice["omitted"] = [], readings: PassageAdvice["readings"] = [], decisions: DecisionOutcome[] = [];
   let prepared: PreparedPassage[] = [];
   let preparationMs = 0, packingMs = 0;
   const classificationBytes = Math.max(128, Math.min(65536, runtime.settings.legacy.evidenceBytes - Buffer.byteLength(input.purpose) - 1024));
-  const result = (reason: string): PassageAdvice => ({ reason, judgments, unitOrder, assessed, omitted, readings, decisions,
+  const result = (reason: string): PassageAdvice => ({ reason, judgments, unitOrder, exclusions, assessed, omitted, readings, decisions,
     procedures: { declaredFiles: input.procedurePaths?.length ?? 0, eligibleUnits: procedureUnitCount,
       preparedUnits: prepared.filter(item => item.procedure).length,
       assessedUnits: readings.filter(item => input.procedurePaths?.includes(item.path) && item.probability !== null).length,
@@ -214,6 +225,14 @@ export async function selectContextPassages(runtime: DecisionRuntime, candidates
         group.push({ span: item.span, probability: direct.probability!, interpretation: direct.value,
           role: selectedRole, roleSource: literalRole ? "path" : supportedRole ? "jev" : "unknown" });
         variants.set(item.candidate.id, group);
+      }
+      // A negative fragment cannot stand for its file. Only the exact complete original can omit background.
+      if (outcome.delivered && direct.value === "negative" && direct.probability !== null && !item.procedure &&
+          item.complete && item.span === null && !item.item.range &&
+          item.excerptDigest === digest(item.candidate.excerpt) && !item.candidate.sourceRange && !item.candidate.sourceRanges &&
+          !item.candidate.sourceUnits?.some(unit => !unit.complete)) {
+        exclusions[item.candidate.id] = { sourceDigest: item.candidate.sourceDigest, excerptDigest: item.excerptDigest,
+          probability: direct.probability, interpretation: "negative", complete: true, scope: "whole-file" };
       }
     }
   }

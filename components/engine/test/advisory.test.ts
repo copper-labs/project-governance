@@ -14,6 +14,18 @@ test("test selection excludes support and generated paths while retaining explic
   assert.deepEqual(testQualityFindings("test.py", "# state contract\nassert result\n"), []);
 });
 
+test("semantic test conventions extend native capture without changing static selection", () => {
+  const options = { extensions: new Set([".py", ".kt", ".kts", ".swift", ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs", ".mts", ".cts"]), nativeTestDirectories: true };
+  for (const path of ["src/commonTest/kotlin/Behavior.kt", "src/androidUnitTest/kotlin/Behavior.kt", "src/iosArm64Test/kotlin/Behavior.kt",
+    "Tests/FeatureTests/Behavior.swift", "FeatureTests/Behavior.swift", "FeatureUITests/Behavior.swift", "src/FeatureTestCase.swift", "test_feature.py", "feature_test.py",
+    "ui/behavior.test.jsx", "spec/behavior.ts", "tests/fixtures/explicit.test.ts"]) assert.equal(isTestFile(path, options), true, path);
+  for (const path of ["src/commonMain/kotlin/Behavior.kt", "src/Contest.kt", "Tests/FeatureTests/helpers/Behavior.swift", "tests/fixtures/data.py",
+    "tests/support/behavior.ts", "build/BehaviorTest.kt", "src/testing/Behavior.swift"]) assert.equal(isTestFile(path, options), false, path);
+  assert.equal(isTestFile("src/commonTest/kotlin/Behavior.kt"), false);
+  assert.equal(isTestFile("Tests/FeatureTests/Behavior.swift"), false);
+  assert.equal(isTestFile("ui/behavior.test.jsx"), false);
+});
+
 test("advisory content does not become a blocking policy; unreadable test bytes do", () => {
   const root = mkdtempSync(join(tmpdir(), "engine-advisory-"));
   try {

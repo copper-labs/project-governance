@@ -61,7 +61,12 @@ export function recoverCommandOwner(directory: string, requestDigest: string, au
     if (rows.some(row => row.pid === owner.pid || row.pid === child.pid || row.group === child.processGroup || members.pids.includes(row.pid)))
       throw new Error("Owner or child process group still present; recovery cannot confirm cleanup");
     const endedAt = new Date().toISOString(), log = join(directory, "output.log");
-    const receipt: CommandReceipt = prior.receipt ?? { version: 1, requestDigest, state: "unknown", cleanup: "confirmed",
+    const originalIdentity = request.executionIdentity === undefined ? {} : object(request.executionIdentity);
+    if (request.executionIdentity !== undefined && (typeof originalIdentity.runtimeVersion !== "string" ||
+        originalIdentity.archiveDigest !== null && !/^sha256:[a-f0-9]{64}$/u.test(String(originalIdentity.archiveDigest)))) throw new Error("Invalid original execution identity");
+    const receipt: CommandReceipt = prior.receipt ?? { version: 1,
+      ...(request.executionIdentity === undefined ? {} : { runtimeVersion: String(originalIdentity.runtimeVersion), archiveDigest: originalIdentity.archiveDigest as string | null }),
+      requestDigest, state: "unknown", cleanup: "confirmed",
       exitCode: null, signal: null, reason: "owner-lost", startedAt: launch.startedAt, endedAt,
       durationMs: Math.max(0, Date.parse(endedAt) - Date.parse(launch.startedAt)), log,
       logBytes: existsSync(log) ? statSync(log).size : 0 };

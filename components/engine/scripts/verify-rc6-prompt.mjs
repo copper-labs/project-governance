@@ -5,6 +5,7 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, realpathSync, rmSy
 import { hostname, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { continuationCandidate, continuationInputs, continuityUpgradeJourney } from './verify-continuity-upgrade.mjs';
 
 /** Prove a prompt's temporary generation reader closes or can be recovered after abrupt exit. */
 async function verifyPromptReaderRecovery({ packageRoot, temporary, workspace, environment }) {
@@ -165,13 +166,13 @@ async function verifyLinkedNativeHooks({ packageRoot, sibling, siblingRegistry, 
 }
 
 /** A pin arriving by merge is reconciled in that worktree after its existing reader drains. */
-async function verifyWorktreeCutover({ packageRoot, archive, temporary, workspace, environment, lock }) {
+async function verifyWorktreeCutover({ packageRoot, archive, temporary, workspace, environment, lock, upgradeInputs }) {
   const { runtimeMigrationPlan } = await import(pathToFileURL(join(packageRoot, 'dist/engine/src/runtime-migration-plan.js')).href);
   const { RuntimeGenerations } = await import(pathToFileURL(join(packageRoot, 'dist/engine/src/runtime-generations.js')).href);
   const { runtimeDoctor } = await import(pathToFileURL(join(packageRoot, 'dist/engine/src/runtime-doctor.js')).href);
   const { runtimeOperationCommand } = await import(pathToFileURL(join(packageRoot, 'dist/engine/src/runtime-operation-command.js')).href);
   const git = (cwd, ...args) => execFileSync('git', args, { cwd, env: environment, encoding: 'utf8', timeout: 30000 }).trim();
-  const install = async (mode, target, registry, nextLock, suffix, lockedCheckout = false) => {
+  const install = async (mode, target, registry, nextLock, suffix, lockedCheckout = false, selectedArchive = archive) => {
     const plan = runtimeMigrationPlan(target), planPath = join(temporary, `${suffix}-plan.json`);
     const requestPath = join(temporary, `${suffix}-request.json`), operation = join(temporary, `${suffix}-operation`);
     const generations = mode === 'init' ? null : new RuntimeGenerations(registry);
@@ -179,7 +180,7 @@ async function verifyWorktreeCutover({ packageRoot, archive, temporary, workspac
     try { if (generations) expectedRevision = generations.state().revision; }
     finally { generations?.close(); }
     writeFileSync(planPath, JSON.stringify(plan));
-    writeFileSync(requestPath, JSON.stringify({ mode, workspace: target, registry, archive, lock: nextLock,
+    writeFileSync(requestPath, JSON.stringify({ mode, workspace: target, registry, archive: selectedArchive, lock: nextLock,
       expectedRevision, inputs: plan.inputs, hostPlan: plan.hostPlan, ...(lockedCheckout ? { lockedCheckout: true } : {}) }));
     const result = await runtimeOperationCommand(mode, ['--request-file', requestPath, '--project-plan', planPath,
       '--operation-directory', operation]);
@@ -208,63 +209,80 @@ async function verifyWorktreeCutover({ packageRoot, archive, temporary, workspac
   await install('init', sibling, siblingRegistry, lock, 'linked-init', true);
   assert.equal(runtimeDoctor(sibling, siblingRegistry).status, 'passed');
   await verifyLinkedNativeHooks({packageRoot,sibling,siblingRegistry,temporary,environment});
+  const candidate = upgradeInputs.candidate ?? continuationCandidate(packageRoot, temporary, environment);
+  const nextLock = candidate.lock ?? { ...lock, version: candidate.version, artifact: candidate.artifact, source_commit: 'b'.repeat(40) };
+  candidate.archiveDigest ??= 'sha256:' + createHash('sha256').update(readFileSync(candidate.archive)).digest('hex');
   const siblingGenerations = new RuntimeGenerations(siblingRegistry), reader = siblingGenerations.acquire('fixture:active-job');
   const pinnedDirectory = reader.directory;
+  let journey, readerHeld = true;
   try {
-    const nextLock = { ...lock, source_commit: 'b'.repeat(40) };
-    const integration = new RuntimeGenerations(join(temporary, 'installation.sqlite'));
-    try { assert.equal(integration.state().readers.length, 0, JSON.stringify(integration.state().readers)); }
-    finally { integration.close(); }
-    const hookPath = join(workspace, '.codex/hooks.json'), portableHooks = readFileSync(hookPath, 'utf8');
-    const oldHooks = JSON.parse(portableHooks);
-    for (const groups of Object.values(oldHooks.hooks)) for (const group of groups) for (const handler of group.hooks)
-      if (handler.command?.includes('startup observe')) handler.command = `'${join(workspace, '.governance/runtime/bin/project-governance')}' startup observe --provider codex --event-stdin --receipts '${join(temporary, 'startup.sqlite')}'`;
-    writeFileSync(hookPath, JSON.stringify(oldHooks));
-    await assert.rejects(install('update', workspace, join(temporary, 'installation.sqlite'), nextLock, 'old-hook-update'),
-      /deliberate RC6 cutover/);
-    writeFileSync(hookPath, portableHooks);
-    await install('update', workspace, join(temporary, 'installation.sqlite'), nextLock, 'integration-update');
-    const siblingHookPath=join(sibling,'.codex/hooks.json'),siblingPortable=readFileSync(siblingHookPath,'utf8');
-    writeFileSync(siblingHookPath,JSON.stringify(oldHooks));
-    const primaryAfterUpdate=startupReceiptFingerprint(temporary);
-    for(const name of ['SessionStart','SessionEnd']) {
-      const stale=spawnSync('/bin/sh',['-c',oldHooks.hooks[name][0].hooks[0].command],
-        {cwd:sibling,env:environment,input:JSON.stringify({session_id:'stale-sibling',hook_event_name:name,cwd:sibling,source:'resume'}),
-          encoding:'utf8',timeout:5000});
-      assert.equal(stale.status,0,stale.stderr||stale.error?.message);
-      assert.deepEqual(JSON.parse(stale.stdout),{});
+    journey = await continuityUpgradeJourney({ packageRoot, temporary, workspace, sibling,
+      registry: join(temporary, 'installation.sqlite'), siblingRegistry, environment, oldPayload: upgradeInputs.old, candidatePayload: candidate });
+    const siblingReaders = siblingGenerations.state().readers;
+    try {
+      const integration = new RuntimeGenerations(join(temporary, 'installation.sqlite'));
+      try { assert.equal(integration.state().readers.length, 0, JSON.stringify(integration.state().readers)); }
+      finally { integration.close(); }
+      const hookPath = join(workspace, '.codex/hooks.json'), portableHooks = readFileSync(hookPath, 'utf8');
+      const oldHooks = JSON.parse(portableHooks);
+      for (const groups of Object.values(oldHooks.hooks)) for (const group of groups) for (const handler of group.hooks)
+        if (handler.command?.includes('startup observe')) handler.command = `'${join(workspace, '.governance/runtime/bin/project-governance')}' startup observe --provider codex --event-stdin --receipts '${join(temporary, 'startup.sqlite')}'`;
+      writeFileSync(hookPath, JSON.stringify(oldHooks));
+      await assert.rejects(install('update', workspace, join(temporary, 'installation.sqlite'), nextLock, 'old-hook-update', false, candidate.archive),
+        /deliberate RC6 cutover/);
+      writeFileSync(hookPath, portableHooks);
+      await install('update', workspace, join(temporary, 'installation.sqlite'), nextLock, 'integration-update', false, candidate.archive);
+      await journey.afterMainUpdate(candidate.version);
+      const siblingHookPath=join(sibling,'.codex/hooks.json'),siblingPortable=readFileSync(siblingHookPath,'utf8');
+      writeFileSync(siblingHookPath,JSON.stringify(oldHooks));
+      const primaryAfterUpdate=startupReceiptFingerprint(temporary);
+      for(const name of ['SessionStart','SessionEnd']) {
+        const stale=spawnSync('/bin/sh',['-c',oldHooks.hooks[name][0].hooks[0].command],
+          {cwd:sibling,env:environment,input:JSON.stringify({session_id:'stale-sibling',hook_event_name:name,cwd:sibling,source:'resume'}),
+            encoding:'utf8',timeout:5000});
+        assert.equal(stale.status,0,stale.stderr||stale.error?.message);
+        assert.deepEqual(JSON.parse(stale.stdout),{});
+      }
+      assert.deepEqual(startupReceiptFingerprint(temporary),primaryAfterUpdate,'An RC5 sibling hook cannot write primary receipts');
+      writeFileSync(siblingHookPath,siblingPortable);
+      assert.equal(siblingGenerations.state().directory, pinnedDirectory);
+      assert.deepEqual(siblingGenerations.state().readers, siblingReaders);
+      assert.equal(JSON.parse(readFileSync(join(sibling, 'config/governance/runtime.lock.yaml'), 'utf8')).source_commit, lock.source_commit);
+      git(workspace, 'add', '.');
+      git(workspace, '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'Approve new runtime pin');
+    } finally { siblingGenerations.release(reader.token, reader.owner); readerHeld = false; }
+    writeFileSync(join(sibling, 'feature.ts'), 'export const feature = true;\n');
+    git(sibling, 'add', 'feature.ts');
+    git(sibling, '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'Feature work');
+    git(sibling, 'merge', '--no-commit', '--no-ff', integrationBranch);
+    assert.equal(existsSync(git(sibling, 'rev-parse', '--path-format=absolute', '--git-path', 'MERGE_HEAD')), true);
+    assert.equal(runtimeDoctor(sibling, siblingRegistry).findings.some(item => item.id === 'installation.lock-mismatch'), true);
+    writeFileSync(join(sibling, 'unrelated.txt'), 'preserve staged content\n');
+    git(sibling, 'add', 'unrelated.txt');
+    const preserved = git(sibling, 'show', ':unrelated.txt');
+    await journey.beforeLinkedUpdate();
+    await install('update', sibling, siblingRegistry, nextLock, 'linked-update', false, candidate.archive);
+    assert.equal(git(sibling, 'show', ':unrelated.txt'), preserved);
+    const unstaged = git(sibling, 'diff', '--name-only').split('\n').filter(Boolean);
+    for (const path of unstaged) {
+      assert.match(path, /^(?:config\/|\.githooks\/|\.codex\/|\.claude\/|\.agents\/|AGENTS\.md|CLAUDE\.md|GEMINI\.md)/u);
+      git(sibling, 'add', '--', path);
     }
-    assert.deepEqual(startupReceiptFingerprint(temporary),primaryAfterUpdate,'An RC5 sibling hook cannot write primary receipts');
-    writeFileSync(siblingHookPath,siblingPortable);
-    assert.equal(siblingGenerations.state().directory, pinnedDirectory);
-    assert.equal(siblingGenerations.state().readers.length, 1);
-    assert.equal(JSON.parse(readFileSync(join(sibling, 'config/governance/runtime.lock.yaml'), 'utf8')).source_commit, lock.source_commit);
-    git(workspace, 'add', '.');
-    git(workspace, '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'Approve new runtime pin');
-  } finally { siblingGenerations.release(reader.token, reader.owner); siblingGenerations.close(); }
-  writeFileSync(join(sibling, 'feature.ts'), 'export const feature = true;\n');
-  git(sibling, 'add', 'feature.ts');
-  git(sibling, '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'Feature work');
-  git(sibling, 'merge', '--no-commit', '--no-ff', integrationBranch);
-  assert.equal(existsSync(git(sibling, 'rev-parse', '--path-format=absolute', '--git-path', 'MERGE_HEAD')), true);
-  assert.equal(runtimeDoctor(sibling, siblingRegistry).findings.some(item => item.id === 'installation.lock-mismatch'), true);
-  writeFileSync(join(sibling, 'unrelated.txt'), 'preserve staged content\n');
-  git(sibling, 'add', 'unrelated.txt');
-  const preserved = git(sibling, 'show', ':unrelated.txt');
-  await install('update', sibling, siblingRegistry, { ...lock, source_commit: 'b'.repeat(40) }, 'linked-update');
-  assert.equal(git(sibling, 'show', ':unrelated.txt'), preserved);
-  const unstaged = git(sibling, 'diff', '--name-only').split('\n').filter(Boolean);
-  for (const path of unstaged) {
-    assert.match(path, /^(?:config\/|\.githooks\/|\.codex\/|\.claude\/|\.agents\/|AGENTS\.md|CLAUDE\.md|GEMINI\.md)/u);
-    git(sibling, 'add', '--', path);
+    assert.equal(runtimeDoctor(sibling, siblingRegistry).status, 'passed');
+    const mergedLock = readFileSync(join(sibling, 'config/governance/runtime.lock.yaml'), 'utf8');
+    assert.equal(git(sibling, 'show', ':config/governance/runtime.lock.yaml'), mergedLock.trimEnd());
+    git(sibling, 'commit', '-qm', 'Integrate approved runtime pin', '-m',
+      'The destination worktree reconciles its installed runtime after the pin arrives by merge, while preserving the staged feature work.');
+    assert.equal(runtimeDoctor(sibling, siblingRegistry).status, 'passed');
+    assert.equal(git(workspace, 'config', '--worktree', 'core.hooksPath'), '.githooks');
+    return await journey.afterLinkedUpdate(candidate.version);
+  } finally {
+    // Native SessionEnd retires only fixture ownership, including an interrupted assertion.
+    try {
+      if (readerHeld) siblingGenerations.release(reader.token, reader.owner);
+      await journey?.cleanup();
+    } finally { siblingGenerations.close(); }
   }
-  assert.equal(runtimeDoctor(sibling, siblingRegistry).status, 'passed');
-  const mergedLock = readFileSync(join(sibling, 'config/governance/runtime.lock.yaml'), 'utf8');
-  assert.equal(git(sibling, 'show', ':config/governance/runtime.lock.yaml'), mergedLock.trimEnd());
-  git(sibling, 'commit', '-qm', 'Integrate approved runtime pin', '-m',
-    'The destination worktree reconciles its installed runtime after the pin arrives by merge, while preserving the staged feature work.');
-  assert.equal(runtimeDoctor(sibling, siblingRegistry).status, 'passed');
-  assert.equal(git(workspace, 'config', '--worktree', 'core.hooksPath'), '.githooks');
 }
 
 /** Qualify the installed launcher and stdin protocol in an unborn disposable repository. */
@@ -373,8 +391,11 @@ function verifyStopUsage({ temporary, event, invoke, hooks, launcher }) {
   assert.deepEqual(invoke(launcher, ['telemetry', 'context', 'status']).usage, { responses: 1, inputTokens: 100, outputTokens: 20 });
 }
 
-export async function verifyRc6Prompt(packageRoot, archive) {
+export async function verifyRc6Prompt(packageRoot, archive, options = {}) {
+  const upgradeInputs = continuationInputs(packageRoot, archive, options);
+  packageRoot = upgradeInputs.old.packageRoot; archive = upgradeInputs.old.archive;
   const temporary = realpathSync(mkdtempSync(join(tmpdir(), 'rc6-installed-prompt-'))), workspace = join(temporary, 'repo');
+  let completed = false;
   mkdirSync(workspace);
   const environment = { ...process.env, XDG_STATE_HOME: join(temporary, 'state'), JEV_TOKEN: '' };
   for (const key of Object.keys(environment)) if (/^(GOVERNANCE_|HARNESS_)/u.test(key)) delete environment[key];
@@ -389,10 +410,7 @@ export async function verifyRc6Prompt(packageRoot, archive) {
     writeFileSync(join(workspace, 'app.ts'), 'export function launch() { return "ready"; }\n');
     const { runtimeMigrationPlan } = await import(pathToFileURL(join(packageRoot, 'dist/engine/src/runtime-migration-plan.js')));
     const plan = runtimeMigrationPlan(workspace), planPath = join(temporary, 'plan.json'), requestPath = join(temporary, 'request.json');
-    const manifest = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8'));
-    const lock = { schema_version: 2, package: manifest.name, version: manifest.version,
-      artifact: { url: pathToFileURL(archive).href, integrity: 'sha512-' + createHash('sha512').update(readFileSync(archive)).digest('base64') },
-      source_commit: 'a'.repeat(40), node: manifest.engines.node, configuration_schema: 1 };
+    const lock = upgradeInputs.old.lock;
     writeFileSync(planPath, JSON.stringify(plan));
     writeFileSync(requestPath, JSON.stringify({ mode: 'init', workspace, registry: join(temporary, 'installation.sqlite'), archive,
       lock, expectedRevision: 0, inputs: plan.inputs, hostPlan: plan.hostPlan }));
@@ -470,7 +488,10 @@ export async function verifyRc6Prompt(packageRoot, archive) {
         '--registry', join(temporary, 'absent-registry.sqlite'), '--receipts', join(temporary, 'receipt.sqlite')], input);
       assert.deepEqual(refused, {});
     }
-    await verifyWorktreeCutover({ packageRoot, archive, temporary, workspace, environment, lock });
-    return { status: 'passed', scope: 'Exact installed package, initial and linked-worktree hooks, stale sibling hook refusal, merged pin cutover, unborn prompt stdin, no-token fallback, compact metadata/procedure/source/assertion delivery through the native hook, exact no-dispatch packet replay, recoverable prompt reader, synthetic native-parent continuation with departed or live retained owners and lifecycle failure. Real native host trust/use not tested.', sourceIdentity: 'synthetic fixture only' };
-  } finally { rmSync(temporary, { recursive: true, force: true }); }
+    const continuityUpgrade = await verifyWorktreeCutover({ packageRoot, archive, temporary, workspace, environment, lock, upgradeInputs });
+    completed = true;
+    return { status: 'passed', continuityUpgrade, evidenceDirectory: upgradeInputs.candidate ? temporary : null, payloadMode: upgradeInputs.mode,
+      scope: 'Exact installed package, initial and linked-worktree hooks, stale sibling hook refusal, merged pin cutover, unborn prompt stdin, no-token fallback, compact metadata/procedure/source/assertion delivery through the native hook, exact no-dispatch packet replay, recoverable prompt reader, synthetic native-parent continuation with departed or live retained owners and lifecycle failure, distinct-version upgrade with retained tasks/checkpoints and isolated cleanup. Real desktop reattachment, native host trust/use and accepted ordinary development not tested.', sourceIdentity: 'synthetic host fixture; supplied archive and lock identities are reported separately' };
+  } catch (error) { error.proofDirectory = temporary; console.error(`Installed prompt proof retained at ${temporary}`); throw error; }
+  finally { if (completed && !upgradeInputs.candidate) rmSync(temporary, { recursive: true, force: true }); }
 }

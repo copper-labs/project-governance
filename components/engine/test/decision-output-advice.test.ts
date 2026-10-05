@@ -29,8 +29,8 @@ test("output advice preserves ambiguous failures, multi-block stacks, incomplete
   const incomplete = await outputSelection(runtime, receipt, scope, present(stack, true));
   assert.equal(incomplete.reason, "incomplete-output"); assert.equal(incomplete.selection, null);
   const overflow = await outputSelection(runtime, receipt, scope, { ...present(stack), limitBytes: 10 });
-  assert.equal(overflow.reason, "protected-overflow"); assert.equal(overflow.selection!.text, stack); assert.equal(calls, 0);
+  assert.equal(overflow.reason, "completion-presentation-excluded"); assert.equal(overflow.selection!.text, stack); assert.equal(calls, 0);
   const routine = "Header\n\nRoutine chatter\n\nWarning: native uncertainty\n\nEnd";
   const failedProvider = await outputSelection(runtime, { ...receipt, state: "succeeded", exitCode: 0 }, scope, present(routine));
-  assert.equal(failedProvider.delivered, false); assert.equal(failedProvider.selection!.text, routine); assert.equal(calls, 1);
+  assert.equal(failedProvider.delivered, false); assert.equal(failedProvider.selection!.text, routine); assert.equal(calls, 0);
 });

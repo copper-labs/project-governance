@@ -2,25 +2,33 @@ import { verifyDecisionExperiments } from "./verify-decision-experiments.mjs";
 import { verifyRc6Prompt } from "./verify-rc6-prompt.mjs";
 import { verifyPythonParser } from "./verify-python-parser.mjs";
 import { verifyGreenfield } from "./verify-greenfield.mjs";
+import { verifyBatchReview } from "./verify-batch-review.mjs";
+import { verifyMajorDelivery } from "./verify-major-delivery.mjs";
+import { verifyInstalledLint } from "./verify-installed-lint.mjs";
+import { verifyEvaluationProducers } from "../test/fixtures/release-evaluation-producers.mjs";
 import { verifyCheckRecovery } from "./verify-check-recovery.mjs";
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { verifyDecisionPilot } from "./verify-decision-pilot.mjs";
-import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 
-// Exercise the shipped command outside the source checkout with only bundled dependencies.
+// Runtime dependencies are bundled; backend qualification uses the caller's explicit pinned tools.
 const archive = resolve(process.argv[2] || '');
 if (!archive.endsWith('.tgz')) throw new Error('Expected compiled package archive');
+const toolArgument = process.argv[3];
+if (!toolArgument) throw new Error('Expected explicit lint toolRoot at argv[3], or --lint-tools-unavailable for an unqualified result');
+const lintToolRoot = toolArgument === '--lint-tools-unavailable' ? null : resolve(toolArgument);
 const root = mkdtempSync(join(tmpdir(), 'governance-release-proof-'));
 try {
   execFileSync('npm', ['install', '--prefix', root, '--offline', '--ignore-scripts', '--no-audit', '--no-fund', archive], { stdio: 'pipe', timeout: 60000 });
   const pkg = join(root, 'node_modules/@organta/project-governance');
   const manifest = JSON.parse(readFileSync(join(pkg, 'package.json'), 'utf8'));
-  if (manifest.name !== '@organta/project-governance' || !manifest.version.startsWith('3.')) throw new Error('Unexpected product identity');
+  if (manifest.name !== '@organta/project-governance') throw new Error('Unexpected product identity');
+  // Staging below validates the exact version, archive identity and canonical runtime lock.
   const output = execFileSync(process.execPath, [join(pkg, 'dist/engine/src/cli.js'), '--help'], { cwd: root, encoding: 'utf8', timeout: 10000 });
   if (!output.includes('workflow-wait') || !output.includes('context-packet')) throw new Error('Installed command surface missing');
   for (const [command, marker] of [['provider-help','provider-submit'], ['startup-help','startup']]) {
@@ -47,8 +55,22 @@ try {
   const experiments = await verifyDecisionExperiments(pkg);
   const prompt = await verifyRc6Prompt(pkg, archive);
   const greenfield = await verifyGreenfield(pkg, archive);
-  console.log(JSON.stringify({ staging, prompt, greenfield, pythonParser, decisionPilot: pilot, experiments, hostApi: 'passed', version: manifest.version, installedCommand: 'passed', scope: 'offline installation and inactive staging, installed greenfield first-task proof, compiled Python source/comment analysis, public host API and decision consumers with fixture inference; not full semantic qualification; no live device or benefit claim' }));
-} finally { rmSync(root, { recursive: true, force: true }); }
+  const batchReview = await verifyBatchReview(pkg, archive);
+  const majorDelivery = await verifyMajorDelivery(pkg, archive);
+  const installedLint = lintToolRoot ? await verifyInstalledLint(pkg, archive, lintToolRoot)
+    : { status: 'unqualified', reason: 'qualified-backend-tools-explicitly-unavailable', execution: 'not-performed' };
+  const receipt = { status: installedLint.status === 'passed' ? 'passed' : 'unqualified', evidence_directory: root,
+    staging, prompt, greenfield, batchReview, majorDelivery, installedLint, pythonParser, decisionPilot: pilot, experiments,
+    hostApi: 'passed', version: manifest.version, installedCommand: 'passed',
+    scope: 'offline installation and inactive staging, original evaluation producers, installed greenfield first-task, deterministic delivery/lint setup, explicit real-backend qualification and batch-before-review preparation proof, compiled Python source/comment analysis, public host API and decision consumers with fixture inference; not full semantic qualification, accepted ordinary tasks or release provenance; no live device or benefit claim' };
+  writeFileSync(join(root, 'archive-proof-receipt.json'), JSON.stringify(receipt, null, 2) + '\n');
+  console.log(JSON.stringify(receipt));
+  if (receipt.status !== 'passed') process.exitCode = 2;
+} catch (error) {
+  writeFileSync(join(root, 'archive-proof-failure.json'), JSON.stringify({ status: 'failed', message: error.message,
+    proofDirectory: error.proofDirectory ?? root, stack: error.stack }, null, 2) + '\n');
+  throw error;
+} finally { console.error(`Archive proof evidence retained: ${root}`); }
 
 
 /** Synthetic source identity tests staging mechanics; never emit this lock as release provenance. */
@@ -62,6 +84,7 @@ async function verifyExplicitStaging(pkg, archive, manifest, root) {
   assert.equal(result.lock.version, manifest.version);
   assert.throws(() => stageRuntimeArchive(archive, { ...lock, version: '3.0.0-rc.999999' }, join(root, 'mismatch')), error => /identity differs from lock/.test(error.cause?.message ?? ''));
   assert.throws(() => stageRuntimeArchive(archive, { ...lock, artifact: { ...lock.artifact, integrity: 'sha512-' + Buffer.alloc(64).toString('base64') } }, join(root, 'bad-hash')), /integrity mismatch/);
+  const evaluationProducers = await verifyEvaluationProducers(result.directory, root);
   const checkRecovery = await verifyCheckRecovery(pkg, result.directory, lock, root);
-  return { status: 'passed', activation: 'isolated recovery fixture only', checkRecovery, sourceIdentity: 'synthetic fixture only; not release provenance' };
+  return { status: 'passed', activation: 'isolated recovery fixture only', checkRecovery, evaluationProducers, sourceIdentity: 'synthetic fixture only; not release provenance' };
 }

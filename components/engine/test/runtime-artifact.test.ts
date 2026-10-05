@@ -14,7 +14,9 @@ test("archive verifier rejects corruption, oversized input and symlink substitut
     const lock: CompiledRuntimeLock = { schema_version: 2, package: "@organta/project-governance", version: "3.0.0",
       artifact: { url: "file:///package.tgz", integrity: "sha512-" + createHash("sha512").update(contents).digest("base64") },
       source_commit: "a".repeat(40), node: ">=24.16.0 <25", configuration_schema: 1 };
-    assert.equal(verifyRuntimeArchive(path, lock).bytes, 150000);
+    const verified = verifyRuntimeArchive(path, lock);
+    assert.equal(verified.bytes, 150000);
+    assert.equal(verified.digest, `sha256:${createHash("sha256").update(contents).digest("hex")}`);
     assert.throws(() => verifyRuntimeArchive(path, lock, 100), /bounded ordinary file/);
     symlinkSync(path, join(root, "alias.tgz"));
     assert.throws(() => verifyRuntimeArchive(join(root, "alias.tgz"), lock));

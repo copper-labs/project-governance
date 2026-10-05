@@ -5,7 +5,7 @@ type: spec
 status: active
 owner: project-governance
 created: 2026-09-27
-updated: 2026-09-29
+updated: 2026-10-05
 summary: Improve prompt and metadata fidelity, rank useful context across the permitted inventory, and qualify bounded parallel JEV selection against frozen repository scenarios.
 ---
 
@@ -83,6 +83,19 @@ list and shares the same retrieval clock, source permissions, family spend and r
 never adds a second source index or authorizes an action. The passage judgment refers to the
 actual captured constituent passage, not a file description. Record its exact range and digest;
 deterministic composition may join several positively judged constituents for delivery.
+
+The packet owner may omit an unpinned automatic optional file only when an applied passage answer
+is negative under the existing question threshold and assesses the exact complete original file.
+Bind that advice to the current source digest and the full-body excerpt digest. A complete clipped
+section, a metadata-negative answer, or incomplete passage coverage cannot exclude the file.
+Required guidance and explicit, task-declared or changed-path pins remain intact. Conflicting positive
+or uncertain advice, shadow mode, unavailable answers and mismatched source proof retain local
+fallback. Record `whole-file-negative-passage` for each such omission and
+`complete-passage-no-match` when no optional candidate remains. Count only packet-applied omissions
+in the route receipt; preview at most 64 exclusion identities and mark truncation explicitly.
+Preserve the original decision receipts and source references. This narrow rule can still omit useful material after a false negative;
+original files remain accessible for follow-up reads. It does not gate execution or add a new
+threshold, and a quality fixture must count any lost essential evidence as a miss.
 
 Group consecutive small declarations of the same observed syntax kind into a passage of at most
 1,024 bytes when only blank or comment lines separate them. Preserve each member's original span

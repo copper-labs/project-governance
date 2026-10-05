@@ -33,6 +33,20 @@ test("staged subjects retain captured blob bytes after both worktree and index c
   } finally { f.close(); }
 });
 
+test("staged review diffs preserve accepted bytes and refuse later index drift", () => {
+  const f = repository();
+  try {
+    writeFileSync(join(f.root, "code.ts"), "const value = 2;\n"); f.git("add", "code.ts");
+    const scope = resolveChangeScope(f.root, { staged: true }), subject = new ValidationSubject(f.root, scope);
+    writeFileSync(join(f.root, "code.ts"), "const value = 3;\n");
+    assert.match(subject.hunks("code.ts"), /\+const value = 2;/u);
+    assert.doesNotMatch(subject.hunks("code.ts"), /\+const value = 3;/u);
+    f.git("add", "code.ts");
+    assert.equal(subject.read("code.ts").toString(), "const value = 2;\n");
+    assert.throws(() => subject.hunks("code.ts"), /index changed after capture/u);
+  } finally { f.close(); }
+});
+
 test("renames, deletes, additions and symlink payloads preserve distinct subject identities", () => {
   const f = repository();
   try {

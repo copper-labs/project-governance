@@ -13,6 +13,11 @@ summary: Defines RC4 evidence selection, requirement-linked quality advice, oper
 
 ## Purpose and ownership
 
+The [next major verification contract](engine-4-verification-feedback.md) extends DL01/DL02 capture
+to Kotlin, Swift and Python and requires exact staged-diff identity and explicit unavailable
+coverage. Existing modes, questions, native verdicts and model defaults retain this owner. Source
+implementation and installed qualification are tracked by that release's delivery plan.
+
 Make ordinary development reach the existing decision layer, assess work against its actual
 requirement, and route eligible new assignments without asking the coordinating LLM to choose a
 model each time. Improve local-CI recommendations using meaningful scenario descriptions. The

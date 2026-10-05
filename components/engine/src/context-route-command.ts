@@ -25,7 +25,7 @@ import { automaticContextCandidates, contextCandidateInventory, contextCaptureOr
 import { recordEntryExposure } from "./decision-episodes.ts";
 import { ContextRouteError, recordContextFailure } from "./context-route-errors.ts";
 import { contextMetadataCatalog, selectContextMetadata } from "./context-metadata.ts";
-import { selectContextPassages } from "./context-passage-advice.ts";
+import { selectContextPassages, wholeFileExclusionPreview } from "./context-passage-advice.ts";
 import { capturedSourceSpans } from "./context-source-facts.ts";
 import { matchesPackPath } from "./planning.ts";
 import type { BudgetScope } from "./decision-budget.ts";
@@ -39,7 +39,7 @@ import { readPreparedPrompt } from "./context-packet-replay.ts";
 import { workContext } from "../../harness/src/store/location.ts";
 import { inspectStartupHookSource } from "./startup-hook-source.ts";
 import { projectContextMetric } from "./telemetry-projection.ts";
-import { RELEASE_VERSION } from "./release-version.ts";
+import { runtimeExecutionIdentity } from "./runtime-execution-identity.ts";
 import { contextExcerptBudget } from "./checkers/context-router.ts";
 import { sessionId } from "../../harness/src/store/location.ts";
 import { declaredDocuments } from "./checkers/document-links.ts";
@@ -392,7 +392,8 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
     sourceLinks: projection.links.flatMap(link => link.resolved && link.targetDigest && admittedPaths.has(link.source) &&
       admittedPaths.has(link.resolved) && ["import", "require"].includes(link.kind)
       ? [{ source: link.source, target: link.resolved, sourceDigest: link.sourceDigest, targetDigest: link.targetDigest }] : []),
-    ...(passageAdvice ? { passageJudgments: passageAdvice.judgments, passageUnitOrder: passageAdvice.unitOrder } : {}),
+    ...(passageAdvice ? { passageJudgments: passageAdvice.judgments, passageUnitOrder: passageAdvice.unitOrder,
+      passageExclusions: passageAdvice.exclusions } : {}),
     optionalExcerptBytes,
   }, provider, options.localOnly ? { signal: AbortSignal.abort() } : options) : null;
   let workflowRecommendation = null;
@@ -452,6 +453,7 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
       preparationMs: passageAdvice.preparationMs, packingMs: passageAdvice.packingMs,
       classificationBytes: passageAdvice.classificationBytes, deliveryExcerptBytes: optionalExcerptBytes,
       positiveCount: Object.values(passageAdvice.judgments).filter(item => item.interpretation === "positive").length,
+      ...wholeFileExclusionPreview(passageAdvice.exclusions, optional?.omissionReasons ?? {}),
       uncertainOrderedCount: Object.keys(passageAdvice.unitOrder).length,
       suggestedCount: Object.keys(passageAdvice.judgments).length, omitted: passageAdvice.omitted.slice(0, 64),
       readings: passageAdvice.readings.slice(0, 64),
@@ -487,7 +489,7 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
   const execution = { workspace: root, worktreeLocator: workContext(root).locator,
     nativeSession, entryId: options.family?.id ?? null, promptLink,
     definitionSource: inspectStartupHookSource(root).definitionRoot };
-  const receipt = { version: 1, runtimeVersion: RELEASE_VERSION, workspace: root, receiptId, execution, createdAt: new Date().toISOString(), ...identity, selection, expansion,
+  const receipt = { version: 1, ...runtimeExecutionIdentity(), workspace: root, receiptId, execution, createdAt: new Date().toISOString(), ...identity, selection, expansion,
     timing: timing.snapshot(metadata?.providerCallMs ?? 0, projection.status.elapsedMs),
     projection: projectionReceiptPreview(projection, admittedPaths),
     procedureReferences: procedureReferences.slice(0, 64), procedureReferenceCount: procedureReferences.length,

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, realpathSync, rmSync } from 'node:fs';
+import { appendFileSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -17,13 +17,28 @@ export async function verifyGreenfield(packageRoot, archive, { live = false } = 
   if (!live) environment.JEV_TOKEN = 'greenfield-fixture-credential';
   const cli = join(resolve(packageRoot), 'dist/engine/src/cli.js'), registry = join(temporary, 'installation.sqlite');
   const calls = join(temporary, 'calls.jsonl'), preload = join(temporary, 'inference.mjs');
-  let hooks, event, launcher;
-  const run = (command, args, input) => spawnSync(command, args, { cwd: workspace, env: environment, input, encoding: 'utf8',
-    timeout: 50000, maxBuffer: 2 * 1024 * 1024 });
-  const invoke = (command, args, input, expected = 0) => {
-    const result = run(command, args, input);
+  let hooks, event, launcher, finished = false, sessionEnded = false, failure;
+  const hookDispatches = [];
+  const run = (command, args, input, timeoutMs = 50000) => {
+    const started = performance.now();
+    const result = spawnSync(command, args, { cwd: workspace, env: environment, input, encoding: 'utf8',
+      timeout: timeoutMs, maxBuffer: 2 * 1024 * 1024 });
+    return { ...result, timeoutMs, elapsedMs: Math.round(performance.now() - started), timedOut: result.error?.code === 'ETIMEDOUT' };
+  };
+  const invoke = (command, args, input, expected = 0, timeoutMs = 50000, hook) => {
+    const result = run(command, args, input, timeoutMs);
+    if (hook) {
+      const receipt = { hook, timeoutMs, elapsedMs: result.elapsedMs, exitCode: result.status, signal: result.signal, timedOut: result.timedOut };
+      hookDispatches.push(receipt); appendFileSync(join(temporary, 'native-hook-dispatches.jsonl'), JSON.stringify(receipt) + '\n');
+    }
+    assert.equal(result.timedOut, false, `${hook ?? 'Command'} exceeded its ${timeoutMs}ms dispatch budget (${result.error?.code}; ${result.signal})`);
     assert.equal(result.status, expected, result.stderr || result.error?.message || result.stdout);
     return JSON.parse(result.stdout);
+  };
+  const invokeHook = (name, value) => {
+    const handler = hooks[name][0].hooks[0];
+    assert.ok(Number.isFinite(handler.timeout) && handler.timeout > 0, 'Installed native hook must declare its budget');
+    return invoke('/bin/sh', ['-c', handler.command], JSON.stringify(value), 0, handler.timeout * 1000, name);
   };
   const write = (path, content) => { mkdirSync(join(workspace, path, '..'), { recursive: true }); writeFileSync(join(workspace, path), content); };
   const status = () => readFileSync(calls, 'utf8').trim().split('\n').filter(Boolean).length;
@@ -34,7 +49,7 @@ export async function verifyGreenfield(packageRoot, archive, { live = false } = 
     const largeEvidence = writeLargeEvidence(write);
     event = { session_id: 'greenfield-host', turn_id: 'initial-task', hook_event_name: 'UserPromptSubmit',
       cwd: workspace, prompt: 'Define the example project onboarding acceptance test. According to projects/example/brief.md, what must onboarding preserve? Use the planning skill.' };
-    const submit = value => invoke('/bin/sh', ['-c', hooks.UserPromptSubmit[0].hooks[0].command], JSON.stringify(value));
+    const submit = value => invokeHook('UserPromptSubmit', value);
     const submitted = submit(event), text = submitted.hookSpecificOutput.additionalContext;
     assert.match(text, /Retain operator authorization/);
     assert.match(text, /preserve the audit log during onboarding/i);
@@ -80,7 +95,8 @@ export async function verifyGreenfield(packageRoot, archive, { live = false } = 
     assert.equal(checked.status, 'passed');
     // Context assertions are finished. Convert these fixture docs only for the gate, then end the session.
     const documentationEvidence = verifyDocumentationEvidence({ temporary, launcher, invoke, write, workspace });
-    await verifyGenerationCleanup({ packageRoot, invoke, hooks, event, registry });
+    await verifyGenerationCleanup({ packageRoot, invokeHook, event, registry });
+    sessionEnded = true; finished = true;
     return { status: 'passed', suite: 'installed-greenfield', provider: live ? 'live' : 'fixture',
       initialCommit: false, installation: 'passed', nativeEntry: 'passed', firstTask: 'context-delivery-passed', selectedEvidence: 'passed',
       providerProof: { metadata: full.metadata.decisions, coverage: compact.metadata.coverage,
@@ -88,10 +104,22 @@ export async function verifyGreenfield(packageRoot, archive, { live = false } = 
         optionalMethod: compact.optional.decision.method, selectedSources: compact.optional.entries.map(item => ({ id: item.id, sourceDigest: item.sourceDigest })) },
       scopeGap: 'detected-without-widening', largeEvidenceCapture: 'passed', compactReplay: 'passed', externalRead: 'passed', documentationEvidence, cleanup: 'passed',
       missingToken: live ? 'offline-suite' : 'passed', billingFailure: live ? 'offline-suite' : 'passed',
-      benefit: 'not-evaluated', sourceIdentity: 'synthetic fixture only' };
+      benefit: 'not-evaluated', hookDispatches,
+      hostEvidence: 'installed hooks with synthetic event stdin and fixture inference; real native host delivery, trust and accepted ordinary development not tested',
+      sourceIdentity: 'synthetic fixture only' };
+  } catch (error) {
+    failure = error; error.proofDirectory = temporary; throw error;
   } finally {
-    if (hooks && event) run('/bin/sh', ['-c', hooks.SessionEnd[0].hooks[0].command], JSON.stringify({ ...event, hook_event_name: 'SessionEnd' }));
-    rmSync(temporary, { recursive: true, force: true });
+    if (hooks && event && !sessionEnded) {
+      try { invokeHook('SessionEnd', { ...event, hook_event_name: 'SessionEnd' }); }
+      catch (error) {
+        if (failure) failure.cleanupError = error.message;
+        else { error.proofDirectory = temporary; throw error; }
+        console.error(`Greenfield cleanup failed: ${error.message}`);
+      }
+    }
+    if (finished) rmSync(temporary, { recursive: true, force: true });
+    else console.error(`Greenfield evidence retained: ${temporary}`);
   }
 }
 
@@ -124,9 +152,9 @@ function verifyOfflineRecovery({ environment, profile, saveProfile, status, subm
 }
 
 /** End native ownership and prove that neither a reader nor a maintenance reservation survives. */
-async function verifyGenerationCleanup({ packageRoot, invoke, hooks, event, registry }) {
+async function verifyGenerationCleanup({ packageRoot, invokeHook, event, registry }) {
   const { RuntimeGenerations } = await import(pathToFileURL(join(packageRoot, 'dist/engine/src/runtime-generations.js')));
-  invoke('/bin/sh', ['-c', hooks.SessionEnd[0].hooks[0].command], JSON.stringify({ ...event, hook_event_name: 'SessionEnd' }));
+  invokeHook('SessionEnd', { ...event, hook_event_name: 'SessionEnd' });
   const generations = new RuntimeGenerations(registry);
   try { assert.equal(generations.state().readers.length, 0); assert.equal(generations.state().maintenance, null); } finally { generations.close(); }
 }
@@ -172,6 +200,7 @@ function verifyExternalRead({ temporary, launcher, entry, invoke, run }) {
   const observations = invoke(launcher, ['telemetry', 'context', 'status']);
   assert.equal(observations.reads.external, 1); assert.equal(observations.reads.local, 0);
   const unsafe = run(launcher, ['telemetry', 'context', 'expansion', '--entry', entry, '--source-workspace', external, '--path', '../source.md']);
+  assert.equal(unsafe.timedOut, false, 'An external path timeout cannot count as a path refusal');
   assert.notEqual(unsafe.status, 0);
 }
 

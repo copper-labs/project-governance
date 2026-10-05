@@ -10,7 +10,7 @@ export function claudeCommand(request: { executable: string; model: string; effo
   if (request.guard) { validateProviderGuard(request.guard); if (request.guard.executable !== request.executable) throw new Error("Guard executable differs"); }
   const argv = [request.executable, "--print", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
     "--permission-mode", request.guard ? "dontAsk" : "bypassPermissions", "--tools", request.guard ? request.guard.tools.join(",") : "default", "--model", request.model, "--effort", request.effort,
-    "--settings", JSON.stringify(request.guard?.settings ?? { fallbackModel: [] }), "--json-schema", JSON.stringify(PROVIDER_FINAL_SCHEMA)];
+    "--settings", JSON.stringify(request.guard?.settings ?? { fallbackModel: [], switchModelsOnFlag: false }), "--json-schema", JSON.stringify(PROVIDER_FINAL_SCHEMA)];
   if (request.guard) argv.push("--restricted", "--safe-mode", "--disable-slash-commands", "--setting-sources", "", "--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}', "--disallowedTools", "mcp__*");
   for (const root of request.additionalRoots) {
     text(root, "additional workspace"); if (!isAbsolute(root)) throw new Error("Additional workspace must be absolute");

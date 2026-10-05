@@ -11,7 +11,7 @@ const fields = ["version", "run_id", "workspace", "stage", "runtime_version", "s
 
 /** Accept only compact measured values. Source text, prompts and native logs have no field here. */
 function metricValue(value: RunMetric): string {
-  if (Object.keys(value).length !== fields.length + (Object.hasOwn(value, "trigger") ? 1 : 0) + (Object.hasOwn(value, "expected_status") ? 1 : 0) || fields.some(key => !Object.hasOwn(value, key)) || value.version !== 1 ||
+  if (Object.keys(value).length !== fields.length + (Object.hasOwn(value, "trigger") ? 1 : 0) + (Object.hasOwn(value, "expected_status") ? 1 : 0) + (Object.hasOwn(value, "archive_digest") ? 1 : 0) || fields.some(key => !Object.hasOwn(value, key)) || value.version !== 1 ||
       !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u.test(value.run_id) ||
       typeof value.workspace !== "string" || value.workspace.length > 4096 ||
       (value.stage !== null && (typeof value.stage !== "string" || !/^[a-z][a-z0-9-]{0,63}$/u.test(value.stage))) ||
@@ -19,6 +19,7 @@ function metricValue(value: RunMetric): string {
       typeof value.runtime_version !== "string" || value.runtime_version.length > 64 ||
       !/^[a-z][a-z0-9-]{0,63}$/u.test(value.termination_reason) ||
       !/^sha256:[a-f0-9]{64}$/u.test(value.result_digest)) throw new Error("Invalid telemetry projection");
+  if (value.archive_digest !== undefined && value.archive_digest !== null && !/^sha256:[a-f0-9]{64}$/u.test(value.archive_digest)) throw new Error("Invalid telemetry archive identity");
   for (const count of [value.duration_ms, value.pack_count, value.command_count, value.blocked_pack_count]) {
     if (!Number.isSafeInteger(count) || count < 0) throw new Error("Invalid telemetry count");
   }

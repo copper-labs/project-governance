@@ -3,16 +3,93 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { prepareCommand } from "../src/cli.ts";
 import { checkDecisionAdvice } from "../src/decision-check-advice.ts";
 import { contextStateRoot } from "../src/context-command.ts";
 import { checkRunRoot } from "../src/check-run.ts";
 import { decisionOutcomeReport } from "../src/decision-outcomes.ts";
-import { durableJson, fileDigest } from "../src/core.ts";
+import { digest, durableJson, fileDigest } from "../src/core.ts";
 import { mergePacks } from "../src/pack-configuration.ts";
 import { buildPlan } from "../src/planning.ts";
 import type { DecisionRuntimeOptions } from "../src/decision-runtime.ts";
+import { ValidationSubject, resolveChangeScope } from "../src/change-subject.ts";
+
+test("ordinary check advice batches permitted native evidence and preserves fallback and native plans", async t => {
+  const temporary = realpathSync(mkdtempSync(join(tmpdir(), "native-check-advice-"))), root = join(temporary, "repo");
+  mkdirSync(root); const previous = process.env.XDG_STATE_HOME; process.env.XDG_STATE_HOME = join(temporary, "state");
+  t.after(() => { if (previous === undefined) delete process.env.XDG_STATE_HOME; else process.env.XDG_STATE_HOME = previous; rmSync(temporary, { recursive: true, force: true }); });
+  const git = (...args: string[]) => execFileSync("git", args, { cwd: root, stdio: "pipe" });
+  git("init", "-q"); git("config", "user.name", "Fixture"); git("config", "user.email", "fixture@example.invalid");
+  mkdirSync(join(root, "config/governance"), { recursive: true });
+  const profile = join(root, "config/governance/profile.yaml");
+  const writeProfile = (mode = "auto", allowedPaths = ["src/**", "Tests/**", "tests/**"]) => writeFileSync(profile, JSON.stringify({ continuity: { decisions: {
+    mode, allowed_data_classes: ["source"], allowed_source_paths: allowedPaths, consumers: {
+      DL01: { mode, questions: ["test.requirement-support/1"] }, DL02: { mode, questions: ["change.requirement-support/1"] },
+    },
+  } } }));
+  writeProfile();
+  const files = [
+    ["src/Feature.kt", 'fun feature() = "old"'], ["src/Feature.swift", 'func feature() -> String { "old" }'], ["src/feature.py", 'def feature(): return "old"'],
+    ["src/commonTest/kotlin/Behavior.kt", '@Test fun rejects() { assertEquals("old", feature()) }'],
+    ["Tests/FeatureTests/Behavior.swift", 'func testRejects() { XCTAssertEqual(feature(), "old") }'],
+    ["tests/test_feature.py", 'def test_feature(): assert feature() == "old"'],
+    ["src/large.kt", "// supporting detail\n".repeat(60_000) + 'fun largeFeature() = "old"'],
+  ];
+  for (const [path, source] of files) { mkdirSync(dirname(join(root, path!)), { recursive: true }); writeFileSync(join(root, path!), `${source}\n`); }
+  git("add", "."); git("commit", "-qm", "base");
+  for (const [path, source] of files) writeFileSync(join(root, path!), `${source!.replaceAll("old", "staged")}\n`);
+  git("add", ".");
+  const registry = mergePacks([{ source: "config/validation/packs/native.yaml", origin: "target", value: {
+    id: "native", enforcement: "blocking", stages: ["batch"], path_globs: ["src/**", "Tests/**", "tests/**"], commands: ["fixture"],
+  } }]);
+  const prepare = () => {
+    const scope = resolveChangeScope(root, { staged: true });
+    return { subject: new ValidationSubject(root, scope), scope, registry, plan: buildPlan(registry, { stage: "batch", mode: "impacted", changedPaths: scope.records.map(item => item.path) }) };
+  };
+  const prepared = prepare(), nativePlan = digest(prepared.plan);
+  for (const [path] of files) writeFileSync(join(root, path!), "unstaged replacement\n");
+  let calls = 0;
+  const transport: DecisionRuntimeOptions = { coordinationRoot: temporary, token: "fixture", fetch: async (_url, init) => {
+    calls++; const payload = JSON.parse(String(init?.body)), serialized = JSON.stringify(payload);
+    for (const path of ["src/Feature.kt", "src/Feature.swift", "src/feature.py", "src/large.kt"]) assert.ok(serialized.includes(path), path);
+    assert.ok(serialized.includes("staged")); assert.ok(!serialized.includes("unstaged replacement"));
+    return Response.json({ model: "jev-1.13.0", usage: { input_tokens: 100, output_tokens: 10 }, answers: Object.fromEntries(Object.keys(payload.questions).map((name, index) =>
+      [name, { type: "choice", choice: index === 0 ? "partial" : "unknown", confidence: 0.95, probabilities: { supported: 0, partial: index === 0 ? 1 : 0, contradicted: 0, unknown: index === 0 ? 0 : 1 } }])) });
+  } };
+  const fixtureOptions = { ...transport, signal: new AbortController().signal };
+  const advice = await checkDecisionAdvice(prepared, { taskId: "native-review", revision: "1", purpose: "Change feature to staged" }, true, fixtureOptions);
+  assert.ok(advice && "review" in advice && advice.review); assert.equal(calls, 1);
+  assert.equal(advice.review.decisions.length, 1); assert.equal(advice.review.batched, true);
+  assert.deepEqual(advice.review.decisions[0]!.usage, { inputTokens: 100, outputTokens: 10 });
+  assert.equal(advice.review.coverage.captured, 7); assert.ok(advice.review.coverage.truncated);
+  assert.equal(advice.review.consumers[0]!.findings[0]?.classification, "partial");
+  assert.ok(advice.review.consumers.every(item => item.assessments.some(row => row.interpretation === "unknown")));
+  assert.equal(digest(prepared.plan), nativePlan);
+  const repeated = await checkDecisionAdvice(prepared, { taskId: "native-review", revision: "1", purpose: "Change feature to staged" }, true, fixtureOptions);
+  assert.ok(repeated && "review" in repeated && repeated.review); assert.equal(calls, 1, "same accepted evidence reuses the charged request");
+
+  writeProfile("auto", ["src/**"]); git("add", "config/governance/profile.yaml");
+  const deniedPrepared = prepare(), deniedPlan = digest(deniedPrepared.plan);
+  const denied = await checkDecisionAdvice(deniedPrepared, { taskId: "denied-review", revision: "1", purpose: "Change feature to staged" }, true, fixtureOptions);
+  assert.ok(denied && "review" in denied && denied.review); assert.equal(calls, 1);
+  assert.ok(denied.review.consumers.every(item => item.reason === "source-scope-disabled")); assert.equal(digest(deniedPrepared.plan), deniedPlan);
+
+  writeProfile("off"); git("add", "config/governance/profile.yaml");
+  const disabledPrepared = prepare(), disabledPlan = digest(disabledPrepared.plan);
+  assert.equal(await checkDecisionAdvice(disabledPrepared, { taskId: "disabled-review", revision: "1" }, true, fixtureOptions), null);
+  assert.equal(calls, 1); assert.equal(digest(disabledPrepared.plan), disabledPlan);
+
+  writeProfile(); git("add", "config/governance/profile.yaml");
+  const missingTransport = { ...fixtureOptions, token: "" };
+  const missingPrepared = prepare(), missing = await checkDecisionAdvice(missingPrepared, { taskId: "missing-review", revision: "1", purpose: "Change feature to staged" }, true, missingTransport);
+  assert.ok(missing && "review" in missing && missing.review); assert.equal(calls, 1);
+  assert.ok(missing.review.consumers.every(item => !item.delivered && item.reason === "missing-token"));
+  const failedTransport = { ...fixtureOptions, fetch: async () => { calls++; return new Response("fixture refusal", { status: 503 }); } };
+  const failed = await checkDecisionAdvice(missingPrepared, { taskId: "failed-review", revision: "1", purpose: "Change feature to staged" }, true, failedTransport);
+  assert.ok(failed && "review" in failed && failed.review); assert.equal(calls, 2);
+  assert.ok(failed.review.consumers.every(item => !item.delivered)); assert.equal(digest(prepared.plan), nativePlan);
+});
 
 test("all-mode exposure joins outcomes and unreadable native telemetry preserves computed advice", async () => {
   const temporary = realpathSync(mkdtempSync(join(tmpdir(), "check-advice-"))), root = join(temporary, "repo");

@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-02-16
-updated: 2026-10-04
+updated: 2026-10-05
 summary: Active and completed execution plans for the current source repository.
 ---
 
@@ -14,7 +14,24 @@ summary: Active and completed execution plans for the current source repository.
 Active plans are short-lived work records. Completed plans retain concise source closeout context;
 Git remains the implementation history and recovery mechanism.
 
+Use the [implementation-plan template](../../src/project_governance_runtime/assets/skills/resources/implementation-plan-template.md)
+and [validation strategy](../governance/validation-strategy.md) for meaningful batches, narrow check
+cadence, seam checkboxes and local commits. The [early-feedback guide](../developer/guides/batch-verification.md)
+shows existing project-owned checks; it does not require a check after every edit.
+
 ## Active
+
+- [Next major verification and semantic review](active/2026-10-04-major-verification-feedback.md)
+  owns the new development sequence: complete installed journeys, multilingual JEV advice,
+  early project-owned checks and known-fault detection before major-release qualification.
+
+- [Release evaluation delivery](active/2026-10-04-release-evaluation.md) adds the major's reporting
+  workstream: stable scorecards, full-chain context labels and outcome-linked comparisons using
+  existing receipts. The major plan retains release ownership.
+
+- [Focused linting MVP delivery](active/2026-10-05-linting-mvp.md) is proposed for review: two real
+  starter backends, language-neutral extensions, safe setup, coverage diagnosis and narrow normal-gate
+  enforcement. Runtime implementation has not started; the major plan retains release ownership.
 
 - [RC10.9 prompt entry and context references](active/2026-10-04-rc10-9-prompt-entry.md)
   repairs advisory native continuation, inherited session receipts and reference diagnostics.

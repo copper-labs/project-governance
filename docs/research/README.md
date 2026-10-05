@@ -5,7 +5,7 @@ type: research
 status: draft
 owner: project-governance
 created: 2026-09-18
-updated: 2026-09-21
+updated: 2026-10-04
 summary: Exploratory work that is not yet a specification, plan, or decision.
 ---
 
@@ -41,3 +41,9 @@ A harness and governance system whose control plane runs on a decision model rat
   compares primary sources on evidence selection, task categories, evaluations, harnesses and CI.
 - The [RC4 specification](../specs/engine-decision-rc4.md) owns accepted behavior; the
   [simplification review](../reviews/2026-09-21-rc4-simplification.md) records scope and tradeoffs.
+
+## Next major verification research
+
+- [Verification and semantic review research](2026-10-04-verification-feedback.md) covers installed
+  journeys, early checks, multilingual advice, mechanical rules and known-fault proof. The
+  [next major specification](../specs/engine-4-verification-feedback.md) owns accepted behavior.
