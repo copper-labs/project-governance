@@ -22,16 +22,16 @@ shows existing project-owned checks; it does not require a check after every edi
 ## Active
 
 - [Next major verification and semantic review](active/2026-10-04-major-verification-feedback.md)
-  owns the new development sequence: complete installed journeys, multilingual JEV advice,
-  early project-owned checks and known-fault detection before major-release qualification.
+  records the published 4.0.0 implementation, installed journeys, multilingual JEV advice,
+  early checks and known-fault detection. Deliberate field adoption remains separate.
 
 - [Release evaluation delivery](active/2026-10-04-release-evaluation.md) adds the major's reporting
   workstream: stable scorecards, full-chain context labels and outcome-linked comparisons using
   existing receipts. The major plan retains release ownership.
 
-- [Focused linting MVP delivery](active/2026-10-05-linting-mvp.md) is proposed for review: two real
+- [Focused linting MVP delivery](active/2026-10-05-linting-mvp.md) records qualified Ruff and ESLint
   starter backends, language-neutral extensions, safe setup, coverage diagnosis and narrow normal-gate
-  enforcement. Runtime implementation has not started; the major plan retains release ownership.
+  enforcement in 4.0.0. Adoption remains deliberate; the major plan retains release ownership.
 
 - [RC10.9 prompt entry and context references](active/2026-10-04-rc10-9-prompt-entry.md)
   repairs advisory native continuation, inherited session receipts and reference diagnostics.

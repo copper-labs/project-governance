@@ -137,7 +137,7 @@ Device/VM/remote lanes run only when qualified and relevant; no exhaustive cross
 - [x] Review the first complete report, reconcile flaws and retain the immutable release baseline.
 - [x] Include the scorecard in the major's existing sign-off/readback package; no extra approval gate.
 - [x] Update passive monitoring to emit only meaningful changed findings and latest comparable rows.
-- [ ] Keep release baselines across windows and label all configuration/mixed-generation changes.
+- [x] Keep release baselines across windows and label all configuration/mixed-generation changes.
 - [x] Add discovered operational failures to owning regressions without exposing private adopter data.
 
 Focused owning tests run per slice. At the major boundary use the existing package/installed proof
@@ -177,8 +177,9 @@ establish acceptance. The explicit installed long-log pilot preserves failures/r
 original references under controlled transport; live semantic usefulness is unqualified and default
 automatic output does not activate it.
 
-Current: the exact archive's source, installed and live characterization report is prepared with its
-known misses and gray dimensions. Actual model consumption, extra original reads, ungoverned
-bypass population, complete ordinary-task costs and accepted outcomes are unknown. Next: retain
-this baseline in the existing major release package after immutable readback, then collect matched
-ordinary-development evidence through the existing passive monitor. No adopter was changed.
+Current: 4.0.0's immutable publication and three-asset readback are verified. Its source, installed,
+published-old continuation and live characterization baseline is retained outside source with known
+misses and gray dimensions. The existing monitor preserves release baselines across windows and
+labels configuration or mixed-generation changes. Actual model consumption, extra original reads,
+ungoverned bypass population, complete ordinary-task costs and accepted outcomes remain unknown.
+Next: collect matched ordinary-development evidence through that passive monitor. No adopter changed.

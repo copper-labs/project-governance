@@ -30,12 +30,12 @@ The exact runtime/adopter responsibility split remains in
 Use [Get Useful Feedback Before Review](guides/batch-verification.md) to declare an early focused
 check through existing project packs and prove that a test catches an intended fault. The
 [next major delivery plan](../exec-plans/active/2026-10-04-major-verification-feedback.md) records
-installed journey and multilingual semantic-review development before release qualification.
+installed journey and multilingual semantic-review qualification for the published 4.0.0 release.
 
 The approved [focused linting MVP specification](../specs/engine-linting-mvp.md) and
 [delivery plan](../exec-plans/active/2026-10-05-linting-mvp.md) describe installable deterministic
-adapters, visible coverage and narrow required checks. Implementation is approved for the next major;
-installed qualification and publication remain release steps. Use [Adopt Focused Deterministic Linting](guides/focused-linting.md)
+adapters, visible coverage and narrow required checks. Source and installed qualification are complete
+in 4.0.0; field adoption remains deliberate. Use [Adopt Focused Deterministic Linting](guides/focused-linting.md)
 for proposal inspection, explicit setup and required batch coverage without model calls.
 
 Use [Update Delivery Plans Without Model Bookkeeping](guides/structured-delivery.md) to define

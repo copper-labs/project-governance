@@ -274,5 +274,9 @@ also passes first-source coverage refusal, setup/apply/repeat, specification/pla
 batch-before-review. Unsupported stacks keep existing project-owned custom packs; typed project
 closure and automatic debt baselines remain deferred.
 
-Next: the major release owner completes exact provenance, continuation and publication. Adoption
-in a real project is separate and deliberate. No adopter files or active native sessions were changed.
+Release closeout: 4.0.0's exact archive, lock and update metadata were published and verified by
+immutable readback after normal local hooks and published-old continuation passed. Hosted CI was
+omitted under the operator's manual-release authorization.
+
+Next: adopt the qualified adapter deliberately in a real project and collect ordinary-development
+evidence. No adopter files or active native sessions were changed.

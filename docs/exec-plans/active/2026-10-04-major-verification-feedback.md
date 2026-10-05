@@ -151,13 +151,13 @@ benefit are separate from deterministic transport fixtures.
 - [x] Consolidate guide updates and simplify any addition that duplicates an existing owner.
 - [x] Freeze source and run typecheck, complete engine/continuity/script suites and package build.
 - [x] Inspect archive boundaries and run complete clean installed journey proof against that archive.
-- [ ] Run exact published old archive to actual frozen major archive continuation once at release.
+- [x] Run exact published old archive to actual frozen major archive continuation once at release.
 - [x] Qualify installed batch-to-review entry with synthetic review preparation; native trust/use remains separate.
 - [x] Obtain independent architectural/code review and reconcile findings on the corrected source;
       final archive qualification remains a separate checkpoint.
 - [x] Include the qualified release scorecard and explicit unknowns using the existing proof package.
-- [ ] Prepare major version, changelog, exact archive and lock only after the release scope is complete.
-- [ ] Publish under the operator's existing release authorization and verify immutable readback.
+- [x] Prepare major version, changelog, exact archive and lock only after the release scope is complete.
+- [x] Publish under the operator's existing release authorization and verify immutable readback.
 - [x] Prepare a bounded adoption handoff with fixed model, approved JEV mode and remaining proof limits.
 
 No live adopter update is implied by this plan. Native desktop continuity, actual semantic accuracy,
@@ -245,11 +245,14 @@ with actual JEV metadata and passage calls carrying full bound intent. Four rese
 unused. The live multilingual matrix delivered all eight seeded defects but also produced false and
 unsupported findings; it establishes characterization, not universal accuracy or authority.
 
-Current: implementation, independent review and final installed qualification are complete. The
-release scorecard retains unknown host consumption, extra reads, accepted tasks and savings.
-Next: bind the archive to the owned commit, qualify exact published-old to actual-major continuation,
-then publish and verify immutable readback through the existing release owner. No adopter is updated.
-Release-closeout evidence remains outside source; a prepared release is not a published release.
+Current: 4.0.0 is published with immutable archive, lock and update metadata readback. Normal local
+hooks passed. Exact published RC10.9-to-major continuation preserves task history, refuses stale
+and foreign packets, and isolates cleanup between linked worktrees. Historical receipts remain
+unchanged; the verifier checks their bytes through the current integrity owner and records the
+actual installer schema. The release scorecard retains unknown host consumption, extra reads,
+accepted tasks and savings. Hosted CI was omitted under the operator's manual-release authorization.
+Next: deliberate adoption and matched ordinary-development measurement through the existing monitor.
+No adopter was updated. Release-closeout evidence remains outside source.
 
 ## Simplification constraints
 
