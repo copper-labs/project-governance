@@ -211,6 +211,7 @@ async function verifyWorktreeCutover({ packageRoot, archive, temporary, workspac
   await verifyLinkedNativeHooks({packageRoot,sibling,siblingRegistry,temporary,environment});
   const candidate = upgradeInputs.candidate ?? continuationCandidate(packageRoot, temporary, environment);
   const nextLock = candidate.lock ?? { ...lock, version: candidate.version, artifact: candidate.artifact, source_commit: 'b'.repeat(40) };
+  candidate.lock ??= nextLock;
   candidate.archiveDigest ??= 'sha256:' + createHash('sha256').update(readFileSync(candidate.archive)).digest('hex');
   const siblingGenerations = new RuntimeGenerations(siblingRegistry), reader = siblingGenerations.acquire('fixture:active-job');
   const pinnedDirectory = reader.directory;

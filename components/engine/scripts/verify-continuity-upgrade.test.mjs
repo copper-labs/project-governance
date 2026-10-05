@@ -7,9 +7,126 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createInterface } from 'node:readline';
-import { continuationCandidate, continuationInputs } from './verify-continuity-upgrade.mjs';
+import { continuationCandidate, continuationInputs, verifyContinuationInstallation } from './verify-continuity-upgrade.mjs';
 import { verifyRuntimeArchive } from '../src/runtime-artifact.ts';
 import { compiledRuntimeLock } from '../src/runtime-lock.ts';
+import { digest } from '../src/core.ts';
+
+function installationFixture(version = '3.0.0-rc.10.9') {
+  const directory = mkdtempSync(join(tmpdir(), 'continuity-old-installation-test-'));
+  const bytes = Buffer.from(`synthetic retained ${version} archive bytes`);
+  const lock = { schema_version: 2, package: '@organta/project-governance', version,
+    artifact: { url: `https://example.invalid/releases/${version}.tgz`,
+      integrity: 'sha512-' + createHash('sha512').update(bytes).digest('base64') },
+    source_commit: 'a'.repeat(40), node: '>=24.16.0 <25', configuration_schema: 1 };
+  const payload = { lock, version: lock.version, archiveDigest: 'sha256:' + createHash('sha256').update(bytes).digest('hex') };
+  const installation = { version: 1, state: 'staged', directory,
+    executable: join(directory, 'node_modules/@organta/project-governance/dist/engine/src/cli.js'),
+    lockDigest: digest(lock), lock, archive: { version: 1, package: lock.package, packageVersion: lock.version,
+      integrity: lock.artifact.integrity, bytes: bytes.length, scope: 'archive-bytes-only' },
+    dependencies: { fixture: 'synthetic' }, installedTree: { fixture: 'synthetic' }, nodeVersion: '24.16.0', activation: 'not-performed' };
+  const receipt = join(directory, 'installation.json'), archive = join(directory, 'runtime.tgz');
+  const write = () => writeFileSync(receipt, JSON.stringify(installation));
+  write(); writeFileSync(archive, bytes);
+  // Only the historical owner's return shape is simulated; the current owner still verifies every byte.
+  const legacyInstallerArchive = (path, lock) => {
+    const { digest, ...legacy } = verifyRuntimeArchive(path, lock); return legacy;
+  };
+  const installer = { package: lock.package, version: '3.0.0-rc.10.9', scope: 'synthetic-installer-schema-fixture' };
+  const qualify = (options = {}) => verifyContinuationInstallation({ directory, payload,
+    verifyArchive: verifyRuntimeArchive, verifyInstallerArchive: legacyInstallerArchive, installer, ...options });
+  return { directory, bytes, installation, payload, receipt, archive, write, qualify };
+}
+
+test('original RC10.9 installation metadata derives SHA256 from valid retained bytes without changing originals', () => {
+  const f = installationFixture();
+  try {
+    assert.deepEqual(Object.keys(f.installation).sort(), ['activation', 'archive', 'dependencies', 'directory', 'executable',
+      'installedTree', 'lock', 'lockDigest', 'nodeVersion', 'state', 'version']);
+    assert.deepEqual(Object.keys(f.installation.archive).sort(), ['bytes', 'integrity', 'package', 'packageVersion', 'scope', 'version']);
+    const receipt = readFileSync(f.receipt), archive = readFileSync(f.archive), payload = structuredClone(f.payload);
+    const result = f.qualify();
+    assert.equal(result.digest, f.payload.archiveDigest); assert.equal(result.integrity, f.installation.archive.integrity);
+    assert.equal(result.bytes, archive.length); assert.equal(result.digestSource, 'verified-retained-archive-legacy-metadata');
+    assert.equal(result.installer.version, '3.0.0-rc.10.9'); assert.equal(result.installer.recordsArchiveDigest, false);
+    assert.deepEqual(result.installer.expectedArchiveFields, Object.keys(f.installation.archive).sort());
+    assert.deepEqual(readFileSync(f.receipt), receipt); assert.deepEqual(readFileSync(f.archive), archive);
+    assert.deepEqual(f.payload, payload); assert.equal(Object.hasOwn(JSON.parse(readFileSync(f.receipt, 'utf8')).archive, 'digest'), false);
+  } finally { rmSync(f.directory, { recursive: true, force: true }); }
+});
+
+test('legacy archive qualification rejects bad original integrity and changed retained bytes', () => {
+  const f = installationFixture();
+  try {
+    writeFileSync(f.archive, Buffer.concat([f.bytes, Buffer.from('changed bytes')]));
+    assert.throws(() => f.qualify(), /Runtime archive integrity mismatch/);
+    writeFileSync(f.archive, f.bytes);
+    f.installation.lock.artifact.integrity = 'sha512-' + Buffer.alloc(64).toString('base64'); f.write();
+    assert.throws(() => f.qualify(), /Runtime archive integrity mismatch/);
+  } finally { rmSync(f.directory, { recursive: true, force: true }); }
+});
+
+test('legacy archive qualification refuses mismatched original lock source and archive descriptor', () => {
+  const f = installationFixture();
+  try {
+    for (const change of [lock => { lock.source_commit = 'b'.repeat(40); },
+      lock => { lock.artifact.url = 'https://example.invalid/releases/different.tgz'; }]) {
+      const original = f.installation.lock;
+      f.installation.lock = structuredClone(original); change(f.installation.lock); f.write();
+      assert.throws(() => f.qualify(), /exact original lock and source/);
+      f.installation.lock = original; f.write();
+    }
+    assert.equal(f.qualify().digest, f.payload.archiveDigest);
+  } finally { rmSync(f.directory, { recursive: true, force: true }); }
+});
+
+test('legacy archive qualification refuses contradictory recorded integrity or SHA256 digest', () => {
+  const f = installationFixture();
+  try {
+    f.installation.archive.integrity = 'sha512-' + Buffer.alloc(64).toString('base64'); f.write();
+    assert.throws(() => f.qualify(), /Recorded archive integrity differs/);
+    f.installation.archive.integrity = f.payload.lock.artifact.integrity;
+    for (const digest of ['sha256:' + '0'.repeat(64), null, false]) {
+      f.installation.archive.digest = digest; f.write();
+      assert.throws(() => f.qualify(), /Recorded archive digest conflicts/);
+    }
+  } finally { rmSync(f.directory, { recursive: true, force: true }); }
+});
+
+test('candidate archive qualification records a legacy installer schema while strictly verifying the whole candidate lock and bytes', () => {
+  const f = installationFixture('4.0.0');
+  try {
+    const original = readFileSync(f.receipt), result = f.qualify();
+    assert.equal(result.digest, f.payload.archiveDigest); assert.equal(result.recordedDigest, false);
+    assert.equal(result.installer.version, '3.0.0-rc.10.9'); assert.equal(result.installer.recordsArchiveDigest, false);
+    assert.equal(result.digestSource, 'verified-retained-archive-legacy-metadata');
+    assert.deepEqual(readFileSync(f.receipt), original);
+    const lock = f.installation.lock;
+    f.installation.lock = { ...lock, source_commit: 'b'.repeat(40) }; f.write();
+    assert.throws(() => f.qualify(), /exact original lock and source/);
+    f.installation.lock = lock; f.write();
+    writeFileSync(f.archive, Buffer.concat([f.bytes, Buffer.from('different candidate bytes')]));
+    assert.throws(() => f.qualify(), /Runtime archive integrity mismatch/);
+  } finally { rmSync(f.directory, { recursive: true, force: true }); }
+});
+
+test('candidate archive qualification requires recorded SHA256 when the actual current installer owner produces it', () => {
+  const f = installationFixture('4.0.0');
+  try {
+    assert.throws(() => verifyContinuationInstallation({ directory: f.directory, payload: f.payload,
+      verifyArchive: verifyRuntimeArchive }), /Current installer must record/);
+    f.installation.archive.digest = f.payload.archiveDigest; f.write();
+    const current = { verifyInstallerArchive: verifyRuntimeArchive,
+      installer: { package: f.payload.lock.package, version: '4.0.0', scope: 'synthetic-installer-schema-fixture' } };
+    const result = f.qualify(current);
+    assert.equal(result.digestSource, 'recorded-and-verified-retained-archive');
+    assert.equal(result.installer.recordsArchiveDigest, true); assert.equal(result.installer.expectedArchiveFields.includes('digest'), true);
+    const original = f.payload.archiveDigest; f.payload.archiveDigest = 'sha256:' + '0'.repeat(64);
+    assert.throws(() => f.qualify(current), /Retained archive bytes differ/);
+    f.payload.archiveDigest = original;
+    assert.equal(f.qualify(current).digest, original);
+  } finally { rmSync(f.directory, { recursive: true, force: true }); }
+});
 
 test('explicit continuation inputs retain exact old/4.0.0 archives and original locks without relabeling', () => {
   const temporary = mkdtempSync(join(tmpdir(), 'continuity-explicit-input-test-'));

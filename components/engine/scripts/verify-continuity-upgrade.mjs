@@ -32,6 +32,38 @@ export function continuationInputs(packageRoot, archive, options = {}) {
   return { old, candidate, mode: candidate ? 'explicit-local-archives' : 'synthetic-generation-separation' };
 }
 
+/** Verify exact retained bytes; the actual installer owner determines its recorded receipt shape. */
+export function verifyContinuationInstallation({ directory, payload, verifyArchive, verifyInstallerArchive = verifyArchive, installer }) {
+  const installation = JSON.parse(readFileSync(join(directory, 'installation.json'), 'utf8'));
+  assert.equal(installation.lock.version, payload.version);
+  assert.deepEqual(installation.lock, payload.lock, 'Installed archive must retain the exact original lock and source');
+  const archive = join(directory, 'runtime.tgz'), verified = verifyArchive(archive, installation.lock);
+  assert.match(verified.digest, /^sha256:[a-f0-9]{64}$/u, 'Archive verification owner must provide SHA256 identity');
+  assert.equal(verified.digest, payload.archiveDigest, 'Retained archive bytes differ from the selected payload');
+  const written = verifyInstallerArchive(archive, installation.lock);
+  for (const field of ['version', 'package', 'packageVersion', 'integrity', 'bytes', 'scope']) {
+    assert.equal(written[field], verified[field], `Installer archive ${field} differs from verified retained bytes`);
+    assert.equal(installation.archive[field], verified[field], `Recorded archive ${field} differs from verified retained bytes`);
+  }
+  const recordedDigest = Object.hasOwn(installation.archive, 'digest');
+  const installerRecordsDigest = Object.hasOwn(written, 'digest');
+  if (installerRecordsDigest) assert.equal(written.digest, verified.digest, 'Installer archive digest conflicts with current verification owner');
+  assert.ok(recordedDigest || !installerRecordsDigest, 'Current installer must record its archive SHA256 digest');
+  if (recordedDigest) assert.equal(installation.archive.digest, verified.digest, 'Recorded archive digest conflicts with verified retained bytes');
+  return { digest: verified.digest, integrity: verified.integrity, bytes: verified.bytes,
+    digestSource: recordedDigest ? 'recorded-and-verified-retained-archive' : 'verified-retained-archive-legacy-metadata',
+    installer: { ...installer, expectedArchiveFields: Object.keys(written).sort(), recordsArchiveDigest: installerRecordsDigest }, recordedDigest };
+}
+
+function continuationInstaller(packageRoot) {
+  const manifest = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8'));
+  const modules = ['runtime-staging', 'runtime-artifact'].map(name => {
+    const path = join(packageRoot, `dist/engine/src/${name}.js`);
+    return { owner: name, path, digest: `sha256:${createHash('sha256').update(readFileSync(path)).digest('hex')}` };
+  });
+  return { package: manifest.name, version: manifest.version, modules };
+}
+
 /** Derive a distinct offline version in scratch; the qualified source package stays intact. */
 export function continuationCandidate(packageRoot, temporary, environment = process.env) {
   const manifest = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8'));
@@ -95,11 +127,18 @@ async function nativeHost({ packageRoot, workspace, environment, log }) {
 /** Real installed hooks and live fixture parents; continuity inspection never substitutes for entry. */
 export async function continuityUpgradeJourney({ packageRoot, temporary, workspace, sibling, registry, siblingRegistry, environment, oldPayload, candidatePayload }) {
   const load = name => import(pathToFileURL(join(packageRoot, `dist/engine/src/${name}.js`)).href);
-  const [{ RuntimeGenerations }, { StartupTasks }, { contextDoctor }, { contextStateRoot }, { startupEvent }, { defaultDbPath, workContext }] = await Promise.all([
+  const [{ RuntimeGenerations }, { StartupTasks }, { contextDoctor }, { contextStateRoot }, { startupEvent }, { defaultDbPath, workContext },
+    { verifyRuntimeArchive }, { verifyRuntimeArchive: verifyInstallerArchive }] = await Promise.all([
     load('runtime-generations'), load('startup-tasks'), load('context-doctor'), load('context-command'),
     load('startup-event'),
     import(pathToFileURL(join(packageRoot, 'dist/harness/src/store/location.js')).href),
+    import(pathToFileURL(join(candidatePayload?.packageRoot ?? packageRoot, 'dist/engine/src/runtime-artifact.js')).href),
+    load('runtime-artifact'),
   ]);
+  const installer = continuationInstaller(packageRoot), archiveInstallations = [];
+  const verifyInstallation = (item, payload, phase) => archiveInstallations.push({ worktree: item.role, phase, version: payload.version,
+    ...verifyContinuationInstallation({ directory: generations(item).directory, payload, verifyArchive: verifyRuntimeArchive,
+      verifyInstallerArchive, installer }) });
   const session = 'continuity-upgrade-host', env = { ...environment, HARNESS_SESSION: session, JEV_TOKEN: '' };
   delete env.NODE_OPTIONS; delete env.GOVERNANCE_DECISION_CONTEXT;
   const stateRoot = root => {
@@ -203,8 +242,7 @@ export async function continuityUpgradeJourney({ packageRoot, temporary, workspa
     assert.notEqual(stateRoot(workspace), stateRoot(sibling));
     for (const item of items) {
       if (oldPayload) {
-        const installation = JSON.parse(readFileSync(join(generations(item).directory, 'installation.json'), 'utf8'));
-        assert.equal(installation.lock.version, oldPayload.version); assert.equal(installation.archive.digest, oldPayload.archiveDigest);
+        verifyInstallation(item, oldPayload, 'old');
       }
       localProfile(item);
       await start(item);
@@ -243,7 +281,7 @@ export async function continuityUpgradeJourney({ packageRoot, temporary, workspa
         await assertLocalPacket(main, main.currentEntry.id);
         const active = JSON.parse(readFileSync(join(generations(main).directory, 'installation.json'), 'utf8'));
         assert.equal(active.lock.version, version); assert.equal(owner(main).host.pid, main.host.pid);
-        if (candidatePayload) { assert.equal(version, candidatePayload.version); assert.equal(active.archive.digest, candidatePayload.archiveDigest); }
+        if (candidatePayload) { assert.equal(version, candidatePayload.version); verifyInstallation(main, candidatePayload, 'candidate'); }
         assert.deepEqual(generations(linked), siblingState); assert.deepEqual(owner(linked), siblingOwner);
         await assertHistory(linked); await refuseForeign(main, linked.boundEntry); await refuseForeign(linked, main.currentEntry);
         await end(main); restoreProfile(main);
@@ -259,7 +297,7 @@ export async function continuityUpgradeJourney({ packageRoot, temporary, workspa
         await assertLocalPacket(linked, linked.currentEntry.id);
         const active = JSON.parse(readFileSync(join(generations(linked).directory, 'installation.json'), 'utf8'));
         assert.equal(active.lock.version, version);
-        if (candidatePayload) { assert.equal(version, candidatePayload.version); assert.equal(active.archive.digest, candidatePayload.archiveDigest); }
+        if (candidatePayload) { assert.equal(version, candidatePayload.version); verifyInstallation(linked, candidatePayload, 'candidate'); }
         await refuseForeign(linked, main.currentEntry); await end(linked); restoreProfile(linked);
         for (const item of items) assert.equal(generations(item).readers.length, 0);
         return { status: 'passed', session: 'same synthetic session in distinct linked worktrees',
@@ -268,6 +306,7 @@ export async function continuityUpgradeJourney({ packageRoot, temporary, workspa
           candidatePayload: candidatePayload?.sourceIdentity ?? 'same compiled development payload with a distinct synthetic version; published-old to actual 4.0.0 upgrade remains release qualification',
           archives: { old: oldPayload ? { path: oldPayload.archive, version: oldPayload.version, digest: oldPayload.archiveDigest, sourceIdentity: oldPayload.sourceIdentity } : null,
             candidate: candidatePayload ? { path: candidatePayload.archive, version: candidatePayload.version, digest: candidatePayload.archiveDigest, sourceIdentity: candidatePayload.sourceIdentity } : null },
+          archiveInstallations,
           hookDeadlines,
           hostEvidence: 'synthetic native ancestors and installed hooks only; desktop reattachment and accepted ordinary development not tested' };
       }, cleanup,

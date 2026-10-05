@@ -200,4 +200,3 @@ test("portable historical metadata binds check items and the entire specificatio
     rmSync(f.directory, { recursive: true, force: true });
   }
 });
-
