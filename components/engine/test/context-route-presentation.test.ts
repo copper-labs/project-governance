@@ -23,12 +23,12 @@ test("ready baseline context names the unavailable semantic selection without cl
 test("partial, full, negative-only and shadow assessments remain distinct from packet delivery", () => {
   const metadata = { reason: "budget-exhausted", coverage: { answeredCount: 63, permittedCount: 500, complete: false, applied: true, mode: "auto" } };
   const partial = contextSelectionStatus(packet({ metadata }));
-  assert.equal(partial.mode, "jev"); assert.equal(partial.coverage, "partial"); assert.match(partial.summary, /63\/500/);
+  assert.equal(partial.mode, "provider"); assert.equal(partial.coverage, "partial"); assert.match(partial.summary, /63\/500/);
   assert.match(partial.summary, /remaining items use local fallback/);
   const complete = contextSelectionStatus(packet({ metadata: { reason: "answered", coverage: { ...metadata.coverage, answeredCount: 500, complete: true } } }));
-  assert.equal(complete.mode, "jev"); assert.equal(complete.coverage, "complete"); assert.equal(complete.applied, true);
+  assert.equal(complete.mode, "provider"); assert.equal(complete.coverage, "complete"); assert.equal(complete.applied, true);
   const negative = contextSelectionStatus(packet({ metadata: { reason: "answered", coverage: { ...metadata.coverage, answeredCount: 500, complete: true, applied: false } } }));
-  assert.equal(negative.mode, "jev"); assert.equal(negative.applied, false, "Valid answers need not change local ordering");
+  assert.equal(negative.mode, "provider"); assert.equal(negative.applied, false, "Valid answers need not change local ordering");
   const shadow = contextSelectionStatus(packet({ metadata: { reason: "shadow", coverage: { ...metadata.coverage, mode: "shadow", applied: false } } }));
   assert.equal(shadow.mode, "shadow"); assert.equal(shadow.applied, false); assert.match(shadow.summary, /results were not applied/);
   const blocked = contextSelectionStatus(packet({ ready: false, metadata: null }));
@@ -37,10 +37,10 @@ test("partial, full, negative-only and shadow assessments remain distinct from p
 
 test("legacy advice does not pretend to have complete index coverage", () => {
   const status = contextSelectionStatus(packet({ metadata: null, optional: { decision: { method: "jev", reason: "answered" } } }));
-  assert.equal(status.mode, "jev"); assert.equal(status.coverage, "unknown"); assert.match(status.summary, /coverage is unknown/);
+  assert.equal(status.mode, "provider"); assert.equal(status.coverage, "unknown"); assert.match(status.summary, /coverage is unknown/);
   const inactive = { reason: "metadata-question-disabled", coverage: { answeredCount: 0, permittedCount: 50, complete: false, applied: false } };
   const used = contextSelectionStatus(packet({ metadata: inactive, optional: { decision: { method: "jev", reason: "answered" } } }));
-  assert.equal(used.mode, "jev"); assert.equal(used.coverage, "unknown"); assert.equal(used.reason, "answered");
+  assert.equal(used.mode, "provider"); assert.equal(used.coverage, "unknown"); assert.equal(used.reason, "answered");
   const fallback = contextSelectionStatus(packet({ metadata: inactive, optional: { reason: "provider-unavailable", decision: null } }));
   assert.equal(fallback.mode, "local"); assert.match(fallback.summary, /provider-unavailable/);
 });

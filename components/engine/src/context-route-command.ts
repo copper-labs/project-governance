@@ -1,4 +1,5 @@
 import { parseArgs } from "node:util";
+import { configuredDecisionProvider } from "./decision-providers.ts";
 import { fileURLToPath } from "node:url";
 import { realpathSync } from "node:fs";
 import { join } from "node:path";
@@ -100,8 +101,11 @@ function routedDecisionProvider(input: { supplied: DecisionProvider | undefined;
     async decide(request) {
       const available = new Set(request.candidates.map(item => item.id));
       const order = [...new Set([...metadata.order.filter(path => available.has(path)), ...available])];
-      return { version: 1, kind: request.kind, inputDigest: digest(request), delivered: order, suggested: metadata.delivered ? order : null,
-        method: metadata.delivered ? "jev" : "baseline", reason: metadata.reason, model: metadata.decisions.find(item => item.model)?.model ?? null,
+      return { version: 3, kind: request.kind, inputDigest: digest(request), delivered: order, suggested: metadata.delivered ? order : null,
+        ...(metadata.decisions.some(item => item.providerCalled === true) ? { providerCalled: true }
+          : metadata.decisions.every(item => typeof item.providerCalled === "boolean") ? { providerCalled: false } : {}),
+        provider: metadata.decisions[0]?.provider ?? configuredDecisionProvider(settings.provider, settings.legacy.model, settings.configDigest),
+        method: metadata.delivered ? "provider" : "baseline", reason: metadata.reason, model: metadata.decisions.find(item => item.model)?.model ?? null,
         questionVersion: "context.metadata-relevance/1", confidence: null, latencyMs: metadata.decisions.reduce((sum, item) => sum + item.latencyMs, 0),
         usage: { inputTokens: null, outputTokens: null } };
     },
@@ -117,8 +121,10 @@ function routedDecisionProvider(input: { supplied: DecisionProvider | undefined;
       });
       onAdvice(advice);
       const decision = advice.decision;
-      return { version: 1, kind: request.kind, inputDigest: digest(request), delivered: advice.order,
-        suggested: advice.delivered ? advice.order : null, method: advice.delivered ? "jev" : "baseline",
+      return { version: 3, kind: request.kind, inputDigest: digest(request), delivered: advice.order,
+        ...(decision ? typeof decision.providerCalled === "boolean" ? { providerCalled: decision.providerCalled } : {} : { providerCalled: false }),
+        suggested: advice.delivered ? advice.order : null,
+        provider: decision?.provider ?? configuredDecisionProvider(settings.provider, settings.legacy.model, settings.configDigest), method: advice.delivered ? "provider" : "baseline",
         reason: advice.reason, model: decision?.model ?? null, questionVersion: "context.relevance/1",
         confidence: null, latencyMs: decision?.latencyMs ?? 0, usage: decision?.usage ?? { inputTokens: null, outputTokens: null } };
     },
@@ -135,8 +141,8 @@ function metadataReceiptPreview(metadata: MetadataSelection | null) {
     catalogDigest: digest(metadata.catalog.candidates), order: metadata.order.slice(0, 64), assessed: metadata.assessed.slice(0, 64),
     assessedCount: metadata.assessed.length, excluded: metadata.excluded.slice(0, 64),
     sourceIndex: { ...metadata.sourceIndex, descriptionOmissions: metadata.sourceIndex.descriptionOmissions.slice(0, 64) },
-    decisions: metadata.decisions.map(({ receiptId, reason, mode, delivered, providerCalled, model, latencyMs, usage, transport, tokenEstimate }) =>
-      ({ receiptId, reason, mode, delivered, providerCalled, model, latencyMs, usage, ...(transport ? { transport } : {}), tokenEstimate })) };
+    decisions: metadata.decisions.map(({ receiptId, reason, mode, delivered, providerCalled, provider, model, latencyMs, usage, transport, tokenEstimate }) =>
+      ({ receiptId, reason, mode, delivered, providerCalled, provider, model, latencyMs, usage, ...(transport ? { transport } : {}), tokenEstimate })) };
 }
 
 function projectionReceiptPreview(projection: ReturnType<typeof maintainContextProjection>, admitted: Set<string>) {
@@ -507,7 +513,7 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
     ...(binding.context ? { expected: { taskId: binding.context.taskId, revision: binding.context.revision,
       ...(binding.attemptId ? { attemptId: binding.attemptId } : {}) } } : {}),
   }) : null;
-  const receipt = { version: 1, ...runtimeExecutionIdentity(), workspace: root, receiptId, execution, createdAt: new Date().toISOString(), ...identity, selection, expansion,
+  const receipt = { version: 3, ...runtimeExecutionIdentity(), workspace: root, receiptId, execution, createdAt: new Date().toISOString(), ...identity, selection, expansion,
     timing: timing.snapshot(metadata?.providerCallMs ?? 0, projection.status.elapsedMs),
     projection: projectionReceiptPreview(projection, admittedPaths),
     procedureReferences: procedureReferences.slice(0, 64), procedureReferenceCount: procedureReferences.length,

@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import type { DecisionProviderPolicy } from "./decision-providers.ts";
 /** One machine/user provider pool; only short SQLite transactions own admission and health. */
 import { DatabaseSync } from "node:sqlite";
 import { closeSync, lstatSync, mkdirSync, openSync } from "node:fs";
@@ -13,7 +15,7 @@ export const PROVIDER_REQUESTS_PER_MINUTE = 960;
 export const PROVIDER_LEASE_CLEANUP_MS = 1000;
 export const PROVIDER_AUTH_COOLDOWN_MS = 300000;
 export const providerCoordinationRoot = () => join(process.env.XDG_STATE_HOME ?? join(homedir(), ".local", "state"), "project-governance", "provider-admission");
-export const providerDatabasePath = (root: string) => join(root, "jev-admission.sqlite");
+export const providerDatabasePath = (root: string, accountScope?: string) => join(root, accountScope ? `admission-${createHash("sha256").update(accountScope).digest("hex")}.sqlite` : "jev-admission.sqlite");
 
 export type ProviderAdmission =
   | { state: "admitted"; id: string; active: number }
@@ -23,9 +25,11 @@ export type ProviderAdmission =
 /** Paid task accounting stays with decision-budget; this store cannot mint a task allowance. */
 export class ProviderPool {
   readonly #db: DatabaseSync;
-  constructor(root = providerCoordinationRoot()) {
+  readonly #policy: DecisionProviderPolicy;
+  constructor(root = providerCoordinationRoot(), options: { accountScope?: string; policy?: DecisionProviderPolicy } = {}) {
+    this.#policy = options.policy ?? { concurrency: PROVIDER_CONCURRENCY, requestsPerMinute: PROVIDER_REQUESTS_PER_MINUTE, estimatedInputTokensPerSecond: PROVIDER_TOKENS_PER_SECOND, maxRequestBytes: PROVIDER_TOKENS_PER_SECOND };
     mkdirSync(root, { recursive: true, mode: 0o700 });
-    const path = providerDatabasePath(root);
+    const path = providerDatabasePath(root, options.accountScope);
     try { closeSync(openSync(path, "wx", 0o600)); }
     catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error; }
     const stat = lstatSync(path);
@@ -65,7 +69,7 @@ export class ProviderPool {
   }
 
   acquire(credential: string, tokens: number, now: number, leaseMs: number, failureScope = credential): ProviderAdmission {
-    if (!Number.isSafeInteger(tokens) || tokens < 0 || tokens > PROVIDER_TOKENS_PER_SECOND || !Number.isFinite(now) || leaseMs < 1 || leaseMs > CONTEXT_OPERATION_MS + PROVIDER_LEASE_CLEANUP_MS)
+    if (!Number.isSafeInteger(tokens) || tokens < 0 || tokens > this.#policy.maxRequestBytes || !Number.isFinite(now) || leaseMs < 1 || leaseMs > CONTEXT_OPERATION_MS + PROVIDER_LEASE_CLEANUP_MS)
       throw new Error("provider-admission-invalid");
     return this.#transaction(() => {
       this.#db.prepare("DELETE FROM leases WHERE expires<=?").run(now);
@@ -74,10 +78,10 @@ export class ProviderPool {
       const reason = this.#suppression(credential, now, failureScope);
       if (reason) return { state: "suppressed", reason };
       const active = Number(this.#db.prepare("SELECT count(*) AS n FROM leases").get()!.n);
-      if (active >= PROVIDER_CONCURRENCY) return { state: "wait", reason: "concurrency", waitMs: 10 };
+      if (active >= this.#policy.concurrency) return { state: "wait", reason: "concurrency", waitMs: 10 };
       const rate = this.#db.prepare("SELECT count(*) AS requests,coalesce(sum(CASE WHEN at>? THEN tokens ELSE 0 END),0) AS tokens,min(at) AS oldest FROM calls").get(now - 1000)!;
-      if (Number(rate.requests) >= PROVIDER_REQUESTS_PER_MINUTE) return { state: "wait", reason: "rate", waitMs: Math.max(1, Math.min(100, Number(rate.oldest) + 60000 - now)) };
-      if (Number(rate.tokens) + tokens > PROVIDER_TOKENS_PER_SECOND) return { state: "wait", reason: "rate", waitMs: 25 };
+      if (Number(rate.requests) >= this.#policy.requestsPerMinute) return { state: "wait", reason: "rate", waitMs: Math.max(1, Math.min(100, Number(rate.oldest) + 60000 - now)) };
+      if (this.#policy.estimatedInputTokensPerSecond !== null && Number(rate.tokens) + tokens > this.#policy.estimatedInputTokensPerSecond) return { state: "wait", reason: "rate", waitMs: 25 };
       const id = randomUUID();
       this.#db.prepare("INSERT INTO leases VALUES (?,?)").run(id, now + leaseMs);
       this.#db.prepare("INSERT INTO calls VALUES (?,?,?,NULL)").run(id, now, tokens);
@@ -91,7 +95,7 @@ export class ProviderPool {
       if (this.#suppression(credential, now, failureScope)) return false;
       const own = this.#db.prepare("SELECT tokens FROM calls WHERE id=?").get(id);
       const rate = this.#db.prepare("SELECT count(*) AS requests,coalesce(sum(CASE WHEN at>? THEN tokens ELSE 0 END),0) AS tokens FROM calls WHERE id<>? AND at>?").get(now - 1000, id, now - 60000)!;
-      if (!own || Number(rate.requests) >= PROVIDER_REQUESTS_PER_MINUTE || Number(rate.tokens) + Number(own.tokens) > PROVIDER_TOKENS_PER_SECOND) return false;
+      if (!own || Number(rate.requests) >= this.#policy.requestsPerMinute || this.#policy.estimatedInputTokensPerSecond !== null && Number(rate.tokens) + Number(own.tokens) > this.#policy.estimatedInputTokensPerSecond) return false;
       if (this.#db.prepare("UPDATE leases SET expires=? WHERE id=? AND expires>?").run(now + leaseMs, id, now).changes !== 1) return false;
       this.#db.prepare("UPDATE calls SET at=? WHERE id=?").run(now, id);
       return true;

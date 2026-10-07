@@ -8,7 +8,7 @@ import type { BudgetScope } from "./decision-budget.ts";
 /** Known lifecycle events need no model. Only explicitly supplied, native-bound residual text is eligible. */
 export async function attentionAdvice(runtime: DecisionRuntime, native: { run: WorkflowRun; stages: WorkflowStage[]; events: unknown[] }, raw: unknown, scope: BudgetScope | null) {
   const eligibility = runtime.eligibility("DL06");
-  const base = { version: 1, mode: eligibility.mode, effect: "advise", structuredEvents: native.events.length,
+  const base = { version: 3, mode: eligibility.mode, effect: "advise", structuredEvents: native.events.length,
     eligible: 0, unassessed: 0, delivered: false, disposition: null as string | null, receiptId: null as string | null,
     actualAvoidedTurns: null, reason: "structured-events-only", authority: "observation only; native delivery and wait result unchanged" };
   if (eligibility.mode === "off") return { ...base, reason: "off" };

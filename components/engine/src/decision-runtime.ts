@@ -1,3 +1,5 @@
+import { configuredDecisionProvider, sameConfiguredDecisionProvider, decisionProviderAdapter, type DecisionProviderIdentity, type DecisionUsage } from "./decision-providers.ts";
+import { readDecisionOutcome } from "./decision-outcome-reader.ts";
 import { prepareDecisionRequest } from "./decision-request-preparation.ts";
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync, statSync, realpathSync } from "node:fs";
@@ -9,11 +11,11 @@ import { digest, durableJson, object } from "./core.ts";
 import { matchesPackPath } from "./planning.ts";
 import { DECISION_CONSUMERS, DECISION_QUESTIONS } from "./decision-catalog.ts";
 import { reserveDecisionCall, closeDecisionScope, contextBudgetScope, contextFamilyScope, type BudgetScope, type BudgetReservation } from "./decision-budget.ts";
-import { JevDecisionClient, decisionCancellationReason, type TransportOptions, type TransportTiming } from "./decision-transport.ts";
+import { DecisionClient, decisionCancellationReason, type TransportOptions, type TransportTiming } from "./decision-transport.ts";
 import { CONTEXT_OPERATION_MS } from "./context-timing.ts";
 import { resolveConsumerMode, type DecisionSettings } from "./decision-settings.ts";
 import {
-  decisionNativeUsage, parseDecisionEnvelope, requestIdentity,
+  requestIdentity,
   metadataQuestionGroup, passageQuestionGroup,
   type DecisionConsumerId, type DecisionCoverage, type DecisionEffect, type DecisionFailureStage, type DecisionMode,
   type EvidenceItem, type QuestionInstance, type QuestionOutcome,
@@ -50,7 +52,7 @@ export interface DecisionAsk {
   runId?: string;
 }
 export interface DecisionOutcome {
-  version: 2; consumerId: DecisionConsumerId; consumers: DecisionConsumerId[]; consumerVersion: string; caller: string;
+  version: 3; provider: DecisionProviderIdentity; consumerId: DecisionConsumerId; consumers: DecisionConsumerId[]; consumerVersion: string; caller: string;
   /** Labelled question-count allocation across a batch. Native usage is recorded once, never divided. */
   usageAllocation: Record<string, number>;
   mode: DecisionMode; ceiling: DecisionMode; effect: DecisionEffect; effectSource: "declared" | "default";
@@ -59,10 +61,10 @@ export interface DecisionOutcome {
   requestId: string; requestIdentity: string | null; payloadDigest: string | null;
   scopeState: "bound" | "unavailable"; scope: BudgetScope | null;
   answers: Record<string, QuestionOutcome>;
-  method: "baseline" | "jev"; reason: string; delivered: boolean;
+  method: "baseline" | "provider"; reason: string; delivered: boolean;
   /** Whether this retained event attempted transport, including failed/uncertain paid calls. Absent in older receipts. */
   providerCalled?: boolean | undefined;
-  model: string | null; latencyMs: number; usage: { inputTokens: number | null; outputTokens: number | null };
+  model: string | null; latencyMs: number; usage: DecisionUsage;
   failureStage?: DecisionFailureStage;
   coverage: DecisionCoverage;
   budget: { state: BudgetReservation["state"] | "not-required"; reservationId: string | null; calls: number | null; bytes: number | null; limits: { maxCalls: number; maxRequestBytes: number }; partition?: "context-selection"; invocationId?: string; unavailableReason?: BudgetReservation["unavailableReason"] };
@@ -73,7 +75,7 @@ export interface DecisionOutcome {
 
 export interface DecisionRuntimeOptions extends TransportOptions {
   signal?: AbortSignal | undefined;
-  client?: JevDecisionClient;
+  client?: DecisionClient;
   /** Bounded SQLite contention window; the caller's deadline still bounds the whole decision. */
   busyTimeoutMs?: number;
   receipts?: boolean;
@@ -89,13 +91,13 @@ const RECEIPT_COLLECTION = "decisions";
 export class DecisionRuntime {
   readonly settings: DecisionSettings;
   readonly stateRoot: string;
-  readonly #client: JevDecisionClient;
+  readonly #client: DecisionClient;
   readonly #options: DecisionRuntimeOptions;
   readonly #executionIdentity: RuntimeExecutionIdentity;
   constructor(settings: DecisionSettings, stateRoot: string, options: DecisionRuntimeOptions = {}) {
     this.settings = settings; this.stateRoot = stateRoot; this.#options = options;
     this.#executionIdentity = runtimeExecutionIdentity();
-    this.#client = options.client ?? new JevDecisionClient({ ...options, healthScope: digest({ stateRoot, config: settings.configDigest }) });
+    this.#client = options.client ?? new DecisionClient({ ...options, provider: settings.provider, healthScope: digest({ stateRoot, config: settings.configDigest }) });
   }
 
   /** Doctor and callers can read the resolved disposition without preparing evidence or calling out. */
@@ -128,8 +130,7 @@ export class DecisionRuntime {
       const path = this.#receiptPath(key);
       if (!existsSync(path) || statSync(path).size > 256 * 1024) return null;
       const receipt = object(JSON.parse(readFileSync(path, "utf8")));
-      if (receipt["version"] !== 2 || !receipt["outcome"]) return null;
-      return receipt["outcome"] as DecisionOutcome;
+      return readDecisionOutcome(receipt) as unknown as DecisionOutcome;
     } catch { return null; }
   }
   #record(key: string, outcome: DecisionOutcome): string | null {
@@ -137,7 +138,7 @@ export class DecisionRuntime {
     // Telemetry storage failure never alters the decision, the budget or native execution.
     try {
       const createdAt = new Date().toISOString();
-      durableJson(this.#receiptPath(key), { version: 2, ...this.#executionIdentity, configDigest: this.settings.configDigest,
+      durableJson(this.#receiptPath(key), { version: 3, ...this.#executionIdentity, configDigest: this.settings.configDigest,
         receiptId: key, createdAt, outcome });
       if (outcome.scope) projectContextMetric(this.stateRoot, { id: key, workspace: outcome.scope.workspace, capturedAt: createdAt,
         kind: "decision", entryId: null, routeId: null, familyId: outcome.budget.invocationId ?? null,
@@ -169,7 +170,8 @@ export class DecisionRuntime {
     const allocation: Record<string, number> = Object.fromEntries(participants.map(id => [id, 0]));
     for (const question of ask.questions) allocation[question.consumerId] = (allocation[question.consumerId] ?? 0) + 1;
     const base: DecisionOutcome = {
-      version: 2, consumerId: ask.consumerId, consumers: participants, consumerVersion: consumer.version, caller: consumer.caller,
+      version: 3, provider: configuredDecisionProvider(this.settings.provider, this.settings.legacy.model, this.settings.configDigest),
+      consumerId: ask.consumerId, consumers: participants, consumerVersion: consumer.version, caller: consumer.caller,
       usageAllocation: allocation,
       mode: resolved.mode, ceiling: resolved.ceiling,
       effect: ask.entryKind === "workflow-observe" ? "advise" : resolved.effect,
@@ -193,9 +195,10 @@ export class DecisionRuntime {
     if (participants.some(id => this.settings.consumers[id].mode === "off")) return fallback("consumer-off");
     if (participants.some(id => resolveConsumerMode(this.settings, id).mode !== resolved.mode)) return fallback("batch-incompatible");
     if (!ask.questions.length) return fallback("no-enabled-questions");
+    if (!decisionProviderAdapter(this.settings.provider).layouts.includes(ask.evidenceLayout ?? "question-local-v1")) return fallback("unsupported-evidence-layout");
     if (ask.legacyDataClass !== undefined && (participants.length !== 1 || participants[0] !== "DL03" ||
       ask.questions.some(question => question.definitionId !== "legacy.context-rank/1"))) return fallback("data-sharing-disabled");
-    if (ask.evidenceLayout && (participants.length !== 1 || ask.consumerId !== "DL03" || ask.legacyDataClass !== undefined ||
+    if (ask.evidenceLayout && ask.evidenceLayout !== "shared-v1" && (participants.length !== 1 || ask.consumerId !== "DL03" || ask.legacyDataClass !== undefined ||
       !(metadata || passage && ["compact-v1", "shared-v1"].includes(ask.evidenceLayout)))) return fallback("data-sharing-disabled");
     const dataClass = (id: DecisionConsumerId) => metadata ? "metadata" : ask.legacyDataClass ?? DECISION_CONSUMERS[id].dataClass;
     if (participants.some(id => !this.settings.legacy.allowedDataClasses.includes(dataClass(id)))) return fallback("data-sharing-disabled");
@@ -224,17 +227,18 @@ export class DecisionRuntime {
       !(metadata || passage) || !/^[a-f0-9]{64}$/u.test(ask.budgetInvocationId ?? "")) ||
       ask.budgetInvocationId && !ask.budgetPartition) return fallback("budget-partition-incompatible");
     if (ask.deadlineAt !== undefined && !Number.isFinite(ask.deadlineAt)) return fallback("invalid-deadline");
+    if (this.#client.adapter.id !== this.settings.provider) return fallback("provider-client-mismatch");
     if (!this.#client.tokenPresent) return fallback("missing-token");
     if (!ask.scope) return fallback("scope-unavailable");
 
     const preparation = prepareDecisionRequest(ask, this.settings, participants, requestId, limits);
     if (!preparation.ok) return fallback(preparation.reason, { tokenEstimate: preparation.tokenEstimate });
-    const { request, body, payloadDigestValue, requestBytes } = preparation;
+    const { request, body, payloadDigestValue, requestBytes, tokenEstimate } = preparation;
 
     const identity = requestIdentity(request);
     const retained = this.#retained(key);
     // Replaying a paid event also binds its exact transmitted question wording, without resetting spending.
-    if (retained?.requestIdentity === identity && retained.payloadDigest === payloadDigestValue && ["reserved", "duplicate"].includes(retained.budget.state))
+    if (retained && sameConfiguredDecisionProvider(retained.provider, base.provider) && retained.requestIdentity === identity && retained.payloadDigest === payloadDigestValue && ["reserved", "duplicate"].includes(retained.budget.state))
       return { ...retained, requestId, reason: Object.keys(retained.answers).length ? "repeated-observation" : `repeated-${retained.reason}`,
         receiptId: key, latencyMs: performance.now() - started };
     // The reservation identity is the consumer-group event key, so one event cannot be spent twice.
@@ -253,32 +257,35 @@ export class DecisionRuntime {
     base.transport = transport.timing;
     const reservation = admittedReservation;
     if (!reservation) return fallback(transport.ok ? "admission-unavailable" : transport.reason,
-      { requestIdentity: identity, payloadDigest: payloadDigestValue, tokenEstimate: request.budget.tokenEstimate,
+      { requestIdentity: identity, payloadDigest: payloadDigestValue, tokenEstimate,
         failureStage: transport.ok ? "budget" : transport.failureStage });
     const budget = { state: reservation.state, reservationId: reservation.reservationId, calls: reservation.calls, bytes: reservation.bytes, limits: base.budget.limits,
       ...(reservation.unavailableReason ? { unavailableReason: reservation.unavailableReason } : {}),
       ...(ask.budgetPartition ? { partition: ask.budgetPartition, invocationId: ask.budgetInvocationId } : {}) };
     if (reservation.state === "duplicate") {
       const retained = this.#retained(key);
-      return retained && retained.requestIdentity === identity && retained.payloadDigest === payloadDigestValue ? { ...retained, requestId,
+      return retained && sameConfiguredDecisionProvider(retained.provider, base.provider) && retained.requestIdentity === identity && retained.payloadDigest === payloadDigestValue ? { ...retained, requestId,
         reason: Object.keys(retained.answers).length ? "repeated-observation" : `repeated-${retained.reason}`, receiptId: key, latencyMs: performance.now() - started }
         : fallback("repeated-observation-unavailable", { budget, requestIdentity: identity });
     }
-    if (reservation.state === "exhausted") return fallback("budget-exhausted", { budget, requestIdentity: identity, failureStage: "budget", tokenEstimate: request.budget.tokenEstimate });
+    if (reservation.state === "exhausted") return fallback("budget-exhausted", { budget, requestIdentity: identity, failureStage: "budget", tokenEstimate });
     if (reservation.state === "unavailable") return fallback(reservation.unavailableReason === "store-capacity" ? "budget-store-capacity" : "budget-unavailable",
-      { budget, requestIdentity: identity, failureStage: "budget", tokenEstimate: request.budget.tokenEstimate });
+      { budget, requestIdentity: identity, failureStage: "budget", tokenEstimate });
 
-    const prepared: Partial<DecisionOutcome> = { requestIdentity: identity, payloadDigest: payloadDigestValue, budget, tokenEstimate: request.budget.tokenEstimate };
+    const prepared: Partial<DecisionOutcome> = { requestIdentity: identity, payloadDigest: payloadDigestValue, budget, tokenEstimate };
     if (!transport.ok) return fallback(transport.reason, { ...prepared, failureStage: transport.failureStage });
+    const rawModel = transport.raw && typeof transport.raw === "object" && !Array.isArray(transport.raw) ? (transport.raw as Record<string, unknown>).model : null;
+    base.provider = { ...base.provider, returnedModel: typeof rawModel === "string" && rawModel.length <= 128 ? rawModel : null };
     let answers: Record<string, QuestionOutcome>, usage: DecisionOutcome["usage"], model: string;
     try {
-      const envelope = parseDecisionEnvelope(transport.raw, request, DECISION_QUESTIONS, this.settings.legacy.model, payloadDigestValue);
+      const envelope = decisionProviderAdapter(this.settings.provider).decode(transport.raw, request, DECISION_QUESTIONS, this.settings.legacy.model, payloadDigestValue);
       answers = envelope.answers; usage = envelope.usage; model = envelope.model;
-    } catch { return fallback("invalid-or-unavailable", { ...prepared, usage: decisionNativeUsage(transport.raw), failureStage: "answer-validation" }); }
+    } catch { return fallback("invalid-or-unavailable", { ...prepared, usage: decisionProviderAdapter(this.settings.provider).usage(transport.raw), failureStage: "answer-validation" }); }
     if (signal?.aborted) return fallback(decisionCancellationReason(signal), { ...prepared, usage });
     const usable = Object.values(answers).some(answer => answer.status === "answered");
     const outcome: DecisionOutcome = { ...base, ...prepared, answers, usage, model,
-      method: resolved.mode === "auto" && usable ? "jev" : "baseline", delivered: resolved.mode === "auto" && usable,
+      provider: { ...base.provider, returnedModel: model },
+      method: resolved.mode === "auto" && usable ? "provider" : "baseline", delivered: resolved.mode === "auto" && usable,
       reason: !usable ? "no-usable-answers" : resolved.mode === "auto" ? "answered" : "shadow", latencyMs: performance.now() - started };
     outcome.receiptId = this.#record(key, outcome);
     return outcome;

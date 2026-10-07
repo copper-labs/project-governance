@@ -47,7 +47,7 @@ test("decision report measures fallback, stale outcomes and partial native token
     add("routes", null, "blocked");
     add("evaluations", baseline); // Private frozen evaluation cases do not enter operational totals.
     const result = decisionTelemetry(root);
-    assert.deepEqual(result.counts, { inspected: 3, matched: 3, invalid: 0, without_decision: 1, delivered: 1, blocked: 1, stale: 1, jev_selected: 1, baseline_selected: 1 });
+    assert.deepEqual(result.counts, { inspected: 3, matched: 3, invalid: 0, without_decision: 1, delivered: 1, blocked: 1, stale: 1, provider_selected: 1, jev_selected: 1, baseline_selected: 1 });
     assert.deepEqual(result.tokens, { decision_samples: 2, input_samples: 1, output_samples: 1, input_total: 42, output_total: 3 });
     assert.deepEqual(result.baselines, { lexical_context_1: 1, discovery_order_1: 0, unspecified: 1, unrecognized: 0 });
     assert.equal(result.latency_ms.p95, 100); assert.equal(result.avoided_llm_tokens, null);
@@ -75,7 +75,7 @@ test("expanded report counts a shared batch once and keeps missing usage unknown
   try {
     const add = (id: string, reservation: string | null, usage: { inputTokens: number | null; outputTokens: number | null }) => {
       durableJson(join(root, "decisions", `${id}.json`), { version: 2, receiptId: id, createdAt: "2026-09-21T12:00:00Z", outcome: {
-        version: 2, consumers: ["DL01", "DL02"], usageAllocation: { DL01: 3, DL02: 2 }, delivered: true, reason: "answered",
+        version: 2, method: "jev", consumers: ["DL01", "DL02"], usageAllocation: { DL01: 3, DL02: 2 }, delivered: true, reason: "answered",
         budget: { reservationId: reservation }, usage, scope: { taskId: "private-task" },
       } });
     };

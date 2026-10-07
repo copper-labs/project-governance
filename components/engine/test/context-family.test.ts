@@ -117,6 +117,37 @@ test("unchanged complete batches replay; edits invalidate the whole affected bat
   assert.equal(clarified.coverage.replayedBatches, 0); assert.ok(readDecisionBudget(root, contextFamilyScope(root, family))!.calls > before);
 });
 
+test("historical cursor answers cannot acquire current provider identity or charge a paid event again", async t => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "family-provider-qualification-"))); t.after(() => rmSync(root, { recursive: true, force: true }));
+  const family = digest("historical-family").slice(7), scope = { workspace: root, taskId: "task", taskRevision: "1" };
+  openContextFamily(root, { id: family, workspace: root, locator: "fixture", session: "one", turn: "one", started: Date.now() });
+  const subject = { root, source: () => ({ file_type: "regular" }), projectionSources: (paths: string[]) => ({ view: "worktree", subject: null,
+    sources: new Map(paths.map(path => [path, { key: digest(path), freshness: "fixture" }])) }),
+    readBatch: (paths: string[]) => new Map(paths.map(path => [path, Buffer.from("export const relevant = true;\n")])) } as unknown as ValidationSubject;
+  const settings = profileDecisionSettings({ continuity: { decisions: { mode: "auto", allowed_data_classes: ["metadata", "source"],
+    allowed_metadata_paths: ["src/**"], allowed_source_paths: ["src/**"], consumers: { DL03: { mode: "auto", questions: ["context.metadata-relevance/1"] } } } } });
+  let calls = 0;
+  const runtime = new DecisionRuntime(settings, root, { coordinationRoot: root, token: "fixture", fetch: async (_url, init) => {
+    calls++; const wire = JSON.parse(String(init?.body));
+    return Response.json({ model: settings.legacy.model, answers: Object.fromEntries(Object.keys(wire.questions).map(name => [name, { type: "noul", noul: 0.9 }])) });
+  } });
+  const catalog = contextMetadataCatalog(["src/owner.ts"], "mechanism", [], [], new Set());
+  const first = await selectContextMetadata(subject, catalog, "mechanism", runtime, scope, digest("subject"), family, undefined,
+    performance.now() + 5000, undefined, { id: family, revision: "1" });
+  assert.equal(calls, 1); assert.equal(first.cursor.batches.length, 1);
+  const previous = structuredClone(first.cursor), batch = previous.batches[0]!, old = batch.outcome as any;
+  old.version = 2; old.method = "jev"; delete old.provider;
+  const receiptPath = join(root, "decisions", `${old.receiptId}.json`), receipt = JSON.parse(readFileSync(receiptPath, "utf8"));
+  receipt.version = 2; receipt.outcome = old; writeFileSync(receiptPath, JSON.stringify(receipt));
+  const original = readFileSync(receiptPath, "utf8"), spending = readDecisionBudget(root, contextFamilyScope(root, family))!;
+  const replay = await selectContextMetadata(subject, catalog, "mechanism", runtime, scope, digest("subject"), family, undefined,
+    performance.now() + 5000, undefined, { id: family, revision: "1", previous });
+  assert.equal(calls, 1); assert.equal(replay.coverage.replayedBatches, 0); assert.equal(replay.coverage.invalidatedBatches, 1);
+  assert.equal(replay.coverage.answeredCount, 0); assert.equal(replay.reason, "repeated-observation-unavailable");
+  assert.equal(readDecisionBudget(root, contextFamilyScope(root, family))!.calls, spending.calls);
+  assert.equal(readFileSync(receiptPath, "utf8"), original);
+});
+
 test("normal prompt expansion validates session, gives explicit originals without JEV and stops a superseded entry", async t => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "native-expansion-"))), previous = process.env.XDG_STATE_HOME;
   writeFileSync(join(root, ".gitignore"), "state/\n");

@@ -49,6 +49,11 @@ in an external release evidence directory. Preserve failed and superseded origin
 An exact archive or passing check is not by itself device proof, host consumption, task acceptance
 or a token/time saving.
 
+Before the checkpoint, verify the declared Node version and the Git executable inherited by test
+subprocesses. A platform launcher that repeatedly starts developer-tool discovery can make fixtures
+slow and invalidate timing cases. Correct that execution environment and rerun failed, unfinished
+or invalidated owners; retain completed proof whose inputs and claims remain valid.
+
 Source proof and archive proof are separate. Bind the selected archive to its qualified source and
 packaging inputs, and bind the review to the source/archive it actually inspected. Reuse originals
 only while their relevant source, dependencies, configuration, toolchain, conditions and claims still

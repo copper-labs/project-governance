@@ -137,7 +137,7 @@ test("auto selects an authorized probe, shadow executes the baseline, and grant 
         probabilities: Object.fromEntries(keys.map(key => [key, key === choice ? 1 : 0])) } } });
     } });
     assert.equal(result.children[0]!.probeId, mode === "auto" ? "probe-1" : "probe-0");
-    assert.ok(result.children.every(child => child.method === (mode === "auto" ? "jev" : "baseline")));
+    assert.ok(result.children.every(child => child.method === (mode === "auto" ? "provider" : "baseline")));
     assert.equal(calls, 2); assert.equal(result.children.length, 2);
   }
   const f = fixture(t, 2, "auto");

@@ -100,7 +100,7 @@ export async function buildContextPacket(input: ContextPacketRequest, provider: 
   if (request.candidates.length) try {
     if (options.signal?.aborted) { reason = "cancelled"; throw new Error("Context advice cancelled"); }
     const result = structuredClone(await provider.decide(structuredClone(request), options));
-    if (result.version !== 1 || result.kind !== request.kind || result.inputDigest !== digest(request) ||
+    if (![1, 3].includes(result.version) || result.kind !== request.kind || result.inputDigest !== digest(request) ||
         result.delivered.length !== order.length || new Set(result.delivered).size !== order.length ||
         result.delivered.some(id => !order.includes(id))) throw new Error("invalid context ranking");
     if (options.signal?.aborted) {
@@ -250,7 +250,7 @@ export async function buildContextPacket(input: ContextPacketRequest, provider: 
     return judgment.preferredSpans.filter(span => !delivered?.sourceUnits?.some(unit => unit.complete && unit.firstLine <= span.start && unit.lastLine >= span.end))
       .map(span => ({ path: id, firstLine: span.start, lastLine: span.end, reason: "packet-budget" }));
   });
-  return { version: 1 as const, taskRevision: input.taskRevision, inputDigest: digest(input),
+  return { version: 3 as const, taskRevision: input.taskRevision, inputDigest: digest(input),
     entries: selected, omitted, omissionReasons, omittedJudgedUnits, judgmentLimitations,
     unitOrdering: Object.fromEntries(selected.filter(item => unitOrdering[item.id]).map(item => [item.id, unitOrdering[item.id]])), bytes: bytes(selected), decision, reason,
     measurement: { excerpts: selected.filter(entry => entry.sourceRange || entry.sourceRanges).map(entry => ({ id: entry.id, sourceDigest: entry.sourceDigest,

@@ -39,7 +39,7 @@ export function captureOutput(path: string): { text: string; digest: string; byt
 }
 
 export interface OutputSelection {
-  version: 1; kind: "project-governance-output-selection";
+  version: 3; kind: "project-governance-output-selection";
   authority: "advisory only: the native receipt, machine parsing, exit status and the complete original output are unchanged";
   mode: string; effect: string; reason: string; delivered: boolean;
   source: { path: string; digest: string | null; capturedBytes: number | null; totalBytes: number | null; windowTruncated: boolean; blockCount: number; blocksTruncated: boolean;
@@ -52,7 +52,7 @@ export interface OutputSelection {
   overflow: { protectedBytes: number; limitBytes: number; note: string } | null;
   retrieval: { path: string; digest: string | null; note: string };
   coverage: DecisionCoverage;
-  decision: Pick<DecisionOutcome, "consumerId" | "requestId" | "receiptId" | "method" | "reason" | "delivered" | "providerCalled" | "model" | "usage" | "latencyMs" | "budget" | "scopeState"> | null;
+  decision: Pick<DecisionOutcome, "provider" | "consumerId" | "requestId" | "receiptId" | "method" | "reason" | "delivered" | "providerCalled" | "model" | "usage" | "latencyMs" | "budget" | "scopeState"> | null;
 }
 
 /** One presentation owner: native proof and retained originals are never replaced by advice. */
@@ -62,7 +62,7 @@ export async function outputSelection(runtime: DecisionRuntime, receipt: Command
   const eligibility = runtime.eligibility("DL13"), limitBytes = options.limitBytes ?? 16_000;
   const limits: string[] = [], unavailable: string[] = [];
   const base: OutputSelection = {
-    version: 1, kind: "project-governance-output-selection",
+    version: 3, kind: "project-governance-output-selection",
     authority: "advisory only: the native receipt, machine parsing, exit status and the complete original output are unchanged",
     mode: eligibility.mode, effect: eligibility.effect, reason: "no-assessable-output", delivered: false,
     source: { path: receipt.log, digest: null, capturedBytes: null, totalBytes: null, windowTruncated: false, blockCount: 0, blocksTruncated: false, ranges: [] },
@@ -121,7 +121,7 @@ export async function outputSelection(runtime: DecisionRuntime, receipt: Command
     coverage: { captured: plan.blocks.length, omitted: plan.optionalIds.filter(id => ![...prepared.questionBlocks.values()].some(block => block.id === id)),
       truncated: false, unavailable, limits }, questions: prepared.questions, eligibilityDigest: null, policyDigest: options.policyDigest });
   base.decision = { consumerId: outcome.consumerId, requestId: outcome.requestId, receiptId: outcome.receiptId,
-    method: outcome.method, reason: outcome.reason, delivered: outcome.delivered, providerCalled: outcome.providerCalled, model: outcome.model,
+    provider: outcome.provider, method: outcome.method, reason: outcome.reason, delivered: outcome.delivered, providerCalled: outcome.providerCalled, model: outcome.model,
     usage: outcome.usage, latencyMs: outcome.latencyMs, budget: outcome.budget, scopeState: outcome.scopeState };
   base.mode = outcome.mode;
   if (!outcome.delivered) return selection(plan.deterministicIds, outcome.reason, true);

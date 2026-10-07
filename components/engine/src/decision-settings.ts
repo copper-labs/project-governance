@@ -1,3 +1,4 @@
+import { decisionProviderAdapter, type DecisionProviderId } from "./decision-providers.ts";
 import { parse } from "yaml";
 import { lstatSync } from "node:fs";
 import { join } from "node:path";
@@ -14,6 +15,8 @@ export interface DecisionBudgetLimits { maxCalls: number; maxRequestBytes: numbe
 export interface DecisionSettings {
   /** The existing top-level mode is the global ceiling over every consumer. */
   mode: DecisionMode;
+  provider: DecisionProviderId;
+  evaluation: { enabled: false; provider: DecisionProviderId; model: string };
   legacy: DecisionConfig;
   consumers: Record<DecisionConsumerId, ConsumerSetting>;
   budget: DecisionBudgetLimits;
@@ -64,8 +67,17 @@ function budgetLimits(raw: unknown, defaults = DEFAULT_DECISION_BUDGET): Decisio
  */
 export function profileDecisionSettings(profile: unknown): DecisionSettings {
   const legacy = profileDecisionConfig(profile);
+  const provider = legacy.provider ?? "jev";
   const root = object(profile, "profile");
   const settings = root["continuity"] === undefined ? {} : object(object(root["continuity"], "continuity")["decisions"] ?? {}, "continuity.decisions");
+  const generic = settings["evaluation"] === undefined ? {} : object(settings["evaluation"], "continuity.decisions.evaluation");
+  for (const key of Object.keys(generic)) if (!["enabled", "provider", "model"].includes(key)) throw new Error("Unknown generic evaluation setting");
+  if (generic.enabled !== undefined && generic.enabled !== false) throw new Error("Generic evaluation is not enabled in this delivery batch");
+  const genericProvider = generic.provider ?? "openai";
+  if (genericProvider !== "jev" && genericProvider !== "openai") throw new Error("Unsupported evaluation provider");
+  const genericModel = generic.model ?? (genericProvider === "openai" ? "gpt-6-luna" : "jev-1.13.0");
+  if (typeof genericModel !== "string" || !decisionProviderAdapter(genericProvider).validModel(genericModel)) throw new Error("Invalid evaluation model");
+  const evaluation = { enabled: false as const, provider: genericProvider as DecisionProviderId, model: genericModel };
   const declared = settings["consumers"] === undefined ? {} : object(settings["consumers"], "continuity.decisions.consumers");
   for (const key of Object.keys(declared)) if (!(DECISION_CONSUMER_IDS as readonly string[]).includes(key)) throw new Error(`Unknown decision consumer: ${key}`);
   const notes: string[] = [];
@@ -105,8 +117,8 @@ export function profileDecisionSettings(profile: unknown): DecisionSettings {
       path.startsWith("/") || /[\x00-\x1f\\]/u.test(path) || path.split("/").some((part: string) => part === ".." || part === ".")))
     throw new Error("Invalid metadata disclosure paths");
   const allowedMetadataPaths = [...new Set(metadata as string[])];
-  const resolved: Omit<DecisionSettings, "configDigest"> = { mode, legacy, consumers, questionIds, budget, contextBudget, modelRouting, allowedMetadataPaths, migration: { notes } };
-  return { ...resolved, configDigest: digest({ mode, model: legacy.model, revision: legacy.revision,
+  const resolved: Omit<DecisionSettings, "configDigest"> = { mode, provider, evaluation, legacy, consumers, questionIds, budget, contextBudget, modelRouting, allowedMetadataPaths, migration: { notes } };
+  return { ...resolved, configDigest: digest({ mode, ...(provider !== "jev" ? { provider } : {}), ...(settings.evaluation !== undefined ? { evaluation } : {}), model: legacy.model, revision: legacy.revision,
     allowedDataClasses: legacy.allowedDataClasses, allowedSourcePaths: legacy.allowedSourcePaths ?? [],
     deadlineMs: legacy.deadlineMs, evidenceBytes: legacy.evidenceBytes, maxCandidates: legacy.maxCandidates,
     consumers, questionIds, budget, contextBudget, modelRouting, allowedMetadataPaths }) };
@@ -127,13 +139,14 @@ export { loadProfileDecisionConfig };
 export function resolveConsumerMode(settings: DecisionSettings, id: DecisionConsumerId): { mode: DecisionMode; effect: DecisionEffect; effectSource: "declared" | "default"; ceiling: DecisionMode } {
   const consumer = settings.consumers[id];
   const mode = ORDER[settings.mode] < ORDER[consumer.mode] ? settings.mode : consumer.mode;
-  return { mode, effect: consumer.effect, effectSource: consumer.effectSource, ceiling: settings.mode };
+  const providerMode = settings.provider === "openai" && mode === "auto" ? "shadow" : mode;
+  return { mode: providerMode, effect: consumer.effect, effectSource: consumer.effectSource, ceiling: settings.provider === "openai" && settings.mode === "auto" ? "shadow" : settings.mode };
 }
 
 /** Convert explicit E3 configuration through the same strict configuration owner. */
 export function legacyDecisionSettings(config: DecisionConfig): DecisionSettings {
   return profileDecisionSettings({ continuity: { decisions: {
-    mode: config.mode, config_revision: config.revision, model: config.model,
+    mode: config.mode, ...(config.provider ? { provider: config.provider } : {}), config_revision: config.revision, model: config.model,
     allowed_questions: config.allowedQuestions, allowed_data_classes: config.allowedDataClasses,
     allowed_source_paths: config.allowedSourcePaths ?? [], deadline_ms: config.deadlineMs,
     evidence_bytes: config.evidenceBytes, max_candidates: config.maxCandidates,

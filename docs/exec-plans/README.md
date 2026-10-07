@@ -26,8 +26,8 @@ shows existing project-owned checks; it does not require a check after every edi
   separate proof checkpoints. Design and review do not authorize implementation or live experiments.
 
 - [Decision providers and image evaluation](active/2026-10-06-decision-providers-and-image-evaluation.md)
-  is a design-only draft for provider adapters, supplied-image evaluation and agent/test integration.
-  Implementation, live qualification and publication remain separate work.
+  owns approved 4.2 implementation for provider adapters, supplied-image evaluation and agent/test
+  integration. B1 starts from published 4.1; live qualification and publication remain separate work.
 
 - [4.1 context quality and ordinary-work evidence](active/2026-10-05-4-1-context-quality.md)
   owns deterministic task snapshots, selection quality, outcome links and exact caller recovery.

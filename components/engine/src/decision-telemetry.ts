@@ -1,3 +1,4 @@
+import { readDecisionOutcome } from "./decision-outcome-reader.ts";
 import { recentReceipts } from "./telemetry-receipt-reader.ts";
 import { readContextProjection } from "./telemetry-projection.ts";
 import { boundedOutcomeReader, decisionOutcomeReport } from "./decision-outcomes.ts";
@@ -14,7 +15,7 @@ export function decisionTelemetry(root: string, options: { limit?: number; since
   catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
   const limit = options.limit ?? 1000, since = options.since === undefined ? -Infinity : Date.parse(options.since);
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 10000 || Number.isNaN(since)) throw new Error("Invalid decision telemetry bounds");
-  const counts = { inspected: 0, matched: 0, invalid: 0, without_decision: 0, delivered: 0, blocked: 0, stale: 0, jev_selected: 0, baseline_selected: 0 };
+  const counts = { inspected: 0, matched: 0, invalid: 0, without_decision: 0, delivered: 0, blocked: 0, stale: 0, provider_selected: 0, jev_selected: 0, baseline_selected: 0 };
   const reasons: Record<string, number> = {}, kinds: Record<string, number> = {};
   const failureStages: Record<string, number> = {};
   const baselines = { lexical_context_1: 0, discovery_order_1: 0, unspecified: 0, unrecognized: 0 };
@@ -33,7 +34,7 @@ export function decisionTelemetry(root: string, options: { limit?: number; since
   for (const { collection, name, value: receipt } of receipts.records) {
     counts.inspected++;
     try {
-      if (receipt.version !== 1 || `${receipt.receiptId}.json` !== name || seen.has(String(receipt.receiptId)) ||
+      if (![1, 3].includes(Number(receipt.version)) || `${receipt.receiptId}.json` !== name || seen.has(String(receipt.receiptId)) ||
           typeof receipt.createdAt !== "string" || !Number.isFinite(Date.parse(receipt.createdAt))) throw new Error("Invalid receipt identity");
       seen.add(String(receipt.receiptId));
           const outcome = receipt.outcome;
@@ -41,7 +42,7 @@ export function decisionTelemetry(root: string, options: { limit?: number; since
           const optional = collection === "routes" ? (receipt.optional === null ? null : object(receipt.optional)) : receipt;
           const decision = optional?.decision === null || optional === null ? null : object(optional.decision);
           if (decision) {
-            if (decision.version !== 1 || !["baseline", "jev"].includes(String(decision.method)) ||
+            if (![1, 3].includes(Number(decision.version)) || !["baseline", "jev", "provider"].includes(String(decision.method)) ||
                 !["rank_optional_context", "rank_diagnostics", "advise_intent"].includes(String(decision.kind)) ||
                 typeof decision.reason !== "string" || !/^[a-z][a-z0-9-]{0,79}$/u.test(decision.reason) ||
                 typeof decision.latencyMs !== "number" || !Number.isFinite(decision.latencyMs) || decision.latencyMs < 0) throw new Error("Invalid decision metrics");
@@ -54,7 +55,7 @@ export function decisionTelemetry(root: string, options: { limit?: number; since
             if (typeof decision.failureStage === "string") failureStages[decision.failureStage] = (failureStages[decision.failureStage] ?? 0) + 1;
             baselines[baseline]++;
             decisionSamples++; latency.push(decision.latencyMs);
-            counts[decision.method === "jev" ? "jev_selected" : "baseline_selected"]++;
+            if (decision.method === "jev" || decision.method === "provider") { counts.provider_selected++; if (decision.method === "jev" || object(decision.provider).id === "jev") counts.jev_selected++; } else counts.baseline_selected++;
             reasons[decision.reason] = (reasons[decision.reason] ?? 0) + 1;
             const kind = String(decision.kind); kinds[kind] = (kinds[kind] ?? 0) + 1;
             if (decision.receiptId !== undefined && decision.receiptId !== null &&
@@ -72,7 +73,7 @@ export function decisionTelemetry(root: string, options: { limit?: number; since
   }
   latency.sort((a, b) => a - b);
   const percentile = (fraction: number) => latency.length ? latency[Math.ceil(latency.length * fraction) - 1] : null;
-  return { version: 1, kind: "project-governance-decision-telemetry", scope: "operational-context-receipts", counts, reasons, kinds, baselines, failure_stages: failureStages,
+  return { version: 3, kind: "project-governance-decision-telemetry", scope: "operational-context-receipts", counts, reasons, kinds, baselines, failure_stages: failureStages,
     truncated, scanComplete: receipts.scanComplete, selection: receipts.selection,
     runtimeFilter: options.runtimeVersion ? { version: options.runtimeVersion, unversionedActivity: "excluded; attribution unknown" } : null,
     projection: { state: projection.state, role: "receipt-read-hints", evictedRecords: projection.evictedRecords, writeCoverage: projection.writeCoverage }, read_bytes: readBytes,
@@ -140,6 +141,7 @@ function decisionPilotTelemetry(root: string, options: { limit: number; since: n
   const consumers: Record<string, { observations: number; delivered: number; questions: number }> = {};
   const reasons: Record<string, number> = {};
   const transport = { called: 0, notCalled: 0, unknown: 0 };
+  const providers: Record<string, number> = {};
   const timing = { samples: 0, unknown: 0, admissionMs: 0, httpMs: 0, rateWaitMs: 0, slotWaitMs: 0, coordinationWaitMs: 0, requestBytes: 0, peakConcurrency: 0 };
   const tokens = { input_samples: 0, output_samples: 0, input_total: 0, output_total: 0 };
   const seen = new Set<string>();
@@ -153,9 +155,9 @@ function decisionPilotTelemetry(root: string, options: { limit: number; since: n
   for (const { name, value: receipt } of receipts.records) {
     counts.inspected++;
     try {
-      if (receipt.version !== 2 || `${receipt.receiptId}.json` !== name || typeof receipt.createdAt !== "string" || !Number.isFinite(Date.parse(receipt.createdAt))) throw new Error("Invalid receipt identity");
-        const outcome = object(receipt.outcome), usage = object(outcome.usage), budget = object(outcome.budget), allocation = object(outcome.usageAllocation);
-        if (outcome.version !== 2 || !Array.isArray(outcome.consumers) || !outcome.consumers.length ||
+      if (![2, 3].includes(Number(receipt.version)) || `${receipt.receiptId}.json` !== name || typeof receipt.createdAt !== "string" || !Number.isFinite(Date.parse(receipt.createdAt))) throw new Error("Invalid receipt identity");
+        const outcome = readDecisionOutcome(receipt), usage = object(outcome.usage), budget = object(outcome.budget), allocation = object(outcome.usageAllocation);
+        if (outcome.version !== 3 || !Array.isArray(outcome.consumers) || !outcome.consumers.length ||
             new Set(outcome.consumers).size !== outcome.consumers.length ||
             outcome.consumers.some(id => !(DECISION_CONSUMER_IDS as readonly unknown[]).includes(id)) ||
             typeof outcome.delivered !== "boolean" || typeof outcome.reason !== "string" || !/^[a-z][a-z0-9-]{0,79}$/u.test(outcome.reason)) throw new Error("Invalid decision metrics");
@@ -168,6 +170,7 @@ function decisionPilotTelemetry(root: string, options: { limit: number; since: n
           seen.add(reservation);
         }
         counts.matched++;
+        providers[outcome.provider.id] = (providers[outcome.provider.id] ?? 0) + 1;
         transport[outcome.providerCalled === true ? "called" : outcome.providerCalled === false ? "notCalled" : "unknown"]++;
         const fields = ["admissionMs", "httpMs", "rateWaitMs", "slotWaitMs", "coordinationWaitMs", "requestBytes"] as const;
         const detail = outcome.transport && typeof outcome.transport === "object" ? object(outcome.transport) : null;
@@ -187,7 +190,7 @@ function decisionPilotTelemetry(root: string, options: { limit: number; since: n
         if (usage.outputTokens !== null) { tokens.output_samples++; tokens.output_total += Number(usage.outputTokens); }
     } catch { counts.invalid++; }
   }
-  return { counts, consumers, reasons, transport, timing: { ...timing, accounting: "sum of per-call durations; not elapsed task time" }, tokens: { ...tokens,
+  return { counts, consumers, providers, reasons, transport, timing: { ...timing, accounting: "sum of per-call durations; not elapsed task time" }, tokens: { ...tokens,
     input_total: tokens.input_samples ? tokens.input_total : null, output_total: tokens.output_samples ? tokens.output_total : null },
     usage_allocation: "native usage counted once per reservation; question counts shown per consumer", truncated,
     scanComplete: receipts.scanComplete, selection: receipts.selection, read_bytes: readBytes,

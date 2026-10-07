@@ -26,7 +26,7 @@ export interface EvaluationMeasure {
   reference: EvaluationReference;
 }
 export interface EvaluationCost {
-  id: string; owner: "native-response" | "provider-job" | "jev-reservation";
+  id: string; owner: "native-response" | "provider-job" | "jev-reservation" | "decision-reservation";
   provider: string; inputTokens: number | null; freshInputTokens: number | null;
   cachedInputTokens: number | null; cacheCreationInputTokens: number | null;
   outputTokens: number | null; reasoningTokens: number | null;

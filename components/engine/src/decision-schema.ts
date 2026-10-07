@@ -62,16 +62,18 @@ export interface DecisionRequest2 {
   scope: DecisionScope; subject: { digest: string; revision: string; environment: string };
   evidence: EvidenceItem[]; coverage: DecisionCoverage; questions: QuestionInstance[];
   eligibilityDigest: string | null; policyDigest: string; configDigest: string;
-  budget: { deadlineMs: number; maxQuestions: number; maxRequestBytes: number; maxCandidates: number; tokenEstimate: number; tokenMethod: string };
+  budget: { deadlineMs: number; maxQuestions: number; maxRequestBytes: number; maxCandidates: number; tokenEstimate: number | null; tokenMethod: string };
 }
 
-export type QuestionOutcome =
+export type QuestionOutcome = (
   | { status: "answered"; shape: "choice"; choice: string; confidence: number; probabilities: Record<string, number> }
   | { status: "answered"; shape: "noul"; probability: number }
-  | { status: "answered"; shape: "score"; score: number; confidence: number; expectation: number; distribution: Record<string, number>; legend: Record<string, string> }
-  | { status: "unknown"; reason: string; native?: { shape: "choice"; choice: string; confidence: number; probabilities: Record<string, number> } }
+  | { status: "answered"; shape: "score"; score: number; confidence: number; expectation?: number; distribution: Record<string, number>; legend: Record<string, string> }
+  | { status: "unknown"; reason: string }
+  | { status: "refused"; reason: string }
+  | { status: "unsupported"; reason: string }
   | { status: "unavailable"; reason: string }
-  | { status: "invalid"; reason: string };
+  | { status: "invalid"; reason: string }) & { native?: Record<string, unknown> };
 
 export interface DecisionEnvelope {
   model: string; payloadDigest: string; usage: { inputTokens: number | null; outputTokens: number | null };
@@ -88,11 +90,11 @@ export function decisionConsumerId(value: unknown): DecisionConsumerId {
 }
 
 /** Structural validation of a prepared request; callers cannot invent questions, IDs or budgets. */
-export function validateDecisionRequest(request: DecisionRequest2, definitions: Record<string, QuestionDefinition>): void {
+export function validateDecisionRequest(request: DecisionRequest2, definitions: Record<string, QuestionDefinition>, provider: "jev" | "openai" = "jev"): void {
   if (request.schemaVersion !== DECISION_SCHEMA_VERSION) throw new Error("Unsupported decision schema version");
   const metadata = metadataQuestionGroup(request.consumerId, request.questions);
   if (request.evidenceLayout !== undefined && (!["compact-v1", "shared-v1", "per-question-v1"].includes(request.evidenceLayout) ||
-    !(metadata || ["compact-v1", "shared-v1"].includes(request.evidenceLayout) && passageQuestionGroup(request.consumerId, request.questions))))
+    !(request.evidenceLayout === "shared-v1" || metadata || request.evidenceLayout === "compact-v1" && passageQuestionGroup(request.consumerId, request.questions))))
     throw new Error("Unsupported shared evidence layout");
   text(request.requestId, "decision request id", 64);
   decisionConsumerId(request.consumerId);
@@ -144,9 +146,9 @@ export function validateDecisionRequest(request: DecisionRequest2, definitions: 
   const budget = request.budget;
   if (!Number.isSafeInteger(budget.deadlineMs) || budget.deadlineMs < 1 || budget.deadlineMs > 30_000 ||
       !Number.isSafeInteger(budget.maxQuestions) || budget.maxQuestions < 1 || budget.maxQuestions > (metadata ? METADATA_MAX_QUESTIONS : 64) ||
-      !Number.isSafeInteger(budget.maxRequestBytes) || budget.maxRequestBytes < 1 || budget.maxRequestBytes > 131_072 ||
+      !Number.isSafeInteger(budget.maxRequestBytes) || budget.maxRequestBytes < 1 || budget.maxRequestBytes > (provider === "jev" ? 131_072 : 16 * 1024 * 1024) ||
       !Number.isSafeInteger(budget.maxCandidates) || budget.maxCandidates < 2 || budget.maxCandidates > 255 ||
-      !Number.isSafeInteger(budget.tokenEstimate) || budget.tokenEstimate < 0) throw new Error("Invalid decision request budget");
+      (budget.tokenEstimate === null ? provider !== "openai" : !Number.isSafeInteger(budget.tokenEstimate) || budget.tokenEstimate < 0)) throw new Error("Invalid decision request budget");
 }
 
 /** Paths occur once in compact state; source hashes and provenance remain in the local request. */

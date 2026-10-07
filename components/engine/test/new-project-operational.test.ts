@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, realpathSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
-import { JevDecisionClient } from "../src/decision-transport.ts";
+import { DecisionClient } from "../src/decision-transport.ts";
 import { decisionDoctor } from "../src/decision-doctor.ts";
 import { contextScopeCoverage } from "../src/context-scope-coverage.ts";
 import { profileDecisionSettings } from "../src/decision-settings.ts";
@@ -17,7 +17,7 @@ test("HTTP failures retain safe status and actionable cause without retaining ar
     [422, "request-rejected"], [429, "provider-overloaded"], [500, "provider-error"]] as const) {
     const root = mkdtempSync(join(tmpdir(), "greenfield-http-"));
     t.after(() => rmSync(root, { recursive: true, force: true }));
-    const client = new JevDecisionClient({ token: "private-token-marker", coordinationRoot: root,
+    const client = new DecisionClient({ token: "private-token-marker", coordinationRoot: root,
       fetch: async () => new Response("private-token-marker arbitrary customer response", { status }) });
     const result = await client.ask("{}", 1000);
     assert.equal(result.ok, false);
@@ -65,7 +65,7 @@ test("passive health distinguishes unobserved credentials, billing failure, succ
   const record = (name: string, createdAt: string, reason: string, method: string, delivered: boolean, config = configDigest) => {
     durableJson(join(contextStateRoot(root), "decisions", digest(name).slice(7) + ".json"),
       { version: 2, runtimeVersion: RELEASE_VERSION, configDigest: config, receiptId: name, createdAt,
-        outcome: { providerCalled: true, scope: { workspace: root }, method, reason, delivered, transport: { httpStatus: reason === "billing-unavailable" ? 402 : 200 } } });
+        outcome: { version: 2, providerCalled: true, scope: { workspace: root }, method, reason, delivered, transport: { httpStatus: reason === "billing-unavailable" ? 402 : 200 } } });
   };
   record("billing", "2026-10-01T10:00:00Z", "billing-unavailable", "baseline", false);
   const failed = decisionDoctor(root, environment);
@@ -86,4 +86,11 @@ test("passive health distinguishes unobserved credentials, billing failure, succ
   record("interrupted", "2026-10-01T14:00:00Z", "cancelled", "baseline", false);
   assert.equal(decisionDoctor(root, environment).operational?.reason, "shadow");
   assert.ok(!JSON.stringify(decisionDoctor(root, environment)).includes("private-token-marker"));
+  durableJson(join(contextStateRoot(root), "decisions", digest("invalid-current").slice(7) + ".json"),
+    { version: 3, runtimeVersion: RELEASE_VERSION, configDigest, receiptId: "invalid-current", createdAt: "2026-10-01T15:00:00Z",
+      outcome: { version: 3, providerCalled: true, scope: { workspace: root }, method: "provider", delivered: true } });
+  const invalidEvidence = decisionDoctor(root, environment);
+  assert.equal(invalidEvidence.status, "needs-attention"); assert.equal(invalidEvidence.providerUse, "eligible");
+  assert.equal(invalidEvidence.operational?.state, "evidence-invalid");
+  assert.equal(invalidEvidence.operational?.reason, "decision-receipt-invalid");
 });

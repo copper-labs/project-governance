@@ -1,3 +1,4 @@
+import { readDecisionOutcome } from "./decision-outcome-reader.ts";
 import { createHash } from "node:crypto";
 import { closeSync, constants, fstatSync, openSync, readSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
@@ -98,8 +99,8 @@ export function decisionOutcomeReport(stateRoot: string, manifestPath: string, r
         const explicit = decisionEvidence.get(receiptId);
         try { receipt = explicit ? reference(explicit) : read(join(stateRoot, "decisions", `${receiptId}.json`)); }
         catch { counts.missing_decisions++; continue; }
-        if (receipt.version !== 2 || receipt.receiptId !== receiptId) throw new Error("Decision receipt identity mismatch");
-        const outcome = object(receipt.outcome);
+        if (![2, 3].includes(Number(receipt.version)) || receipt.receiptId !== receiptId) throw new Error("Decision receipt identity mismatch");
+        const outcome = readDecisionOutcome(receipt);
         if (outcome.scope === null) counts.unscoped_decisions++;
         else {
         const binding = object(outcome.scope);
@@ -107,13 +108,13 @@ export function decisionOutcomeReport(stateRoot: string, manifestPath: string, r
         if (scope !== null && scope !== identity) throw new Error("An episode cannot mix decision task revisions");
         scope = identity;
         }
-        if (outcome.version !== 2 || typeof outcome.delivered !== "boolean") throw new Error("Invalid decision outcome");
+        if (outcome.version !== 3 || typeof outcome.delivered !== "boolean") throw new Error("Invalid decision outcome");
         const budget = outcome.budget === undefined ? {} : object(outcome.budget);
         const reservation = typeof budget.reservationId === "string" ? budget.reservationId : null;
         const duplicateReservation = reservation !== null && (seenReservations.has(reservation) || pendingReservations.has(reservation));
         if (duplicateReservation) counts.duplicate_reservations++;
         if (reservation !== null) pendingReservations.add(reservation);
-        decisions.push({ id: receiptId, consumerIds: outcome.consumers, mode: outcome.mode, delivered: outcome.delivered, reason: outcome.reason,
+        decisions.push({ id: receiptId, provider: outcome.provider, method: outcome.method, sourceVersion: outcome.sourceVersion ?? 3, consumerIds: outcome.consumers, mode: outcome.mode, delivered: outcome.delivered, reason: outcome.reason,
           ...(manifest.version === 2 ? { reservationId: reservation, duplicateReservation, providerCalled: typeof outcome.providerCalled === "boolean" ? outcome.providerCalled : null, usage: outcome.usage ?? null } : {}) });
         if (explicit) decisions[decisions.length - 1]!.source = { path: explicit.path, digest: explicit.digest };
         pendingIds.add(receiptId);

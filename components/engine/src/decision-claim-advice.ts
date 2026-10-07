@@ -15,7 +15,7 @@ export interface ClaimCorrection {
   evidence: { index: number | null; description: string | null }; message: string;
 }
 export interface ClaimAdvice {
-  version: 1; kind: "project-governance-completion-claim-advice";
+  version: 3; kind: "project-governance-completion-claim-advice";
   authority: "advisory only: this is not a stop gate, an approval queue or an automatic test run; deterministic acceptance is unchanged";
   mode: string; effect: string; reason: string; delivered: boolean; evidenceBasis: "reported-only" | "file-consistent" | "mixed";
   nativeFacts: { state: string; exitCode: number | null; cleanup: string; reportedOutcome: string | null; remaining: string[]; truncatedReport: boolean };
@@ -25,7 +25,7 @@ export interface ClaimAdvice {
   scope: { label: string; confidence: number | null } | null;
   correction: string | null;
   coverage: DecisionCoverage;
-  decision: Pick<DecisionOutcome, "consumerId" | "requestId" | "receiptId" | "method" | "reason" | "delivered" | "providerCalled" | "model" | "usage" | "latencyMs" | "budget" | "scopeState"> | null;
+  decision: Pick<DecisionOutcome, "provider" | "consumerId" | "requestId" | "receiptId" | "method" | "reason" | "delivered" | "providerCalled" | "model" | "usage" | "latencyMs" | "budget" | "scopeState"> | null;
 }
 
 /**
@@ -40,7 +40,7 @@ export async function claimAdvice(runtime: DecisionRuntime, receipt: CommandRece
   const nativeFacts = { state: receipt.state, exitCode: receipt.exitCode, cleanup: receipt.cleanup,
     reportedOutcome: completion?.outcome ?? null, remaining: completion?.remaining ?? [], truncatedReport: summary?.truncated ?? false };
   const base: ClaimAdvice = {
-    version: 1, kind: "project-governance-completion-claim-advice",
+    version: 3, kind: "project-governance-completion-claim-advice",
     authority: "advisory only: this is not a stop gate, an approval queue or an automatic test run; deterministic acceptance is unchanged",
     mode: eligibility.mode, effect: eligibility.effect, reason: eligibility.reasons[0] ?? "not-applicable", delivered: false,
     evidenceBasis: "reported-only", boundEvidence: options.boundEvidence ?? [], nativeFacts, assessedClaims: 0, corrections: [], scope: null, correction: null,
@@ -100,7 +100,7 @@ export async function claimAdvice(runtime: DecisionRuntime, receipt: CommandRece
     subject: { digest: receipt.providerResultDigest ?? receipt.requestDigest, revision: options.revision, environment: options.environment },
     evidence, coverage, questions: questions.filter(question => runtime.settings.questionIds.DL09.includes(question.definitionId)), eligibilityDigest: null, policyDigest: options.policyDigest });
   const decision = { consumerId: outcome.consumerId, requestId: outcome.requestId, receiptId: outcome.receiptId,
-    method: outcome.method, reason: outcome.reason, delivered: outcome.delivered, providerCalled: outcome.providerCalled, model: outcome.model,
+    provider: outcome.provider, method: outcome.method, reason: outcome.reason, delivered: outcome.delivered, providerCalled: outcome.providerCalled, model: outcome.model,
     usage: outcome.usage, latencyMs: outcome.latencyMs, budget: outcome.budget, scopeState: outcome.scopeState };
   if (!outcome.delivered) return { ...base, mode: outcome.mode, reason: outcome.reason, coverage, decision };
   const corrections: ClaimCorrection[] = [...base.corrections];

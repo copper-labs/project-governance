@@ -75,7 +75,7 @@ function boundedTail(path: string, window: number): { text: string; digest: stri
 }
 
 export interface DeviceAdvice {
-  version: 1; kind: "project-governance-device-advice";
+  version: 3; kind: "project-governance-device-advice";
   authority: "advisory only: no probe, reset, rebuild or recovery is dispatched; native classification, target identity and cleanup state are unchanged";
   mode: string; effect: string; reason: string; delivered: boolean;
   stage: { id: string; state: string; exitCode: number | null; cleanup: string; inputValidity: string } | null;
@@ -85,7 +85,7 @@ export interface DeviceAdvice {
   unknownDiagnosis: boolean;
   nextProbe: { id: string; confidence: number | null } | null;
   coverage: DecisionCoverage;
-  decision: Pick<DecisionOutcome, "consumerId" | "requestId" | "receiptId" | "method" | "reason" | "delivered" | "providerCalled" | "model" | "usage" | "latencyMs" | "budget" | "scopeState"> | null;
+  decision: Pick<DecisionOutcome, "provider" | "consumerId" | "requestId" | "receiptId" | "method" | "reason" | "delivered" | "providerCalled" | "model" | "usage" | "latencyMs" | "budget" | "scopeState"> | null;
 }
 
 /** Check the existing command owner before reading any purported stage log. */
@@ -125,7 +125,7 @@ export async function deviceAdvice(runtime: DecisionRuntime, run: WorkflowRun, s
   const failed = stages.find(stage => stage.state === "failed" || stage.state === "unknown") ?? null;
   const result = failed?.result ?? null;
   const base: DeviceAdvice = {
-    version: 1, kind: "project-governance-device-advice",
+    version: 3, kind: "project-governance-device-advice",
     authority: "advisory only: no probe, reset, rebuild or recovery is dispatched; native classification, target identity and cleanup state are unchanged",
     mode: eligibility.mode, effect: "advise", reason: eligibility.reasons[0] ?? "no-failed-stage", delivered: false,
     stage: failed && result ? { id: failed.id, state: failed.state, exitCode: result.exitCode, cleanup: result.cleanup, inputValidity: result.inputValidity } : null,
@@ -191,7 +191,7 @@ export async function deviceAdvice(runtime: DecisionRuntime, run: WorkflowRun, s
     eligibilityDigest: digest({ probes: probes.map(probe => probe.id), target: envelope?.target ?? null }),
     policyDigest: options.policyDigest });
   const decision = { consumerId: outcome.consumerId, requestId: outcome.requestId, receiptId: outcome.receiptId,
-    method: outcome.method, reason: outcome.reason, delivered: outcome.delivered, providerCalled: outcome.providerCalled, model: outcome.model,
+    provider: outcome.provider, method: outcome.method, reason: outcome.reason, delivered: outcome.delivered, providerCalled: outcome.providerCalled, model: outcome.model,
     usage: outcome.usage, latencyMs: outcome.latencyMs, budget: outcome.budget, scopeState: outcome.scopeState };
   if (!outcome.delivered) return { ...base, mode: outcome.mode, reason: outcome.reason, coverage, decision };
   const currentLog = boundLog(run, failed);

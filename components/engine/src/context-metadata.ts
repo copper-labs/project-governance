@@ -1,6 +1,7 @@
 import { digest } from "./core.ts";
 import { matchesPackPath } from "./planning.ts";
 import { automaticContextPath } from "./context-path-policy.ts";
+import { configuredDecisionProvider, decisionProviderAdapter, sameConfiguredDecisionProvider } from "./decision-providers.ts";
 import type { ValidationSubject } from "./change-subject.ts";
 import { interpretNoul, type DecisionAsk, type DecisionOutcome, type DecisionRuntime } from "./decision-runtime.ts";
 import type { BudgetScope } from "./decision-budget.ts";
@@ -93,7 +94,8 @@ export async function selectContextMetadata(subject: ValidationSubject, catalog:
   const purposeItem: EvidenceItem = { id: "purpose", text: purpose, sourceDigest: digest(purpose), provenance: "supplied", trust: "untrusted" };
   const purposeBytes = Buffer.byteLength(purpose), limit = runtime.settings.legacy.evidenceBytes;
   const definition = DECISION_QUESTIONS["context.metadata-relevance/1"]!;
-  const wireLimit = Math.min(65536, runtime.settings.contextBudget.maxRequestBytes), baseWire = 1000 + Buffer.byteLength(JSON.stringify(purposeItem)) + (layout === "compact-v1" ? Buffer.byteLength(definition.instructions) : 0);
+  const adapter = decisionProviderAdapter(runtime.settings.provider);
+  const wireLimit = Math.min(adapter.policy.maxRequestBytes, runtime.settings.contextBudget.maxRequestBytes), baseWire = 1000 + Buffer.byteLength(JSON.stringify(purposeItem)) + (layout === "compact-v1" ? Buffer.byteLength(definition.instructions) : 0);
   const itemWire = (item: EvidenceItem) => layout === "compact-v1"
     ? Buffer.byteLength(JSON.stringify(compactMetadataItem(item))) + 150
     : Buffer.byteLength(JSON.stringify(item)) + Buffer.byteLength(JSON.stringify({ instructions: { question: definition.instructions, evidenceIds: ["purpose", item.id] }, type: "noul" })) + 32;
@@ -128,7 +130,9 @@ export async function selectContextMetadata(subject: ValidationSubject, catalog:
   };
   let replayedBatches = 0, invalidatedBatches = 0, providerCallMs = 0, httpTotalMs = 0, admissionTotalMs = 0, packingMs = 0, peakConcurrency = 0, firstBatchMs: number | null = null, budgetFinalized: boolean | null = null;
   for (const batch of family?.previous?.batches ?? []) {
-    if (batch.paths.every(path => permitted.has(path)) && batch.signature === signature(batch.paths) &&
+    if (batch.outcome.version === 3 && sameConfiguredDecisionProvider(batch.outcome.provider,
+        configuredDecisionProvider(runtime.settings.provider, runtime.settings.legacy.model, runtime.settings.configDigest)) &&
+        batch.paths.every(path => permitted.has(path)) && batch.signature === signature(batch.paths) &&
         runtime.eligibility("DL03", "context.metadata-relevance/1").providerUse === "eligible") {
       apply(batch.paths, batch.outcome); cursor.batches.push(batch); replayedBatches++;
     } else invalidatedBatches++;
@@ -140,7 +144,7 @@ export async function selectContextMetadata(subject: ValidationSubject, catalog:
   let priorityAssessed = 0, generalAssessed = 0;
   const reserveCalls = evaluation.reservePassageBudget && runtime.eligibility("DL03", "context.metadata-relevance/1").providerUse === "eligible"
     ? Math.min(2, runtime.settings.contextBudget.maxCalls - 1) : 0;
-  const reserveBytes = reserveCalls ? Math.min(65_536, Math.floor(runtime.settings.contextBudget.maxRequestBytes / 4)) : 0;
+  const reserveBytes = reserveCalls ? Math.min(adapter.policy.maxRequestBytes, Math.floor(runtime.settings.contextBudget.maxRequestBytes / 4)) : 0;
   const metadataByteCeiling = Math.max(0, runtime.settings.contextBudget.maxRequestBytes - reserveBytes);
   const metadataCallCeiling = runtime.settings.contextBudget.maxCalls - reserveCalls;
   const spent = scope ? readDecisionBudget(runtime.stateRoot, family

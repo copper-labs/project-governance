@@ -18,12 +18,12 @@ One existing decision runtime supports explicit JEV/OpenAI adapters and a reusab
 `evaluate_evidence` operation for text/images. CLI, a narrow library export and agent guidance
 share that operation. A project test script can use it without another browser or check runner.
 
-The operator authorized document authoring, Opus 5.5 medium-effort review, reconciliation and a
-subsequent simplification pass on 2026-10-06. Implementation, paid inference, publication, commits
-and adopter changes are not authorized by this request. Delivery is local draft documentation.
-Future work starts only after implementation is authorized and the affected source ownership is
-settled. Current 4.1 work remains separately owned; do not overwrite its dirty changes or reset
-an installed generation.
+The operator approved implementation and focused local verification for release 4.2 on 2026-10-06,
+following publication of the qualified 4.1 release. The design, Opus 5.5 medium review,
+reconciliation and separate simplification pass are complete. The 4.1 source and archive are frozen
+at their release identity; new runtime changes belong to 4.2. Preserve normal hooks and make local
+commits at completed coherent seams. Paid inference, 4.2 publication and adopter changes remain
+separate actions. One writer owns shared decision contracts; support work is read-only.
 
 ## Fixed decisions and source owners
 
@@ -55,15 +55,16 @@ changes or copied Python assets are planned.
 
 ## Plan tracking and validation cadence
 
-This design-only plan uses prose checkpoints. Machine tracking requires real configured proof
+This plan uses prose checkpoints. Machine tracking requires real configured proof
 owners and the then-current spec digest; no source pack exists for this proposal. Documentation
 validation does not qualify runtime behavior. No additional runner is needed for progress tracking.
 
-Follow the [validation strategy](../../governance/validation-strategy.md). Use Node `>=24.16.0 <25`.
+Follow the [validation strategy](../../governance/validation-strategy.md). Use Node `>=24.16.0 <25`
+and verify the Git executable inherited by fixtures before the checkpoint.
 Author each batch's source, bindings and meaningful fixtures together; run focused checks once at
 batch completion. Repeat failed/invalidated owners, or run early for a named blocking uncertainty.
 Existing hooks remain effective. Retain original proof and update implementation/verification/
-closeout boxes at each batch or handoff. No source checkpoint is complete today. One independent
+closeout boxes at each batch or handoff. B1 is implemented and locally verified; B2/B3 remain open. One independent
 implementation review consumes B3 proof; commits/publication remain separately authorized.
 
 ## B1 — Interchangeable text providers
@@ -80,29 +81,29 @@ implementation review consumes B3 proof; commits/publication remain separately a
 
 Implementation:
 
-- [ ] Extract one small typed provider seam and preserve shared transport/operational ownership.
-- [ ] Implement JEV and OpenAI codecs for Boolean, Choice and weighted Score; validate model aliases
+- [x] Extract one small typed provider seam and preserve shared transport/operational ownership.
+- [x] Implement JEV and OpenAI codecs for Boolean, Choice and weighted Score; validate model aliases
   according to provider rules and retain requested/returned identities and native usage.
-- [ ] Extend canonical configuration, provider/account admission and passive diagnostics without
+- [x] Extend canonical configuration, provider/account admission and passive diagnostics without
   enabling generic evaluation, changing legacy defaults or adding paid doctor probes.
   Generic configuration has one provider/model, not separate modality routes.
-- [ ] Declare compatible evidence layouts and reject unsupported isolated layouts without dispatch.
+- [x] Declare compatible evidence layouts and reject unsupported isolated layouts without dispatch.
   Keep registered OpenAI swaps shadow-only; use exact adapter model mappings, with no new
   qualification registry or guessed dated alias forms.
-- [ ] Preserve unknown/refusal/per-question-invalid/envelope-invalid distinctions and current
+- [x] Preserve unknown/refusal/per-question-invalid/envelope-invalid distinctions and current
   deterministic consumer fallbacks. Add provider-neutral version-3 outcomes, version-2 JEV receipt
   projection and provider-aware reports, usage and health without rewriting historical receipts.
-- [ ] Author fixture transport regressions for both providers and unchanged registered callers.
+- [x] Author fixture transport regressions for both providers and unchanged registered callers.
 
 Verification:
 
-- [ ] Run the B1 focused suite and no-emit typecheck at the completed batch checkpoint.
-- [ ] Confirm zero dispatch on unsupported capability, denied disclosure, absent credentials and
+- [x] Run the B1 focused suite and no-emit typecheck at the completed batch checkpoint.
+- [x] Confirm zero dispatch on unsupported capability, denied disclosure, absent credentials and
   local-only policy; exact answer/distribution validation and existing cancellation remain effective.
 
 Closeout:
 
-- [ ] Record settled configuration/adapter contracts, retained original proof and any remaining
+- [x] Record settled configuration/adapter contracts, retained original proof and any remaining
   provider-alias or live-service evidence limits before B2.
 
 | Trigger | Exact checkpoint command | Scope/claim | Repeat only when |
@@ -111,16 +112,26 @@ Closeout:
 | B1 complete | `npm run typecheck` | Shared TypeScript integration and affected callers | Relevant typed source/dependency changes or failure |
 
 ```sh
-node --test --test-concurrency=2 components/engine/test/decision-configuration.test.ts components/engine/test/decision-settings.test.ts components/engine/test/decision-doctor.test.ts components/engine/test/decision-schema.test.ts components/engine/test/decision-runtime.test.ts components/engine/test/decision-transport.test.ts components/engine/test/decision-admission.test.ts components/engine/test/decisions.test.ts components/engine/test/decision-telemetry.test.ts components/engine/test/release-evaluation.test.ts components/engine/test/release-evaluation-capture.test.ts
+node --test --test-concurrency=2 components/engine/test/decision-configuration.test.ts components/engine/test/decision-settings.test.ts components/engine/test/decision-doctor.test.ts components/engine/test/decision-schema.test.ts components/engine/test/decision-runtime.test.ts components/engine/test/decision-transport.test.ts components/engine/test/decision-admission.test.ts components/engine/test/decisions.test.ts components/engine/test/decision-telemetry.test.ts components/engine/test/decision-outcomes.test.ts components/engine/test/decision-episodes.test.ts components/engine/test/release-evaluation.test.ts components/engine/test/release-evaluation-capture.test.ts components/engine/test/decision-providers.test.ts components/engine/test/decision-context-advice.test.ts components/engine/test/decision-check-advice.test.ts components/engine/test/decision-output-advice.test.ts components/engine/test/decision-device-advice.test.ts components/engine/test/decision-claim-advice.test.ts components/engine/test/decision-workflow-advice.test.ts components/engine/test/decision-validation-advice.test.ts components/engine/test/decision-review.test.ts components/engine/test/decision-attention.test.ts components/engine/test/decision-provider-advice.test.ts components/engine/test/decision-log-filter.test.ts components/engine/test/decision-diagnose.test.ts components/engine/test/decision-task-binding.test.ts components/engine/test/context-route-command.test.ts components/engine/test/context-route-presentation.test.ts components/engine/test/context-packet.test.ts components/engine/test/context-evaluation.test.ts components/engine/test/context-metadata.test.ts components/engine/test/context-passage-advice.test.ts components/engine/test/context-family.test.ts components/engine/test/context-task-switch.test.ts components/engine/test/context-observations.test.ts components/engine/test/provider-context.test.ts components/engine/test/new-project-operational.test.ts
 ```
 
-Add the implemented provider codec cases to these owners or one owning new suite; freeze its exact
-command before the checkpoint. Include affected presentation/filter/episode suites selected from
-all current `method === "jev"` readers (context routes/packets/evaluation, log filtering, diagnosis,
-task binding, check output, operational projects and episodes); version-3 outward JSON deliberately
-uses provider identity. No network credentials or live inference are needed. Proof state:
-not run. Default test cadence: batch completion. Split early if model/answer/configuration meaning
-is unresolved; do not add a generic plugin registry to work around it.
+The command above freezes 38 affected suites, including the new provider codec owner and current
+presentation/filter/episode readers. Version-3 outward JSON uses provider identity. The checkpoint
+and focused replacements cover 286 distinct passing cases, together with the no-emit typecheck.
+The initial environment used a
+slow platform Git launcher; retain its failed timing cases as diagnosis, not runtime qualification.
+Corrected process access qualifies native ownership tests without weakening those checks. Original
+commands, logs and source hashes stay in the external B1 evidence record; passing cases are not
+double-counted across retries.
+
+The settled seam preserves JEV payload/parser/defaults and its aggregate pacing. OpenAI uses the
+documented Decisions request/answer arrays, exact `gpt-6-luna` alias checks and byte admission with
+no invented token estimate. Registered swaps remain shadow-only, and generic evaluation stays
+disabled. Provider/account admission, v3 usage/reporting and historical v2 projection are verified.
+Receipt and cursor reuse require the same provider/adapter/model/configuration; unqualified history
+cannot dispatch or charge the same reserved event again. Live API compatibility and immutable
+backend identity remain unqualified. No network inference was used. B2 can now extend this settled
+seam. Default cadence remains batch completion, with failed or invalidated owners rechecked.
 
 ## B2 — Supplied-image evaluation and public entry
 
@@ -287,8 +298,8 @@ needs verified coordinate mapping. Image optimization remains part of this separ
 comparison, not a new core dependency or permission to run paid experiments now.
 
 Provider prices, account access and model identities require current readback at that checkpoint.
-An alias does not establish reproducible weights. Do not launch a paid baseline, threshold-fitting
-experiment or adopter test under this document-authoring authorization. A project keeps capture,
+An alias does not establish reproducible weights. Implementation approval does not authorize a paid
+baseline, threshold-fitting experiment or adopter test. A project keeps capture,
 baselines and thresholds in its repository and adopts the pinned runtime deliberately.
 
 ## Rollback
@@ -303,5 +314,8 @@ store deletion, compatibility shim or automatic adopter change is part of rollba
 Document authoring, Opus 5.5 medium design review, focused reconciliation and the separate
 simplification pass are complete. See the [design reconciliation](../../reviews/2026-10-06-decision-providers-design-reconciliation.md)
 and [simplification decisions](../../reviews/2026-10-06-decision-providers-simplification.md).
-All implementation, runtime verification and closeout boxes remain unchecked. The next action is
-implementation authorization and reconciliation of shared source ownership before B1.
+Implementation is authorized for 4.2. B1's provider seam, accounting/readers and reuse boundaries
+are implemented and locally verified against frozen synthetic cases. Normal source hooks govern
+the local batch commit. B2 generic/image evaluation and B3 integration, installed proof and final
+independent implementation review remain pending. Live beta compatibility, visual accuracy and
+ordinary accepted-task benefit remain unqualified.

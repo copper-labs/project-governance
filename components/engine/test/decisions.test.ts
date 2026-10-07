@@ -1,4 +1,5 @@
 import { providerDatabasePath } from "../src/decision-admission.ts";
+import { decisionProviderAdapter } from "../src/decision-providers.ts";
 import { canonical, digest } from "../src/core.ts";
 import { buildContextPacket } from "../src/context-packet.ts";
 import { test } from "node:test";
@@ -30,6 +31,8 @@ test("off, absent token and unapproved data make zero network calls", async () =
       const result = await new JevDecisionAdapter(settings as DecisionConfig, f.path, { coordinationRoot: (f.path) + ".coordination", token, fetch: transport }).decide(request);
       assert.equal(result.baselineVersion, "lexical-context-1");
       assert.equal(result.reason, reason); assert.deepEqual(result.delivered, ["b", "a"]);
+      assert.equal(result.version, 3); assert.equal(result.provider?.id, "jev"); assert.equal(result.provider?.returnedModel, null);
+      assert.equal(result.providerCalled, false);
     }
     assert.equal(calls, 0);
   } finally { f.close(); }
@@ -46,7 +49,7 @@ test("live-shaped advice ranks supplied IDs and records native usage; shadow pre
   };
   try {
     const live = await new JevDecisionAdapter(config, f.path, { coordinationRoot: (f.path) + ".coordination", token: "synthetic-test", fetch: transport }).decide(request);
-    assert.deepEqual(live.delivered, ["a", "b"]); assert.equal(live.method, "jev");
+    assert.deepEqual(live.delivered, ["a", "b"]); assert.equal(live.method, "provider");
     assert.deepEqual(live.usage, { inputTokens: 200, outputTokens: 20 });
     const shadow = await new JevDecisionAdapter({ ...config, mode: "shadow" }, f.path, { coordinationRoot: (f.path) + ".coordination", token: "synthetic-test", fetch: transport }).decide(request);
     assert.deepEqual(shadow.delivered, ["b", "a"]); assert.deepEqual(shadow.suggested, ["a", "b"]);
@@ -74,7 +77,7 @@ test("abstention and low confidence preserve baseline and usage without suppress
       assert.deepEqual(result.delivered, ["b", "a"]);
       assert.equal(result.suggested, null);
       assert.deepEqual(result.usage, { inputTokens: 77, outputTokens: 8 });
-      assert.equal((await adapter.decide({ ...request, purpose: "a separate subsequent observation" })).method, "jev");
+      assert.equal((await adapter.decide({ ...request, purpose: "a separate subsequent observation" })).method, "provider");
       assert.equal(calls, 2);
     } finally { f.close(); }
   }
@@ -152,7 +155,7 @@ test("source class approval also requires explicit matching source paths before 
           type: "choice", choice: "a", confidence: 0.9, probabilities: { a: 0.9, unknown: 0.1 },
         } }, usage: { input_tokens: 20, output_tokens: 2 } });
       } }).decide(sourceRequest);
-    assert.equal(partial.method, "jev");
+    assert.equal(partial.method, "provider");
     assert.deepEqual(partial.delivered, ["b", "a"], "Unapproved source keeps its baseline slot");
     const partialReceipt = JSON.parse(readFileSync(join(dirname(f.path), "decisions", `${partial.receiptId}.json`), "utf8"));
     assert.deepEqual(partialReceipt.outcome.coverage.omitted, ["b"]);
@@ -160,7 +163,7 @@ test("source class approval also requires explicit matching source paths before 
     assert.equal(calls, 1);
     const result = await new JevDecisionAdapter({ ...config, allowedDataClasses: ["source"], allowedSourcePaths: ["a", "b"] }, f.path,
       { coordinationRoot: (f.path) + ".coordination", token: "fixture", fetch: transport }).decide(sourceRequest);
-    assert.equal(result.method, "jev"); assert.equal(calls, 2);
+    assert.equal(result.method, "provider"); assert.equal(calls, 2);
   } finally { f.close(); }
 });
 
@@ -182,10 +185,10 @@ test("broader source approval at one task revision gets a new decision event", a
   };
   try {
     const first = await new SharedAdapter({ ...config, allowedDataClasses: ["source"], allowedSourcePaths: ["src/*.ts"] }, f.path,
-      { token: "fixture", fetch: transport, scope }).decide(sourceRequest);
+      { coordinationRoot: f.path + ".coordination", token: "fixture", fetch: transport, scope }).decide(sourceRequest);
     const second = await new SharedAdapter({ ...config, allowedDataClasses: ["source"], allowedSourcePaths: ["src/*.ts", "Makefile"] }, f.path,
-      { token: "fixture", fetch: transport, scope }).decide(sourceRequest);
-    assert.equal(first.method, "jev"); assert.equal(second.method, "jev");
+      { coordinationRoot: f.path + ".coordination", token: "fixture", fetch: transport, scope }).decide(sourceRequest);
+    assert.equal(first.method, "provider"); assert.equal(second.method, "provider");
     assert.equal(calls, 2);
     assert.notEqual(first.receiptId, second.receiptId);
   } finally { f.close(); }
@@ -213,7 +216,7 @@ test("a candidate above the model count cap keeps bounded JEV advice active", as
         probabilities: Object.fromEntries(keys.map(key => [key, key === "docs/explicit.md" ? 1 : 0])),
       } }, usage: { input_tokens: 20, output_tokens: 2 } });
     } }).decide(sourceRequest);
-    assert.equal(result.method, "jev"); assert.equal(calls, 1);
+    assert.equal(result.method, "provider"); assert.equal(calls, 1);
     assert.equal(result.delivered.length, 17);
     assert.equal(result.excerptCoverage?.length, 16);
     const receipt = JSON.parse(readFileSync(join(dirname(f.path), "decisions", `${result.receiptId}.json`), "utf8"));
@@ -240,7 +243,7 @@ test("the maximum configured candidate count reserves the purpose evidence slot"
         probabilities: Object.fromEntries(keys.map(key => [key, key === keys[0] ? 1 : 0])),
       } }, usage: { input_tokens: 20, output_tokens: 2 } });
     } }).decide({ ...request, dataClass: "source", candidates });
-    assert.equal(result.method, "jev"); assert.equal(calls, 1);
+    assert.equal(result.method, "provider"); assert.equal(calls, 1);
     assert.equal(result.delivered.length, 64);
     const receipt = JSON.parse(readFileSync(join(dirname(f.path), "decisions", `${result.receiptId}.json`), "utf8"));
     assert.deepEqual(receipt.outcome.coverage.omitted, ["docs/63.md"]);
@@ -281,7 +284,7 @@ test("indivisible approved evidence does not disable JEV for its peer", async ()
         probabilities: { "src/good.ts": 0.9, unknown: 0.1 },
       } }, usage: { input_tokens: 20, output_tokens: 2 } });
     } }).decide(sourceRequest);
-    assert.equal(result.method, "jev"); assert.equal(calls, 1);
+    assert.equal(result.method, "provider"); assert.equal(calls, 1);
     assert.deepEqual(result.delivered, ["src/long.ts", "src/good.ts"]);
     assert.equal(result.excerptCoverage?.find(item => item.id === "src/long.ts")?.excerptBytes, 0);
     const receipt = JSON.parse(readFileSync(join(dirname(f.path), "decisions", `${result.receiptId}.json`), "utf8"));
@@ -312,7 +315,7 @@ test("unapproved baseline slots can crowd out approved advice under a tight pack
       required: [], optional: sourceRequest.candidates,
       maximumBytes: Buffer.byteLength(canonical([sourceRequest.candidates[0]])) + 1 }, adapter);
     assert.equal(calls, 1);
-    assert.equal(packet.decision?.method, "jev");
+    assert.equal(packet.decision?.method, "provider");
     assert.deepEqual(packet.decision?.delivered, ["Makefile", "src/b.ts", "src/a.ts"]);
     assert.deepEqual(packet.entries.map(entry => entry.id), ["Makefile"]);
     assert.equal(packet.omissionReasons["src/b.ts"], "packet-budget");
@@ -375,7 +378,7 @@ test("caller cancellation returns baseline, aborts transport and does not create
     assert.equal(cancelled.method, "baseline"); assert.equal(cancelled.suggested, null);
     const snapshot = structuredClone(cancelled); late!(response()); await Promise.resolve();
     assert.deepEqual(cancelled, snapshot);
-    assert.equal((await adapter.decide({ ...request, purpose: "a separate subsequent observation" })).method, "jev");
+    assert.equal((await adapter.decide({ ...request, purpose: "a separate subsequent observation" })).method, "provider");
     assert.equal(calls, 2);
   } finally { f.close(); }
 });
@@ -402,7 +405,8 @@ test("separate processes share rate-limit suppression without retaining credenti
     };
     assert.deepEqual(invoke(), { reason: "provider-error", calls: 1 });
     assert.deepEqual(invoke(), { reason: "cooldown", calls: 0 });
-    assert.ok(!readFileSync(providerDatabasePath(f.path + ".coordination"), "utf8").includes("never-persist-this-test-token"));
+    const account = digest({ endpoint: decisionProviderAdapter("jev").endpoint, token: "never-persist-this-test-token" });
+    assert.ok(!readFileSync(providerDatabasePath(f.path + ".coordination", account), "utf8").includes("never-persist-this-test-token"));
   } finally { f.close(); }
 });
 
@@ -417,8 +421,8 @@ test("legacy callers need explicit scope, share the new budget and reuse the sam
     const settings = legacyDecisionSettings(config); settings.budget.maxCalls = 1;
     const scope = { workspace: dirname(f.path), taskId: "shared-task", taskRevision: request.taskRevision };
     const adapter = new SharedAdapter(config, f.path, { coordinationRoot: f.path + ".coordination", token: "fixture", fetch: fetcher, scope, settings });
-    assert.equal((await adapter.decide(request)).method, "jev");
-    assert.equal((await adapter.decide(request)).method, "jev"); assert.equal(calls, 1);
+    assert.equal((await adapter.decide(request)).method, "provider");
+    assert.equal((await adapter.decide(request)).method, "provider"); assert.equal(calls, 1);
     const runtime = new DecisionRuntime(settings, dirname(f.path), { coordinationRoot: dirname(f.path), token: "fixture", fetch: fetcher });
     const next = await runtime.ask({ consumerId: "DL03", eventId: "separate-new-runtime-event", scope,
       subject: { digest: digest("evidence"), revision: scope.taskRevision, environment: "test" },

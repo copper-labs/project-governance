@@ -2,7 +2,7 @@
 id: spec.engine-decision-providers-and-image-evaluation
 title: Interchangeable Decision Providers and Image Evaluation
 type: spec
-status: draft
+status: approved
 owner: project-governance
 created: 2026-10-06
 updated: 2026-10-06
@@ -23,9 +23,10 @@ can select another compatible provider. A reusable `evaluate_evidence` operation
 text, images or both against bounded Boolean, choice and score questions. Agents and test scripts
 use the same operation through a command or a narrow library entry.
 
-The operator requested the specification, implementation plan, Opus 5.5 medium-effort review and a
-subsequent simplification pass. This document specifies future behavior. It does not authorize
-runtime implementation, live provider experiments, publication or changes to an adopter.
+The operator approved implementation and focused local verification for release 4.2 after the
+qualified 4.1 release. The Opus 5.5 medium design review and subsequent simplification pass are
+complete. This document owns the intended behavior; batch evidence records what is implemented.
+Paid live qualification, 4.2 publication and changes to an adopter remain separate actions.
 
 ## Ownership and boundaries
 

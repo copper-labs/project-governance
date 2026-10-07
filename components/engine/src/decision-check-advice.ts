@@ -88,10 +88,10 @@ export async function checkDecisionAdvice(prepared: { subject: ValidationSubject
       } catch { comparison = { status: "unavailable", comparisons: [], savings: null }; }
     }
     const episode = record(binding ? "observed" : "scope-unavailable", [...(review?.decisions ?? []), ...(validation?.decision ? [validation.decision] : [])]);
-    return { version: 1, review, validation, comparison, episode, authority: "advice only; native checks and selection unchanged" };
+    return { version: 3, review, validation, comparison, episode, authority: "advice only; native checks and selection unchanged" };
   } catch {
     try { record("advice-unavailable-or-stale", []); } catch { /* Native result remains authoritative. */ }
-    return { version: 1, review: null, validation: null, reason: "advice-unavailable-or-stale",
+    return { version: 3, review: null, validation: null, reason: "advice-unavailable-or-stale",
       authority: "advice only; native checks and selection unchanged" };
   }
 }

@@ -1,3 +1,4 @@
+import { decisionProviderAdapter } from "./decision-providers.ts";
 import { decisionBudgetStoreStatus } from "./decision-budget.ts";
 import { contextStateRoot } from "./context-command.ts";
 import { loadProfileDecisionSettings, resolveConsumerMode } from "./decision-settings.ts";
@@ -9,7 +10,7 @@ import { observedDecisionHealth } from "./decision-operational-health.ts";
 export function decisionDoctor(workspace: string, environment: NodeJS.ProcessEnv = process.env) {
   try {
     const settings = loadProfileDecisionSettings(workspace), config = settings.legacy;
-    const tokenPresent = Boolean(environment.JEV_TOKEN);
+    const tokenPresent = Boolean(environment[decisionProviderAdapter(settings.provider).credentialName]);
     const reasons: string[] = [];
     if (config.mode === "off") reasons.push("off");
     if (!tokenPresent) reasons.push("missing-token");
@@ -18,8 +19,8 @@ export function decisionDoctor(workspace: string, environment: NodeJS.ProcessEnv
     const sourceEnabled = config.allowedDataClasses.includes("source") && Boolean(config.allowedSourcePaths?.length);
     const operational = observedDecisionHealth(workspace, settings.configDigest);
     if (config.allowedDataClasses.length === 1 && config.allowedDataClasses[0] === "source" && !sourceEnabled) reasons.push("source-scope-disabled");
-    return { version: 1, capability: "decisions", status: operational.state === "failed" ? "needs-attention" : "passed", mode: config.mode,
-      provider: "jev", model: config.model, tokenPresent, providerUse: reasons.length ? "disabled" : "eligible",
+    return { version: 3, capability: "decisions", status: ["failed", "evidence-invalid"].includes(operational.state) ? "needs-attention" : "passed", mode: config.mode,
+      provider: settings.provider, adapter: decisionProviderAdapter(settings.provider).version, evaluation: settings.evaluation, model: config.model, tokenPresent, providerUse: reasons.length ? "disabled" : "eligible",
       reasons, fallback: "deterministic-baseline", allowedQuestions: config.allowedQuestions,
       allowedDataClasses: config.allowedDataClasses, sourceScopeConfigured: sourceEnabled,
       limits: { deadlineMs: config.deadlineMs, evidenceBytes: config.evidenceBytes, maxCandidates: config.maxCandidates },
@@ -35,7 +36,7 @@ export function decisionDoctor(workspace: string, environment: NodeJS.ProcessEnv
       network: "not-attempted", providerHealth: operational.state === "not-observed" ? "not-probed" : "observed",
       operational, benefit: "not-evaluated", mutation: "none" };
   } catch {
-    return { version: 1, capability: "decisions", status: "failed", providerUse: "invalid-configuration",
+    return { version: 3, capability: "decisions", status: "failed", providerUse: "invalid-configuration",
       findings: [{ id: "decisions.configuration-invalid", message: "Correct continuity.decisions in the project profile before using decision assistance." }],
       network: "not-attempted", mutation: "none" };
   }

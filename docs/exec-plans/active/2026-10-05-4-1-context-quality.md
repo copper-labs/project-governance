@@ -1050,6 +1050,12 @@ Actual desktop consumption, ordinary accepted outcomes and total-cost savings re
 Keep failed originals and historical native evidence. Publication and adopter upgrades remain
 separate deliberate actions. The exact final archive, original proof and completed review remain
 indexed outside source; close F5 only through the existing typed updater.
+
+Publication: [4.1.0](https://github.com/copper-labs/project-governance/releases/tag/4.1.0) is immutable
+at source `dc512c4c8f13c76d5da64d22acfaa6d3080b5de0`. Remote readback matched the frozen archive and
+both metadata files. The release reused qualified local proof with normal commit/push hooks;
+hosted CI was not run. Publication changed no adopter or native conversation. New decision-provider
+implementation belongs to 4.2.
 <!-- /governance:notes F5-progress -->
 
 ## Promotion, rollback and exclusions

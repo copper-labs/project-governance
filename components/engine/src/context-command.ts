@@ -86,7 +86,7 @@ export async function contextCommand(args: string[], root: string, suppliedProvi
     catch { return true; }
   }).map(candidate => candidate.id);
   durableJson(join(stateRoot, "receipts", `${receiptId}.json`), {
-    version: 1, ...runtimeExecutionIdentity(), receiptId, workspace: canonicalRoot, createdAt: new Date().toISOString(), inputDigest: packet.inputDigest,
+    version: 3, ...runtimeExecutionIdentity(), receiptId, workspace: canonicalRoot, createdAt: new Date().toISOString(), inputDigest: packet.inputDigest,
     taskRevision: packet.taskRevision, sources: [...required, ...optional].map(({ id, sourceDigest }) => ({ id, sourceDigest })),
     selected: packet.entries.map(entry => entry.id), omitted: packet.omitted,
     omissionReasons: packet.omissionReasons, decision: packet.decision,

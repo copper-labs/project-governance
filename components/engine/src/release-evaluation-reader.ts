@@ -3,7 +3,7 @@ import { realpathSync } from "node:fs";
 import { digest, object, text } from "./core.ts";
 import type { ContextQualityScore } from "./context-evaluation-quality.ts";
 import { boundedOutcomeReader, decisionOutcomeReport, type OutcomeEvidenceReader } from "./decision-outcomes.ts";
-import { canonicalEvidencePath, jevEvaluationCost, measuredNumber, nativeEvaluationCost, providerEvaluationCost } from "./release-evaluation-cost.ts";
+import { canonicalEvidencePath, decisionEvaluationCost, measuredNumber, nativeEvaluationCost, providerEvaluationCost } from "./release-evaluation-cost.ts";
 import { RELEASE_DIMENSIONS, type EvaluationCondition, type EvaluationEnvelope, type EvaluationEpisode, type EvaluationIssue,
   type EvaluationContextTiming, type EvaluationMeasure, type EvaluationReference, type ReleaseEvaluationInput } from "./release-evaluation-types.ts";
 
@@ -157,7 +157,7 @@ export function readReleaseEvaluationInput(stateRoot: string, manifestPath: stri
         const path = join(stateRoot, "decisions", `${String(decision.id)}.json`), record = captured?.record ?? reader.read(path);
         const source = captured?.reference ?? { path: resolve(path), digest: bounded.digestFor(path)! };
         if (![true, false].includes(object(record.outcome).providerCalled as boolean)) episode.costCaptureUnknown = true;
-        const cost = jevEvaluationCost(record, source); if (cost) episode.costs.push(cost);
+        const cost = decisionEvaluationCost(record, source); if (cost) episode.costs.push(cost);
         identity(record); episode.sources.push(source);
       }
       const artifacts: Array<{kind: string; variant: unknown; reference: EvaluationReference; record: Record<string, unknown>}> = [];
@@ -180,7 +180,7 @@ export function readReleaseEvaluationInput(stateRoot: string, manifestPath: stri
           const native = object(caller.record.native), linked = caller.record.entryKind === "context-delivery"
             ? native.receiptId === record.receiptId && native.inputDigest === record.inputDigest
             : prompt?.record.routeReceiptId === record.receiptId && prompt?.record.routeInputDigest === record.inputDigest;
-          if (record.version !== 1 || typeof record.receiptId !== "string" || !hash(record.inputDigest) || !linked || record.workspace !== episode.scope?.workspace && episode.scope !== null) {
+          if (![1, 3].includes(Number(record.version)) || typeof record.receiptId !== "string" || !hash(record.inputDigest) || !linked || record.workspace !== episode.scope?.workspace && episode.scope !== null) {
             problem("context-timing-route-unlinked", source); continue;
           }
           episode.contextTimings.push(contextTiming(record, source));

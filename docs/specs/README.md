@@ -14,7 +14,7 @@ summary: Active specifications for the package runtime, KMP surface validation, 
 | Specification | Purpose |
 | --- | --- |
 | [Optional computer use and combined visual testing](engine-optional-computer-use-testing.md) | Proposed local Holo grounding, optional-tool behavior and realistic Decisions checkpoint experiments with independent truth |
-| [Decision providers and image evaluation](engine-decision-providers-and-image-evaluation.md) | Draft provider interchangeability and reusable supplied-image evaluation through the existing decision runtime; design review only |
+| [Decision providers and image evaluation](engine-decision-providers-and-image-evaluation.md) | Approved 4.2 provider interchangeability and reusable supplied-image evaluation through the existing decision runtime; implementation and live qualification remain separate |
 | [Next major verification and semantic review](engine-4-verification-feedback.md) | Accepted complete workflow proof, multilingual JEV review, early focused checks and known-fault detection through existing owners |
 | [Focused linting MVP](engine-linting-mvp.md) | Proposed deterministic tool adapters, safe setup, visible language coverage and required narrow checks without model calls |
 | [Release evaluation scorecard](engine-release-evaluation.md) | Reproducible release comparisons, passive field trends, full-chain context quality and accepted-task cost with explicit evidence gaps |

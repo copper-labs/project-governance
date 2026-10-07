@@ -11,7 +11,7 @@ test("offline outcomes join caller links, retain disagreeing labels, deduplicate
   try {
     const id = "a".repeat(32), other = "b".repeat(32);
     const add = (key: string) => durableJson(join(root, "decisions", `${key}.json`), { version: 2, receiptId: key, outcome: {
-      version: 2, scope: { workspace: root, taskId: "task", taskRevision: "1" }, consumers: ["DL05"], mode: "auto", delivered: true, reason: "answered" } });
+      version: 2, method: "jev", scope: { workspace: root, taskId: "task", taskRevision: "1" }, consumers: ["DL05"], mode: "auto", delivered: true, reason: "answered" } });
     add(id); add(other);
     const callerPath = join(root, "caller.json"), nativePath = join(root, "native.json");
     durableJson(callerPath, { deviceAdvice: { decision: { receiptId: id } }, privateText: "never-export" });
@@ -41,7 +41,7 @@ test("unscoped fallback receipts retain episode labels and every selected episod
   try {
     const id = "c".repeat(32), scoped = "d".repeat(32), absent = "e".repeat(32);
     for (const key of [id, scoped]) durableJson(join(root, "decisions", `${key}.json`), { version: 2, receiptId: key,
-      outcome: { version: 2, scope: key === id ? null : { workspace: root, taskId: "task", taskRevision: "1" },
+      outcome: { version: 2, method: "jev", scope: key === id ? null : { workspace: root, taskId: "task", taskRevision: "1" },
         consumers: ["DL09"], delivered: false, reason: key === id ? "scope-unavailable" : "missing-token", mode: "auto" } });
     const caller = join(root, "caller.json");
     // Caller artifacts have object roots, matching the public command envelope.

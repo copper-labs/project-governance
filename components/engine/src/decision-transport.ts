@@ -1,12 +1,11 @@
+import { decisionProviderAdapter, type DecisionProviderAdapter, type DecisionProviderId } from "./decision-providers.ts";
 import { performance } from "node:perf_hooks";
 import { CONTEXT_OPERATION_MS } from "./context-timing.ts";
 import { digest } from "./core.ts";
-import { decisionNativeUsage, type DecisionFailureStage } from "./decision-schema.ts";
-import { ProviderPool, PROVIDER_LEASE_CLEANUP_MS, PROVIDER_CONCURRENCY, PROVIDER_TOKENS_PER_SECOND, PROVIDER_REQUESTS_PER_MINUTE } from "./decision-admission.ts";
-
-export const DECISION_ENDPOINT = "https://api.typesafe.ai/v1/systemone";
-const RESPONSE_LIMIT = 262_144;
+import type { DecisionFailureStage } from "./decision-schema.ts";
+import { ProviderPool, PROVIDER_LEASE_CLEANUP_MS } from "./decision-admission.ts";
 export interface TransportOptions {
+  provider?: DecisionProviderId;
   token?: string | undefined; fetch?: typeof fetch; now?: () => number;
   /** Isolated test state; production uses the one user-local endpoint pool. */
   coordinationRoot?: string;
@@ -20,7 +19,7 @@ export interface TransportTiming {
   activeConcurrency: number; dispatched: boolean; attemptId: string | null;
   requestBytes: number;
   coordinationIssues: string[];
-  poolLimits: { concurrency: number; estimatedInputTokensPerSecond: number; requestsPerMinute: number };
+  poolLimits: { concurrency: number; estimatedInputTokensPerSecond: number | null; requestsPerMinute: number };
 }
 export type TransportOutcome = ({ ok: true; raw: unknown } |
   { ok: false; reason: string; failureStage: DecisionFailureStage }) & { timing: TransportTiming };
@@ -51,14 +50,16 @@ export const decisionCancellationReason = (signal?: AbortSignal) =>
   ["context-selection-deadline", "context-operation-deadline"].includes(signal?.reason) ? "operation-deadline" : "cancelled";
 
 /** Admission precedes paid reservation; only dispatch starts the individual HTTP clock. */
-export class JevDecisionClient {
+export class DecisionClient {
+  readonly adapter: DecisionProviderAdapter;
   readonly #token: string | undefined;
   readonly #fetch: typeof fetch;
   readonly #now: () => number;
   readonly #root: string | undefined;
   readonly #healthScope: string;
   constructor(options: TransportOptions = {}) {
-    this.#token = options.token ?? process.env.JEV_TOKEN;
+    this.adapter = decisionProviderAdapter(options.provider ?? "jev");
+    this.#token = options.token ?? process.env[this.adapter.credentialName];
     this.#fetch = options.fetch ?? fetch; this.#now = options.now ?? Date.now;
     this.#root = options.coordinationRoot;
     this.#healthScope = options.healthScope ?? digest({ workspace: process.cwd() });
@@ -70,7 +71,7 @@ export class JevDecisionClient {
     const started = performance.now(), operationDeadline = deadlineAt ?? started + deadlineMs;
     const timing: TransportTiming = { admissionMs: 0, httpMs: 0, totalMs: 0, rateWaitMs: 0, slotWaitMs: 0, coordinationWaitMs: 0,
       activeConcurrency: 0, dispatched: false, attemptId: null, httpStatus: null, requestBytes: Buffer.byteLength(body), coordinationIssues: [],
-      poolLimits: { concurrency: PROVIDER_CONCURRENCY, estimatedInputTokensPerSecond: PROVIDER_TOKENS_PER_SECOND, requestsPerMinute: PROVIDER_REQUESTS_PER_MINUTE } };
+      poolLimits: { concurrency: this.adapter.policy.concurrency, estimatedInputTokensPerSecond: this.adapter.policy.estimatedInputTokensPerSecond, requestsPerMinute: this.adapter.policy.requestsPerMinute } };
     let httpStart: number | null = null, httpEnd: number | null = null;
     const done = (outcome: { ok: true; raw: unknown } | { ok: false; reason: string; failureStage: DecisionFailureStage }): TransportOutcome => {
       timing.totalMs = performance.now() - started;
@@ -83,7 +84,7 @@ export class JevDecisionClient {
     if (!Number.isSafeInteger(deadlineMs) || deadlineMs < 1 || deadlineMs > CONTEXT_OPERATION_MS || !Number.isFinite(operationDeadline))
       return done({ ok: false, reason: "invalid-deadline", failureStage: "transport" });
     if (!this.#token) return done({ ok: false, reason: "missing-token", failureStage: "transport" });
-    const credential = digest({ endpoint: DECISION_ENDPOINT, token: this.#token });
+    const credential = digest({ endpoint: this.adapter.endpoint, token: this.#token });
     const failureScope = digest({ credential, scope: this.#healthScope });
     let pool: ProviderPool | undefined, lease: string | null = null, failureStage: DecisionFailureStage = "health-storage";
     const controller = new AbortController(), cancel = () => controller.abort();
@@ -109,7 +110,7 @@ export class JevDecisionClient {
         const admissionStart = performance.now();
         let admission: ReturnType<ProviderPool["acquire"]>;
         try {
-          pool ??= new ProviderPool(this.#root);
+          pool ??= new ProviderPool(this.#root, { accountScope: credential, policy: this.adapter.policy });
           admission = pool.acquire(credential, Buffer.byteLength(body), this.#now(), deadlineMs + PROVIDER_LEASE_CLEANUP_MS, failureScope);
         } catch (error) {
           if (!contention(error)) throw error;
@@ -139,7 +140,7 @@ export class JevDecisionClient {
       timer = setTimeout(() => controller.abort(), remaining);
       httpStart = performance.now(); failureStage = "transport";
       onDispatch?.(); timing.dispatched = true; providerFault = true;
-      const pending = this.#fetch(DECISION_ENDPOINT, { method: "POST",
+      const pending = this.#fetch(this.adapter.endpoint, { method: "POST",
         headers: { Authorization: `Bearer ${this.#token}`, "Content-Type": "application/json" }, body,
         signal: controller.signal, redirect: "error" });
       void pending.then(response => { if (controller.signal.aborted) void response.body?.cancel().catch(() => {}); }, () => {});
@@ -162,7 +163,7 @@ export class JevDecisionClient {
         for (;;) {
           const part = await abortable(reader.read(), controller.signal); if (part.done) break;
           size += part.value.byteLength;
-          if (size > RESPONSE_LIMIT) { void reader.cancel().catch(() => {}); throw new Error("response budget exceeded"); }
+          if (size > this.adapter.responseBytes) { void reader.cancel().catch(() => {}); throw new Error("response budget exceeded"); }
           chunks.push(part.value);
         }
       } finally { if (controller.signal.aborted) void reader.cancel().catch(() => {}); reader.releaseLock(); }
@@ -170,7 +171,7 @@ export class JevDecisionClient {
       const raw: unknown = JSON.parse(Buffer.concat(chunks).toString("utf8"));
       httpEnd = performance.now(); providerFault = false;
       if (timer) clearTimeout(timer);
-      await cleanup("usage-storage-unavailable", () => pool!.reportUsage(lease!, decisionNativeUsage(raw).inputTokens));
+      await cleanup("usage-storage-unavailable", () => pool!.reportUsage(lease!, this.adapter.usage(raw).inputTokens));
       if (controller.signal.aborted) return done({ ok: false, reason: signal?.aborted ? decisionCancellationReason(signal) : "deadline", failureStage });
       return done({ ok: true, raw });
     } catch {

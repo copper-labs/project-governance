@@ -290,7 +290,7 @@ test("explicit decision evidence crosses isolated stores with the existing calle
       native: { runId: "run", runDigest: hash, stagesDigest: hash, eventsDigest: hash }, decision: { receiptId } };
     episode.caller = f.write("isolated-caller.json", caller); episode.decisions = [receiptId];
     const evidence = f.write("isolated-state/decisions/evidence.json", { version: 2, receiptId, runtimeVersion: "new", archiveDigest: newArchive,
-      outcome: { version: 2, delivered: true, providerCalled: true, mode: "auto", consumers: ["DL08"], reason: "answered", scope: f.scope,
+      outcome: { version: 2, method: "jev", delivered: true, providerCalled: true, mode: "auto", consumers: ["DL08"], reason: "answered", scope: f.scope,
         budget: { reservationId }, usage: { inputTokens: 10, outputTokens: 2 }, transport: { httpMs: 5 } } });
     const selected = { ...episode, decisionEvidence: [{ receiptId, ...evidence }] };
     const report = readReleaseEvaluation(join(f.root, "wrong-default-store"), f.manifest([selected]));

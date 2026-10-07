@@ -36,7 +36,7 @@ test("native probability, weighted score and explicit unknown survive normalizat
   assert.deepEqual(parsed.answers["yes"], { status: "answered", shape: "noul", probability: 0.9 });
   const pick = parsed.answers["pick"]!;
   assert.equal(pick.status, "unknown");
-  if (pick.status === "unknown") assert.equal(pick.native?.probabilities["unknown"], 0.9);
+  if (pick.status === "unknown") assert.deepEqual(pick.native?.probabilities, { a: 0.1, unknown: 0.9 });
   const rating = parsed.answers["rating"]!;
   assert.equal(rating.status, "answered");
   if (rating.status === "answered" && rating.shape === "score") assert.equal(rating.expectation, 0.75);

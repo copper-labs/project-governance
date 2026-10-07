@@ -8,14 +8,14 @@ import type { DecisionCoverage, EvidenceItem, QuestionInstance } from "./decisio
 import { matchesPackPath } from "./planning.ts";
 
 export interface ContextAdvice {
-  version: 1; kind: "project-governance-context-advice";
+  version: 3; kind: "project-governance-context-advice";
   authority: "advisory only: mandatory context, required packs and delivered required evidence are unchanged";
   mode: string; effect: string; reason: string; delivered: boolean;
   baselineVersion: "lexical-context-1"; method: "baseline" | "rank-fusion-1";
   order: string[]; baselineOrder: string[]; assessed: string[]; unassessed: string[];
   relevance: Array<{ id: string; probability: number | null; interpretation: string }>;
   coverage: DecisionCoverage;
-  decision: Pick<DecisionOutcome, "consumerId" | "requestId" | "receiptId" | "method" | "reason" | "delivered" | "providerCalled" | "model" | "usage" | "latencyMs" | "budget" | "scopeState"> | null;
+  decision: Pick<DecisionOutcome, "provider" | "consumerId" | "requestId" | "receiptId" | "method" | "reason" | "delivered" | "providerCalled" | "model" | "usage" | "latencyMs" | "budget" | "scopeState"> | null;
 }
 
 /** Code-owned reciprocal-rank merge. A missing score keeps a candidate's baseline position. */
@@ -43,7 +43,7 @@ export async function contextAdvice(runtime: DecisionRuntime, candidates: Candid
     purpose: options.purpose, candidates, dataClass: "source" as const };
   const baseline = lexicalContextOrder(request);
   const base: ContextAdvice = {
-    version: 1, kind: "project-governance-context-advice",
+    version: 3, kind: "project-governance-context-advice",
     authority: "advisory only: mandatory context, required packs and delivered required evidence are unchanged",
     mode: eligibility.mode, effect: eligibility.effect, reason: eligibility.reasons[0] ?? "no-assessable-evidence",
     delivered: false, baselineVersion: "lexical-context-1", method: "baseline",
@@ -92,7 +92,7 @@ export async function contextAdvice(runtime: DecisionRuntime, candidates: Candid
     evidence, coverage, questions, sourcePaths: [...index.values()],
     eligibilityDigest: null, policyDigest: options.policyDigest, ...(options.deadlineAt === undefined ? {} : { deadlineAt: options.deadlineAt }) });
   const decision = { consumerId: outcome.consumerId, requestId: outcome.requestId, receiptId: outcome.receiptId,
-    method: outcome.method, reason: outcome.reason, delivered: outcome.delivered, providerCalled: outcome.providerCalled, model: outcome.model,
+    provider: outcome.provider, method: outcome.method, reason: outcome.reason, delivered: outcome.delivered, providerCalled: outcome.providerCalled, model: outcome.model,
     usage: outcome.usage, latencyMs: outcome.latencyMs, budget: outcome.budget, scopeState: outcome.scopeState };
   const relevance: ContextAdvice["relevance"] = [], scores = new Map<string, number>();
   for (const [name, id] of index) {

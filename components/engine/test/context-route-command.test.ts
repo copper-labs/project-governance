@@ -131,7 +131,7 @@ test("routed command captures staged policy, delivers mandatory content and writ
       const legacyArgs = ["--task", "fix", "--revision", "legacy", "--decision-task", "legacy-task", "--optional-path", "optional.ts"];
       const legacy = await contextRouteCommand(legacyArgs, root, assets);
       assert.equal(legacy.optional?.decision?.questionVersion, "legacy.context-rank/1");
-      assert.equal(legacy.optional?.decision?.method, "jev");
+      assert.equal(legacy.optional?.decision?.method, "provider");
       await contextRouteCommand(legacyArgs, root, assets);
       assert.equal(networkCalls, 1, "Repeated migrated caller reuses its decision");
       networkCalls = 0;
@@ -421,7 +421,7 @@ test("explicit optional source above a full automatic set still reaches JEV", as
     resolve("src/project_governance_runtime/assets/skills"));
     assert.equal(packet.ready, true);
     assert.equal(packet.selection.candidateCount, 17);
-    assert.equal(packet.optional?.decision?.method, "jev");
+    assert.equal(packet.optional?.decision?.method, "provider");
     assert.equal(packet.optional?.decision?.excerptCoverage?.length, 16);
     assert.ok(packet.optional?.entries.some(entry => entry.id === "other/explicit.md"));
     assert.equal(calls, 1);
@@ -446,7 +446,7 @@ test("explicit optional source above a full automatic set still reaches JEV", as
     const scoped = await contextRouteCommand(["--task", "Find explicit task evidence", "--revision", "2",
       "--decision-task", "fixture", "--changed-path", "docs", "--optional-path", "other/explicit.md"], root,
     resolve("src/project_governance_runtime/assets/skills"));
-    assert.equal(scoped.optional?.decision?.method, "jev");
+    assert.equal(scoped.optional?.decision?.method, "provider");
     assert.ok(scoped.optional?.entries.some(entry => entry.id === "other/explicit.md"));
     const decisionReceipt = JSON.parse(readFileSync(join(contextStateRoot(root), "decisions",
       `${scoped.optional?.decision?.receiptId}.json`), "utf8"));

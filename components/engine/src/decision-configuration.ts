@@ -15,10 +15,12 @@ export function profileDecisionConfig(profile: unknown): DecisionConfig {
   const mapping = { mode: "mode", config_revision: "revision", model: "model", allowed_questions: "allowedQuestions",
     allowed_data_classes: "allowedDataClasses", deadline_ms: "deadlineMs", evidence_bytes: "evidenceBytes",
     max_candidates: "maxCandidates", minimum_confidence: "minimumConfidence", allowed_source_paths: "allowedSourcePaths" } as const;
-  if (settings["provider"] !== undefined && settings["provider"] !== "jev") throw new Error("Unsupported decision provider");
+  if (settings["provider"] !== undefined && !["jev", "openai"].includes(String(settings["provider"]))) throw new Error("Unsupported decision provider");
   // `consumers` and `budget` belong to the first-RC owner in decision-settings.ts; this E3 view ignores them.
-  for (const key of Object.keys(settings)) if (!["provider", "consumers", "budget", "allowed_metadata_paths"].includes(key) && !Object.hasOwn(mapping, key)) throw new Error("Unknown decision configuration key");
+  for (const key of Object.keys(settings)) if (!["provider", "evaluation", "consumers", "budget", "allowed_metadata_paths"].includes(key) && !Object.hasOwn(mapping, key)) throw new Error("Unknown decision configuration key");
   const result = structuredClone(DEFAULT_DECISIONS);
+  if (settings["provider"] !== undefined) result.provider = settings["provider"] as "jev" | "openai";
+  if (result.provider === "openai" && settings["model"] === undefined) result.model = "gpt-6-luna";
   for (const [external, internal] of Object.entries(mapping)) if (Object.hasOwn(settings, external)) {
     (result as unknown as Record<string, unknown>)[internal] = settings[external];
   }

@@ -144,13 +144,13 @@ export interface ConsumerAdvice {
   findings: ReviewFinding[]; coverageLimits: string[]; summary: string;
 }
 export interface ReviewAdvice {
-  version: 1; kind: "project-governance-review-advice";
+  version: 3; kind: "project-governance-review-advice";
   authority: "advisory only: deterministic findings, checker results, required proof and exit status are unchanged";
   subjectDigest: string; purpose: string; purposeSource: string;
   changedPaths: number | null;
   batched: boolean; coverage: DecisionCoverage;
   consumers: ConsumerAdvice[];
-  decisions: Array<Pick<DecisionOutcome, "consumerId" | "consumers" | "requestId" | "receiptId" | "mode" | "effect" | "method" | "reason" | "delivered" | "providerCalled" | "model" | "usage" | "usageAllocation" | "latencyMs" | "budget" | "scopeState">>;
+  decisions: Array<Pick<DecisionOutcome, "provider" | "consumerId" | "consumers" | "requestId" | "receiptId" | "mode" | "effect" | "method" | "reason" | "delivered" | "providerCalled" | "model" | "usage" | "usageAllocation" | "latencyMs" | "budget" | "scopeState">>;
 }
 
 const MESSAGES: Record<string, (path: string, rule: ReviewRule | null) => string> = {
@@ -164,7 +164,7 @@ const MESSAGES: Record<string, (path: string, rule: ReviewRule | null) => string
 };
 
 function receiptOf(outcome: DecisionOutcome) {
-  return { consumerId: outcome.consumerId, consumers: outcome.consumers, requestId: outcome.requestId, receiptId: outcome.receiptId,
+  return { provider: outcome.provider, consumerId: outcome.consumerId, consumers: outcome.consumers, requestId: outcome.requestId, receiptId: outcome.receiptId,
     mode: outcome.mode, effect: outcome.effect, method: outcome.method, reason: outcome.reason, delivered: outcome.delivered, providerCalled: outcome.providerCalled,
     model: outcome.model, usage: outcome.usage, usageAllocation: outcome.usageAllocation, latencyMs: outcome.latencyMs,
     budget: outcome.budget, scopeState: outcome.scopeState };
@@ -319,7 +319,7 @@ export async function reviewAdvice(runtime: DecisionRuntime, capture: ReviewCapt
         summary: "No advice delivered; the ordinary baseline applies." });
     }
   }
-  return { version: 1, kind: "project-governance-review-advice",
+  return { version: 3, kind: "project-governance-review-advice",
     authority: "advisory only: deterministic findings, checker results, required proof and exit status are unchanged",
     subjectDigest: capture.subjectDigest, purpose: capture.purpose, purposeSource: capture.purposeSource, changedPaths: capture.changedPaths ?? null,
     batched, coverage: capture.coverage,

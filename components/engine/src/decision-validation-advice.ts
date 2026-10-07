@@ -8,7 +8,7 @@ import type { DecisionCoverage, EvidenceItem, QuestionInstance } from "./decisio
 const MAX_OPTIONAL = 6, MAX_CATEGORIES = 4;
 
 export interface ValidationAdvice {
-  version: 1; kind: "project-governance-validation-advice";
+  version: 3; kind: "project-governance-validation-advice";
   authority: "advisory only: required checks, execution order, reuse validity and CI publication rules are unchanged";
   mode: string; effect: string; reason: string; delivered: boolean;
   eligibleOptionalChecks: string[];
@@ -16,7 +16,7 @@ export interface ValidationAdvice {
   coverageConcerns: Array<{ category: string; probability: number | null; paths: string[] }>;
   coverage: DecisionCoverage;
   history: { available: false; note: string };
-  decision: Pick<DecisionOutcome, "consumerId" | "requestId" | "receiptId" | "method" | "reason" | "delivered" | "providerCalled" | "model" | "usage" | "latencyMs" | "budget" | "scopeState"> | null;
+  decision: Pick<DecisionOutcome, "provider" | "consumerId" | "requestId" | "receiptId" | "method" | "reason" | "delivered" | "providerCalled" | "model" | "usage" | "latencyMs" | "budget" | "scopeState"> | null;
   binding: { subjectDigest: string; packsDigest: string; stage: string | null; workspace: string | null };
 }
 
@@ -45,7 +45,7 @@ export async function validationAdvice(runtime: DecisionRuntime, packs: Packs, p
     .map(pack => pack.id).sort().slice(0, MAX_OPTIONAL);
   const groups = categories(plan.changed_paths);
   const base: ValidationAdvice = {
-    version: 1, kind: "project-governance-validation-advice",
+    version: 3, kind: "project-governance-validation-advice",
     authority: "advisory only: required checks, execution order, reuse validity and CI publication rules are unchanged",
     mode: eligibility.mode, effect: eligibility.effect, reason: eligibility.reasons[0] ?? "no-assessable-evidence",
     delivered: false, eligibleOptionalChecks: eligible, recommendedOptionalChecks: [], coverageConcerns: [],
@@ -105,7 +105,7 @@ export async function validationAdvice(runtime: DecisionRuntime, packs: Packs, p
     eligibilityDigest: digest({ eligible, selected: plan.selected_packs, order: plan.execution_order }),
     policyDigest: options.policyDigest });
   const decision = { consumerId: outcome.consumerId, requestId: outcome.requestId, receiptId: outcome.receiptId,
-    method: outcome.method, reason: outcome.reason, delivered: outcome.delivered, providerCalled: outcome.providerCalled, model: outcome.model,
+    provider: outcome.provider, method: outcome.method, reason: outcome.reason, delivered: outcome.delivered, providerCalled: outcome.providerCalled, model: outcome.model,
     usage: outcome.usage, latencyMs: outcome.latencyMs, budget: outcome.budget, scopeState: outcome.scopeState };
   if (!outcome.delivered) return { ...base, mode: outcome.mode, reason: outcome.reason, decision };
   const recommended: ValidationAdvice["recommendedOptionalChecks"] = [];

@@ -1,3 +1,4 @@
+import { configuredDecisionProvider, decisionProviderAdapter, type DecisionProviderIdentity } from "./decision-providers.ts";
 import { lexicalContextOrder } from "./context-ranking.ts";
 import { CONTEXT_PATH_LIMIT, CONTEXT_PROMPT_LIMIT } from "./context-limits.ts";
 import { dirname } from "node:path";
@@ -18,7 +19,7 @@ export interface DecisionRequest {
   candidates: Candidate[]; dataClass: "source" | "diagnostic" | "synthetic";
 }
 export interface DecisionConfig {
-  mode: "off" | "auto" | "shadow"; revision: string; model: string;
+  mode: "off" | "auto" | "shadow"; revision: string; model: string; provider?: "jev" | "openai";
   allowedQuestions: DecisionKind[]; allowedDataClasses: Array<DecisionRequest["dataClass"] | "metadata">;
   deadlineMs: number; evidenceBytes: number; maxCandidates: number; minimumConfidence: number;
   allowedSourcePaths?: string[];
@@ -27,8 +28,9 @@ export const DECISION_FAILURE_STAGES = ["health-storage", "transport", "response
 export interface DecisionResult {
   failureStage?: typeof DECISION_FAILURE_STAGES[number];
   baselineVersion?: "lexical-context-1" | "discovery-order-1";
-  version: 1; kind: DecisionKind; inputDigest: string; delivered: string[]; suggested: string[] | null;
-  method: "baseline" | "jev"; reason: string; model: string | null; questionVersion: string;
+  version: 1 | 3; kind: DecisionKind; inputDigest: string; delivered: string[]; suggested: string[] | null;
+  method: "baseline" | "jev" | "provider"; provider?: DecisionProviderIdentity; reason: string; model: string | null; questionVersion: string;
+  providerCalled?: boolean;
   confidence: number | null; latencyMs: number; usage: { inputTokens: number | null; outputTokens: number | null };
   excerptCoverage?: ExcerptCoverage[];
   receiptId?: string | null;
@@ -44,7 +46,7 @@ const QUESTION_VERSION = "legacy.context-rank/1";
 /** Invalid policy never silently enables a provider or broadens data sharing. */
 export function validateDecisionConfig(config: DecisionConfig): void {
   text(config.revision, "decision configuration revision", 128);
-  if (!["off", "auto", "shadow"].includes(config.mode) || typeof config.model !== "string" || !/^jev-\d+\.\d+\.\d+$/.test(config.model)) throw new Error("invalid decision mode/revision/pinned model");
+  if (!["off", "auto", "shadow"].includes(config.mode) || typeof config.model !== "string" || !decisionProviderAdapter(config.provider ?? "jev").validModel(config.model)) throw new Error("invalid decision mode/revision/pinned model");
   if (!Array.isArray(config.allowedQuestions) || config.allowedQuestions.some(q => !KINDS.includes(q))) throw new Error("unsupported decision question");
   if (!Array.isArray(config.allowedDataClasses) || config.allowedDataClasses.some(c => !["source", "diagnostic", "synthetic", "metadata"].includes(c))) throw new Error("unsupported decision data class");
   if (config.allowedSourcePaths !== undefined && (!Array.isArray(config.allowedSourcePaths) || config.allowedSourcePaths.some(path =>
@@ -82,14 +84,16 @@ export class JevDecisionAdapter implements DecisionProvider {
     const candidateIds = request.candidates.map(candidate => candidate.id);
     const baseline = request.kind === "rank_optional_context" ? lexicalContextOrder(request) : request.candidates.map(c => c.id);
     const inputDigest = digest(request);
-    const result: DecisionResult = { version: 1, kind: request.kind, inputDigest, delivered: baseline,
+    const settings = this.#options.settings ?? legacyDecisionSettings(this.config);
+    const result: DecisionResult = { version: 3, provider: configuredDecisionProvider(settings.provider, settings.legacy.model, settings.configDigest),
+      kind: request.kind, inputDigest, delivered: baseline,
       baselineVersion: request.kind === "rank_optional_context" ? "lexical-context-1" : "discovery-order-1",
-      suggested: null, method: "baseline", reason: "off", model: null, questionVersion: QUESTION_VERSION,
+      suggested: null, method: "baseline", providerCalled: false, reason: "off", model: null, questionVersion: QUESTION_VERSION,
       confidence: null, latencyMs: 0, usage: { inputTokens: null, outputTokens: null } };
     const fallback = (reason: string): DecisionResult => ({ ...result, reason, latencyMs: performance.now() - started });
     if (options.signal?.aborted) return fallback("cancelled");
     if (this.config.mode === "off") return fallback("off");
-    if (!(this.#options.token ?? process.env["JEV_TOKEN"])) return fallback("missing-token");
+    if (!(this.#options.token ?? process.env[decisionProviderAdapter(this.config.provider ?? "jev").credentialName])) return fallback("missing-token");
     if (request.kind !== "rank_optional_context" || !this.config.allowedQuestions.includes(request.kind)) return fallback("question-disabled");
     if (!this.config.allowedDataClasses.includes(request.dataClass)) return fallback("data-sharing-disabled");
     // A decision receipt can name at most 256 omitted candidates. Larger direct requests
@@ -125,7 +129,6 @@ export class JevDecisionAdapter implements DecisionProvider {
       ...(countOmitted ? [`${countOmitted} candidates beyond classifier count limit ${maxAssessed}`] : []),
       ...(excerptOmitted ? [`${excerptOmitted} candidates without a representable whole-line excerpt`] : []),
     ];
-    const settings = this.#options.settings ?? legacyDecisionSettings(this.config);
     const runtime = new DecisionRuntime(settings, this.#stateRoot, { ...this.#options, ...options });
     const evidence = [{ id: "purpose", text: request.purpose, sourceDigest: digest(request.purpose), provenance: "supplied" as const, trust: "untrusted" as const },
       ...request.candidates.map((candidate, index) => ({ id: `candidate:${index}`, text: candidate.excerpt, sourceDigest: candidate.sourceDigest,
@@ -139,7 +142,8 @@ export class JevDecisionAdapter implements DecisionProvider {
       questions: [{ name: "suggestion", definitionId: "legacy.context-rank/1", consumerId: "DL03", evidenceIds: evidence.map(item => item.id),
         candidates: request.candidates.map(candidate => ({ id: candidate.id, description: candidate.id })) }],
       sourcePaths: request.candidates.map(candidate => candidate.id), legacyDataClass: request.dataClass, policyDigest: settings.configDigest });
-    result.usage = outcome.usage; result.model = outcome.model; result.receiptId = outcome.receiptId;
+    result.provider = outcome.provider; result.usage = outcome.usage; result.model = outcome.model; result.receiptId = outcome.receiptId;
+    if (typeof outcome.providerCalled === "boolean") result.providerCalled = outcome.providerCalled; else delete result.providerCalled;
     if (outcome.reason !== "cancelled" && outcome.failureStage) {
       if (outcome.failureStage === "answer-validation") result.failureStage = "model-identity";
       else if ((DECISION_FAILURE_STAGES as readonly string[]).includes(outcome.failureStage)) result.failureStage = outcome.failureStage as typeof DECISION_FAILURE_STAGES[number];
@@ -156,7 +160,7 @@ export class JevDecisionAdapter implements DecisionProvider {
       .sort((a, b) => Number(answer.probabilities[b]) - Number(answer.probabilities[a]) || baseline.indexOf(a) - baseline.indexOf(b));
     let next = 0;
     result.suggested = baseline.map(id => approved.has(id) ? ranked[next++]! : id);
-    if (outcome.delivered) { result.delivered = result.suggested; result.method = "jev"; }
+    if (outcome.delivered) { result.delivered = result.suggested; result.method = "provider"; }
     result.reason = outcome.mode === "shadow" ? "shadow" : outcome.delivered ? "suggested" : outcome.reason;
     result.latencyMs = performance.now() - started;
     return result;

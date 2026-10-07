@@ -15,16 +15,17 @@ dispositions:
     source extraction and provider admission already have independent owners.
 - finding: quality.large-function
   path: components/engine/src/decision-transport.ts
-  symbol: JevDecisionClient.ask
+  symbol: DecisionClient.ask
   disposition: cohesion-accepted
   owner: project-governance-maintainers
-  reviewer: Codex reconciliation and Claude Opus 5.5 medium focused cohesion review
-  approved_on: '2026-09-27'
+  reviewer: Codex focused provider-lifecycle cohesion review
+  approved_on: '2026-10-07'
   responsibility: Own one provider admission lease and bounded HTTP attempt through response and cleanup.
-  rationale: Admission revalidation precedes paid reservation, and one cancellation lifetime distinguishes
-    provider faults from local coordination failures. Response accounting and lease release share one
-    cleanup allowance. Keeping this sequence together makes the no-call and no-double-spend boundaries
-    visible; the SQLite pool and wire schema already have separate owners.
+  rationale: The explicit provider seam changes endpoint, credential and admission policy, while this
+    function retains one dispatch, cancellation, response and cleanup lifetime. Admission revalidation
+    precedes paid reservation, and provider faults remain separate from local coordination failures.
+    Splitting the sequence would scatter its lease and reservation state; codecs, preparation and the
+    SQLite pool already have independent owners. The focused B1 regressions qualify both adapters.
 - finding: quality.large-function
   path: components/engine/src/context-projection.ts
   symbol: maintainContextProjection

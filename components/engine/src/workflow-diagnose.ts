@@ -1,4 +1,5 @@
 import { parseArgs } from "node:util";
+import { configuredDecisionProvider } from "./decision-providers.ts";
 import { randomUUID } from "node:crypto";
 import { hostname } from "node:os";
 import { existsSync, realpathSync, statSync } from "node:fs";
@@ -58,7 +59,7 @@ export async function diagnoseWorkflow(database: string, rawManifest: unknown,
     const entrySettings = loadProfileDecisionSettings(workspace);
     const entryEligibility = new DecisionRuntime(entrySettings, contextStateRoot(workspace), options).eligibility("DL05");
     const report = (record: DiagnosticEpisode, persisted: boolean, refusalReason: string | null = null) => {
-      const result = { version: 1, episode: record, persisted, refusalReason, parent: { id: parent.id, state: parent.state },
+      const result = { version: 3, episode: record, persisted, refusalReason, parent: { id: parent.id, state: parent.state },
         children: record.attempts.map(attempt => { const run = store.read(attempt.childRunId); return { ...attempt, run, stages: store.stages(run.id) }; }),
         authority: "read-only diagnosis; parent failure unchanged; no repair or verification claim" };
       if (!options.assignmentPath) return result;
@@ -70,7 +71,7 @@ export async function diagnoseWorkflow(database: string, rawManifest: unknown,
             configuredEffect: entrySettings.consumers.DL05.effect, configDigest: entrySettings.configDigest,
             providerUse: entryEligibility.providerUse, eligibilityReasons: entryEligibility.reasons,
             reason: refusalReason ?? record.closedReason, persisted, probes: record.attempts,
-            delivered: record.attempts.slice(prior?.attempts.length ?? 0).some(attempt => attempt.method === "jev"), elapsedMs: Date.now() - startedAt },
+            delivered: record.attempts.slice(prior?.attempts.length ?? 0).some(attempt => (attempt.method === "provider" || attempt.method === "jev")), elapsedMs: Date.now() - startedAt },
           decisions: record.decisions }) };
       } catch (error) { return { ...result, collection: { status: "failed", reason:
         error instanceof Error && error.message === "episode-id-already-used" ? "episode-id-already-used" : "episode-recording-unavailable" } }; }
@@ -138,7 +139,8 @@ export async function diagnoseWorkflow(database: string, rawManifest: unknown,
       if (!eligible.length) { close("no-eligible-probes"); break; }
       const baseline = manifest.baselineOrder.map(id => eligible.find(probe => probe.id === id)).find(Boolean) ?? null;
       const settings = loadProfileDecisionSettings(workspace), runtime = new DecisionRuntime(settings, contextStateRoot(workspace), options), eligibility = runtime.eligibility("DL05");
-      let selected = baseline, method: "baseline" | "jev" = "baseline", receiptId: string | null = null;
+      let selected = baseline, method: "baseline" | "provider" = "baseline", receiptId: string | null = null;
+      let provider = configuredDecisionProvider(settings.provider, settings.legacy.model, settings.configDigest);
       if (eligibility.effect !== "choose-read") { close("diagnostic-effect-disabled"); break; }
       if (!manifest.exactBaseline && eligibility.providerUse === "eligible") {
         const evidence = { parent: { id: parent.id, state: parent.state, stage: failed.id, result: failed.result, excerpt: workflowStageExcerpt(parent, failed)?.text ?? null }, target,
@@ -153,9 +155,9 @@ export async function diagnoseWorkflow(database: string, rawManifest: unknown,
           coverage: { captured: 1, omitted: [], truncated: false, unavailable: [], limits: ["post-cleanup observations; diagnosis is not repair"] },
           policyDigest: settings.configDigest, eligibilityDigest: digest(eligible), questions: [{ name: "probe", definitionId: "runtime.next-probe/2", consumerId: "DL05", evidenceIds: ["observations"],
             candidates: eligible.map(probe => ({ id: probe.id, description: probe.description })) }] });
-        receiptId = outcome.receiptId;
+        receiptId = outcome.receiptId; provider = outcome.provider;
         if (receiptId) episode = store.recordDiagnosticDecision(episode.id, owner.token, episode.revision, receiptId);
-        if (eligibility.mode === "auto" && outcome.delivered) { selected = eligible.find(probe => probe.id === interpretChoice(outcome.answers.probe).value) ?? null; method = "jev"; }
+        if (eligibility.mode === "auto" && outcome.delivered) { selected = eligible.find(probe => probe.id === interpretChoice(outcome.answers.probe).value) ?? null; method = "provider"; }
         else if (eligibility.mode === "auto" && Object.keys(outcome.answers).length) { close("selection-unknown"); break; }
       }
       if (Date.now() >= episode.deadline) { close("deadline"); break; }
@@ -166,7 +168,7 @@ export async function diagnoseWorkflow(database: string, rawManifest: unknown,
       if (!validateInputs(selected.binding.recipe) || !validateInputs(parent.binding.recipe) ||
           (manifest.target.kind === "ios-simulator" && !await observeSimulatorCleanup([`ios-simulator:${manifest.target.id}`]))) { close("source-or-target-changed"); break; }
       if (loadProfileDecisionSettings(workspace).configDigest !== settings.configDigest || options.signal?.aborted) { close("configuration-changed-or-cancelled"); break; }
-      try { episode = store.reserveDiagnosticProbe(episode.id, owner.token, episode.revision, selected, { method, decisionReceiptId: receiptId }); }
+      try { episode = store.reserveDiagnosticProbe(episode.id, owner.token, episode.revision, selected, { method, provider, decisionReceiptId: receiptId }); }
       catch { close("pre-dispatch-admission-changed"); break; }
     }
     return report(episode, true);

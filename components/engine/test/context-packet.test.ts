@@ -79,7 +79,7 @@ test("undeliverable and blank sources do not suppress legacy advice for useful e
         { id: "blank", sourceDigest: "blank", excerpt: "  \n" },
         { id: "good", sourceDigest: "good", excerpt: "Useful source for the task\n" }] }, provider);
     assert.equal(calls, 1);
-    assert.equal(packet.decision?.method, "jev");
+    assert.equal(packet.decision?.method, "provider");
     assert.deepEqual(packet.entries.map(entry => entry.id), ["good", "blank"]);
     assert.deepEqual(packet.omitted, ["single-line"]);
     assert.equal(packet.omissionReasons["single-line"], "excerpt-unrepresentable");

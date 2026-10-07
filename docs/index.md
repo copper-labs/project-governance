@@ -22,7 +22,7 @@ deliberate cutover. Reading this index or building the package does not change t
 - [Root source instructions](../AGENTS.md) distinguish compiled development commands from the
   retained Python source Git hook owner. [README](../README.md) describes package setup and proof.
 - The approved [4.1 context quality specification](specs/engine-4-1-context-quality.md) and
-  [implementation plan](exec-plans/active/2026-10-05-4-1-context-quality.md) own current release work,
+  [implementation plan](exec-plans/active/2026-10-05-4-1-context-quality.md) record published 4.1,
   exact task/plan linkage and proof mappings. Installed releases remain unchanged until adoption.
 - [Developer documentation](developer/index.md) routes current capabilities and labels retained
   journeys. Read the smallest owning specification or plan before editing.
@@ -83,10 +83,11 @@ Holo grounding, project-owned browser execution and Decisions checkpoint experim
 realistic synthetic scenarios and honest coverage when tools are absent. Runtime and live proof
 remain future work.
 
-The draft [decision providers and image evaluation specification](specs/engine-decision-providers-and-image-evaluation.md)
+The approved [decision providers and image evaluation specification](specs/engine-decision-providers-and-image-evaluation.md)
 and [implementation plan](exec-plans/active/2026-10-06-decision-providers-and-image-evaluation.md)
-propose interchangeable JEV/OpenAI adapters and a reusable text/image evaluation operation.
-This is design work; it does not enable providers or change current release ownership.
+own 4.2 implementation of interchangeable JEV/OpenAI adapters and a reusable text/image evaluation
+operation. The batch plan distinguishes completed source work from installed and live qualification.
+Implementation does not enable providers or change an installed release.
 
 The [4.0 verification and semantic review specification](specs/engine-4-verification-feedback.md)
 and [delivery plan](exec-plans/active/2026-10-04-major-verification-feedback.md) record the delivered

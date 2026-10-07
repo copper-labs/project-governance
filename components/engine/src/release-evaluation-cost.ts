@@ -1,3 +1,4 @@
+import { readDecisionOutcome } from "./decision-outcome-reader.ts";
 import { realpathSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { digest, object, text } from "./core.ts";
@@ -81,16 +82,15 @@ export function nativeEvaluationCost(record: Record<string, unknown>, reference:
     accounting: "incremental native response; cached input and reasoning are subsets, not extra tokens", reference };
 }
 
-export function jevEvaluationCost(record: Record<string, unknown>, reference: EvaluationReference): EvaluationCost | null {
-  const outcome = object(record.outcome), budget = object(outcome.budget ?? {}), usage = object(outcome.usage ?? {});
-  if (record.version !== 2 || outcome.version !== 2) throw new Error("decision-cost-version-invalid");
+export function decisionEvaluationCost(record: Record<string, unknown>, reference: EvaluationReference): EvaluationCost | null {
+  const outcome = readDecisionOutcome(record), budget = object(outcome.budget ?? {}), usage = object(outcome.usage ?? {});
   if (outcome.providerCalled !== true) return null;
   if (typeof budget.reservationId !== "string" || !/^[a-f0-9]{32}$/u.test(budget.reservationId)) throw new Error("decision-cost-reservation-missing");
-  return { id: `jev-reservation:${budget.reservationId}`, owner: "jev-reservation", provider: "jev",
-    inputTokens: tokens(usage.inputTokens), freshInputTokens: null, cachedInputTokens: null, cacheCreationInputTokens: null,
-    outputTokens: tokens(usage.outputTokens), reasoningTokens: null, estimatedUSD: null,
-    durationMs: measuredNumber(object(outcome.transport ?? {}).httpMs), allocation: "episode", requestedModel: null, reportedModels: null,
-    scopeKey: null, accounting: "one native usage observation per JEV reservation; HTTP duration is not episode wall time", reference };
+  return { id: `${outcome.sourceVersion === 2 ? "jev-reservation" : `decision-reservation:${outcome.provider.id}`}:${budget.reservationId}`, owner: outcome.sourceVersion === 2 ? "jev-reservation" : "decision-reservation", provider: outcome.provider.id,
+    inputTokens: tokens(usage.inputTokens), freshInputTokens: null, cachedInputTokens: tokens(usage.cachedInputTokens), cacheCreationInputTokens: tokens(usage.cacheWriteInputTokens),
+    outputTokens: tokens(usage.outputTokens), reasoningTokens: tokens(usage.reasoningTokens), estimatedUSD: null,
+    durationMs: measuredNumber(object(outcome.transport ?? {}).httpMs), allocation: "episode", requestedModel: outcome.provider.requestedModel, reportedModels: outcome.provider.returnedModel ? [outcome.provider.returnedModel] : null,
+    scopeKey: null, accounting: "one native usage observation per decision reservation; HTTP duration is not episode wall time", reference };
 }
 
 export function canonicalEvidencePath(path: string, manifestDirectory: string) {

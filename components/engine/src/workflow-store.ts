@@ -424,7 +424,7 @@ export class WorkflowStore {
 
   /** Reserve the aggregate slot and native child in one transaction before any process dispatch. */
   reserveDiagnosticProbe(id: string, owner: string, revision: number, probe: DiagnosticProbe,
-    selection: Pick<DiagnosticAttempt, "method" | "decisionReceiptId">): DiagnosticEpisode {
+    selection: Pick<DiagnosticAttempt, "method" | "decisionReceiptId" | "provider">): DiagnosticEpisode {
     return this.#atomic(() => {
       const record = this.#diagnosticOwned(id, owner, revision);
       if (Date.now() >= record.deadline || record.attempts.length >= 3 ||
