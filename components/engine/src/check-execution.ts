@@ -36,7 +36,7 @@ export async function executeChecks(packs: Packs, plan: ValidationPlan, request:
       } else if (command["arguments"] !== undefined && (!Array.isArray(command["arguments"]) || command["arguments"].some(value => !["commit_message_file", "pr_body_file", "pr_title"].includes(String(value))))) {
         result = { status: "failed", findings: [{ rule_id: "checker.invocation-invalid", severity: "blocking", message: "Unsupported built-in argument binding." }] };
       } else {
-        try { result = await dispatch({ ...request, id: command["builtin"] }); }
+        try { result = await dispatch({ ...request, id: command["builtin"], packId: id }); }
         catch { result = { status: "failed", findings: [{ rule_id: "checker.invocation-invalid", severity: "blocking", message: "Checker execution did not produce a result." }] }; }
       }
       if (!["passed", "warning", "failed", "not-applicable"].includes(result.status) || !Array.isArray(result.findings)) throw new Error("Invalid checker result");

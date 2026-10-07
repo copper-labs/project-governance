@@ -1,6 +1,6 @@
 {
   "name": "@organta/project-governance",
-  "version": "4.0.0",
+  "version": "4.1.0",
   "description": "Unified governance, durable development workflows and evidence",
   "license": "Apache-2.0",
   "type": "module",

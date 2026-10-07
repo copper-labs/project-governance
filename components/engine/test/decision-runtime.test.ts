@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, symlinkSync, truncateSync, statSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, truncateSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DecisionRuntime, type DecisionAsk } from "../src/decision-runtime.ts";
@@ -130,6 +130,46 @@ test("invalid answers never count as delivered and rejected envelopes retain nat
     assert.deepEqual(result.usage, { inputTokens: 77, outputTokens: 8 });
     assert.equal(result.reason, model === settings.legacy.model ? "no-usable-answers" : "invalid-or-unavailable");
   }
+});
+
+test("changed question wording cannot reuse old answers under the same IDs or reset spending", async t => {
+  const root = mkdtempSync(join(tmpdir(), "decision-question-identity-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const settings = profileDecisionSettings({ continuity: { decisions: { mode: "auto", allowed_data_classes: ["source"],
+    allowed_source_paths: ["src/**"], budget: { max_calls: 1, max_request_bytes: 8192 },
+    consumers: { DL03: { mode: "auto", questions: ["context.passage-evidence/1"] } } } } });
+  let calls = 0, wire: { questions: Record<string, { instructions: { question: string } }> } | undefined;
+  const runtime = new DecisionRuntime(settings, root, { coordinationRoot: root, token: "fixture-only", fetch: async (_url, init) => {
+    calls++; wire = JSON.parse(String(init?.body));
+    return Response.json({ model: settings.legacy.model, answers: { q: { type: "noul", noul: 0.9 } } });
+  } });
+  const ask: DecisionAsk = { consumerId: "DL03", eventId: "unchanged-event", scope: { workspace: root, taskId: "task", taskRevision: "1" },
+    subject: { digest: digest("source"), revision: "1", environment: "fixture" },
+    evidence: [{ id: "source", text: "Useful captured behavior", sourceDigest: digest("behavior"), provenance: "captured", trust: "untrusted" }],
+    coverage: { captured: 1, omitted: [], truncated: false, unavailable: [], limits: [] },
+    questions: [{ name: "q", definitionId: "context.passage-evidence/1", consumerId: "DL03", evidenceIds: ["source"] }],
+    sourcePaths: ["src/example.ts"], policyDigest: settings.configDigest };
+  const original = await runtime.ask(ask);
+  assert.equal(original.reason, "answered"); assert.equal(calls, 1); assert.ok(original.receiptId && wire);
+  const receiptPath = join(root, "decisions", `${original.receiptId}.json`), originalBytes = readFileSync(receiptPath);
+  const prior = JSON.parse(originalBytes.toString()), oldPayload = structuredClone(wire);
+  // A prior generation can retain the same request IDs while transmitting different registered wording.
+  oldPayload.questions.q!.instructions.question = "Probability that this passage matches the background task.";
+  prior.outcome.payloadDigest = digest(oldPayload);
+  assert.notEqual(prior.outcome.payloadDigest, original.payloadDigest);
+  writeFileSync(receiptPath, JSON.stringify(prior));
+  const retainedBytes = readFileSync(receiptPath), spending = readDecisionBudget(root, ask.scope!);
+  const refused = await runtime.ask(ask);
+  assert.equal(refused.requestIdentity, original.requestIdentity);
+  assert.equal(refused.reason, "repeated-observation-unavailable"); assert.equal(refused.budget.state, "duplicate");
+  assert.equal(refused.delivered, false); assert.equal(refused.providerCalled, false); assert.deepEqual(refused.answers, {});
+  assert.deepEqual(readDecisionBudget(root, ask.scope!), spending); assert.deepEqual(readFileSync(receiptPath), retainedBytes);
+  assert.equal(calls, 1);
+  writeFileSync(receiptPath, originalBytes);
+  const reused = await runtime.ask(ask);
+  assert.equal(reused.reason, "repeated-observation"); assert.equal(reused.delivered, true);
+  assert.equal(reused.payloadDigest, original.payloadDigest); assert.deepEqual(reused.answers, original.answers);
+  assert.deepEqual(readDecisionBudget(root, ask.scope!), spending); assert.equal(calls, 1);
 });
 
 test("observation capability stays advisory and incompatible entries never reach transport", async t => {

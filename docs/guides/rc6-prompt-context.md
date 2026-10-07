@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-09-25
-updated: 2026-10-04
+updated: 2026-10-06
 summary: Enable prompt delivery and optional metadata selection, then inspect actual usage without inferring savings.
 ---
 
@@ -76,6 +76,16 @@ Run the repository-local command:
 The first automatic adapter is Codex `UserPromptSubmit`. It requires the host's session, turn, cwd
 and submitted prompt. It rejects delegated workers and mismatched workspaces. Other hosts keep the
 explicit governed command path until their native adapter is independently qualified.
+
+Steering can append another prompt to the same active Codex turn. The turn ID does not identify
+one immutable prompt. Repeating the current input replays its captured packet. Returning to earlier
+text after another prompt creates a new occurrence. Changed input gets its own
+entry and supersedes the earlier selection, while retaining that turn's original context family and
+remaining allowance. In-flight or exhausted selection falls back locally; it does not require a
+new operator turn merely because the earlier prompt already had a reservation. A late superseded
+preparation emits a notice instead of presenting its old context as current. Earlier receipts remain
+intact, and concurrent prompt or per-turn model-usage ambiguity remains unknown. See the
+[4.1 conversational contract](../specs/engine-4-1-context-quality.md#changed-input-during-an-active-turn).
 
 If Codex resumes the same session under a new process, a prior startup reader can still be held.
 When the prior process is proved absent and the pinned runtime is unchanged, prompt context can
@@ -294,6 +304,20 @@ explicit reference is declared reuse, not independent evidence of the current na
 or superseded entry has a named reason and supported refresh action; no automatic paid retry occurs.
 RC10.9 distinguishes an incorrectly supplied reference from a malformed stored identity and points
 to a safe failure receipt. Copy the concrete entry ID from the packet; do not infer another turn.
+In 4.1, selected output also supplies `nativeEntryReference.entryId` and `reuseArguments` for a native
+packet. Human output labels the native entry and route receipt separately. A standalone route has no
+native entry reference. A route receipt UUID cannot be passed as `--entry`. The reference's `reuses`
+field names `original-packet`; an expansion's reference still points to the original turn packet.
+
+Stale captured context has a safe cause such as `configuration-changed` or `source-changed`, a source
+kind and a path digest. The failure receipt records the executing runtime and whether a provider was
+called; archive identity remains unknown unless the executing generation was verified. The recovery
+descriptor supplies arguments for the existing same-entry expansion and `requires: ["task"]`.
+Add `--task "<current or clarified purpose>"`, then use that command if a refresh is needed. It still checks
+the current session, task, worktree and turn. Admission can fall back locally if a continuation slot
+or the shared allowance is unavailable. No retry is automatic; original packets and spending remain.
+Retained receipt or delivery corruption is `entry-packet-invalid`, with no refresh advice. Inspect
+the originals rather than treating an integrity failure as routine source drift.
 
 RC10.2 returns selected evidence and compact status by default. Add `--json` to the same command
 when full index and selection diagnostics are needed. The normal result includes the retained

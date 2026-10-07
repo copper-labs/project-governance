@@ -6,6 +6,7 @@ import { commandApplies } from "./planning.ts";
 import type { Packs } from "./pack-configuration.ts";
 import type { Finding } from "./checker-results.ts";
 import { validateSpecificationReferences } from "./specification-contract.ts";
+import { normalizedDeliveryNotes } from "./delivery-notes.ts";
 
 export interface PlanItem {
   id: string; kind: "implementation" | "verification" | "closeout"; requires: string[];
@@ -65,6 +66,7 @@ export function hasImplementationPlanDeclaration(content: string): boolean {
 /** Only a deliberately adopted fence and marked slots are machine owned; other Markdown stays opaque. */
 export function parseImplementationPlan(path: string, content: string): ParsedImplementationPlan {
   safeSubjectPath(path);
+  normalizedDeliveryNotes(content); // Refuse ambiguous notes before adopting any machine-owned slots.
   if (!/^docs\/exec-plans\/.+\.md$/u.test(path)) throw new Error("Implementation plan must live under docs/exec-plans");
   const fences = markdownFences(content), declarations = fences.filter(fence => /^governance-plan(?:\s|$)/u.test(fence.info));
   if (declarations.length !== 1 || declarations[0]!.info !== "governance-plan" || !declarations[0]!.closed) throw new Error("Exactly one closed governance-plan declaration without attributes is required");
@@ -136,10 +138,10 @@ export function parseImplementationPlan(path: string, content: string): ParsedIm
   return { path, content, digest: planBytesDigest(content), declaration: { version: 1, specifications, batches }, slots };
 }
 
-/** Erase parsed mutable slots only. Requirement text, check declarations and ordinary prose remain identity-bearing. */
+/** Erase explicit commentary and parsed progress only; requirements and check declarations retain their identity. */
 export function normalizedPlanContent(plan: ParsedImplementationPlan): string {
   const replacements = [...plan.slots.values()].flatMap(slot => [{ start: slot.stateOffset, end: slot.stateOffset + 1, text: " " }, { start: slot.evidenceStart, end: slot.evidenceEnd, text: "[]" }]).sort((a, b) => b.start - a.start);
-  return replacements.reduce((text, replacement) => text.slice(0, replacement.start) + replacement.text + text.slice(replacement.end), plan.content);
+  return normalizedDeliveryNotes(replacements.reduce((text, replacement) => text.slice(0, replacement.start) + replacement.text + text.slice(replacement.end), plan.content));
 }
 export function implementationPlanFindings(subject: ValidationSubject, path: string, packs: Packs): Finding[] {
   try {

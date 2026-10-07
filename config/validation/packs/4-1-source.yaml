@@ -1,0 +1,21 @@
+id: source-4-1
+label: Explicit 4.1 source batch verification
+implementation_status: active
+enforcement: blocking
+stages: [4-1-F0, 4-1-F1, 4-1-F2, 4-1-F3, 4-1-F4, 4-1-F5]
+run_when: matched
+path_globs: ["components/**", "config/**", "docs/**", "package.json", "package-lock.json", "tsconfig*.json", "tools/**", "src/**"]
+depends_on: []
+commands:
+  - stages: [4-1-F0]
+    run: [node, components/engine/scripts/check-4-1-source.mjs, --batch, F0]
+  - stages: [4-1-F1]
+    run: [node, components/engine/scripts/check-4-1-source.mjs, --batch, F1]
+  - stages: [4-1-F2]
+    run: [node, components/engine/scripts/check-4-1-source.mjs, --batch, F2]
+  - stages: [4-1-F3]
+    run: [node, components/engine/scripts/check-4-1-source.mjs, --batch, F3]
+  - stages: [4-1-F4]
+    run: [node, components/engine/scripts/check-4-1-source.mjs, --batch, F4]
+  - stages: [4-1-F5]
+    run: [node, components/engine/scripts/check-4-1-source.mjs, --batch, F5]

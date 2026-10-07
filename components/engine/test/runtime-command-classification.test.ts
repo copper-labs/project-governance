@@ -19,4 +19,7 @@ test("delivery commands enter the managed generation with their actual mutation 
   assert.equal(managedCommandEffect("lint", ["setup", "--apply"]), "write");
   assert.equal(managedCommandEffect("lint-adapter"), "write");
   assert.equal(managedCommandEffect("release-evaluation"), "read");
+  assert.equal(managedCommandEffect("release-evaluation", ["report"]), "read");
+  assert.equal(managedCommandEffect("release-evaluation", ["capture"]), "write");
+  assert.equal(managedCommandEffect("task-facts", ["--session", "exact-chat"]), "read");
 });

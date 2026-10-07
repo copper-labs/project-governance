@@ -5,15 +5,15 @@ type: governance
 status: current
 owner: project-governance
 created: 2026-08-15
-updated: 2026-10-05
-summary: Defines compiled major-release proof and deliberate publication, with retained legacy wheel guidance.
+updated: 2026-10-06
+summary: Defines compiled proof reuse and exact manual publication, with retained legacy wheel guidance.
 ---
 
 # Release Process
 
 ## Compiled runtime (3.x and later)
 
-The coordinated major release uses `@organta/project-governance`, one bundled `.tgz` archive,
+The coordinated release uses `@organta/project-governance`, one bundled `.tgz` archive,
 Node `>=24.16.0 <25`, and the schema-2 runtime lock. Package and canonical dependency-lock
 versions must match the exact stable, `MAJOR.MINOR.PATCH-rc.N`, or RC hotfix
 `MAJOR.MINOR.PATCH-rc.N.M` tag (positive N and M). Preview versions are local qualification artifacts;
@@ -22,37 +22,94 @@ the release metadata builder refuses to publish them as stable releases.
 Release candidates publish with GitHub prerelease status and `latest: false`. Their update metadata
 is deliberate-only and pins `from_version` to the exact RC. Ordinary stable discovery excludes them.
 An operator-authorized RC may tag its qualified implementation branch before stable integration;
-this does not merge that branch or activate any adopter. Release notes must identify deferred native
-host/device qualification and experimental provider behavior. The tagged release workflow normally
-repeats source and installed-package proof before publishing the immutable assets. An explicitly
-authorized manual release retains exact local qualification, source/archive binding and immutable
-remote readback. Its notes name the hosted-CI exception.
+this does not merge that branch or activate any adopter. Release notes identify deferred native
+host/device qualification and experimental provider behavior.
 
-The source-readiness workflow runs source tests, type checking, release-metadata tests, package
-construction and offline installed-command proof on each non-draft pull request update, including
-new commits. This does not replace the required device, semantic or migration evidence for a release.
-A changed integration candidate requires current proof.
-Installed archive proof includes the dedicated greenfield suite: an empty Git repository grows
-knowledge and skills, then exercises the shipped prompt, task, context, check and cleanup paths
-before its first commit. Deterministic fixture inference covers both successful delivery and
-provider failure. It also proves that saved review evidence and frozen source copies pass the
-documentation gate while a broken live guide still blocks, without rewriting the raw artifacts.
-Live provider qualification remains separately labelled and requires a funded
-account; an available token alone is not readiness proof.
+### Current publication owners
 
-The release workflow repeats that source/package boundary, then creates `runtime.lock.yaml` and
-`runtime-update.json` from the archive identity and full source commit. Metadata defaults to
-deliberate adoption (`automatic: false`, `integration_change: true`); no major upgrade is inferred.
-Before an authorized tag, confirm repository release immutability, reconcile exact candidate proof,
-and prepare migration notes. The workflow uploads the archive and metadata to a draft before
-publishing. Pushing, tagging and publication require explicit operator authorization. Before tagging, compare the exact release archive with the device-qualified archive; enumerate
-unchanged executed paths and rerun any affected scenario. Passing CI or matching source names alone
-does not establish this binding. After
-publication, verify the release assets and immutable status before claiming released adoption.
+**4.x uses qualified local proof and manual publication.** The current
+[release workflow](../../.github/workflows/release.yml) has no 4.x release job. Do not wait for it to
+rebuild or publish the candidate. The same workflow retains tagged 3.x compiled and 2.x wheel jobs;
+those are separate generation-specific publication owners.
 
-The source checkout can retain its current governance hook owner while the preview is qualified.
-Shared automatic startup and related instruction replacement remain a separate deliberate cutover;
-release packaging does not grant authority to change another checkout.
+The [source-readiness workflow](../../.github/workflows/source-readiness.yml) remains available for
+non-draft pull requests on `opened`, `reopened` and `ready_for_review`; it does not run on every
+repair push. Hosted proof is a separate environment boundary. It does not replace required local,
+device, semantic or migration evidence, and publication alone does not justify replaying valid proof.
+Use the existing operator authorization for the selected publication path; do not add per-step
+approval or a hook bypass. An authorized manual 3.x exception still identifies the hosted-CI
+exception in its release notes. For 4.x, notes identify the normal local qualification path.
+
+### Keep one candidate and reuse its originals
+
+Finish the coherent repairs, stop writers, and qualify one active candidate through the owning plan
+and [validation strategy](validation-strategy.md). Keep source/check manifests, dependency and
+configuration identities, archive hashes, installed proof, review and their scope limits together
+in an external release evidence directory. Preserve failed and superseded originals as history.
+An exact archive or passing check is not by itself device proof, host consumption, task acceptance
+or a token/time saving.
+
+Source proof and archive proof are separate. Bind the selected archive to its qualified source and
+packaging inputs, and bind the review to the source/archive it actually inspected. Reuse originals
+only while their relevant source, dependencies, configuration, toolchain, conditions and claims still
+match. A new commit identity or a status update does not require rebuilding unchanged archive bytes;
+verify the changed paths and packaging correspondence instead of assuming equivalence.
+
+After a correction, recheck the failed or invalidated owner and its directly affected boundaries.
+Keep other valid originals. Do not restart the whole release matrix or independent review merely
+because a repair, commit or publication step finished. Required gates and declared broad-proof
+boundaries remain effective; this policy adds no cache or alternate approval authority.
+
+| Actual change | Requalify | Retain when its inputs still match |
+| --- | --- | --- |
+| Executable source, packaged assets, dependencies or configuration | Affected source and installed/semantic boundaries; produce a new archive if its contents changed | Unaffected original cases and review findings |
+| Verifier or synthetic fixture only | Its regression/assessment and affected installed cases; current declared source closure | Frozen runtime bytes after verifying no packaging/runtime change |
+| Unpackaged documentation, authored notes or typed plan progress | Documentation/narrative and exact source-to-candidate comparison | Runtime, installed and review proof unaffected by those edits |
+| Publication metadata or destination | Metadata binding and remote asset readback | Qualified source/archive execution proof |
+
+Installed package proof includes the dedicated greenfield suite: an empty Git repository grows
+knowledge and skills, then exercises shipped prompt, task, context, check and cleanup paths before
+its first commit. Fixture inference covers delivery and provider failure, and saved raw evidence
+must survive the documentation gate while a broken live guide still blocks. Live provider proof
+remains separate and uses existing disclosure authorization and a funded account. A token alone is
+not readiness proof; a successful call alone is not a useful accepted development outcome.
+
+### Manual compiled publication checklist
+
+Record these fields in the external release record; reuse existing manifests and receipts rather
+than copying their contents into another source document.
+
+- [ ] **Candidate:** exact version, full release commit, archive filename, byte count, SHA256 and
+  SHA512 integrity; package/dependency-lock agreement and source/archive correspondence.
+- [ ] **Proof:** original source, installed, applicable migration/semantic/device and independent
+  review references, their exact identities, closed findings and explicit remaining limits.
+- [ ] **Git gates:** stage only owned changes and prepare the authored narrative. Let the normal
+  commit/push hook invocation count for its gate; do not run that same stage manually immediately
+  before it. A failed hook is repaired and retried normally, with its original failure retained.
+- [ ] **Metadata:** from the intended release commit, generate `runtime.lock.yaml` and
+  `runtime-update.json` against the frozen archive using the existing metadata owner below.
+  Inspect version, archive integrity, full source commit and lock digest. Adoption stays deliberate
+  (`automatic: false`, `integration_change: true`). Do not rebuild the archive to generate metadata.
+- [ ] **Publication:** use the recorded push/tag/publication authorization. Confirm repository
+  release immutability before publishing, verify the exact tag commit, and use authored
+  `.github/release-notes/<version>.md` notes. Upload the frozen archive and both metadata files to a
+  draft, then publish the complete release with the correct stable/prerelease channel.
+- [ ] **Readback:** download all three published assets into a fresh external directory. Compare
+  archive bytes/SHA256/SHA512 and metadata byte hashes with the selected local assets; verify lock
+  version/source commit, update lock digest, tag target, release URL, non-draft state, immutable
+  status and stable/prerelease channel before claiming publication.
+- [ ] **Closeout:** retain local and remote identities and readback in the existing release record.
+  Publication does not upgrade adopters, alter their pins, move chats or change startup authority.
+
+The existing metadata command reads the current checkout's `HEAD`; run it from the intended release
+commit. Use exact arguments and a fresh existing output directory:
+
+```sh
+node components/engine/scripts/release-assets.mjs <frozen-archive> <version> <owner/repository> <output-directory>
+```
+
+The source checkout retains its current governance hook owner until deliberate cutover. Release
+packaging grants no authority to change another checkout or replace its shared startup instructions.
 
 ## Legacy wheel process (2.x)
 

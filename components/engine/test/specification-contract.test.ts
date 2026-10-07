@@ -6,7 +6,7 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ValidationSubject, resolveChangeScope } from "../src/change-subject.ts";
-import { parseSpecificationDeclaration, safeSpecificationPath, validateSpecificationReferences, type SpecificationReferences } from "../src/specification-contract.ts";
+import { parseSpecificationDeclaration, safeSpecificationPath, specificationDefinitionDigest, validateSpecificationReferences, type SpecificationReferences } from "../src/specification-contract.ts";
 
 const path = "docs/spec.md";
 const criteria = [
@@ -106,6 +106,19 @@ test("whole-spec digest invalidates changed prose and changed claims even when I
     }
     const malformed = declaration(); malformed.specifications = [{ path, digest: "not-a-digest", criteria: ["R1"] }];
     assert.ok(validateSpecificationReferences(fixture.subject(), malformed).some(finding => finding.rule_id === "specification.digest-invalid"));
+  } finally { fixture.close(); }
+});
+
+test("captured specification notes may change while its original requirement binding remains exact", () => {
+  const notes = "<!-- governance:notes progress -->\nImplementation ready; verification pending.\n<!-- /governance:notes progress -->\n";
+  const original = document() + notes, fixture = repository(original);
+  try {
+    const bound = declaration(original); bound.specifications[0]!.digest = specificationDefinitionDigest(original);
+    const changed = original.replace("Implementation ready; verification pending.", "Original narrow checks passed; acceptance unknown.");
+    writeFileSync(join(fixture.root, path), changed); fixture.git("add", path);
+    assert.deepEqual(validateSpecificationReferences(fixture.subject(), bound), []);
+    writeFileSync(join(fixture.root, path), changed.replace("Readable rationale.", "Change the required behavior.")); fixture.git("add", path);
+    assert.ok(validateSpecificationReferences(fixture.subject(), bound).some(finding => finding.rule_id === "specification.digest-mismatch"));
   } finally { fixture.close(); }
 });
 

@@ -31,7 +31,7 @@ export function boundContinuationDefinition() {
       maxCalls: 16, maxRequestBytes: 131072, providerDenied: [], entry: 'generated-native-UserPromptSubmit-hook',
       scope: 'workspace-only; no source-file pins', arms: ['deterministic', 'jev'], hostConsumption: 'unknown', acceptedTaskOutcome: 'unknown' },
     priorProxy: { suiteDigest: original.suiteDigest, caseDigest: original.cases.find(item => item.id === 'short-resume').caseDigest,
-      status: 'unchanged-separate-condition', reservedHoldout: original.reservedHoldout } };
+      status: 'original-proxy-case-in-expanded-suite', reservedHoldout: original.reservedHoldout } };
   return { ...body, definitionDigest: digest(body) };
 }
 
@@ -75,6 +75,7 @@ export function freezeBoundContinuationCase({ definition = boundContinuationDefi
 /** Qualify the observed native binding and score what reached hook stdout, not just the route packet. */
 export function assessBoundContinuation(fixture, { entry, packet, receipt, hookOutput, replay, calls }, quality = sourceQuality) {
   const expected = fixture.conditions.binding, text = hookOutput.hookSpecificOutput?.additionalContext;
+  assert.equal(nativeContinuationEntryId(text), entry.entryId, 'Native entry reference differs from its original');
   assert.equal(entry.status, 'prepared', 'Native prompt preparation failed');
   assert.equal(entry.scopeKind, 'bound-task');
   assert.equal(entry.binding.source, 'session', 'Native prompt must read the existing task/session owner');
@@ -111,6 +112,14 @@ export function assessBoundContinuation(fixture, { entry, packet, receipt, hookO
     providerPurpose: calls.length ? 'complete-bound-purpose-observed' : 'not-called',
     routeOptionalCount: route.optional?.entries?.length ?? 0, nativeOptionalCount: nativeEntries.length,
     hostConsumption: 'unknown', acceptanceCriteriaCarried: true, acceptedTaskOutcome: 'unknown', resumeWithoutNewTask: true } };
+}
+
+/** Read the current native header exactly; a route UUID is not an entry reference. */
+export function nativeContinuationEntryId(text) {
+  assert.equal(typeof text, 'string', 'Native hook context is unavailable');
+  const references = [...text.matchAll(/^Native entry reference \(for --entry\): ([a-f0-9]{64})\.$/gmu)];
+  assert.equal(references.length, 1, 'Native hook must deliver one exact entry reference');
+  return references[0][1];
 }
 
 /** The native packet may omit an item for space, but cannot add unscored or duplicate evidence. */
@@ -229,7 +238,7 @@ export async function stopSyntheticParent(child, exited, { graceMs = 2000, termi
 }
 
 // This is the existing synthetic native-parent fixture, not another task or selection owner.
-async function nativeFixture({ packageRoot, workspace, environment, log }) {
+export async function nativeFixture({ packageRoot, workspace, environment, log }) {
   const child = spawn(process.execPath, [fileURLToPath(new URL('./fixtures/continuity-native-host.mjs', import.meta.url)), workspace,
     pathToFileURL(join(packageRoot, 'dist/engine/src/startup-host-owner.js')).href], { cwd: workspace, env: environment, stdio: ['pipe', 'pipe', 'pipe'] });
   const reader = createInterface({ input: child.stdout }), stream = reader[Symbol.asyncIterator]();
@@ -350,8 +359,7 @@ export async function verifyBoundContinuation({ packageRoot, archive, archiveDig
       const handler = item.hooks.UserPromptSubmit[0].hooks[0]; assert.ok(handler.timeout > 0 && handler.timeout <= 55);
       const hookOutput = await host.run('/bin/sh', ['-c', handler.command], JSON.stringify(event), handler.timeout * 1000);
       writeJson(join(item.trial, 'hook-output.json'), hookOutput);
-      const entryId = /Governance prompt context\. Entry ([a-f0-9]{64}); route/u.exec(hookOutput.hookSpecificOutput?.additionalContext)?.[1];
-      assert.ok(entryId, 'Native hook did not deliver a prepared entry; inspect original hook output');
+      const entryId = nativeContinuationEntryId(hookOutput.hookSpecificOutput?.additionalContext);
       const contextRoot = join(item.environment.XDG_STATE_HOME, 'project-governance/context', digest(realpathSync(item.workspace)).slice(7));
       const entryPath = join(contextRoot, 'prompt-entries', `${entryId}.json`), packetPath = join(contextRoot, 'prompt-packets', `${entryId}.json`);
       const entry = JSON.parse(readFileSync(entryPath, 'utf8')), packet = JSON.parse(readFileSync(packetPath, 'utf8'));

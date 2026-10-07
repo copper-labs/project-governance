@@ -17,9 +17,11 @@ import { checkMaintainability } from "./checkers/maintainability.ts";
 import { maintainabilityInputs } from "./checkers/maintainability-inputs.ts";
 import { objectValue } from "./checkers/dependency-manifests.ts";
 import { checkStructuredPlans } from "./structured-plan-check.ts";
+import { checkJunitEvidence } from "./checkers/junit-evidence.ts";
+import { commandApplies } from "./planning.ts";
 import type { Packs } from "./pack-configuration.ts";
 
-export const BUILTIN_CHECKS = ["format", "prose", "test-quality", "naming", "secrets", "documentation", "context-router", "commit-message", "pr-description", "dependencies", "apple-dependencies", "comments", "maintainability", "kmp-surface-validation"] as const;
+export const BUILTIN_CHECKS = ["format", "prose", "test-quality", "naming", "secrets", "documentation", "context-router", "commit-message", "pr-description", "dependencies", "apple-dependencies", "comments", "maintainability", "kmp-surface-validation", "junit-evidence"] as const;
 export interface CheckerAssets {
   schema(name: string): AnySchema;
   policy(name: string): Record<string, unknown>;
@@ -30,6 +32,7 @@ export interface BuiltinCheckRequest {
   packIds: ReadonlySet<string>; stage: string; asOf: string;
   managedPaths?: Set<string>; workId?: string; runFixtureProof?: boolean;
   registry?: Packs;
+  packId?: string;
   // Detached workers retain the owning run store without inheriting ambient state configuration.
   checkRunsRoot?: string;
   commit?: { text: string; path: string; commentMarker?: string };
@@ -58,6 +61,14 @@ export async function runBuiltinCheck(request: BuiltinCheckRequest) {
     const document = (name: string, schema = name) => ({ value: mapping(name), path: `config/policies/${name}.yaml`, schema: assets.schema(schema) });
     const paths = scope.mode === "all" ? subject.paths() : scope.records.filter(record => record.after).map(record => record.path);
     switch (id) {
+      case "junit-evidence": {
+        const owner = request.packId ? request.registry?.[request.packId] : undefined;
+        if (!owner || owner._origin !== "target" || !owner.commands.some(command => command && typeof command === "object" &&
+            !Array.isArray(command) && (command as Record<string, unknown>).builtin === id && commandApplies(command, request.stage))) {
+          return failures("Retained JUnit checking requires its exact declaring target pack.");
+        }
+        return checkJunitEvidence(subject, scope, owner);
+      }
       case "kmp-surface-validation": return checkKmpSurface(subject);
       case "format": return checkFormat(subject, paths);
       case "prose": return checkProse(subject, paths);

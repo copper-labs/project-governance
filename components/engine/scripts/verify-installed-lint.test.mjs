@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { inspectInstalledLintCase } from './verify-installed-lint.mjs';
@@ -9,7 +9,7 @@ const hash = value => createHash('sha256').update(value).digest('hex');
 const subject = 'sha256:' + 'a'.repeat(64);
 
 function fixture(status = 'passed') {
-  const root = mkdtempSync(join(tmpdir(), 'installed-lint-receipt-test-')), run = join(root, 'run'), pack = join(run, 'pack'), evidence = join(pack, 'evidence');
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'installed-lint-receipt-test-'))), run = join(root, 'run'), pack = join(run, 'pack'), evidence = join(pack, 'evidence');
   mkdirSync(join(evidence, 'candidate/src'), { recursive: true }); mkdirSync(join(pack, 'command-0'));
   const sourcePath = 'src/example.py', configPath = 'src/ruff.toml', sourceBytes = status === 'passed' ? 'value=1\n' : 'undefined_name\n', configBytes = '[lint]\nselect=["F82"]\n';
   const write = (path, value) => writeFileSync(path, JSON.stringify(value) + '\n');

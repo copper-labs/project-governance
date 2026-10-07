@@ -4,14 +4,21 @@ import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { durableJson } from "./core.ts";
 import { contextStateRoot } from "./context-command.ts";
+import { runtimeExecutionIdentity } from "./runtime-execution-identity.ts";
 
-interface ContextFailureDiagnostic {
+export interface ContextFailureDiagnostic {
     stage: string; causeCode: string; sessionDigest?: string; turnDigest?: string;
     referenceDigest?: string; referenceBytes?: number;
+    sourceKind?: string; sourcePathDigest?: string;
+}
+export interface ContextRecovery {
+  action: "refresh-current-entry"; entryId: string; sharedAllowance: true;
+  command: "context-route"; arguments: string[]; requires: ["task"];
 }
 export class ContextRouteError extends Error {
   readonly code: string;
   readonly diagnostic?: ContextFailureDiagnostic;
+  recovery?: ContextRecovery;
   receiptPath: string | null = null;
   constructor(code: string, message: string, diagnostic?: ContextFailureDiagnostic) {
     super(message); this.code = code; if (diagnostic) this.diagnostic = diagnostic;
@@ -19,7 +26,7 @@ export class ContextRouteError extends Error {
 }
 
 /** A failed entry still has evidence, without retaining prompt text, flags or parser payloads. */
-export function recordContextFailure(root: string, error: unknown): ContextRouteError {
+export function recordContextFailure(root: string, error: unknown, providerCalled: false | null = null): ContextRouteError {
   const message = error instanceof Error ? error.message : "";
   const known = error instanceof ContextRouteError ? error
     : message.startsWith("unsafe") ? new ContextRouteError("unsafe-path", "An unsafe repository-relative context path was refused.")
@@ -41,18 +48,20 @@ export function recordContextFailure(root: string, error: unknown): ContextRoute
   try {
     known.receiptPath = join(contextStateRoot(root), "entry-failures", `${randomUUID()}.json`);
     const capturedAt = new Date().toISOString();
-    durableJson(known.receiptPath, { version: 1, createdAt: capturedAt, caller: "context-route", status: "failed",
+    durableJson(known.receiptPath, { version: 1, ...runtimeExecutionIdentity(), createdAt: capturedAt, caller: "context-route", status: "failed",
       code: known.code, message: known.message, ...(known.diagnostic ? { diagnostic: known.diagnostic } : {}),
-      providerCalled: null, providerUsage: "unknown", taskUse: "unknown" });
+      ...(known.recovery ? { recovery: known.recovery } : {}),
+      providerCalled, providerUsage: providerCalled === false ? "not-called" : "unknown", taskUse: "unknown" });
     projectContextMetric(contextStateRoot(root), { id: known.receiptPath.split("/").at(-1)!.replace(".json", ""), workspace: realpathSync(root), capturedAt,
       kind: "failure", entryId: null, routeId: null, familyId: null, taskId: null, taskRevision: null,
-      status: "failed", reason: known.code, counts: { providerCalled: null } });
+      status: "failed", reason: known.code, counts: { providerCalled: providerCalled === false ? 0 : null } });
   } catch { known.receiptPath = null; }
   return known;
 }
 
 export const CONTEXT_ROUTE_HELP = `context-route [--task <purpose> --revision <revision>] [--decision-task <id>]
   --entry <id> revalidates a native packet without selection; requires its matching host session.
+  Use the 64-character native entry reference, never a route receipt UUID or task ID.
   A bare shell command cannot identify the current host turn. --task is prose, not a task ID.
   After refresh-required, the normal command joins the current turn and its shared allowance.
   --changed-path <path>   Repeatable routing scope (file or directory).

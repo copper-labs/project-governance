@@ -7,6 +7,13 @@ import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { continuationCandidate, continuationInputs, continuityUpgradeJourney } from './verify-continuity-upgrade.mjs';
 
+/** Parse only the selected payload's declared presentation; never treat a route UUID as an entry. */
+function promptEntryReference(text, presentation) {
+  return (presentation === 'published-4.0.0'
+    ? /^Governance prompt context\. Entry ([a-f0-9]{64}); route /u
+    : /Native entry reference \(for --entry\): ([a-f0-9]{64})\./u).exec(text)?.[1];
+}
+
 /** Prove a prompt's temporary generation reader closes or can be recovered after abrupt exit. */
 async function verifyPromptReaderRecovery({ packageRoot, temporary, workspace, environment }) {
   const rolloverUrl = pathToFileURL(join(packageRoot, 'dist/engine/src/startup-prompt-rollover.js')).href;
@@ -45,7 +52,7 @@ async function verifyPromptReaderRecovery({ packageRoot, temporary, workspace, e
 
 /** Exercise native owner rollover through the installed launcher without changing the old owner. */
 async function verifyOwnerRollover({ packageRoot, temporary, workspace, environment, launcher, registry, readers,
-  beforeReaders, invoke, RuntimeGenerations, event }) {
+  beforeReaders, invoke, RuntimeGenerations, event, presentation }) {
   const { StartupTasks } = await import(pathToFileURL(join(packageRoot, 'dist/engine/src/startup-tasks.js')).href);
   const seedPriorHost = (session, pid) => {
     const receipts = join(dirname(registry), 'startup.sqlite');
@@ -103,7 +110,7 @@ async function verifyOwnerRollover({ packageRoot, temporary, workspace, environm
   assert.deepEqual(afterTasks.owner(present.taskId), beforeOwner, 'A live prior owner must remain unchanged');
   afterTasks.close();
   assert.equal(invoke(launcher, ['telemetry', 'context', 'status']).counts['context-observations:startup-owner-rollover'], 2);
-  const entryId = /Governance prompt context\. Entry ([a-f0-9]{64});/u.exec(liveContinuation.hookSpecificOutput.additionalContext)?.[1];
+  const entryId = promptEntryReference(liveContinuation.hookSpecificOutput.additionalContext, presentation);
   assert.ok(entryId, 'A submitted prompt must return its concrete entry reference');
   const replay = spawnSync(launcher, ['context-route', '--entry', entryId], { cwd: workspace,
     env: { ...environment, HARNESS_SESSION: present.prompt.session_id }, encoding: 'utf8', timeout: 10000 });
@@ -327,7 +334,7 @@ function verifyNativeEnvelope({ invoke, hooks, workspace, launcher, event }) {
 }
 
 /** Exercise procedure/source delivery and exact reuse through the shipped native hook. */
-function verifyRc10Delivery({ invoke, hooks, workspace, launcher, environment, temporary, event }) {
+function verifyRc10Delivery({ invoke, hooks, workspace, launcher, environment, temporary, event, presentation }) {
   const profile = join(workspace, 'config/governance/profile.yaml'), before = readFileSync(profile), app = readFileSync(join(workspace, 'app.ts'));
   const guide = join(workspace, 'recovery.md'), assertion = join(workspace, 'app.test.ts'), calls = join(temporary, 'delivery-calls.jsonl'), preload = join(temporary, 'delivery-fixture.mjs');
   const oldSession = environment.HARNESS_SESSION, oldOptions = environment.NODE_OPTIONS, oldToken = environment.JEV_TOKEN;
@@ -360,7 +367,7 @@ function verifyRc10Delivery({ invoke, hooks, workspace, launcher, environment, t
     assert.ok(text.includes(JSON.stringify(readFileSync(join(workspace, 'app.ts'), 'utf8'))),
       'The native profile allowance must deliver this complete source unit, which exceeds the default 3 KB slot');
     assert.ok(Buffer.byteLength(text) > 8000, 'The normal hook must honor the declared envelope instead of a second 8 KB optional cap');
-    const entry = text.match(/Entry ([a-f0-9]{64}); route/)?.[1]; assert.ok(entry);
+    const entry = promptEntryReference(text, presentation); assert.ok(entry);
     const count = () => readFileSync(calls, 'utf8').trim().split('\n').length, dispatched = count();
     assert.ok(dispatched >= 2);
     assert.deepEqual(invoke('/bin/sh', ['-c', command], JSON.stringify(turn)), output);
@@ -394,6 +401,7 @@ function verifyStopUsage({ temporary, event, invoke, hooks, launcher }) {
 
 export async function verifyRc6Prompt(packageRoot, archive, options = {}) {
   const upgradeInputs = continuationInputs(packageRoot, archive, options);
+  const presentation = upgradeInputs.candidate && upgradeInputs.old.version === '4.0.0' ? 'published-4.0.0' : 'current';
   packageRoot = upgradeInputs.old.packageRoot; archive = upgradeInputs.old.archive;
   const temporary = realpathSync(mkdtempSync(join(tmpdir(), 'rc6-installed-prompt-'))), workspace = join(temporary, 'repo');
   let completed = false;
@@ -463,7 +471,7 @@ export async function verifyRc6Prompt(packageRoot, archive, options = {}) {
     assert.match(active.hookSpecificOutput.additionalContext, /app.ts/);
     assert.equal(readFileSync(calls, 'utf8').trim().split('\n').length, 1);
     verifyTaskSwitch({ invoke, launcher, workspace, environment, session: event.session_id, calls });
-    verifyRc10Delivery({ invoke, hooks, workspace, launcher, environment, temporary, event });
+    verifyRc10Delivery({ invoke, hooks, workspace, launcher, environment, temporary, event, presentation });
     const observed = invoke(launcher, ['telemetry', 'context', 'status']).documentation;
     assert.equal(observed.status, 'observed-subset');
     const appGap = observed.candidates.find(item => item.path === 'app.ts');
@@ -473,7 +481,7 @@ export async function verifyRc6Prompt(packageRoot, archive, options = {}) {
     const { RuntimeGenerations, registry, readers, beforeReaders } = await verifyPromptReaderRecovery({
       packageRoot, temporary, workspace, environment });
     await verifyOwnerRollover({ packageRoot, temporary, workspace, environment, launcher, registry,
-      readers, beforeReaders, invoke, RuntimeGenerations, event });
+      readers, beforeReaders, invoke, RuntimeGenerations, event, presentation });
     // The original installed-host session still owns a startup reader. End that exact
     // session before the integration tree changes its pin.
     invoke('/bin/sh', ['-c', hooks.hooks.SessionEnd[0].hooks[0].command],

@@ -6,7 +6,7 @@ import type { Finding } from "../checker-results.ts";
 
 const REGISTRY = "config/policies/format-preserved-notices.json";
 const LIMIT = 1024 * 1024;
-const SUFFIXES = new Set([".cfg", ".json", ".md", ".py", ".sh", ".toml", ".txt", ".yaml", ".yml"]);
+const SUFFIXES = new Set([".cfg", ".json", ".jsonl", ".md", ".py", ".sh", ".toml", ".txt", ".yaml", ".yml"]);
 const NAMES = new Set([".gitignore", ".env.example", "LICENSE", "MANIFEST.in", "commit-msg", "pre-commit", "pre-pr", "pre-push"]);
 const sha256 = (bytes: Buffer) => createHash("sha256").update(bytes).digest("hex");
 const decode = (bytes: Buffer) => new TextDecoder("utf-8", { fatal: true }).decode(bytes);

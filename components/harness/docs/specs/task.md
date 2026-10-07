@@ -23,6 +23,24 @@ Operator provenance means host-reported operator intent. Observations should ref
 free-form CLI notes and ruled-out hypotheses are labelled hypotheses. Repeating a model conclusion
 does not turn it into a fact. Structured operation constraints are described in [Action](action.md).
 
+## Exact plan association
+
+A task may retain one active `plan-reference` item. Its JSON body contains `version: 1`, a safe
+workspace-relative structured-plan `path` under `docs/exec-plans`, an exact `batch` identifier and
+a `definition_digest` in SHA-256 form. The engine validates the actual plan and batch and computes
+that digest; continuity validates and stores the small identity without parsing plan documents.
+The reference does not establish implementation completion, check success or task acceptance.
+
+The unified `harness task create` and `task revise` commands accept `--plan-path PATH --plan-batch ID`
+as a pair, exactly once. The standalone harness requires an injected engine resolver for these
+arguments. Replacement explicitly revokes the former item's sequence and requires the existing
+host authority reference and expected task version. Rejected or stale revisions preserve the
+original association. Ordinary revisions carry it forward.
+
+Forks omit the active association, including forks in the same worktree. Their pinned parent task
+and revision preserve the original reference as attributed history. A child selects its own batch
+through an explicit task revision.
+
 ## Sessions and attempts
 
 A host session binds to an explicit task and workspace. Stable identity comes from `--session`,

@@ -4,7 +4,9 @@ import { canonical, digest } from "../src/core.ts";
 import { evaluateContext } from "../src/context-evaluation.ts";
 import { contextQualityLabelDigest, qualitySourceDigest, scoreContextQuality, validateContextQualityLabels } from "../src/context-evaluation-quality.ts";
 import type { Candidate, DecisionProvider } from "../src/decisions.ts";
-import { contextQualityDevelopment, contextQualityHoldout } from "./fixtures/context-quality-frozen.ts";
+import { contextQualityDevelopment, contextQualityHoldout, contextQualityRepresentation, contextQualityRepresentation41 } from "./fixtures/context-quality-frozen.ts";
+import { contextExcerpt } from "../src/context-excerpts.ts";
+import { extractSourceFacts } from "../src/context-source-facts.ts";
 
 const deterministic: DecisionProvider = { async decide(request) {
   assert.equal("qualityLabels" in request, false);
@@ -61,6 +63,45 @@ test("right path with the wrong or incomplete passage is a complete-evidence mis
   const complete = scoreContextQuality(entry.request, entry.qualityLabels!, [ranged(original, 4, 7)]);
   assert.equal(complete.essentialGroups.completeDelivered, 1);
   assert.equal(complete.precision.rate, 1);
+});
+
+test("table evidence needs column headers and the matching row, not just the right file", async () => {
+  const entry = structuredClone(contextQualityRepresentation[0]!), original = entry.request.optional[0]!;
+  validateContextQualityLabels(entry.request, entry.qualityLabels!);
+  const fragment = (firstLine: number, lastLine: number): Candidate => {
+    const lines = original.excerpt.match(/[^\n]*\n|[^\n]+$/gu) ?? [];
+    const excerpt = lines.slice(firstLine - 1, lastLine).join("");
+    return { ...original, excerpt, sourceRange: { firstLine, lastLine, totalLines: lines.length,
+      excerptDigest: qualitySourceDigest(excerpt), complete: false } };
+  };
+  for (const body of [fragment(4, 4), fragment(2, 3), fragment(5, 5)]) {
+    const score = scoreContextQuality(entry.request, entry.qualityLabels!, [body]);
+    assert.equal(score.invalidSources.length, 0);
+    assert.equal(score.essentialGroups.fileDelivered, 1);
+    assert.equal(score.essentialGroups.completeDelivered, 0);
+    assert.deepEqual(score.essentialGroups.missed, ["radio-storage-columns"]);
+  }
+  const complete = scoreContextQuality(entry.request, entry.qualityLabels!, [fragment(2, 4)]);
+  assert.equal(complete.essentialGroups.completeDelivered, 1);
+  const report = await evaluateContext([entry], deterministic);
+  assert.equal(report.results[0]!.quality!.candidate.essentialGroups.completeDelivered, 1);
+  assert.equal(report.summary.tokenSavings, null);
+});
+
+test("deep table columns and row are separately required and exact disjoint delivery scores both", () => {
+  const fixture = contextQualityRepresentation41[0]!, original = fixture.request.optional[0]!;
+  const facts = extractSourceFacts(original.id, Buffer.from(original.excerpt));
+  const row = facts.spans.find(span => span.kind === "table-row" && span.name.startsWith("Radio stream"))!;
+  const excerpt = contextExcerpt(original, fixture.request.purpose, fixture.request.optionalExcerptBytes!, facts.spans, [row]);
+  const score = scoreContextQuality(fixture.request, fixture.qualityLabels!, [excerpt]);
+  assert.deepEqual(score.invalidSources, []);
+  assert.equal(score.essentialGroups.expected, 2); assert.equal(score.essentialGroups.completeDelivered, 2);
+  assert.equal(score.precision.rate, 1);
+  for (const fragment of [ranged(original, 2, 3), ranged(original, 40, 40)]) {
+    const partial = scoreContextQuality(fixture.request, fixture.qualityLabels!, [fragment]);
+    assert.equal(partial.essentialGroups.completeDelivered, 1);
+    assert.equal(partial.essentialGroups.missed.length, 1);
+  }
 });
 
 test("complete-unit regressions remain visible when the useful-file comparison is tied", async () => {

@@ -1,10 +1,37 @@
 import assert from 'node:assert/strict';
 import { spawn, execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { appendFileSync, cpSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { appendFileSync, cpSync, existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createInterface } from 'node:readline';
+import { readDeliveredFacts } from './verify-conversational-facts.mjs';
+import { digest } from '../src/core.ts';
+
+/** Post-upgrade facts must come from hook stdout and preserve the exact task and attempt originals. */
+export function assessUpgradeTaskFacts(output, { task, attempt, checkpoint, entry, workspace, session }) {
+  const { text, facts } = readDeliveredFacts(output);
+  assert.equal(entry.workspace, workspace); assert.equal(entry.session, session);
+  assert.equal(facts.association.status, 'associated');
+  assert.equal(facts.association.taskId, task.taskId); assert.equal(facts.association.observedRevision, task.version);
+  assert.equal(facts.association.boundRevision, task.version); assert.equal(facts.association.attemptId, attempt.attemptId);
+  assert.equal(facts.association.workspaceId, attempt.workspaceId);
+  assert.equal(facts.task.outcome, task.outcome); assert.equal(facts.task.status, task.status);
+  assert.equal(facts.task.execution_permission, 'not granted by this snapshot');
+  for (const key of ['checkpointId', 'taskId', 'taskVersion', 'attemptId', 'summary', 'next', 'createdAt'])
+    assert.equal(facts.checkpoint?.[key], checkpoint[key], `Post-upgrade checkpoint ${key} differs`);
+  assert.equal(facts.checkpoint.applicability, 'same-revision-and-attempt');
+  assert.equal(facts.checkpoint.provenance, 'caller-declared summary and next action; not executed proof');
+  assert.equal(entry.promptDigest, digest('Continue where you left off'), 'Post-upgrade proof must use the vague native continuation');
+  assert.equal(entry.currentPromptComplete, true);
+  assert.equal(entry.packetDigest, digest(text)); assert.equal(entry.taskFacts?.digest, digest(facts));
+  assert.equal(entry.binding.taskId, task.taskId); assert.equal(entry.binding.attemptId, attempt.attemptId);
+  assert.equal(entry.binding.revision, String(task.version));
+  assert.equal(entry.packetBytes, Buffer.byteLength(text));
+  assert.ok(entry.packetBytes <= entry.packetLimitBytes);
+  return { taskId: task.taskId, taskRevision: task.version, attemptId: attempt.attemptId, checkpointId: checkpoint.checkpointId,
+    nativeSession: session, workspace, generatedAdditionalContext: true, hostConsumption: 'unknown', acceptedDevelopmentOutcome: 'unknown' };
+}
 
 /** Select explicit local payloads without installing, relabeling or changing supplied locks. */
 export function continuationInputs(packageRoot, archive, options = {}) {
@@ -170,7 +197,7 @@ export async function continuityUpgradeJourney({ packageRoot, temporary, workspa
     assert.ok(Number.isFinite(handler.timeout) && handler.timeout > 0, 'Installed native hook must declare its budget');
     return item.host.run('/bin/sh', ['-c', handler.command], JSON.stringify({ session_id: session,
       hook_event_name: name, cwd: item.root, source: 'resume',
-      ...(turn ? { turn_id: turn, prompt: `Continue the ${item.role} app launch task in this worktree.` } : {}) }),
+      ...(turn ? { turn_id: turn, prompt: turn.endsWith('-after-upgrade') ? 'Continue where you left off' : `Continue the ${item.role} app launch task in this worktree.` } : {}) }),
     0, false, handler.timeout * 1000);
   };
   const command = (item, args, expected = 0, plain = false) => item.host.run(item.launcher, args, undefined, expected, plain);
@@ -182,14 +209,18 @@ export async function continuityUpgradeJourney({ packageRoot, temporary, workspa
       log: join(temporary, `continuity-${item.role}-${item.previousPid ? 'successor' : 'original'}.jsonl`) });
     item.startupTask = startupEvent('codex', { session_id: session, hook_event_name: 'UserPromptSubmit' }, item.root, false, env).taskId;
   };
-  const entry = async (item, turn) => {
+  const entry = async (item, turn, verifyFacts = false) => {
     const prompt = await hook(item, 'UserPromptSubmit', turn);
-    const id = /Entry ([a-f0-9]{64}); route/u.exec(prompt.hookSpecificOutput?.additionalContext)?.[1];
+    const text = prompt.hookSpecificOutput?.additionalContext;
+    // Original baseline hooks have their own older presentation; do not alter that payload.
+    const id = /Native entry reference \(for --entry\): ([a-f0-9]{64})\./u.exec(text)?.[1] ?? /Entry ([a-f0-9]{64}); route/u.exec(text)?.[1];
     assert.ok(id, JSON.stringify(prompt));
     const path = join(stateRoot(item.root), 'prompt-entries', `${id}.json`);
     const bytes = readFileSync(path, 'utf8'), record = JSON.parse(bytes);
     assert.equal(record.session, session); assert.equal(record.workspace, item.root);
     assert.equal(record.worktreeLocator, workContext(item.root).locator);
+    if (verifyFacts) item.deliveredTaskFacts = assessUpgradeTaskFacts(prompt, { task: item.task, attempt: item.attempt,
+      checkpoint: item.checkpoint, entry: record, workspace: item.root, session });
     return { id, path, bytes, record };
   };
   const assertHistory = async item => {
@@ -277,7 +308,8 @@ export async function continuityUpgradeJourney({ packageRoot, temporary, workspa
         assert.equal(readFileSync(main.boundEntry.path, 'utf8'), main.boundEntry.bytes);
         await assertHistory(main);
         localProfile(main);
-        main.currentEntry = await entry(main, 'main-after-upgrade');
+        const candidateFactsSupported = existsSync(join(generations(main).directory, 'node_modules/@organta/project-governance/dist/engine/src/task-facts.js'));
+        main.currentEntry = await entry(main, 'main-after-upgrade', candidateFactsSupported);
         await assertLocalPacket(main, main.currentEntry.id);
         const active = JSON.parse(readFileSync(join(generations(main).directory, 'installation.json'), 'utf8'));
         assert.equal(active.lock.version, version); assert.equal(owner(main).host.pid, main.host.pid);
@@ -293,7 +325,8 @@ export async function continuityUpgradeJourney({ packageRoot, temporary, workspa
         assert.equal(await command(linked, ['--version'], 0, true), `project-governance ${version}`);
         await assertHistory(linked);
         localProfile(linked);
-        linked.currentEntry = await entry(linked, 'linked-after-upgrade');
+        const candidateFactsSupported = existsSync(join(generations(linked).directory, 'node_modules/@organta/project-governance/dist/engine/src/task-facts.js'));
+        linked.currentEntry = await entry(linked, 'linked-after-upgrade', candidateFactsSupported);
         await assertLocalPacket(linked, linked.currentEntry.id);
         const active = JSON.parse(readFileSync(join(generations(linked).directory, 'installation.json'), 'utf8'));
         assert.equal(active.lock.version, version);
@@ -308,6 +341,7 @@ export async function continuityUpgradeJourney({ packageRoot, temporary, workspa
             candidate: candidatePayload ? { path: candidatePayload.archive, version: candidatePayload.version, digest: candidatePayload.archiveDigest, sourceIdentity: candidatePayload.sourceIdentity } : null },
           archiveInstallations,
           hookDeadlines,
+          deliveredTaskFacts: items.map(item => ({ worktree: item.role, ...(item.deliveredTaskFacts ?? { status: 'unsupported-by-selected-payload' }) })),
           hostEvidence: 'synthetic native ancestors and installed hooks only; desktop reattachment and accepted ordinary development not tested' };
       }, cleanup,
     };

@@ -27,9 +27,11 @@ export function contextSelectionStatus(packet: RoutedContextPacket) {
 export function presentContextRoute(packet: RoutedContextPacket & { reuse?: unknown }) {
   const selection = packet.selection, metadata = packet.metadata;
   return { version: 1, presentation: "selected-context", ready: packet.ready, receiptId: packet.receiptId,
+    nativeEntryReference: packet.execution.entryId ? { version: 1, kind: "native-prompt-entry", entryId: packet.execution.entryId,
+      reuses: "original-packet", reuseArguments: ["--entry", packet.execution.entryId] } : null,
     selectionStatus: contextSelectionStatus(packet),
     receipt: packet.receiptPersisted ? join(contextStateRoot(packet.execution.workspace), "routes", `${packet.receiptId}.json`) : null,
-    execution: packet.execution, inputDigest: packet.inputDigest, revision: packet.revision, source: packet.source,
+    execution: packet.execution, taskFacts: packet.taskFacts, inputDigest: packet.inputDigest, revision: packet.revision, source: packet.source,
     route: packet.route, entries: packet.entries, skills: packet.skills, blockers: packet.blockers,
     routingPaths: { mode: packet.routingPaths.mode },
     omissions: packet.omissions, optional: packet.optional ? { entries: packet.optional.entries,

@@ -184,6 +184,26 @@ test("progress recaptures clean-file and new-file changes after the original che
   } finally { rmSync(f.directory, { recursive: true, force: true }); }
 });
 
+test("updating explicit progress commentary reuses the original check without changing its receipt", async () => {
+  const f = fixture();
+  try {
+    writeFileSync(join(f.root, path), f.current().content.replace("Current/next: original.\n",
+      "<!-- governance:notes progress -->\nCurrent/next: original.\n<!-- /governance:notes progress -->\n"));
+    f.update({ version: 1, expected_digest: f.current().digest, batch: "B1", updates: [{ id: "B1.I", completed: true }] });
+    const result = await runFixtureCheck(f); assert.equal(result.status, "passed");
+    const originalPath = join(f.directory, "runs", result.run_id, "result.json"), original = readFileSync(originalPath);
+    writeFileSync(join(f.root, path), f.current().content.replace("Current/next: original.", "Current/next: record the completed narrow proof."));
+    const request: PlanProgressRequest = { version: 1, expected_digest: f.current().digest, batch: "B1", updates: [{ id: "B1.V", completed: true, run_id: result.run_id }] };
+    assert.equal(f.update(request).status, "updated");
+    assert.deepEqual(readFileSync(originalPath), original);
+    assert.equal(f.current().slots.get("B1.V")?.completed, true);
+    assert.equal(f.update(request).status, "unchanged");
+    writeFileSync(join(f.root, "code.txt"), "changed after proof\n");
+    const staleRequest = { ...request, expected_digest: f.current().digest };
+    assert.throws(() => f.update(staleRequest), /stale|changed|unqualified/u);
+  } finally { rmSync(f.directory, { recursive: true, force: true }); }
+});
+
 test("staged proof permits live bookkeeping but refuses revised live semantic plan content", async () => {
   const f = fixture();
   try {

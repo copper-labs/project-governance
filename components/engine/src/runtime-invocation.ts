@@ -18,6 +18,8 @@ const writeCommands = new Set([...COMMAND_RECOVERY_COMMANDS, "lint-adapter", "ha
 
 export function managedCommandEffect(command: string, args: readonly string[] = []): "read" | "write" | null {
   if (["--help", "-h", "help"].includes(command)) return "read";
+  if (command === "task-facts") return "read";
+  if (command === "release-evaluation" && args[0] === "capture") return "write";
   if (command === "context-index") return "write";
   if (command === "implementation-plan") return args[0] === "inspect" ? "read" : "write";
   if (command === "lint") return args[0] === "setup" && !args.includes("--apply") ? "read" : "write";

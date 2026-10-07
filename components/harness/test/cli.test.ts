@@ -1,8 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { writeFileSync, readFileSync } from 'node:fs';
+import { writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { fixture } from './helpers.ts';
 const cli = resolve('src/cli.ts');
 test('CLI resumes across processes, emits real contents and blocks missing mandatory context', () => {
@@ -93,4 +94,64 @@ test('schema5 migration adds item provenance without changing old history', asyn
     assert.equal(s.readTask('old')!.items[0]!.origin, null);
     assert.equal(s.readTask('old')!.items[0]!.body, 'legacy observation');
     s.close();
+});
+
+test('CLI pairs plan flags and refuses standalone or unrelated operations before creating state', () => {
+    const f = fixture(), db = join(f.root, 'uncreated.db');
+    f.store.close();
+    const run = (args: string[]) => {
+        const result = spawnSync(process.execPath, [cli, ...args, '--db', db], { cwd: f.root, encoding: 'utf8' });
+        return { code: result.status, value: JSON.parse(result.stdout) };
+    };
+    const path = 'docs/exec-plans/active/example.md';
+    for (const flags of [['--plan-path', path], ['--plan-batch', 'F1'],
+        ['--plan-path', path, '--plan-batch', 'F1', '--plan-batch', 'F2']]) {
+        const result = run(['task', 'create', '--outcome', 'linked', ...flags]);
+        assert.equal(result.code, 2); assert.match(result.value.error, /together exactly once/);
+    }
+    const missing = run(['task', 'create', '--outcome', 'linked', '--plan-path', path, '--plan-batch', 'F1']);
+    assert.equal(missing.code, 2); assert.match(missing.value.error, /unified engine.*resolver/);
+    const wrongOperation = run(['task', 'fork', '--plan-path', path, '--plan-batch', 'F1']);
+    assert.equal(wrongOperation.code, 2); assert.match(wrongOperation.value.error, /only valid/);
+    assert.equal(existsSync(db), false);
+});
+
+test('injected plan resolver supports create and explicit expected-version replacement', () => {
+    const f = fixture(), db = join(f.root, '.harness/harness.db');
+    f.store.close();
+    const script = `import {continuityCommand} from ${JSON.stringify(pathToFileURL(cli).href)};
+        process.exitCode=continuityCommand(JSON.parse(process.argv[1]),{resolvePlanReference(workspace,path,batch){
+            if(workspace!==${JSON.stringify(f.root)})throw Error('wrong workspace');
+            return {version:1,path,batch,definition_digest:'sha256:'+'a'.repeat(64)};}});`;
+    const run = (args: string[]) => {
+        const result = spawnSync(process.execPath, ['--input-type=module', '-e', script, JSON.stringify([...args, '--db', db, '--session', 'plan-session'])], { cwd: f.root, encoding: 'utf8' });
+        return { code: result.status, value: JSON.parse(result.stdout) };
+    };
+    const flags = ['--plan-path', 'docs/exec-plans/active/example.md', '--plan-batch'];
+    const created = run(['task', 'create', '--outcome', 'linked', ...flags, 'F1']);
+    assert.equal(created.code, 0);
+    const item = created.value.task.items.find((item: { kind: string }) => item.kind === 'plan-reference');
+    assert.equal(JSON.parse(item.body).batch, 'F1');
+    const id = created.value.task.taskId;
+    const duplicate = run(['task', 'revise', '--task', id, '--expected-version', '1', ...flags, 'F2']);
+    assert.equal(duplicate.code, 2); assert.match(duplicate.value.error, /one active plan reference/);
+    const replacement = run(['task', 'revise', '--task', id, '--expected-version', '1', '--revoke', String(item.seq), '--authority-ref', 'host:change-batch', ...flags, 'F2']);
+    assert.equal(replacement.code, 0);
+    assert.equal(replacement.value.task.version, 2);
+    assert.equal(replacement.value.task.items.filter((item: { kind: string; revoked: boolean }) => item.kind === 'plan-reference' && !item.revoked).length, 1);
+    const stale = run(['task', 'revise', '--task', id, '--expected-version', '1', '--note', 'stale caller']);
+    assert.equal(stale.code, 2); assert.match(stale.value.error, /expected revision 1, found 2/);
+});
+
+test('a resolver cannot substitute a different association or persist an invalid identity', () => {
+    const f = fixture(), db = join(f.root, 'uncreated.db');
+    f.store.close();
+    for (const substitution of [{ path: 'docs/exec-plans/active/other.md', batch: 'F1', definition_digest: `sha256:${'a'.repeat(64)}` },
+        { path: 'docs/exec-plans/active/example.md', batch: 'F1', definition_digest: 'unknown' }]) {
+        const script = `import {continuityCommand} from ${JSON.stringify(pathToFileURL(cli).href)};
+            process.exitCode=continuityCommand(JSON.parse(process.argv[1]),{resolvePlanReference(){return {version:1,...${JSON.stringify(substitution)}};}});`;
+        const args = ['task', 'create', '--outcome', 'linked', '--plan-path', 'docs/exec-plans/active/example.md', '--plan-batch', 'F1', '--db', db];
+        const result = spawnSync(process.execPath, ['--input-type=module', '-e', script, JSON.stringify(args)], { cwd: f.root, encoding: 'utf8' });
+        assert.equal(result.status, 2); assert.equal(existsSync(db), false);
+    }
 });

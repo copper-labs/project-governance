@@ -9,9 +9,10 @@ const root = fileURLToPath(new URL("../../..", import.meta.url));
 const builtin = fileURLToPath(new URL("../../../src/project_governance_runtime/packs", import.meta.url));
 const fixture = JSON.parse(readFileSync(new URL("./fixtures/planning-parity.json", import.meta.url), "utf8"));
 
-test("all shipped pack selections match retained Python output fixtures", () => {
-  const packs = loadPacks(root, builtin);
-  assert.equal(Object.keys(packs).filter(id => packs[id]!._origin === "builtin").length, 13);
+test("all shipped builtin pack selections match retained Python output fixtures", () => {
+  // Historical parity covers the shipped corpus; source-only project packs have separate declarations.
+  const packs = Object.fromEntries(Object.entries(loadPacks(root, builtin)).filter(([, pack]) => pack._origin === "builtin"));
+  assert.equal(Object.keys(packs).length, 13);
   for (const entry of fixture.cases) assert.deepEqual(JSON.parse(JSON.stringify(buildPlan(packs, entry.options))), entry.expected);
 });
 

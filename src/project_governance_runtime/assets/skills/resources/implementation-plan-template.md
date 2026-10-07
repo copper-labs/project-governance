@@ -22,7 +22,7 @@ summary: <One-sentence final state.>
 ## Machine Declaration
 
 Use this structure for a new plan. Replace the example stage/pack with its actual configured owner.
-Bind applicable specification criteria to their captured full-file digest; an empty specification
+Bind applicable specification criteria to their captured definition digest; an empty specification
 list is valid only when this plan has no separately declared specification scope. Keep explanatory
 prose below. IDs remain stable when wording changes. The runtime validates these declarations through
 the normal documentation pack; the declaration does not prove semantic acceptance.
@@ -98,7 +98,14 @@ record verification automatically using `--implementation-plan <plan> --batch B1
 completion. Otherwise pass its original run ID to the updater. Do not flip verification boxes from
 a summary or model judgment. Retain failed/invalidated proof, and leave product acceptance to its owner.
 
+<!-- governance:notes B1-progress -->
 Current/next: <next action; blocker or deferred work if any>.
+<!-- /governance:notes B1-progress -->
+
+In 4.1 these explicit notes may change without invalidating the task/plan link. Give each region a
+unique ID. Keep requirements, approvals, check declarations and progress slots outside notes.
+Unmarked prose remains definition-bearing. The typed updater still uses the exact current file
+digest and preserves original evidence; commentary cannot certify new candidate inputs.
 
 Commit each completed, verified batch with its plan update when local commits are authorized.
 Inspect staged ownership and keep normal hooks enabled. A pause or failed checkpoint may retain

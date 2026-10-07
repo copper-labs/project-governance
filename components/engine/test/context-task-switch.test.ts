@@ -36,6 +36,26 @@ function fixture(t: TestContext, paid: boolean) {
   return { root, run, state: contextStateRoot(root), event: { hook_event_name: "UserPromptSubmit", session_id: "owner-session", turn_id: "turn-one", cwd: root, prompt: "Fix the second implementation" } };
 }
 
+test("a rebind during native selection cannot attach another task's facts to the original scope", async t => {
+  const f = fixture(t, true), first = f.run("task", "create", "--outcome", "Original owned task", "--scope", f.root);
+  let second: any;
+  t.mock.method(globalThis, "fetch", async (_url: unknown, init: RequestInit) => {
+    second ??= f.run("task", "create", "--outcome", "New unrelated task", "--scope", f.root);
+    const wire = JSON.parse(String(init.body));
+    return Response.json({ model: "jev-1.13.0", answers: Object.fromEntries(Object.keys(wire.questions).map(name => [name, { type: "noul", noul: 0.9 }])) });
+  });
+  const output = await promptContext("codex", f.event, f.root, { environment: {}, assetRoot: assets });
+  assert.ok(second, "The binding must actually change during provider selection");
+  const text = (output as any).hookSpecificOutput.additionalContext;
+  const marker = "Current task facts (read-only snapshot; declarations are not proof):\n";
+  const facts = JSON.parse(text.slice(text.indexOf(marker) + marker.length).split("\n")[0]);
+  assert.equal(facts.association.status, "association-changed-during-preparation");
+  assert.equal(facts.task, undefined); assert.equal(facts.association.taskId, undefined);
+  const entry = JSON.parse(readFileSync(join(f.state, "prompt-entries", readdirSync(join(f.state, "prompt-entries"))[0]!), "utf8"));
+  assert.equal(entry.binding.taskId, first.task.taskId); assert.notEqual(entry.binding.taskId, second.task.taskId);
+  assert.equal(entry.taskFacts.delivered, true); assert.equal(entry.taskFacts.association.status, facts.association.status);
+});
+
 test("task switch refreshes on the normal route, preserves paid budget and cannot rewrite historical context", async t => {
   const f = fixture(t, true); let calls = 0;
   t.mock.method(globalThis, "fetch", async (_url: unknown, init: RequestInit) => {

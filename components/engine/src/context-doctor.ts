@@ -18,6 +18,22 @@ import { contextScopeCoverage } from "./context-scope-coverage.ts";
 import { contextWorkspaceIdentity, contextWorkspaceAlignmentMessage } from "./context-workspace-identity.ts";
 import { SOURCE_CAPTURE_MAX_BYTES, SOURCE_CAPTURE_BATCH_MAX_BYTES } from "./source-capture-limits.ts";
 
+/** Configuration readback only; eligibility does not prove provider availability or host consumption. */
+export interface ContextReadiness {
+  version: 1;
+  status: "ready" | "degraded" | "unavailable";
+  selection: "off" | "not-configured" | "metadata-only" | "passages";
+  mode: "off" | "shadow" | "auto" | null;
+  provider: "not-requested" | "eligible-unproven" | "disabled" | "unknown";
+  sharing: "not-requested" | "restricted" | "configured" | "unknown";
+  promptHook: string;
+  issues: string[];
+  next: string;
+  basis: "current-configuration-only";
+  providerAvailability: "not-probed";
+  hostConsumption: "not-observed";
+}
+
 /** Passive readiness, not host trust or successful first-read qualification. */
 export function contextDoctor(workspace: string) {
   const findings: Array<{ id: string; message: string }> = [];
@@ -28,6 +44,9 @@ export function contextDoctor(workspace: string) {
   let budgets: ReturnType<typeof contextBudgetReadiness> | null = null;
   let metadata = { enabled: false, disclosure: false }, hook = "unavailable";
   let inference: Record<string, unknown> | null = null;
+  let selection: ContextReadiness["selection"] = "not-configured";
+  let effectiveMode: ContextReadiness["mode"] = null;
+  let provider: ContextReadiness["provider"] = "unknown";
   let optionalExcerptBytes: number | undefined;
   let scopeCoverage: ReturnType<typeof contextScopeCoverage> | null = null;
   let hookSource: ReturnType<typeof inspectStartupHookSource> | null = null;
@@ -48,6 +67,20 @@ export function contextDoctor(workspace: string) {
     metadata = { enabled: settings.mode !== "off" && settings.consumers.DL03.mode !== "off" && settings.questionIds.DL03.includes("context.metadata-relevance/1"),
       disclosure: settings.legacy.allowedDataClasses.includes("metadata") && Boolean(settings.allowedMetadataPaths?.length) };
     const eligibility = new DecisionRuntime(settings, contextStateRoot(workspace)).eligibility("DL03", "context.metadata-relevance/1");
+    effectiveMode = eligibility.mode;
+    const sourceApproved = settings.legacy.allowedDataClasses.includes("source") && Boolean(settings.legacy.allowedSourcePaths?.length);
+    selection = eligibility.mode === "off" ? "off" : !metadata.enabled || !metadata.disclosure ? "not-configured"
+      : passageEnabled && sourceApproved ? "passages" : "metadata-only";
+    provider = eligibility.mode === "off" ? "not-requested"
+      : eligibility.providerUse === "eligible" && metadata.enabled && metadata.disclosure ? "eligible-unproven" : "disabled";
+    if (eligibility.mode !== "off" && eligibility.reasons.includes("missing-token"))
+      findings.push({ id: "context.credentials-missing", message: "JEV selection is requested, but JEV_TOKEN is absent from this host environment. Local fallback remains available; no provider request was attempted." });
+    if (eligibility.mode !== "off" && !metadata.enabled)
+      findings.push({ id: "context.metadata-question-not-enabled", message: "JEV is requested for DL03, but its repository metadata question is not enabled. Inspect DL03 questions before claiming metadata selection readiness." });
+    if (eligibility.mode !== "off" && passageEnabled && !sourceApproved)
+      findings.push({ id: "context.passage-not-approved", message: "Passage questions are enabled, but source data and intended source paths are not both approved. Passage selection remains unavailable; review sharing consent without widening it automatically." });
+    if (eligibility.mode !== "off" && scopeCoverage.status === "unavailable")
+      findings.push({ id: "context.scope-unavailable", message: "Approved selection paths are configured, but the local Git inventory could not be inspected. Verify the worktree before claiming sharing-scope coverage; no index or provider probe was run." });
     inference = { configuredMode: settings.consumers.DL03.mode, effectiveMode: eligibility.mode, providerUse: eligibility.providerUse,
       reasons: eligibility.reasons, metadataApproved: metadata.disclosure, sourceClassApproved: settings.legacy.allowedDataClasses.includes("source"),
       descriptorPaths: settings.legacy.allowedSourcePaths ?? [], metadataPaths: settings.allowedMetadataPaths ?? [],
@@ -94,7 +127,21 @@ export function contextDoctor(workspace: string) {
   const indexObservation = projection.status === "present" && "generations" in projection
     ? projection.generations.some(generation => Number(generation.paths) > 0) ? "populated-snapshot" : "empty-snapshot"
     : "not-observed";
+  // Valid metadata-only and path-only configurations are useful, limited choices rather than activation failures.
+  const suggestions = new Set(["context.path-only-disclosure", "context.passage-not-enabled"]);
+  const issues = [...new Set(findings.filter(finding => !suggestions.has(finding.id)).map(finding => finding.id))];
+  const readiness: ContextReadiness = { version: 1,
+    status: inference === null ? "unavailable" : issues.length ? "degraded" : "ready",
+    selection, mode: effectiveMode, provider,
+    sharing: selection === "off" ? "not-requested" : scopeCoverage === null || scopeCoverage.status === "unavailable" ? "unknown"
+      : scopeCoverage.status === "restricted" ? "restricted" : "configured",
+    promptHook: hook, issues,
+    next: issues.length ? findings.find(finding => finding.id === issues[0])!.message
+      : selection === "off" ? "JEV is off. Local retrieval remains available; enabling it requires explicit configuration and sharing consent."
+        : `Configured for ${selection === "passages" ? "metadata and passage" : "metadata-only"} selection. Provider availability and delivery to the model still require ordinary-use evidence.`,
+    basis: "current-configuration-only", providerAvailability: "not-probed", hostConsumption: "not-observed" };
   return { version: 1, capability: "context", status: findings.length ? "needs-attention" : "configured", findings, metadata, inference, requiredGuidance,
+    readiness,
     budgets: budgets ? { routes: budgets.routes, coverage: budgets.coverage } : null,
     localRetrieval: "provider-independent", promptHook: hook, promptHookSource: hookSource, hostTrust: "not-observable", beforeFirstRead: "requires-installed-host-evidence",
     projection, scopeCoverage, workspaceIdentity, repositoryContext: { indexObservation, overviewFiles: projectOverview, purposeQuality: "not-established",

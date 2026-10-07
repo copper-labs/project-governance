@@ -4,11 +4,11 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
-import { providerContext, validateProviderContext } from "../src/provider-context.ts";
+import { PreparedContextValidationError, providerContext, validateProviderContext } from "../src/provider-context.ts";
 import { decisionTaskContext, readDecisionTaskContext } from "../src/decision-task-context.ts";
 import { resolveChangeScope, ValidationSubject } from "../src/change-subject.ts";
 import { contextRouteCommand } from "../src/context-route-command.ts";
-import { fileDigest } from "../src/core.ts";
+import { digest, fileDigest } from "../src/core.ts";
 
 test("provider launch accepts retained inventory receipts and originals larger than one MiB", async () => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "provider-context-capacity-")));
@@ -40,11 +40,19 @@ test("provider launch accepts retained inventory receipts and originals larger t
     assert.ok(readFileSync(prepared.delivery.receipt).length > 1024 * 1024);
     validateProviderContext(root, prepared.delivery, prepared.text);
     writeFileSync(join(root, "docs/review.md"), original + "Changed review evidence.\n");
-    assert.throws(() => validateProviderContext(root, prepared.delivery, prepared.text), /changed before dispatch/);
+    assert.throws(() => validateProviderContext(root, prepared.delivery, prepared.text), (error: unknown) => {
+      assert.ok(error instanceof PreparedContextValidationError);
+      assert.equal(error.diagnostic.causeCode, "source-changed"); assert.equal(error.diagnostic.sourceKind, "optional");
+      assert.equal(error.diagnostic.sourcePathDigest, digest("docs/review.md"));
+      assert.ok(!JSON.stringify(error.diagnostic).includes("docs/review.md")); return true;
+    });
     rmSync(join(root, "docs/review.md")); symlinkSync(join(root, "rules.md"), join(root, "docs/review.md"));
     assert.throws(() => validateProviderContext(root, prepared.delivery, prepared.text), /changed before dispatch/);
     rmSync(join(root, "docs/review.md")); writeFileSync(join(root, "docs/review.md"), Buffer.alloc(16 * 1024 * 1024 + 1));
-    assert.throws(() => validateProviderContext(root, prepared.delivery, prepared.text), /bounded regular file/);
+    assert.throws(() => validateProviderContext(root, prepared.delivery, prepared.text), (error: unknown) => {
+      assert.ok(error instanceof PreparedContextValidationError); assert.match(error.message, /bounded regular file/);
+      assert.equal(error.diagnostic.causeCode, "source-unavailable"); assert.equal(error.diagnostic.sourceKind, "optional"); return true;
+    });
   } finally {
     if (previousState === undefined) delete process.env.XDG_STATE_HOME; else process.env.XDG_STATE_HOME = previousState;
     if (previousToken === undefined) delete process.env.JEV_TOKEN; else process.env.JEV_TOKEN = previousToken;

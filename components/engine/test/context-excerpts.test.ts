@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { contextExcerpt } from "../src/context-excerpts.ts";
+import { contextExcerpt, contextSpanChoices } from "../src/context-excerpts.ts";
+import { extractSourceFacts } from "../src/context-source-facts.ts";
 import { buildContextPacket } from "../src/context-packet.ts";
 import { digest } from "../src/core.ts";
 
@@ -43,4 +44,56 @@ test("excerpt windows favor actual source content over leading whitespace", () =
   assert.ok(excerpt.excerpt.includes("The retry budget is 30 seconds."));
   assert.ok(excerpt.excerpt.trim());
   assert.ok(Buffer.byteLength(excerpt.excerpt) <= 2048);
+});
+
+// Frozen separately from the existing quality labels: a weak ownership row competes with two complete rules.
+const tableFallbackRegression = Object.freeze({
+  path: "docs/fallback.md", purpose: "Inspect lease release cleanup and approval safeguard", maximumBytes: 512,
+  source: "# Ownership\n| Area | Steward |\n| --- | --- |\n| Release | platform |\n" +
+    "Background ownership note.\n".repeat(30) +
+    "# Lease release cleanup\nThe verified owner clears the lease and completes cleanup after release.\n" +
+    "# Approval safeguard\nApproval stays required before changing the protected safeguard.\n" +
+    "# Other notes\n" + "Unrelated presentation detail.\n".repeat(30),
+  expectedSections: Object.freeze(["Lease release cleanup", "Approval safeguard"]),
+});
+
+test("a weak table match cannot replace stronger complete and complementary fallback sections", () => {
+  const fixture = tableFallbackRegression, facts = extractSourceFacts(fixture.path, Buffer.from(fixture.source));
+  const candidate = { id: fixture.path, sourceDigest: facts.digest, excerpt: fixture.source };
+  const choices = contextSpanChoices(candidate, fixture.purpose, facts.spans);
+  assert.equal(choices[0]!.span.name, fixture.expectedSections[0]);
+  assert.equal(choices[1]!.span.name, fixture.expectedSections[1]);
+  const row = choices.find(item => item.span.kind === "table-row")!;
+  assert.ok(row.score > 0 && row.score < choices[1]!.score, "The row matches the request, but ranks below both complete rules");
+  const excerpt = contextExcerpt(candidate, fixture.purpose, fixture.maximumBytes, facts.spans);
+  assert.deepEqual(excerpt.sourceUnits?.map(item => item.name), fixture.expectedSections);
+  assert.ok(excerpt.sourceUnits?.every(item => item.complete && item.kind === "heading"));
+  assert.match(excerpt.excerpt, /The verified owner clears/);
+  assert.match(excerpt.excerpt, /Approval stays required/);
+  assert.equal(excerpt.excerpt.includes("| Release | platform |"), false);
+  assert.equal(excerpt.sourceRanges?.length, 2);
+  const lines = fixture.source.match(/[^\n]*\n|[^\n]+$/gu)!;
+  for (const range of excerpt.sourceRanges!) {
+    const original = lines.slice(range.firstLine - 1, range.lastLine).join("");
+    assert.equal(range.excerptDigest, `sha256:${createHash("sha256").update(original).digest("hex")}`);
+    assert.ok(excerpt.excerpt.includes(original));
+  }
+  assert.ok(Buffer.byteLength(excerpt.excerpt) <= fixture.maximumBytes);
+});
+
+test("the strongest table fallback still delivers its exact columns and distant row atomically", () => {
+  const source = "# Inventory\n| Source | Stored unit |\n| --- | --- |\n" +
+    Array.from({ length: 30 }, (_, index) => `| Sensor ${index} | routine value |\n`).join("") +
+    "| Radio stream | milliseconds |\n# Side notes\nThe milliseconds guide contains presentation details.\n";
+  const facts = extractSourceFacts("docs/inventory.md", Buffer.from(source));
+  const candidate = { id: "docs/inventory.md", sourceDigest: facts.digest, excerpt: source }, purpose = "Find radio stream milliseconds";
+  const strongest = contextSpanChoices(candidate, purpose, facts.spans)[0]!;
+  assert.equal(strongest.span.kind, "table-row"); assert.equal(strongest.span.start, 34);
+  const excerpt = contextExcerpt(candidate, purpose, 256, facts.spans);
+  assert.deepEqual(excerpt.sourceUnits?.map(item => [item.kind, item.complete]), [["table-columns", true], ["table-row", true]]);
+  assert.deepEqual(excerpt.sourceRanges?.map(item => [item.firstLine, item.lastLine]), [[2, 3], [34, 34]]);
+  assert.match(excerpt.excerpt, /\| Source \| Stored unit \|/);
+  assert.match(excerpt.excerpt, /\| Radio stream \| milliseconds \|/);
+  assert.equal(excerpt.excerpt.includes("Sensor 0"), false);
+  assert.ok(Buffer.byteLength(excerpt.excerpt) <= 256);
 });

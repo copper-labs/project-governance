@@ -13,6 +13,35 @@ import { profileDecisionSettings } from "../src/decision-settings.ts";
 import { digest } from "../src/core.ts";
 import { wirePassageEvidence } from "./fixtures/context-wire.ts";
 import { contextBudgetScope, reserveDecisionCall } from "../src/decision-budget.ts";
+import { contextQuality41Development, contextQualityRepresentation41 } from "./fixtures/context-quality-frozen.ts";
+import { scoreContextQuality } from "../src/context-evaluation-quality.ts";
+
+test("mixed current-turn passage questions keep rationale and recorded status distinct from proven outcomes", async t => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "passage-current-turn-"))); t.after(() => rmSync(root, { recursive: true, force: true }));
+  const fixture = contextQuality41Development.find(item => item.id === "4-1-mixed-status-fix")!;
+  const settings = profileDecisionSettings({ continuity: { decisions: { mode: "auto", allowed_data_classes: ["source"], allowed_source_paths: ["**"],
+    consumers: { DL03: { mode: "auto", questions: ["context.passage-evidence/1", "context.passage-role/1"] } } } } });
+  const seen = new Set<string>();
+  const runtime = new DecisionRuntime(settings, root, { coordinationRoot: root, token: "fixture", fetch: async (_url, init) => {
+    const wire = JSON.parse(String(init?.body)); assert.equal(wire.state.purpose, fixture.request.purpose);
+    const instructions = wire.state.instructions["context.passage-evidence/1"];
+    assert.match(instructions, /current request takes priority/iu); assert.match(instructions, /design rationale, recorded progress or blockers/iu);
+    assert.match(instructions, /never proof of execution or acceptance/iu); assert.match(instructions, /decisive body is clipped.*uncertain/iu);
+    assert.equal(JSON.stringify(wire).includes("authored-labels"), false);
+    return Response.json({ model: settings.legacy.model, answers: Object.fromEntries(Object.entries(wire.questions).map(([name, raw]) => {
+      seen.add(wirePassageEvidence(wire, raw).path); return [name, { type: "noul", noul: 0.6 }];
+    })) });
+  } });
+  const candidates = fixture.request.optional;
+  const advice = await selectContextPassages(runtime, candidates, { purpose: fixture.request.purpose,
+    scope: { workspace: root, taskId: "mixed-current-turn", taskRevision: "1" }, subjectDigest: digest("source"), revision: "1",
+    environment: "explicit", invocationId: digest("current-turn-usefulness").slice(7), policyDigest: settings.configDigest,
+    deadlineAt: performance.now() + 5000, excerptBytes: fixture.request.optionalExcerptBytes! });
+  assert.equal(advice.reason, "answered"); assert.equal(advice.readings.length, candidates.length);
+  assert.deepEqual([...seen].sort(), candidates.map(item => item.id).sort());
+  assert.deepEqual(advice.exclusions, {}, "Uncertainty does not authorize excluding background or source evidence");
+  assert.deepEqual(advice.judgments, {}, "The wiring response does not become a fabricated semantic positive");
+});
 
 test("source excerpts carry the assertion and launch outcome, not only the matching label", () => {
   const body = ["test('selected simulator launches the app', async () => {\n", "  const result = await launch('SIM-1');\n",
@@ -23,6 +52,41 @@ test("source excerpts carry the assertion and launch outcome, not only the match
   assert.match(excerpt.excerpt, /assert\.equal\(result\.status, 'running'\)/);
   assert.equal(excerpt.sourceUnits?.[0]?.complete, true);
   assert.equal(excerpt.sourceUnits?.[0]?.kind, "literal-test-label");
+});
+
+test("a positive deep table row carries its columns through passage advice and final packet", async t => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "passage-table-columns-"))); t.after(() => rmSync(root, { recursive: true, force: true }));
+  const fixture = contextQualityRepresentation41[0]!, candidate = fixture.request.optional[0]!;
+  const facts = extractSourceFacts(candidate.id, Buffer.from(candidate.excerpt));
+  const settings = profileDecisionSettings({ continuity: { decisions: { mode: "auto", allowed_data_classes: ["source"], allowed_source_paths: ["docs/**"],
+    consumers: { DL03: { mode: "auto", questions: ["context.passage-evidence/1", "context.passage-role/1"] } } } } });
+  const runtime = new DecisionRuntime(settings, root, { coordinationRoot: root, token: "fixture", fetch: async (_url, init) => {
+    const wire = JSON.parse(String(init?.body));
+    return Response.json({ model: settings.legacy.model, answers: Object.fromEntries(Object.entries(wire.questions).map(([name, raw]) => {
+      const passage = wirePassageEvidence(wire, raw);
+      const decisive = passage.passage.includes("Radio stream") && !passage.passage.includes("unrelated channel");
+      if (decisive) {
+        assert.match(passage.passage, /Source \| Input unit \| Stored unit/);
+        assert.deepEqual(passage.ranges?.map(range => [range.firstLine, range.lastLine]), [[2, 3], [40, 40]]);
+      }
+      return [name, { type: "noul", noul: decisive ? 0.95 : 0.1 }];
+    })) });
+  } });
+  const advice = await selectContextPassages(runtime, [candidate], { purpose: fixture.request.purpose,
+    scope: { workspace: root, taskId: "table-contract", taskRevision: "1" }, subjectDigest: digest("subject"), revision: "1",
+    environment: "explicit", invocationId: digest("deep-table-unit").slice(7), policyDigest: settings.configDigest,
+    deadlineAt: performance.now() + 5000, excerptBytes: fixture.request.optionalExcerptBytes!, sourceSpans: { [candidate.id]: facts.spans } });
+  const judgment = advice.judgments[candidate.id]!;
+  assert.equal(judgment.preferredSpans[0]!.kind, "table-row");
+  const reading = advice.readings.find(item => item.interpretation === "positive")!;
+  assert.equal(reading.complete, true); assert.deepEqual(reading.assessedRanges, [{ firstLine: 2, lastLine: 3 }, { firstLine: 40, lastLine: 40 }]);
+  const packet = await buildContextPacket({ ...fixture.request, sourceSpans: { [candidate.id]: facts.spans }, passageJudgments: advice.judgments },
+    { async decide(request) { return { version: 1, kind: request.kind, inputDigest: digest(request), delivered: [candidate.id], suggested: null,
+      method: "baseline", reason: "fixture", model: null, questionVersion: "fixture", confidence: null, latencyMs: 0,
+      usage: { inputTokens: null, outputTokens: null } }; } });
+  assert.equal(scoreContextQuality(fixture.request, fixture.qualityLabels!, packet.entries).essentialGroups.completeDelivered, 2);
+  assert.deepEqual(packet.judgmentLimitations, {});
+  assert.equal(packet.entries[0]!.excerpt.includes("unrelated channel"), false);
 });
 
 test("passage judgments keep complementary evidence ahead of a second similar source", async t => {

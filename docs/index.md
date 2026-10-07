@@ -5,18 +5,35 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-07-05
-updated: 2026-10-05
-summary: Entry point for the reusable, package-based project governance runtime.
+updated: 2026-10-06
+summary: Routes current compiled-runtime development and retained installed generations to their owning documentation.
 ---
 
 # Documentation Index
 
-`project-governance` provides a small, project-neutral runtime for checking changed work. Markdown
-is the current authority for its policies, guides, and configuration. The runtime is distributed as
-one wheel; each adopting repository pins one exact wheel and SHA256 in its runtime lock. Adoption
-is deliberate by default, with an optional compatible-update policy for top-level task startup.
+Current source development produces the compiled TypeScript npm package
+`@organta/project-governance`. It combines checks, continuity, workflows, context and evidence.
+Markdown owns rationale and rule changes; accepted machine rules have one declaration or code owner.
+Existing installations, source Git hooks and shared startup handlers retain their owners until
+deliberate cutover. Reading this index or building the package does not change their authority.
 
-## Start Here
+## Current Source Work
+
+- [Root source instructions](../AGENTS.md) distinguish compiled development commands from the
+  retained Python source Git hook owner. [README](../README.md) describes package setup and proof.
+- The approved [4.1 context quality specification](specs/engine-4-1-context-quality.md) and
+  [implementation plan](exec-plans/active/2026-10-05-4-1-context-quality.md) own current release work,
+  exact task/plan linkage and proof mappings. Installed releases remain unchanged until adoption.
+- [Developer documentation](developer/index.md) routes current capabilities and labels retained
+  journeys. Read the smallest owning specification or plan before editing.
+- [Validation strategy](governance/validation-strategy.md) defines focused batch proof and when to
+  widen it. [Change narrative contract](specs/change-narrative-contract.md) owns commit and PR context.
+- [Charter](../CHARTER.md) defines authority and the rule to remove complexity that does not earn its cost.
+
+## Retained Wheel Journeys
+
+These entries describe the older Python wheel and its installed owners. Use them only for that
+generation; their commands and source paths do not select the compiled engine.
 
 - [System spine](system-spine.md) explains the ownership boundary and normal workflow.
 - [Runtime specification](specs/governance-kernel.md) defines the CLI, pack selection, findings,
@@ -27,12 +44,6 @@ is deliberate by default, with an optional compatible-update policy for top-leve
   upgrades.
 - [Startup update guide](guides/startup-runtime-updates.md) explains one-time Codex opt-in,
   work assessment, isolated local commits, and recovery.
-- [Developer documentation](developer/index.md) provides progressive evaluator/operator and
-  source-contributor journeys plus the shared agent catalog.
-- [Validation strategy](governance/validation-strategy.md) defines narrow proof by default and the
-  few situations that require broader proof.
-- [Change narrative contract](specs/change-narrative-contract.md) defines the product-level and
-  conceptual context required before a reader opens a commit or pull request diff.
 - [KMP Surface Validation](specs/kmp-surface-validation.md) defines the opt-in contract that maps
   selected cross-surface KMP capabilities through an adopter-owned target catalog, the existing pack
   runner, shallow routes, and guarded target-local proof.
@@ -48,7 +59,7 @@ is deliberate by default, with an optional compatible-update policy for top-leve
 The [Test Execution contract](specs/test-execution.md) defines direct/external proof, deterministic
 batches, Codex/Claude completion handoff and bounded usage observations.
 
-The [optional provider agent contract](specs/provider-agent-skills.md) defines the standalone
+The retained [optional provider agent contract](specs/provider-agent-skills.md) defines the standalone
 Gemini, Claude, and Codex wrappers in 2.4.0, including the scoped Gemini live-validation exception.
 
 - [Governance policies](governance/README.md) cover packs, hooks, context routing, quality, and
@@ -61,19 +72,19 @@ Gemini, Claude, and Codex wrappers in 2.4.0, including the scoped Gemini live-va
 
 This repository does not contain a customer's source paths, build commands, runtime evidence,
 credentials, product vocabulary, or target-specific checks. Those remain in the adopting
-repository. Publishing a wheel requires an operator decision. An adopter may authorize compatible
+repository. Publishing a runtime requires an operator decision. An adopter may authorize compatible
 startup updates through its tracked profile; major releases and integration changes remain deliberate.
 
-## Unified development direction
+## Compiled Runtime Contracts
 
 The draft [decision providers and image evaluation specification](specs/engine-decision-providers-and-image-evaluation.md)
 and [implementation plan](exec-plans/active/2026-10-06-decision-providers-and-image-evaluation.md)
 propose interchangeable JEV/OpenAI adapters and a reusable text/image evaluation operation.
 This is design work; it does not enable providers or change current release ownership.
 
-The [next major verification and semantic review specification](specs/engine-4-verification-feedback.md)
-and [delivery plan](exec-plans/active/2026-10-04-major-verification-feedback.md) define the current
-development sequence: installed workflow proof, multilingual JEV advice, focused batch checks,
+The [4.0 verification and semantic review specification](specs/engine-4-verification-feedback.md)
+and [delivery plan](exec-plans/active/2026-10-04-major-verification-feedback.md) record the delivered
+foundation: installed workflow proof, multilingual JEV advice, focused batch checks,
 typed plan/specification links and known-fault detection. The [structured delivery guide](developer/guides/structured-delivery.md)
 explains compact batch inspection and deterministic progress updates from original check receipts.
 This source work does not replace an installed runtime or certify a release.
@@ -88,95 +99,69 @@ The [release evaluation contract](specs/engine-release-evaluation.md) and
 context-quality and whole-task comparisons. The [reporting guide](developer/guides/release-evaluation.md)
 explains evidence linkage and explicit unknown coverage. Passive observations stay separate from controlled proof.
 
-The [RC10.9 prompt-entry repair](exec-plans/active/2026-10-04-rc10-9-prompt-entry.md) separates
+The historical [RC10.9 prompt-entry repair](exec-plans/active/2026-10-04-rc10-9-prompt-entry.md) separates
 advisory context preparation from retained startup ownership, records safe failure causes and
-verifies exact packet-reference replay. Local qualification precedes manual publication.
+verifies exact packet-reference replay. Its retained evidence does not qualify the current candidate.
 
-For the next delivery sequence, start with the
-[decision-layer delivery, release and pilot measurement plan](exec-plans/active/2026-09-21-major-adoption-and-measurement.md).
-The explicit-preview implementation has a recorded closeout; routine reading should not treat older
-pending checkpoints as new work. The first RC includes eight optional decision consumers. The
-[RC3 experiment specification](specs/engine-decision-experiments.md) and the delivery plan’s N0–N6
-slices add attention advice, read-only diagnostic sequences and offline history analysis. Next,
-[RC4 quality evaluation, routing and CI advice](specs/engine-decision-rc4.md) follows the same plan’s
-R0–R6 slices: governed entry, fixed model defaults, opt-in routing, requirement-linked quality
-and richer CI recommendations. Deliberate adoption compares ordinary automation with JEV-enabled
-work and records authorized fallback or missing exposure. Successive consumer batches repeat this
-release/update/measurement cycle before the selected stable-major launch.
-The [September research reconciliation](research/2026-09-21-jev-agentic-development.md) and
-[RC4 simplification pass](reviews/2026-09-21-rc4-simplification.md) prioritize existing context/output
-selection and simple operator-defined category mappings, with fixed-model operation by default.
+## Migration History
+
+The [decision-layer delivery and pilot measurement plan](exec-plans/active/2026-09-21-major-adoption-and-measurement.md),
+[RC3 experiments](specs/engine-decision-experiments.md) and
+[RC4 quality, routing and CI advice](specs/engine-decision-rc4.md) preserve earlier delivery decisions.
+Their old pending checkpoints are not new source work. The
+[September research reconciliation](research/2026-09-21-jev-agentic-development.md) and
+[RC4 simplification pass](reviews/2026-09-21-rc4-simplification.md) retain the reasoning behind
+context/output advice and fixed-model defaults.
 
 The [architecture decision register](specs/unified-development-engine.md) and
-[transition plan](exec-plans/active/2026-09-20-unified-development-engine.md) describe the accepted
-move to a unified engine. The [migration inventory](reference/2026-09-20-engine-migration-inventory.md)
-records established intent, category treatments and the next decisions. Mnemos integration needs are
-designed now, adoption later; RN iOS simulator qualification is followed by RN real devices.
+[transition closeout](exec-plans/active/2026-09-20-unified-development-engine.md#implementation-closeout)
+record the explicit compiled-engine foundation. The
+[migration inventory](reference/2026-09-20-engine-migration-inventory.md)
+preserves category treatments and deferred authority changes.
 The [local-CI contract](specs/engine-local-ci-and-merge-contract.md) makes execution placement independent
 of proof requirements and integrates both remote and already authorized local CI paths.
 The [capability pressure test](specs/engine-capability-boundaries.md) keeps future release support
-optional; additional adopter stacks inform core design without expanding first-iteration delivery. The runtime
-and distribution described above remain the current implementation until accepted cutover.
+optional; additional adopter stacks inform core design without expanding first-iteration delivery.
 
 The [Opus 5 extra-high review reconciliation](reviews/2026-09-20-unified-engine-reconciliation.md)
-records the latest design corrections, remaining decisions and limits of the review evidence.
+records the original design corrections and limits of that review evidence.
 
 ## Continuity
 
-The [continuity module](../components/harness/README.md) owns task history and bounded resume.
-It is part of this governance product and wheel; policy and process supervision retain their existing
-owners. See the [process map](../components/harness/docs/architecture/development-flow.md).
+The [continuity module instructions](../components/harness/AGENTS.md) own task history and bounded
+resume work inside the current root package. Its
+[original README](../components/harness/README.md) and
+[process map](../components/harness/docs/architecture/development-flow.md) preserve the module's
+earlier integration design; their wheel and toolchain descriptions are historical.
 
-The [ordinary task context contract](specs/engine-task-context-entry.md) and [corrective implementation plan](exec-plans/active/2026-09-22-task-context-entry.md) close the gap between enabled decisions and normal task use.
-The [RC6 prompt retrieval contract](specs/engine-rc6-linked-retrieval.md) and its
-[implementation plan](exec-plans/active/2026-09-23-rc6-linked-retrieval.md) define automatic entry,
-a maintained SQLite repository index, basic source-backed relationships, bounded JEV selection with
-expansion and ordinary-task qualification. The earlier transient-index candidate is the comparison
-baseline; the expanded implementation is complete and release sign-off is in progress. The
-[configuration guide](guides/rc6-prompt-context.md) separates local retrieval, hosted disclosure,
-host trust and measured use.
-The [RC7 reliability amendment](specs/engine-rc7-prompt-reliability.md) and its
-[delivery plan](exec-plans/active/2026-09-25-rc7-prompt-reliability.md) separate retrieval timing
-and refresh context after explicit task changes while preserving history and spending.
-The [RC8 hook and context repair](specs/engine-rc8-hook-sources.md) and its
-[delivery plan](exec-plans/active/2026-09-25-rc8-hook-sources.md) account for Codex loading linked
-worktree hook definitions from the main checkout, remove expensive repository preparation and
-check required-context budgets across routes. The accepted
-[RC9 context quality and parallel selection contract](specs/engine-rc9-parallel-context.md) and
-[implementation plan](exec-plans/active/2026-09-27-rc9-parallel-context.md) define metadata/prompt
-repairs, useful passage delivery, real-repository scenarios, fuller JEV batches, bounded concurrent
-requests, shared local rate admission and a 30-second total retrieval budget.
-The [RC9.1 context deadline correction](specs/engine-rc9-1-context-deadlines.md) and its
-[delivery plan](exec-plans/active/2026-09-28-rc9-1-context-deadlines.md) remove RC9's redundant
-one-second JEV request cap while retaining the 30-second operation limit and fallback.
-The approved [RC10 reliable context and procedure selection](specs/engine-rc10-context-use.md) and
-[implementation/adoption plan](exec-plans/active/2026-09-29-rc10-context-use.md) address prompt/command
-worktree alignment, actual descriptor/passage disclosure, exact reuse, optional runbook sections
-and outcome-linked measurement. Runtime changes are implemented; the plan records qualification
-and publication status. Adopters retain their own pins until deliberately upgraded.
-The [RC10.1 parser repair](exec-plans/completed/2026-09-30-rc10-1-python-parser.md) fixes valid Python
-expression bodies in the shared source/comment bridge while preserving enforcement and adopter pins.
-The [RC10.2 fresh-project correction](exec-plans/completed/2026-10-01-rc10-2-new-project.md) adds an
-installed first-task release suite, actionable provider diagnostics, compact context output and
-explicit accounting for companion-repository reads. Its immutable prerelease and asset readback
-are complete; live synthetic proof does not establish accepted development or token savings.
-The [RC10.3 documentation correction](exec-plans/completed/2026-10-01-rc10-3-documentation-evidence.md)
-separates saved evidence from live documents and accepts established lifecycle labels. Its immutable
-prerelease passed independent source/installed proof and exact published-asset readback.
-The [RC10.4 evidence-capture repair](exec-plans/completed/2026-10-02-rc10-4-evidence-capture.md)
-prevents unrelated large logs from blocking scoped provider reviews and native prompt context.
-Its immutable prerelease passed local and release-workflow proof plus exact published-asset readback.
-RC9 is published as an immutable prerelease. Frozen development cases confirm a corrected ranking
-regression, while fresh cases expose remaining coverage and passage limits. Adopters remain on
-their pinned runtimes until deliberately upgraded. The
-[computer-use research](research/2026-09-25-jev-computer-use.md) evaluates optional JEV action
-selection without declaring another executor part of the release.
-The [repository-index research](research/2026-09-25-repository-index-harness-practices.md) compares
-current harness practices and explains the bounded first iteration accepted for RC6; its wider
-research alternatives remain outside the release scope.
-The [RC6 design review](reviews/2026-09-25-rc6-index-design-reconciliation.md) records the Opus 5.5
-medium reconciliation and worktree/database boundaries. The
-[accepted simplifications](reviews/2026-09-25-rc6-index-simplification.md) reduce implementation
-overhead while retaining the feature scope. The
+## Context Delivery History
+
+The following contracts explain the accumulated context behavior and its original proof. Use the
+current 4.1 plan for new work; historical release status and test results are not current proof.
+
+
+| Original scope | Contract and delivery record |
+| --- | --- |
+| Ordinary task entry | [Contract](specs/engine-task-context-entry.md), [plan](exec-plans/active/2026-09-22-task-context-entry.md) |
+| RC6 automatic entry and maintained index | [Contract](specs/engine-rc6-linked-retrieval.md), [plan](exec-plans/active/2026-09-23-rc6-linked-retrieval.md) |
+| RC7 retrieval timing and explicit task changes | [Contract](specs/engine-rc7-prompt-reliability.md), [plan](exec-plans/active/2026-09-25-rc7-prompt-reliability.md) |
+| RC8 hook sources and required-context budgets | [Contract](specs/engine-rc8-hook-sources.md), [plan](exec-plans/active/2026-09-25-rc8-hook-sources.md) |
+| RC9 metadata, passage and parallel selection | [Contract](specs/engine-rc9-parallel-context.md), [plan](exec-plans/active/2026-09-27-rc9-parallel-context.md) |
+| RC9.1 removal of the per-request deadline | [Contract](specs/engine-rc9-1-context-deadlines.md), [plan](exec-plans/active/2026-09-28-rc9-1-context-deadlines.md) |
+| RC10 alignment, exact reuse and optional procedures | [Contract](specs/engine-rc10-context-use.md), [plan](exec-plans/active/2026-09-29-rc10-context-use.md) |
+| RC10.1 Python parser repair | [Completed plan](exec-plans/completed/2026-09-30-rc10-1-python-parser.md) |
+| RC10.2 first-task and provider diagnostics | [Completed plan](exec-plans/completed/2026-10-01-rc10-2-new-project.md) |
+| RC10.3 live documents and saved evidence | [Completed plan](exec-plans/completed/2026-10-01-rc10-3-documentation-evidence.md) |
+| RC10.4 scoped evidence capture | [Completed plan](exec-plans/completed/2026-10-02-rc10-4-evidence-capture.md) |
+
+The [context configuration guide](guides/rc6-prompt-context.md) separates local retrieval, hosted
+disclosure, host trust and measured use. The
 [source-control and Codex workflow guide](developer/guides/source-control-and-worktrees.md) explains
 worktree ownership, reviewed integration, coordinated upgrades and cleanup.
+
+The [repository-index research](research/2026-09-25-repository-index-harness-practices.md),
+[RC6 design review](reviews/2026-09-25-rc6-index-design-reconciliation.md) and
+[accepted simplifications](reviews/2026-09-25-rc6-index-simplification.md) retain the original design
+comparisons and worktree/database boundaries. The
+[computer-use research](research/2026-09-25-jev-computer-use.md) remains exploratory; it does not
+declare another executor part of the current release.

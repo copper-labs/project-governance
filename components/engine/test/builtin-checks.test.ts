@@ -21,7 +21,7 @@ test("shared invocation reaches every built-in and fails closed for missing requ
       const result = await runBuiltinCheck({ ...request, id });
       assert.ok(["passed", "failed", "warning", "not-applicable"].includes(result.status), id);
       const invocationFailure = result.findings.some(finding => finding.rule_id === "checker.invocation-invalid");
-      assert.equal(invocationFailure, ["commit-message", "pr-description"].includes(id), id);
+      assert.equal(invocationFailure, ["commit-message", "pr-description", "junit-evidence"].includes(id), id);
     }
     assert.equal((await runBuiltinCheck({ ...request, id: "not-a-check" })).status, "failed");
     assert.equal((await runBuiltinCheck({ ...request, id: "format", asOf: "invalid" })).status, "failed");

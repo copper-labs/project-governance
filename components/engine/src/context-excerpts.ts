@@ -2,7 +2,7 @@ import { contextTerms } from "./context-terms.ts";
 import { createHash } from "node:crypto";
 import type { Candidate, SourceRange, SourceUnit } from "./decisions.ts";
 
-export type Span = { kind?: string; name: string; start: number; end: number; members?: Span[] };
+export type Span = { kind?: string; name: string; start: number; end: number; members?: Span[]; context?: Span[] };
 const words = (value: string) => [...contextTerms(value)];
 const sourceLines = (value: string) => value.match(/[^\n]*\n|[^\n]+$/gu) ?? [];
 const range = (lines: string[], firstLine: number, lastLine: number): SourceRange => ({
@@ -26,7 +26,7 @@ export function contextSourceClusters(candidate: Candidate, spans: Span[], maxim
   let current: Span | null = null;
   const flush = () => { if (current) clusters.push(current); current = null; };
   for (const span of sorted) {
-    const canJoin = current && current.kind === span.kind && current.kind !== "heading" &&
+    const canJoin = current && !current.context && !span.context && current.kind === span.kind && current.kind !== "heading" &&
       adjacent(lines, current, span) &&
       (current.members?.length ?? 1) < 6 &&
       Buffer.byteLength(lines.slice(current.start - 1, span.end).join("")) <= maximumBytes;
@@ -75,9 +75,12 @@ export function contextExcerpt(candidate: Candidate, purpose: string, maximumByt
         for (const part of [...parts].sort((a, b) => a.sourceRange!.firstLine - b.sourceRange!.firstLine)) {
           const last = joined.at(-1), kind = last?.sourceUnits?.[0]?.kind;
           const left = last?.sourceRange, right = part.sourceRange!;
-          if (last && left && kind && kind !== "heading" &&
+          const contiguousTable = last && left && right.firstLine === left.lastLine + 1 &&
+            last.sourceUnits?.every(item => item.kind === "table-columns" || item.kind === "table-row") &&
+            part.sourceUnits?.every(item => item.kind === "table-row");
+          if (last && left && (contiguousTable || kind && kind !== "heading" &&
             last.sourceUnits?.every(item => item.kind === kind) && part.sourceUnits?.every(item => item.kind === kind) &&
-            adjacent(lines, { name: "", start: left.firstLine, end: left.lastLine }, { name: "", start: right.firstLine, end: right.lastLine })) {
+            adjacent(lines, { name: "", start: left.firstLine, end: left.lastLine }, { name: "", start: right.firstLine, end: right.lastLine }))) {
             const excerpt = lines.slice(left.firstLine - 1, right.lastLine).join("");
             joined[joined.length - 1] = { ...last, excerpt, sourceRange: range(lines, left.firstLine, right.lastLine),
               sourceUnits: [...last.sourceUnits!, ...part.sourceUnits!] };
@@ -90,6 +93,21 @@ export function contextExcerpt(candidate: Candidate, purpose: string, maximumByt
       let parts: Candidate[] = [];
       // Admit in judgment order first. A later neighbor cannot evict an already admitted passage.
       for (const span of chosen) {
+        if (span.context?.length) {
+          // Table columns and their row enter together. Dropping either loses the meaning.
+          const required = [...span.context, span].sort((left, right) => left.start - right.start);
+          const added: Candidate[] = [];
+          for (const part of required) {
+            if (parts.some(existing => existing.sourceRange!.firstLine <= part.start && existing.sourceRange!.lastLine >= part.end)) continue;
+            if (parts.some(existing => existing.sourceRange!.firstLine <= part.end && existing.sourceRange!.lastLine >= part.start)) continue;
+            const body = lines.slice(part.start - 1, part.end).join("");
+            added.push({ ...candidate, excerpt: body, sourceRange: range(lines, part.start, part.end), sourceUnits: units(part, true) });
+          }
+          const trial = combine([...parts, ...added]);
+          if (required.every(required => trial.some(part => part.sourceRange!.firstLine <= required.start && part.sourceRange!.lastLine >= required.end)) &&
+              Buffer.byteLength(content(trial)) <= maximumBytes) parts = trial;
+          continue;
+        }
         const body = lines.slice(span.start - 1, span.end).join("");
         const marker = (first: number, last: number) => Buffer.byteLength(`[source lines ${first}-${last}]\n`);
         const framing = parts.length ? 1 + marker(span.start, span.end) + (parts.length === 1
@@ -112,7 +130,13 @@ export function contextExcerpt(candidate: Candidate, purpose: string, maximumByt
     }
   }
   const matches = contextSpanChoices(candidate, purpose, valid);
-  const complete = matches.filter(item => item.bytes <= maximumBytes);
+  const tableRow = matches.find(item => item.span.context?.length && item.score > 0);
+  if (tableRow && tableRow === matches[0] && !preferred.length) {
+    // Atomic columns preserve a winning row's meaning; they cannot promote a weaker match.
+    const excerpt = contextExcerpt(candidate, purpose, maximumBytes, valid, [tableRow.span]);
+    if (excerpt.sourceUnits?.some(item => item.kind === "table-row" && item.complete)) return excerpt;
+  }
+  const complete = matches.filter(item => !item.span.context?.length && item.bytes <= maximumBytes);
   if (complete.length) {
     const first = complete[0]!;
     const second = complete.find(item => item !== first && (item.span.start > first.span.end || item.span.end < first.span.start) &&
@@ -173,5 +197,6 @@ function contiguousExcerpt(candidate: Candidate, purpose: string, maximumBytes: 
   return { ...candidate, excerpt, sourceRange: range(lines, bestStart + 1, bestEnd),
     ...(intersecting.length ? { sourceUnits: (intersecting[0]!.members ?? [intersecting[0]!])
       .filter(item => item.start <= bestEnd && item.end >= bestStart + 1)
-      .map(item => unit(item, item.start >= bestStart + 1 && item.end <= bestEnd)) } : {}) };
+      .map(item => unit(item, item.start >= bestStart + 1 && item.end <= bestEnd &&
+        (item.context ?? []).every(context => context.start >= bestStart + 1 && context.end <= bestEnd))) } : {}) };
 }

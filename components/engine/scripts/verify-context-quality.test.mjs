@@ -5,8 +5,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { digest } from '../src/core.ts';
 import { qualitySourceDigest } from '../src/context-evaluation-quality.ts';
-import { assessContextRoute, contextArchiveDescriptor, contextQualityFixtureReply, freezeContextQualitySuite, qualifyContextArchiveStage,
-  stageContextQualityArchive, verifyContextQuality } from './verify-context-quality.mjs';
+import { renderPromptContext } from '../src/prompt-context.ts';
+import { PROMPT_FRAMING_RESERVE, requiredPromptText } from '../src/prompt-context-budget.ts';
+import { assessContextRoute, assessRenderedContext, contextArchiveDescriptor, contextQualityFixtureReply, freezeContextQualitySuite, qualifyContextArchiveStage,
+  renderContextQualityReport, stageContextQualityArchive, verifyContextQuality } from './verify-context-quality.mjs';
 
 const suite = freezeContextQualitySuite();
 const fixture = id => structuredClone(suite.cases.find(item => item.id === id));
@@ -30,11 +32,12 @@ const call = request => {
     [name, { status: 'answered', shape: answer.type, probability: answer.noul }])) } };
 };
 
-test('full-chain suite freezes balanced source labels, conditions and a separate unused holdout', () => {
-  assert.equal(suite.cases.length, 7);
+test('full-chain suite freezes balanced source labels, conditions and reserved independent holdouts', () => {
+  assert.equal(suite.cases.filter(item => item.split === 'development').length, 15);
+  assert.equal(suite.cases.filter(item => item.split === 'holdout').length, 4);
   assert.equal(freezeContextQualitySuite().suiteDigest, suite.suiteDigest);
-  assert.equal(suite.reservedHoldout.length, 4);
-  assert.ok(suite.reservedHoldout.every(item => !suite.cases.some(value => value.originalLabelDigest === item.labelDigest)));
+  assert.equal(suite.reservedHoldout.length, 8);
+  assert.ok(suite.reservedHoldout.every(item => !suite.cases.some(value => value.split === 'development' && value.originalLabelDigest === item.labelDigest)));
   for (const item of suite.cases) {
     assert.equal(item.caseDigest, digest({ request: item.request, labels: item.labels, conditions: item.conditions }));
     assert.equal(item.labels.labelSource.independentOfSelector, true);
@@ -43,6 +46,108 @@ test('full-chain suite freezes balanced source labels, conditions and a separate
   assert.ok(Buffer.byteLength(large.request.optional[0].excerpt) > 256 * 1024);
   assert.equal(large.labels.units.at(-1).lastLine - large.labels.units.at(-1).firstLine + 1, 4);
   assert.match(fixture('weak-description').request.optional[0].excerpt, /^\/\*\* Miscellaneous helpers/);
+});
+
+test('installed selection scoring rejects a table row delivered without its column context', () => {
+  const input = fixture('representation-table-units'), { route, receipt } = delivered(input);
+  const whole = assessContextRoute(input, route, receipt, []);
+  assert.equal(whole.score.essentialGroups.completeDelivered, 2);
+  const original = route.optional.entries[0], lines = original.excerpt.match(/[^\n]*\n|[^\n]+$/gu);
+  const excerpt = lines[3];
+  route.optional.entries = [{ ...original, excerpt, sourceRange: { firstLine: 4, lastLine: 4,
+    totalLines: lines.length, excerptDigest: qualitySourceDigest(excerpt), complete: false } }];
+  const clipped = assessContextRoute(input, route, receipt, []);
+  assert.equal(clipped.score.essentialGroups.fileDelivered, 2);
+  assert.equal(clipped.score.essentialGroups.completeDelivered, 1);
+  assert.deepEqual(clipped.semanticFailures, ['missing-complete-evidence:radio-storage-columns']);
+  assert.equal(clipped.stages.acceptedTaskOutcome, 'unknown');
+  assert.equal(clipped.stages.consumed, null);
+});
+
+test('native rendering preserves a route-quality failure when framing omits its complete decisive source', () => {
+  const input = fixture('weak-description'), { route, receipt } = delivered(input), entryId = 'a'.repeat(64), packetLimitBytes = 32000;
+  Object.assign(route, { ready: true, blockers: [], route: { primary: ['AGENTS.md'], active: [],
+    budget: { primary_context_tokens: 1000, active_plan_context_tokens: 1000, expansion_context_tokens: 7000, total_context_tokens: 8000 },
+    budgetAuthority: { nativePacketBytes: packetLimitBytes } }, skills: { entries: [{ path: 'required/SKILL.md', sourceDigest: qualitySourceDigest('padding'), content: '' }] } });
+  const framingBytes = Buffer.byteLength(requiredPromptText(route.entries, route.skills.entries, entryId, route.receiptId).text);
+  route.skills.entries[0].content = 'Q'.repeat(packetLimitBytes - PROMPT_FRAMING_RESERVE - framingBytes - 80);
+  route.skills.entries[0].sourceDigest = qualitySourceDigest(route.skills.entries[0].content);
+  const requiredText = requiredPromptText(route.entries, route.skills.entries, entryId, route.receiptId).text;
+  const rendered = renderPromptContext(route, { state: 'unavailable', candidates: [], inspected: 0, omissions: [] }, entryId);
+  assert.equal(rendered.status, 'prepared'); assert.deepEqual(rendered.delivered, []);
+  assert.deepEqual(assessContextRoute(input, route, receipt, []).semanticFailures, []);
+  const final = assessRenderedContext(input, route, receipt, [], { rendered, requiredText, packetLimitBytes });
+  assert.equal(final.rendering.requiredComplete, true); assert.equal(final.rendering.envelopeRespected, true);
+  assert.deepEqual(final.rendering.omittedOptionalSources, [input.request.optional[0].id]);
+  assert.ok(final.rendering.lostDecisiveUnits.includes('conversion'));
+  assert.equal(final.score.essentialGroups.completeDelivered, 1);
+  assert.ok(final.semanticFailures.some(value => value.startsWith('missing-complete-evidence:')));
+  assert.deepEqual(final.routeSemanticFailures, []); assert.equal(final.rendering.hostDelivery, 'unknown');
+  assert.equal(final.rendering.hostConsumption, 'unknown'); assert.equal(final.stages.acceptedTaskOutcome, 'unknown');
+});
+
+test('blocked required guidance and oversized final bytes cannot qualify as successful native delivery', () => {
+  const input = fixture('weak-description'), { route, receipt } = delivered(input);
+  const final = assessRenderedContext(input, route, receipt, [], { rendered: { status: 'blocked', text: 'Required context unavailable', delivered: [] },
+    requiredText: 'Required original', packetLimitBytes: 10 });
+  assert.equal(final.rendering.requiredComplete, false); assert.equal(final.rendering.envelopeRespected, false);
+  assert.ok(final.integrityFailures.includes('native-required-context-not-intact'));
+  assert.ok(final.integrityFailures.includes('native-packet-exceeds-envelope'));
+  assert.deepEqual(final.score.requiredMissing, ['AGENTS.md']);
+  assert.throws(() => assessRenderedContext(input, route, receipt, [], { rendered: { status: 'blocked', text: '', delivered: ['src/converter.ts'] },
+    requiredText: 'Required original', packetLimitBytes: 32000 }), /Blocked rendering claims/);
+});
+
+test('offline rendering refuses changed frozen originals before inspecting a runtime or dispatching', async t => {
+  const directory = mkdtempSync(join(tmpdir(), 'context-quality-render-drift-')); t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const frozenSuite = join(directory, 'suite.json'), renderReport = join(directory, 'report.json'), changed = structuredClone(suite);
+  changed.cases[0].request.purpose = 'Relabeled after observing results';
+  writeFileSync(frozenSuite, JSON.stringify(changed));
+  writeFileSync(renderReport, JSON.stringify({ frozenSuite, suiteDigest: suite.suiteDigest, assignedTrials: 1 }));
+  await assert.rejects(renderContextQualityReport({ renderReport, output: join(directory, 'proof') }), /Retained frozen suite identity differs/);
+});
+
+test('4.1 source cases preserve six task needs, independent holdouts and complete decisive units', () => {
+  const cases = suite.cases.filter(item => item.id.startsWith('4-1-') && item.split === 'development');
+  assert.deepEqual(cases.map(item => item.id), ['4-1-weak-description', '4-1-near-match', '4-1-long-decisive-span',
+    '4-1-mixed-status-fix', '4-1-permission-separation', '4-1-true-no-match']);
+  assert.ok(cases.every(item => item.originalLabelDigest && item.originalInputDigest));
+  assert.equal(fixture('4-1-weak-description').labels.sources.find(item => item.candidateId === 'src/value-helper.ts').description.quality, 'weak');
+  const large = fixture('4-1-long-decisive-span');
+  assert.ok(Buffer.byteLength(large.request.optional[0].excerpt) > 256 * 1024);
+  const decisive = large.labels.units.find(item => item.id === 'complete-owned-shutdown'), text = large.request.optional[0].excerpt.split(/(?<=\n)/u)
+    .slice(decisive.firstLine - 1, decisive.lastLine).join('');
+  assert.ok(Buffer.byteLength(text) > 512 && Buffer.byteLength(text) < large.conditions.optionalExcerptBytes);
+  assert.match(text, /await session\.pendingOutput/); assert.match(text, /finally/); assert.match(text, /active\.id === session\.id/);
+  assert.match(fixture('4-1-mixed-status-fix').request.purpose, /update.*then fix/u);
+  const mixedLabels = fixture('4-1-mixed-status-fix').labels;
+  assert.equal(mixedLabels.essentialGroups.length, 4); // Required instructions plus status, implementation and counter-case.
+  assert.equal(fixture('4-1-true-no-match').labels.noMatch, true);
+  const permission = fixture('4-1-permission-separation');
+  assert.equal(permission.labels.sources.find(item => item.candidateId === permission.conditions.providerDenied[0]).bodyPermission, 'permitted');
+  assert.equal(permission.request.optional.length, 2, 'Provider denial does not forbid local reading');
+  const absent = fixture('4-1-holdout-unavailable-resource');
+  assert.equal(absent.split, 'holdout'); assert.deepEqual(absent.conditions.unavailableSources, ['src/local-export.ts']);
+  assert.equal(absent.request.optional.some(item => item.id === 'src/local-export.ts'), false);
+  const { route, receipt } = delivered(absent), assessment = assessContextRoute(absent, route, receipt, []);
+  assert.deepEqual(assessment.semanticFailures, ['missing-complete-evidence:export-authorization']);
+  assert.deepEqual(assessment.score.permissionExclusions, [{ candidateId: 'src/local-export.ts', reason: 'upstream-resource-not-installed' }]);
+});
+
+test('separated table columns and row are both observed and a bare row remains a final-delivery miss', () => {
+  const input = fixture('representation-deep-table-row'), { route, receipt } = delivered(input);
+  receipt.selection = { passageAdvice: { readingsTruncated: false, readings: [{ path: input.request.optional[0].id,
+    firstLine: 40, lastLine: 40, assessedRange: null, assessedRanges: [{ firstLine: 2, lastLine: 3 }, { firstLine: 40, lastLine: 40 }],
+    complete: true, probability: 0.95, interpretation: 'positive' }] } };
+  const row = assessContextRoute(input, route, receipt, []);
+  assert.equal(row.score.judgments.positive, 2);
+  assert.equal(row.score.essentialGroups.completeDelivered, 3);
+  const original = route.optional.entries[0], text = original.excerpt.match(/[^\n]*\n|[^\n]+$/gu)[39];
+  route.optional.entries = [{ ...original, excerpt: text, sourceRange: { firstLine: 40, lastLine: 40,
+    totalLines: 40, excerptDigest: qualitySourceDigest(text), complete: false } }];
+  const clipped = assessContextRoute(input, route, receipt, []);
+  assert.deepEqual(clipped.semanticFailures, ['missing-complete-evidence:radio-contract-columns']);
+  assert.equal(clipped.score.essentialGroups.completeDelivered, 2);
 });
 
 test('receipt scoring binds exact captured input and leaves unobserved task use unknown', () => {

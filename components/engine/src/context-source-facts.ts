@@ -7,8 +7,8 @@ import { localDocumentLinks } from "./checkers/document-links.ts";
 import type { Candidate } from "./decisions.ts";
 import { SOURCE_CAPTURE_MAX_BYTES, SOURCE_CAPTURE_BATCH_MAX_BYTES } from "./source-capture-limits.ts";
 
-export const SOURCE_EXTRACTOR = "literal-syntax-12";
-export interface SourceSpan { kind: string; name: string; signature: string; start: number; end: number; level?: number; ancestry?: string[] }
+export const SOURCE_EXTRACTOR = "literal-syntax-13";
+export interface SourceSpan { kind: string; name: string; signature: string; start: number; end: number; level?: number; ancestry?: string[]; context?: SourceSpan[] }
 export interface SourceLink { kind: "import" | "export" | "require" | "reference" | "dynamic-import" | "document"; target: string; line: number }
 export interface SourceFacts {
   digest: string; language: string; bytes: number; descriptor: string | null;
@@ -148,11 +148,55 @@ export function markdownSections(text: string): SourceSpan[] {
 }
 
 function extractMarkdownFacts(text: string, facts: SourceFacts): void {
-  const spans = markdownSections(text);
-  facts.spans = spans.slice(0, 96);
-  if (spans.length > 96) facts.descriptor = JSON.stringify({ ...JSON.parse(facts.descriptor ?? "{}"), spanLimitReached: true });
+  const sections = markdownSections(text), rows = markdownTableRows(text);
+  // New table clues cannot evict the section ranges the existing extractor retained.
+  facts.spans = [...sections.slice(0, 96), ...rows.slice(0, Math.max(0, 96 - sections.length))]
+    .sort((left, right) => left.start - right.start || left.end - right.end);
+  if (sections.length + rows.length > 96) facts.descriptor = JSON.stringify({ ...JSON.parse(facts.descriptor ?? "{}"), spanLimitReached: true });
   facts.links = localDocumentLinks(text).slice(0, 128).map(link => ({ kind: "document", ...link }));
   facts.coverage = "markdown";
+}
+
+/** A literal table row needs its column names; intervening rows are not part of that evidence. */
+function markdownTableRows(text: string): SourceSpan[] {
+  const lines = text.match(/[^\n]*\n|[^\n]+$/gu) ?? [], spans: SourceSpan[] = [];
+  const cells = (line: string): string[] | null => {
+    const value = line.trim();
+    if (!value.includes("|")) return null;
+    // Escaped separators and inline code stay in their authored cell.
+    const parts: string[] = []; let cell = "", fence = "";
+    for (let index = 0; index < value.length; index++) {
+      const char = value[index]!;
+      if (char === "\\" && index + 1 < value.length) { cell += char + value[++index]; continue; }
+      if (char === "`") {
+        let marker = char; while (value[index + 1] === "`") { marker += value[++index]; }
+        if (!fence) fence = marker; else if (fence === marker) fence = "";
+        cell += marker; continue;
+      }
+      if (char === "|" && !fence) { parts.push(cell.trim()); cell = ""; } else cell += char;
+    }
+    parts.push(cell.trim());
+    if (value.startsWith("|")) parts.shift(); if (value.endsWith("|") && !cell.trim()) parts.pop();
+    return parts.length > 1 ? parts : null;
+  };
+  let fence: string | null = null, frontmatter = lines[0]?.trim() === "---";
+  for (let index = 0; index < lines.length; index++) {
+    const value = lines[index]!;
+    if (frontmatter) { if (index > 0 && value.trim() === "---") frontmatter = false; continue; }
+    const marker = value.match(/^\s*(`{3,}|~{3,})/u)?.[1];
+    if (marker) { if (!fence) fence = marker; else if (marker[0] === fence[0] && marker.length >= fence.length) fence = null; continue; }
+    if (fence) continue;
+    const columns = cells(value), delimiter = cells(lines[index + 1] ?? "");
+    if (!columns || !delimiter || columns.length !== delimiter.length || !delimiter.every(cell => /^:?-{3,}:?$/u.test(cell))) continue;
+    const header: SourceSpan = { kind: "table-columns", name: bounded(columns.join(" | "), 128), signature: "", start: index + 1, end: index + 2 };
+    index += 2;
+    for (; index < lines.length; index++) {
+      const row = cells(lines[index]!);
+      if (!row || row.length !== columns.length) { index--; break; }
+      spans.push({ kind: "table-row", name: bounded(row.join(" | "), 128), signature: "", start: index + 1, end: index + 1, context: [header] });
+    }
+  }
+  return spans;
 }
 
 /** Native syntax remains a shallow clue; no compiler or body-boundary proof is implied. */

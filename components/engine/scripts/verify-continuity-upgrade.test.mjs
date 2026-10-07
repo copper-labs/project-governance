@@ -7,10 +7,42 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createInterface } from 'node:readline';
-import { continuationCandidate, continuationInputs, verifyContinuationInstallation } from './verify-continuity-upgrade.mjs';
+import { continuationCandidate, continuationInputs, verifyContinuationInstallation, assessUpgradeTaskFacts } from './verify-continuity-upgrade.mjs';
+import { FACTS_MARKER } from './verify-conversational-facts.mjs';
 import { verifyRuntimeArchive } from '../src/runtime-artifact.ts';
 import { compiledRuntimeLock } from '../src/runtime-lock.ts';
 import { digest } from '../src/core.ts';
+
+test('post-upgrade native facts preserve the original task, attempt and checkpoint rather than only a successful resume', () => {
+  const task = { taskId: 'original-task', version: 2, outcome: 'Finish the original reconnect task.', status: 'open' };
+  const attempt = { attemptId: 'original-attempt', workspaceId: 'original-workspace' };
+  const checkpoint = { checkpointId: 'original-checkpoint', taskId: task.taskId, taskVersion: task.version, attemptId: attempt.attemptId,
+    summary: 'The original diagnosis remains.', next: 'Verify after the update.', createdAt: '2026-10-06T12:00:00.000Z' };
+  const facts = { version: 1, observed_at: '2026-10-06T13:00:00.000Z', association: { status: 'associated', taskId: task.taskId,
+    observedRevision: task.version, boundRevision: task.version, ...attempt }, task: { outcome: task.outcome, status: task.status,
+    execution_permission: 'not granted by this snapshot' }, checkpoint: { ...checkpoint, applicability: 'same-revision-and-attempt',
+    provenance: 'caller-declared summary and next action; not executed proof' }, unavailable: [], omitted: [] };
+  const output = value => ({ hookSpecificOutput: { additionalContext: FACTS_MARKER + JSON.stringify(value) + '\n' } });
+  const originalOutput = output(facts), entry = { workspace: '/fixture/wearable', session: 'original-chat',
+    promptDigest: digest('Continue where you left off'), currentPromptComplete: true,
+    packetDigest: digest(originalOutput.hookSpecificOutput.additionalContext), taskFacts: { digest: digest(facts) },
+    binding: { taskId: task.taskId, attemptId: attempt.attemptId, revision: String(task.version) },
+    packetBytes: Buffer.byteLength(originalOutput.hookSpecificOutput.additionalContext), packetLimitBytes: 24000 };
+  const originals = { task, attempt, checkpoint, entry, workspace: entry.workspace, session: entry.session };
+  const assessed = assessUpgradeTaskFacts(originalOutput, originals);
+  assert.equal(assessed.hostConsumption, 'unknown'); assert.equal(assessed.acceptedDevelopmentOutcome, 'unknown');
+  for (const mutate of [value => { value.association.taskId = 'main-checkout-task'; }, value => { value.association.attemptId = 'new-attempt'; },
+    value => { value.association.workspaceId = 'main-workspace'; }, value => { value.task.outcome = 'Different task'; },
+    value => { value.task.status = 'accepted'; }, value => { value.checkpoint.next = 'Invented next action'; },
+    value => { value.checkpoint.applicability = 'historical-or-other-attempt'; }]) {
+    const changed = structuredClone(facts); mutate(changed); assert.throws(() => assessUpgradeTaskFacts(output(changed), originals));
+  }
+  assert.throws(() => assessUpgradeTaskFacts(originalOutput, { ...originals, workspace: '/fixture/main' }));
+  assert.throws(() => assessUpgradeTaskFacts(originalOutput, { ...originals, session: 'another-chat' }));
+  for (const changed of [{ ...entry, promptDigest: digest('Task description supplied instead of a vague continuation') },
+    { ...entry, taskFacts: { digest: 'sha256:invented' } }, { ...entry, binding: { ...entry.binding, taskId: 'different-task' } }])
+    assert.throws(() => assessUpgradeTaskFacts(originalOutput, { ...originals, entry: changed }));
+});
 
 function installationFixture(version = '3.0.0-rc.10.9') {
   const directory = mkdtempSync(join(tmpdir(), 'continuity-old-installation-test-'));

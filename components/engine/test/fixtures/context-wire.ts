@@ -15,7 +15,8 @@ export function wireMetadataEvidence(wire: any, question: any): { id: string; te
 }
 
 /** Resolve the actual named passage the provider receives, rather than a fixture-side answer key. */
-export function wirePassageEvidence(wire: any, question: any): { path: string; passage: string; sourceUnits: any[]; kind?: string } {
+export function wirePassageEvidence(wire: any, question: any): { path: string; passage: string; sourceUnits: any[]; kind?: string;
+  ranges?: Array<{ firstLine: number; lastLine: number; totalLines: number; excerptDigest: string }> } {
   if (wire.state.layout === "compact-v1") {
     const id = question.instructions.question.match(/state\.items\.(c\d+)/u)?.[1];
     if (!id || !wire.state.items[id]) throw new Error("Question has no supplied compact passage");

@@ -29,7 +29,7 @@ export interface PassageAdvice {
   assessed: string[]; omitted: Array<{ path: string; reason: string }>;
   readings: Array<{ path: string; firstLine: number | null; lastLine: number | null; excerptDigest: string;
     probability: number | null; interpretation: string; role: string | null;
-    assessedRange: { firstLine: number; lastLine: number } | null; complete: boolean }>;
+    assessedRange: { firstLine: number; lastLine: number } | null; assessedRanges?: Array<{ firstLine: number; lastLine: number }>; complete: boolean }>;
   procedures: { declaredFiles: number; eligibleUnits: number; preparedUnits: number; assessedUnits: number; assessedBytes: number; selectedFiles: number };
   decisions: DecisionOutcome[]; elapsedMs: number; eligibleUnitCount: number; preparedUnitCount: number; assessedUnitCount: number;
   preparationMs: number; packingMs: number; classificationBytes: number;
@@ -39,7 +39,8 @@ type PassageInput = {
   invocationId: string; policyDigest: string; deadlineAt: number; signal?: AbortSignal; family?: boolean;
   excerptBytes: number; procedurePaths?: string[]; procedureBytes?: number; sourceSpans?: Record<string, SourceSpan[]>;
 };
-type PreparedPassage = { candidate: Candidate; item: EvidenceItem; span: SourceSpan | null; excerptDigest: string; procedure: boolean; complete: boolean };
+type PreparedPassage = { candidate: Candidate; item: EvidenceItem; span: SourceSpan | null; excerptDigest: string; procedure: boolean; complete: boolean;
+  ranges?: Array<{ firstLine: number; lastLine: number }> };
 /** Spend the bounded candidate allocation across files before taking deeper units. */
 function preparePassages(runtime: DecisionRuntime, candidates: Candidate[], input: PassageInput, remainingBytes: number, classificationBytes: number) {
   const omitted: PassageAdvice["omitted"] = [], prepared: PreparedPassage[] = [];
@@ -95,8 +96,11 @@ function preparePassages(runtime: DecisionRuntime, candidates: Candidate[], inpu
       omitted.push({ path: candidate.id, reason: "excerpt-unrepresentable" }); continue;
     }
     const unit = excerpt.sourceUnits?.map(part => ({ kind: part.kind, name: part.name, complete: part.complete })) ?? [];
-    const item = { candidate, span, procedure, complete: excerpt.sourceUnits?.every(unit => unit.complete) ?? !(excerpt.sourceRange || excerpt.sourceRanges), excerptDigest: digest(excerpt.excerpt), item: { id: `passage-${prepared.length}`, sourceDigest: candidate.sourceDigest,
-      text: JSON.stringify({ path: candidate.id, ...(procedure ? { ancestry: (span as { ancestry?: string[] })?.ancestry ?? [], kind: "procedure" } : {}), sourceUnits: unit, passage: excerpt.excerpt }), provenance: "captured", trust: "untrusted",
+    const item = { candidate, span, procedure, complete: excerpt.sourceUnits?.every(unit => unit.complete) ?? !(excerpt.sourceRange || excerpt.sourceRanges), excerptDigest: digest(excerpt.excerpt),
+      ...(excerpt.sourceRanges ? { ranges: excerpt.sourceRanges.map(({ firstLine, lastLine }) => ({ firstLine, lastLine })) } : {}),
+      item: { id: `passage-${prepared.length}`, sourceDigest: candidate.sourceDigest,
+      text: JSON.stringify({ path: candidate.id, ...(procedure ? { ancestry: (span as { ancestry?: string[] })?.ancestry ?? [], kind: "procedure" } : {}), sourceUnits: unit,
+        ...(excerpt.sourceRanges ? { ranges: excerpt.sourceRanges } : {}), passage: excerpt.excerpt }), provenance: "captured", trust: "untrusted",
       ...(excerpt.sourceRange ? { range: { firstLine: excerpt.sourceRange.firstLine, lastLine: excerpt.sourceRange.lastLine,
         totalLines: excerpt.sourceRange.totalLines } } : {}) } } satisfies PreparedPassage;
     const bytes = Buffer.byteLength(item.item.text);
@@ -211,6 +215,7 @@ export async function selectContextPassages(runtime: DecisionRuntime, candidates
       readings.push({ path: item.candidate.id, firstLine: item.span?.start ?? item.item.range?.firstLine ?? null, lastLine: item.span?.end ?? item.item.range?.lastLine ?? null,
         excerptDigest: item.excerptDigest,
         assessedRange: item.item.range ? { firstLine: item.item.range.firstLine, lastLine: item.item.range.lastLine } : null,
+        ...(item.ranges ? { assessedRanges: item.ranges } : {}),
         complete: item.complete,
         probability: direct.probability,
         interpretation: outcome.delivered ? direct.value : "unavailable", role: role?.value ?? literalRole });

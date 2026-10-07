@@ -4,6 +4,7 @@ import { mkdirSync, readFileSync, writeFileSync, openSync, fsyncSync, closeSync 
 import { dirname, join } from "node:path";
 import { SCHEMA, SCHEMA_VERSION, V5, V6 } from "./schema.ts";
 import { ExecutionStateUnavailable, RevisionConflict, type Action, type ActionStatus, type Artifact, type Evidence, type Task, type TaskItem, type TaskMode, type TaskStatus, type Usage, type Attempt, type Checkpoint, type LedgerEvent, type ExecutionBinding, } from "../model/types.ts";
+import { parsePlanReference } from "../model/plan-reference.ts";
 const now = (): string => new Date().toISOString();
 export class StoreSchemaMismatch extends Error {
     constructor() { super("read-only inspection needs the current store schema"); }
@@ -124,7 +125,8 @@ export class Store {
         // Scope is rewritten to the forking worktree: a branched thread works in its own
         // checkout, and inheriting the parent's path would refuse every action it takes.
         const inherited = parent.items
-            .filter((i) => !i.revoked)
+            // Parent identity preserves the association as history; the child chooses its own batch.
+            .filter((i) => !i.revoked && i.kind !== "plan-reference")
             .map((i) => i.kind === "scope" && meta.worktree && parent.worktree && (i.body === parent.worktree || i.body.startsWith(parent.worktree + "/"))
             ? { kind: i.kind, provenance: i.provenance, origin: i.origin ?? `${taskId}@${parent.version}`, body: meta.worktree + i.body.slice(parent.worktree!.length) }
             : { kind: i.kind, provenance: i.provenance, origin: i.origin ?? `${taskId}@${parent.version}`, body: i.body });
@@ -144,29 +146,33 @@ export class Store {
         expectedVersion?: number;
         authorityRef?: string;
     } = {}): Task {
-        const current = this.readTask(taskId);
-        if (!current)
-            throw new ExecutionStateUnavailable(`no task ${taskId}`);
-        if (opts.expectedVersion !== undefined && opts.expectedVersion !== current.version)
-            throw new RevisionConflict(taskId, opts.expectedVersion, current.version);
-        validateItems(added);
-        if (opts.status && !["open", "needs-input", "accepted", "cancelled"].includes(opts.status))
-            throw new Error("invalid task status");
-        if ((opts.revoke?.length || opts.status === "accepted") && !opts.authorityRef?.trim())
-            throw new Error("a host authority reference is required to revoke or accept; it is host-reported, not independently authenticated");
-        if (opts.outcome !== undefined && !opts.outcome.trim())
-            throw new Error("task outcome must not be empty");
-        const revoke = new Set(opts.revoke ?? []);
-        if ([...revoke].some(n => !current.items.some(i => i.seq === n)))
-            throw new Error("unknown item to revoke");
-        const carried = current.items.map((i) => ({
-            kind: i.kind,
-            provenance: i.provenance,
-            body: i.body,
-            origin: i.origin ?? null,
-            revoked: i.revoked || revoke.has(i.seq),
-        }));
-        return this.#writeTaskVersion(taskId, current.version + 1, current.version, opts.outcome ?? current.outcome, opts.status ?? current.status, [...carried, ...added.map((a) => ({ ...a, revoked: false }))], { worktree: current.worktree ?? undefined, branch: current.branch, parentTask: current.parentTask ?? undefined, parentVersion: current.parentVersion ?? undefined, parentCheckpoint: current.parentCheckpoint ?? undefined, authorityRef: opts.authorityRef, session: opts.session, mode: current.mode });
+        return this.atomic(() => {
+            const current = this.readTask(taskId);
+            if (!current)
+                throw new ExecutionStateUnavailable(`no task ${taskId}`);
+            if (opts.expectedVersion !== undefined && opts.expectedVersion !== current.version)
+                throw new RevisionConflict(taskId, opts.expectedVersion, current.version);
+            validateItems(added);
+            if (opts.status && !["open", "needs-input", "accepted", "cancelled"].includes(opts.status))
+                throw new Error("invalid task status");
+            if ((opts.revoke?.length || opts.status === "accepted") && !opts.authorityRef?.trim())
+                throw new Error("a host authority reference is required to revoke or accept; it is host-reported, not independently authenticated");
+            if (opts.outcome !== undefined && !opts.outcome.trim())
+                throw new Error("task outcome must not be empty");
+            const revoke = new Set(opts.revoke ?? []);
+            if ([...revoke].some(n => !current.items.some(i => i.seq === n)))
+                throw new Error("unknown item to revoke");
+            const carried = current.items.map((i) => ({
+                kind: i.kind,
+                provenance: i.provenance,
+                body: i.body,
+                origin: i.origin ?? null,
+                revoked: i.revoked || revoke.has(i.seq),
+            }));
+            const items = [...carried, ...added.map((a) => ({ ...a, revoked: false }))];
+            validateItems(items);
+            return this.#writeTaskVersion(taskId, current.version + 1, current.version, opts.outcome ?? current.outcome, opts.status ?? current.status, items, { worktree: current.worktree ?? undefined, branch: current.branch, parentTask: current.parentTask ?? undefined, parentVersion: current.parentVersion ?? undefined, parentCheckpoint: current.parentCheckpoint ?? undefined, authorityRef: opts.authorityRef, session: opts.session, mode: current.mode });
+        });
     }
     #writeTaskVersion(taskId: string, version: number, supersedes: number | null, outcome: string, status: Task["status"], items: (Omit<TaskItem, "seq" | "revoked"> & {
         revoked?: boolean;
@@ -298,10 +304,13 @@ export class Store {
             .prepare("SELECT * FROM action WHERE status IN ('prepared','in-progress','outcome-unknown') OR (status='authorized' AND action_id IN (SELECT action_id FROM execution)) ORDER BY created_at")
             .all() as Record<string, unknown>[]).map(rowToAction);
     }
-    listActions(taskId: string): Action[] {
+    /** An explicit limit returns newest records by insertion order; omitted history remains unknown. */
+    listActions(taskId: string, limit?: number): Action[] {
+        if (limit !== undefined) validateReadLimit(limit);
         return (this.#db
-            .prepare("SELECT * FROM action WHERE task_id = ? ORDER BY created_at")
-            .all(taskId) as Record<string, unknown>[]).map(rowToAction);
+            .prepare(limit === undefined ? "SELECT * FROM action WHERE task_id = ? ORDER BY created_at"
+                : "SELECT * FROM action WHERE task_id = ? ORDER BY rowid DESC LIMIT ?")
+            .all(...(limit === undefined ? [taskId] : [taskId, limit])) as Record<string, unknown>[]).map(rowToAction);
     }
     // ------------------------------------------------------------ artifacts
     putArtifact(a: Omit<Artifact, "artifactId" | "createdAt"> & {
@@ -389,10 +398,13 @@ export class Store {
             return null;
         }
     }
-    listEvidence(taskId: string): Evidence[] {
+    /** An explicit limit returns newest records by insertion order; it is not a complete task history. */
+    listEvidence(taskId: string, limit?: number): Evidence[] {
+        if (limit !== undefined) validateReadLimit(limit);
         return (this.#db
-            .prepare("SELECT * FROM evidence WHERE task_id = ? ORDER BY created_at")
-            .all(taskId) as Record<string, unknown>[]).map((r) => ({
+            .prepare(limit === undefined ? "SELECT * FROM evidence WHERE task_id = ? ORDER BY created_at"
+                : "SELECT * FROM evidence WHERE task_id = ? ORDER BY rowid DESC LIMIT ?")
+            .all(...(limit === undefined ? [taskId] : [taskId, limit])) as Record<string, unknown>[]).map((r) => ({
             evidenceId: r["evidence_id"] as string,
             taskId: (r["task_id"] as string | null) ?? null,
             actionId: (r["action_id"] as string | null) ?? null,
@@ -566,6 +578,16 @@ export class Store {
             throw new Error("invalid event cursor/limit");
         return (this.#db.prepare("SELECT * FROM ledger WHERE task_id=? AND seq>? ORDER BY seq LIMIT ?").all(taskId, after, limit) as Record<string, unknown>[])
             .map(r => ({ seq: Number(r["seq"]), eventId: String(r["event_id"]), taskId, kind: String(r["kind"]), detail: JSON.parse(String(r["detail"])), createdAt: String(r["created_at"]) }));
+    }
+    /** Exact revision provenance without exporting unrelated action or conversation events. */
+    taskRevisionEvent(taskId: string, version: number): LedgerEvent | null {
+        if (!Number.isSafeInteger(version) || version < 1) throw new Error("invalid task revision");
+        const rows = this.#db.prepare("SELECT * FROM ledger WHERE task_id=? AND kind='task-revision' AND json_extract(detail,'$.version')=? ORDER BY seq LIMIT 2")
+            .all(taskId, version) as Record<string, unknown>[];
+        if (rows.length > 1) throw new Error("ambiguous task revision provenance");
+        const row = rows[0];
+        return row ? { seq: Number(row["seq"]), eventId: String(row["event_id"]), taskId, kind: "task-revision",
+            detail: JSON.parse(String(row["detail"])), createdAt: String(row["created_at"]) } : null;
     }
     latestCursor(taskId: string): number {
         return Number((this.#db.prepare("SELECT MAX(seq) seq FROM ledger WHERE task_id=?").get(taskId) as {
@@ -782,9 +804,20 @@ const TRANSITIONS: Record<ActionStatus, ActionStatus[]> = {
     prepared: ["in-progress", "cancelled", "refused"], "in-progress": ["completed", "cancelled", "outcome-unknown"],
     completed: ["verified"], verified: [], refused: [], cancelled: [], "outcome-unknown": ["completed", "cancelled"],
 };
-function validateItems(items: Omit<TaskItem, "seq" | "revoked">[]): void {
-    for (const i of items)
-        if (!["constraint", "acceptance", "scope", "open-question", "ruled-out", "handoff"].includes(i.kind)
+function validateReadLimit(limit: number): void {
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000)
+        throw new Error("read limit must be an integer from 1 to 1000");
+}
+function validateItems(items: (Omit<TaskItem, "seq" | "revoked"> & { revoked?: boolean })[]): void {
+    let activePlanReferences = 0;
+    for (const i of items) {
+        if (!["constraint", "acceptance", "scope", "open-question", "ruled-out", "handoff", "plan-reference"].includes(i.kind)
             || !["operator", "observed", "hypothesis"].includes(i.provenance) || !i.body.trim() || Buffer.byteLength(i.body) > 8000)
             throw new Error("invalid task item");
+        if (i.kind === "plan-reference") {
+            parsePlanReference(JSON.parse(i.body));
+            if (!i.revoked && ++activePlanReferences > 1)
+                throw new Error("only one active plan reference is allowed");
+        }
+    }
 }

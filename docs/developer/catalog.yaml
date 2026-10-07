@@ -45,7 +45,7 @@ capabilities:
       - compare runtime reliability, context quality and whole-task efficiency
       - distinguish controlled release results from passive development trends
       - diagnose missing denominators, outcome links and native usage coverage
-    symbols: [project-governance release-evaluation report, readReleaseEvaluation, reduceReleaseEvaluation, evaluateContext, decisionOutcomeReport]
+    symbols: [project-governance release-evaluation report, project-governance release-evaluation capture, readReleaseEvaluation, reduceReleaseEvaluation, evaluateContext, decisionOutcomeReport]
     reference: docs/specs/engine-release-evaluation.md
     guides:
       - docs/developer/guides/release-evaluation.md
@@ -53,6 +53,7 @@ capabilities:
       - components/harness/docs/specs/measurement-and-qualification.md
     sources:
       - components/engine/src/release-evaluation.ts
+      - components/engine/src/release-evaluation-capture.ts
       - components/engine/src/release-evaluation-reader.ts
       - components/engine/src/release-evaluation-cost.ts
       - components/engine/src/release-evaluation-types.ts
@@ -78,6 +79,19 @@ capabilities:
       - components/engine/src/decision-check-advice.ts
       - components/engine/src/planning.ts
       - components/engine/scripts/verify-greenfield.mjs
+  - id: retained-junit-evidence
+    title: Validate retained test reports without rerunning tests
+    aliases: [junit-evidence, retained-test-reports]
+    tasks:
+      - declare exact retained report roots through a target-owned validation pack
+      - validate captured report identities, counters and dispositions without claiming current acceptance
+    symbols: [junit-evidence, parseJunitEvidence, checkJunitEvidence]
+    reference: docs/specs/engine-4-1-context-quality.md
+    guides: [docs/developer/guides/retained-junit-evidence.md]
+    sources:
+      - components/engine/src/checkers/junit-evidence.ts
+      - components/engine/src/builtin-checks.ts
+      - components/engine/src/check-execution.ts
   - id: source-control-worktrees
     title: Coordinate source changes and Codex worktrees
     aliases: [codex-workflow, parallel-worktrees, worktree-upgrades]

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { parseDocument } from "yaml";
 import { safeSubjectPath, type ValidationSubject } from "./change-subject.ts";
 import type { Finding } from "./checker-results.ts";
+import { normalizedDeliveryNotes } from "./delivery-notes.ts";
 
 export interface SpecificationCriterion {
   id: string;
@@ -17,6 +18,7 @@ export interface SpecificationReferences {
 const stableId = (id: string) => /^[A-Za-z][A-Za-z0-9._-]{0,63}$/u.test(id);
 const record = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const sha256 = (bytes: Buffer) => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+export const specificationDefinitionDigest = (bytes: Buffer | string) => sha256(Buffer.from(normalizedDeliveryNotes(typeof bytes === "string" ? bytes : new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes))));
 
 export function safeSpecificationPath(path: string): string {
   safeSubjectPath(path);
@@ -48,6 +50,7 @@ export function parseSpecificationDeclaration(bytes: Buffer | string): Specifica
   if (fence?.specification) throw new Error("governance-spec fence is not closed");
   if (!declarations.length) return null;
   if (declarations.length !== 1) throw new Error("specification must contain exactly one governance-spec declaration");
+  normalizedDeliveryNotes(source);
   if (parseDocument(declarations[0]!, { schema: "json", uniqueKeys: true }).errors.length) throw new Error("ambiguous specification declaration");
   let raw: unknown;
   try { raw = JSON.parse(declarations[0]!); } catch { throw new Error("governance-spec declaration must contain valid JSON"); }
@@ -95,7 +98,9 @@ export function validateSpecificationReferences(subject: ValidationSubject, decl
       add("source-unavailable", path, `cannot read captured specification: ${(error as Error).message}`);
       continue;
     }
-    const actual = sha256(bytes);
+    let actual: string;
+    try { actual = specificationDefinitionDigest(bytes); }
+    catch { add("declaration-invalid", path, "specification delivery notes are malformed or contain machine-owned content"); continue; }
     if (reference.digest !== actual) add("digest-mismatch", path, "captured specification contents differ from the plan's bound digest", { expected_digest: reference.digest, actual_digest: actual });
     let parsed: SpecificationDeclaration | null;
     try { parsed = parseSpecificationDeclaration(bytes); }

@@ -3,12 +3,41 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, rmSync, readFileSync, realpathSync, writeFileSync, chmodSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { waitCommand } from "../src/process-owner.ts";
+import { spawn } from "node:child_process";
+import { once } from "node:events";
+import { waitCommand, processFingerprint } from "../src/process-owner.ts";
 import { submitProviderJob } from "../src/provider-job.ts";
 import { reconcileCommand } from "../src/command-recovery.ts";
+import { commandProcesses } from "../src/command-owner-recovery.ts";
+
+type FixtureWriter = { pid: number; fingerprint: string };
+
+async function waitFixtureWriters(writers: FixtureWriter[], until: number, root: string) {
+  while (true) {
+    const rows = commandProcesses();
+    const live = writers.filter(writer => {
+      if (!rows.some(row => row.pid === writer.pid)) return false;
+      const fingerprint = processFingerprint(writer.pid);
+      return fingerprint === null || fingerprint === writer.fingerprint;
+    });
+    if (!live.length) return;
+    assert.ok(Date.now() < until, `Retain fixture evidence at ${root}; exact fixture writers remain live: ${JSON.stringify(live)}`);
+    await new Promise(resolve => setTimeout(resolve, Math.min(50, Math.max(1, until - Date.now()))));
+  }
+}
+
+function acknowledgedFixtureWriters(directory: string, requestDigest: string): FixtureWriter[] {
+  return ["owner.json", "guardian.json"].map(name => {
+    const record = JSON.parse(readFileSync(join(directory, name), "utf8"));
+    assert.equal(record.requestDigest, requestDigest);
+    assert.ok(Number.isSafeInteger(record.pid) && record.pid > 1 && typeof record.fingerprint === "string" && record.fingerprint.length);
+    return { pid: record.pid, fingerprint: record.fingerprint };
+  });
+}
 
 test("shared owner exchanges Codex messages and cleans persistent completion or parent-input requests", async () => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "codex-owner-")));
+  const jobs: Array<{ directory: string; requestDigest: string; until: number }> = [];
   try {
     const extra = join(root, "additional"); mkdirSync(extra);
     const scopeLine = `Additional roots: ${JSON.stringify([extra])}`;
@@ -27,6 +56,7 @@ if(v.id===33)require('node:fs').writeFileSync('callback.json',JSON.stringify(v))
       const submitted = await submitProviderJob(join(root, callback ? "callback" : "completed"), { id: callback ? "callback" : "completed", prompt: "assignment",
         provider: "codex", model: "fixture", effort: "high", requiredTools: [], additionalRoots: [extra],
         executable, workspace: root, registry: join(root, "registry.sqlite"), assignment: { role: "reviewer", constraints: "No publication", context: "" }, deadlineMs: 8000, outputLimit: 16384 });
+      jobs.push({ ...submitted, until: Date.now() + 10000 });
       const result = await waitCommand(submitted.directory, submitted.requestDigest, 10000);
       assert.equal(result.receipt?.state, callback ? "failed" : "succeeded");
       assert.equal(result.receipt?.reason, callback ? "provider-blocked" : "provider-completed");
@@ -38,5 +68,41 @@ if(v.id===33)require('node:fs').writeFileSync('callback.json',JSON.stringify(v))
       reconcileCommand(submitted.directory, submitted.requestDigest);
       if (callback) assert.deepEqual(JSON.parse(readFileSync(join(root, "callback.json"), "utf8")), { id: 33, result: { answers: {} } });
     }
-  } finally { rmSync(root, { recursive: true, force: true }); }
+  } finally {
+    // Native cleanup does not end detached supervisor bookkeeping; retain their directory until both acknowledged writers exit.
+    for (const job of jobs) await waitFixtureWriters(acknowledgedFixtureWriters(job.directory, job.requestDigest), job.until, root);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("fixture disposal waits for an exact writer that can publish after terminal evidence", async () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "codex-owner-quiescence-"))), terminal = join(root, "terminal.json"), late = join(root, "late-bookkeeping.json");
+  const writer = spawn(process.execPath, ["--input-type=module", "-e", `
+    import {writeFileSync} from 'node:fs';
+    writeFileSync(${JSON.stringify(terminal)}, JSON.stringify({cleanup:'confirmed'}));
+    process.send('terminal');
+    process.on('message', () => { writeFileSync(${JSON.stringify(late)}, 'bookkeeping complete'); process.disconnect(); });
+  `], { stdio: ["ignore", "ignore", "ignore", "ipc"] });
+  const until = Date.now() + 10000;
+  try {
+    const [message] = await once(writer, "message", { signal: AbortSignal.timeout(Math.max(1, until - Date.now())) });
+    assert.equal(message, "terminal");
+    assert.equal(JSON.parse(readFileSync(terminal, "utf8")).cleanup, "confirmed");
+    const fingerprint = processFingerprint(writer.pid!); assert.ok(fingerprint);
+    let settled = false;
+    const quiescence = waitFixtureWriters([{ pid: writer.pid!, fingerprint }], until, root).then(() => { settled = true; });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(settled, false, "Terminal evidence cannot authorize disposal while its exact writer is live");
+    writer.send("complete-bookkeeping");
+    await quiescence;
+    assert.equal(readFileSync(late, "utf8"), "bookkeeping complete", "Late publication must finish before directory removal");
+  } finally {
+    if (writer.connected) writer.send("complete-bookkeeping");
+    // This spawn handle remains exact even when initial fingerprint inspection fails.
+    if (writer.exitCode === null && writer.signalCode === null) {
+      try { await once(writer, "close", { signal: AbortSignal.timeout(Math.max(1, until - Date.now())) }); }
+      catch { assert.fail(`Retain fixture evidence at ${root}; exact spawned writer has not closed: ${writer.pid}`); }
+    }
+    rmSync(root, { recursive: true, force: true });
+  }
 });

@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-02-16
-updated: 2026-10-05
+updated: 2026-10-06
 summary: Active and completed execution plans for the current source repository.
 ---
 
@@ -24,6 +24,10 @@ shows existing project-owned checks; it does not require a check after every edi
 - [Decision providers and image evaluation](active/2026-10-06-decision-providers-and-image-evaluation.md)
   is a design-only draft for provider adapters, supplied-image evaluation and agent/test integration.
   Implementation, live qualification and publication remain separate work.
+
+- [4.1 context quality and ordinary-work evidence](active/2026-10-05-4-1-context-quality.md)
+  owns deterministic task snapshots, selection quality, outcome links and exact caller recovery.
+  Source implementation and qualified release proof remain separate batch claims.
 
 - [Next major verification and semantic review](active/2026-10-04-major-verification-feedback.md)
   records the published 4.0.0 implementation, installed journeys, multilingual JEV advice,

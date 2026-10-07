@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-06
 summary: Builds a read-only release scorecard from explicit existing captures while preserving missing outcomes, usage and comparison limits.
 ---
 
@@ -80,6 +80,68 @@ short scorecard. A successful command means it produced a report, not that the e
 
 ## Replace synthetic captures with real evidence
 
+Capture existing originals through the normal command instead of rebuilding task history by hand:
+
+```sh
+project-governance release-evaluation capture --request /tmp/outcome-request.json --output-directory /tmp/new-outcome-capture
+```
+
+The request is an explicit version-two outcome manifest with its case, conditions and original
+receipt references. An episode can declare `taskLineage: {"fromRevision": 1, "throughRevision": 3}`
+to freeze those exact revisions and their authority events from the canonical task owner. The
+output directory must be new and outside the checkout. Capture preserves original receipt paths;
+`originalsRequired` means those files must remain accessible for later reporting. It refuses foreign
+jobs, conflicting hashes and concurrent task changes. It does not infer archive identity, host
+consumption, missing usage or acceptance from a successful check.
+
+## Capture one development cycle
+
+1. Declare the case, expected evidence and conditions before evaluating the work. Keep the original
+   source, profile, question, permission, model and cache identities. A current runtime lock cannot
+   establish the archive that executed earlier work.
+2. Use the normal prompt, check and consultation commands. Select their original caller receipts and
+   exact native references. For native response usage, also select the original `prompt-entry` and
+   matching `usage` observations. Do not rebuild them from an agent's progress answer.
+3. When the task owner explicitly accepts or reopens the work, set `taskLineage.fromRevision` to the
+   episode's task revision and `throughRevision` to the current exact owner revision. Capture freezes
+   every revision and its original authority event in that interval. Missing ancestors or changed
+   scope/acceptance conditions cannot qualify an unchanged accepted result.
+4. Put those selected references in the existing version-two outcome request. Leave
+   `usagePopulation`, eligible prompt count and unobserved reads unknown unless their completeness
+   has been established separately. Naming the observed response IDs alone does not prove that no
+   other response, job or retry occurred.
+5. Run `release-evaluation capture`, then `release-evaluation report` on its returned manifest. Keep
+   the manifest, captured task revisions, reports and all referenced originals outside the checkout.
+   Capture checks selected hashes and task state again before publishing the final manifest.
+
+The supported Codex usage observer reads native `token_usage_record` response increments. Its
+verified cursor resumes at a complete-line byte boundary. A session delta may contain late responses
+for an earlier turn. Exactly indexed responses join their original entry. Unindexed turns remain
+explicit `unlinkedTurns` unknown coverage; they do not pin every later session delta. The existing
+cursor retains their exact file, byte-range and hash hints. Adjacent usage lines share a range.
+When an exact entry later appears, the observer rechecks only that turn's retained originals and
+validates their counters together before attribution. A historical preparation marker or live
+session reservation does not prove a preparation is pending. Ambiguous indexed entries, unavailable
+entry originals, malformed current usage and conflicting counters still prevent normal advancement.
+Identical imports remain idempotent. Incomplete final lines wait for a later collection. Rotation,
+truncation and rewritten boundaries reset the append hint and record the reason. Deferred originals
+that changed or disappeared remain explicitly unknown; a current snapshot cannot restamp them.
+Rows skipped in that current snapshot retain their response count and exact byte-range/hash
+references as unknown coverage, without importing their usage.
+
+The cursor stores native turn identities, offsets and hashes, never conversation text. Deferred
+recovery shares the existing 8 MiB native read allowance with the current delta, and hint retention
+uses that same size limit. Reported `readBytes` covers the captured transcript window and deferred
+originals; it excludes boundary verification, separate serialized hint reads and the durable rewrite.
+A near-cap hint can require two full hint reads and one full rewrite even for a small transcript
+delta. Over-cap hints and a deferred turn exceeding one window remain
+unknown with their immutable original references; recovery then needs explicit original inspection
+and import. A changed cursor observed during publication is retained, including changes at the same
+byte offset. This advisory file is not a cross-process coverage certificate or an atomic database
+transaction. Unsupported native formats, omitted older bytes, missing response
+denominators and host consumption remain unknown. Collector generation and original prompt
+generation stay separate; collecting old work under a new release cannot restamp it as new work.
+
 Keep the manifest outside source checkouts. Declare eligible cases and expected outcomes before
 running them. Include assigned and unfinished attempts, not only successful receipts. Give every
 capture its original path and byte SHA256 digest; the reader verifies these references with a shared
@@ -153,6 +215,13 @@ same frozen cases/trials, source, profile, questions, permissions, environment, 
 effort and cache condition in both arms. `kind: release` changes the exact runtime archive while keeping
 the selection arm fixed. `kind: jev` keeps that archive fixed and compares `code-only` with `jev-active`.
 Shadow advice cannot prove changed development outcomes. Set the practical change threshold first.
+
+`questionDigest` hashes the exact selected question-definition objects from the executing archive
+with the existing canonical `digest` owner. Retain those definitions and their installed catalog
+identity with the condition. An unchanged question ID does not establish unchanged instructions,
+shape or options. Do not substitute a frozen case/source digest or an ID list. If the definitions
+were not captured, use null. The context-quality verifier already records this exact identity as
+`questionIdentity.definitionDigest`; changed definitions prevent a matched-cost comparison.
 
 Execution captures need their original runtime version and archive digest. A current installation
 lock cannot stamp older work as current. Installed producers capture the executing package's verified

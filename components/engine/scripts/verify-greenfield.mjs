@@ -53,7 +53,7 @@ export async function verifyGreenfield(packageRoot, archive, { live = false } = 
     const submitted = submit(event), text = submitted.hookSpecificOutput.additionalContext;
     assert.match(text, /Retain operator authorization/);
     assert.match(text, /preserve the audit log during onboarding/i);
-    const entry = text.match(/Entry ([a-f0-9]{64}); route/)?.[1]; assert.ok(entry, text);
+    const entry = text.match(/Native entry reference \(for --entry\): ([a-f0-9]{64})\./u)?.[1]; assert.ok(entry, text);
     environment.HARNESS_SESSION = event.session_id;
     const bound = invoke(launcher, ['harness', 'task', 'create', '--outcome', event.prompt, '--scope', workspace]);
     assert.ok(bound.task.taskId);
@@ -84,7 +84,7 @@ export async function verifyGreenfield(packageRoot, archive, { live = false } = 
     assert.equal(invoke(launcher, ['doctor', '--capability', 'decisions']).operational.state, 'succeeded');
     if (!live) assert.equal(status(), before, 'Binding and packet replay cannot pay for repeated inference');
     const ordinary = submit({ ...event, turn_id: 'bound-task' });
-    const boundEntry = ordinary.hookSpecificOutput.additionalContext.match(/Entry ([a-f0-9]{64}); route/)?.[1];
+    const boundEntry = ordinary.hookSpecificOutput.additionalContext.match(/Native entry reference \(for --entry\): ([a-f0-9]{64})\./u)?.[1];
     assert.ok(boundEntry);
     assert.equal(invoke(launcher, ['context-route', '--entry', boundEntry]).selection.binding.taskId, bound.task.taskId);
     verifyExternalRead({ temporary, launcher, entry, invoke, run });

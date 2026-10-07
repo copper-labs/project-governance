@@ -52,11 +52,19 @@ review. The label does not prove acceptance or choose a check.
 evidence needed. Name the existing check or review owner and any limits of that proof.>
 
 The implementation plan references this repository-relative path and the applicable criterion IDs.
-Its versioned declaration binds the SHA256 of this entire file, including the prose. Update that
-binding deliberately when the specification changes; retaining an ID does not preserve old proof.
+Its versioned declaration binds the definition digest returned by the 4.1 read-only inspector:
+`project-governance implementation-plan inspect --specification <this-path>`.
+The digest includes all unmarked prose and criteria; only explicit commentary-region contents are
+excluded. Without notes it remains the entire file's SHA256. The inspector also preserves the exact
+observed file digest. Update the binding deliberately when requirements change; retaining an ID
+does not preserve old proof.
 Implementation progress, check mappings and evidence belong in the plan. Keep this specification
 focused on intended behavior, without completion boxes or execution logs.
 
 ## Related Artifacts and Open Decisions
 
 <Source intent, related contracts, implementation plan and unresolved questions.>
+
+<!-- governance:notes commentary -->
+<Changing commentary only. Keep intended behavior, requirements and approvals outside notes.>
+<!-- /governance:notes commentary -->

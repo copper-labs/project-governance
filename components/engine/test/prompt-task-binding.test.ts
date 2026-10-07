@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync, realpathSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -17,6 +17,8 @@ import { startupHooks } from "../src/startup-hooks.ts";
 import { Store } from "../../harness/src/store/store.ts";
 import { defaultDbPath } from "../../harness/src/store/location.ts";
 import { contextRouteCommand } from "../src/context-route-command.ts";
+import { RELEASE_VERSION } from "../src/release-version.ts";
+import { DECISION_BUDGET_FILE } from "../src/decision-budget.ts";
 
 const assets = resolve("src/project_governance_runtime/assets/skills"), cli = resolve("components/engine/src/cli.ts");
 function fixture() {
@@ -101,14 +103,19 @@ test("ordinary context records an inherited session and explicitly reports a mis
 test("malformed references distinguish supplied format from stored identity without retaining the reference", async () => {
   const f = fixture();
   try {
-    const supplied = "PRIVATE-invalid-reference";
-    await assert.rejects(contextRouteCommand(["--entry", supplied], f.root, assets), (error: any) => {
-      const receipt = JSON.parse(readFileSync(error.receiptPath, "utf8"));
-      assert.equal(receipt.diagnostic.causeCode, "entry-reference-format");
-      assert.equal(receipt.diagnostic.referenceDigest, digest(supplied));
-      assert.equal(receipt.diagnostic.referenceBytes, Buffer.byteLength(supplied));
-      assert.ok(!JSON.stringify(receipt).includes(supplied)); return true;
-    });
+    for (const supplied of ["PRIVATE-invalid-reference", "4b5ae5e4-909d-48ae-b703-a1a6785b7127"]) {
+      await assert.rejects(contextRouteCommand(["--entry", supplied], f.root, assets), (error: any) => {
+        const receipt = JSON.parse(readFileSync(error.receiptPath, "utf8"));
+        assert.equal(receipt.diagnostic.causeCode, "entry-reference-format");
+        assert.equal(receipt.diagnostic.referenceDigest, digest(supplied));
+        assert.equal(receipt.diagnostic.referenceBytes, Buffer.byteLength(supplied));
+        assert.equal(receipt.runtimeVersion, RELEASE_VERSION);
+        assert.equal(receipt.archiveDigest, null, "Source execution cannot certify an installed archive");
+        assert.equal(receipt.providerCalled, false); assert.equal(receipt.providerUsage, "not-called");
+        assert.equal(error.recovery, undefined, "A route UUID must not be guessed into another turn");
+        assert.ok(!JSON.stringify(receipt).includes(supplied)); return true;
+      });
+    }
     await promptContext("codex", f.event, f.root, { environment: {}, assetRoot: assets });
     const id = f.entryId(), path = join(contextStateRoot(f.root), "prompt-entries", `${id}.json`);
     const entry = JSON.parse(readFileSync(path, "utf8")); entry.entryId = "corrupt";
@@ -171,6 +178,7 @@ test("another task cannot retarget an associated entry or its native usage", asy
     await promptContext("codex", f.event, f.root, { environment: {}, assetRoot: assets });
     const first = f.run("task", "create", "--outcome", "First task");
     const id = f.entryId(), transcript = join(f.base, "usage.jsonl");
+    const entryPath = join(contextStateRoot(f.root), "prompt-entries", `${id}.json`), originalEntry = readFileSync(entryPath, "utf8");
     const usageRecord = (response: string) => JSON.stringify({ type: "token_usage_record", payload: { thread_id: f.event.session_id,
       root_turn_id: f.event.turn_id, response_id: response, usage: { input_tokens: 15, output_tokens: 3 } } }) + "\n";
     writeFileSync(transcript, usageRecord("response-one"));
@@ -179,7 +187,15 @@ test("another task cannot retarget an associated entry or its native usage", asy
     assert.equal(second.contextEntry.status, "refresh-required");
     assert.equal(promptEntryTaskBinding(f.root, readPromptEntry(f.root, id))?.taskId, first.task.taskId);
     const provider = await providerContext(f.root, resolveTaskContext(f.root).context!, {}, assets);
-    assert.equal("promptEntry" in provider.delivery && provider.delivery.promptEntry, null);
+    const providerEntry = "promptEntry" in provider.delivery ? provider.delivery.promptEntry : null;
+    assert.ok(providerEntry && "transitionId" in providerEntry);
+    assert.equal(providerEntry.bindingSource, "explicit-task-refresh");
+    assert.equal(providerEntry.entryId, id);
+    assert.equal(providerEntry.transitionId, second.contextEntry.transitionId);
+    assert.equal(providerEntry.originalBinding?.taskId, first.task.taskId);
+    assert.equal(provider.delivery.scope?.taskId, second.task.taskId);
+    assert.equal(readFileSync(entryPath, "utf8"), originalEntry);
+    assert.equal(promptEntryTaskBinding(f.root, readPromptEntry(f.root, id))?.taskId, first.task.taskId);
     writeFileSync(transcript, usageRecord("response-one") + usageRecord("response-two"));
     const imported = importContextUsage(f.root, id, transcript);
     assert.equal(imported.recorded, 1); assert.equal(imported.storeProjection, "unallocated-multiple-tasks");
@@ -202,16 +218,20 @@ test("foreign sessions cannot adopt another session's provisional prompt", async
   } finally { f.cleanup(); }
 });
 
-test("changed worktree identity and changed duplicate prompt cannot acquire a new association", async () => {
+test("same-turn changed input links current intent while changed worktree identity remains refused", async () => {
   const f = fixture();
   try {
     await promptContext("codex", f.event, f.root, { environment: {}, assetRoot: assets });
-    const id = f.entryId(), path = join(contextStateRoot(f.root), "prompt-entries", `${id}.json`);
+    const id = f.entryId(), path = join(contextStateRoot(f.root), "prompt-entries", `${id}.json`), original = readFileSync(path);
     const changed = await promptContext("codex", { ...f.event, prompt: "An entirely different task" }, f.root, { environment: {}, assetRoot: assets });
-    assert.match((changed as any).hookSpecificOutput.additionalContext, /No selection was repeated/);
-    assert.equal(readdirSync(join(contextStateRoot(f.root), "prompt-entries")).length, 1);
-    const entry = readPromptEntry(f.root, id); entry.worktreeLocator = "fs:another-worktree";
-    writeFileSync(path, JSON.stringify(entry));
+    assert.match((changed as any).hookSpecificOutput.additionalContext, /Current task facts/);
+    const entries = readdirSync(join(contextStateRoot(f.root), "prompt-entries")).map(name => JSON.parse(readFileSync(join(contextStateRoot(f.root), "prompt-entries", name), "utf8")));
+    assert.equal(entries.length, 2); const current = entries.find(entry => entry.entryId !== id)!;
+    assert.equal(current.familyId, id); assert.equal(current.promptDigest, digest("An entirely different task"));
+    assert.equal(f.run("task", "create", "--outcome", "Current changed intent").contextEntry.entryId, current.entryId);
+    assert.deepEqual(readFileSync(path), original); assert.equal(existsSync(join(contextStateRoot(f.root), DECISION_BUDGET_FILE)), false);
+    current.worktreeLocator = "fs:another-worktree";
+    writeFileSync(join(contextStateRoot(f.root), "prompt-entries", `${current.entryId}.json`), JSON.stringify(current));
     assert.equal(f.run("task", "create", "--outcome", "Should remain unlinked").contextEntry.reason, "entry-worktree-identity-changed");
   } finally { f.cleanup(); }
 });
@@ -305,7 +325,9 @@ test("ambiguous or later prompt entries cannot be guessed into a binding", async
     turnMarker(f, { entryId: otherId, turn: "another-turn", submittedAt: entry.submittedAt });
     assert.equal(f.run("task", "create", "--outcome", "Ambiguous intent").contextEntry.reason, "session-entry-ambiguous");
     assert.equal(promptEntryTaskBinding(f.root, entry), null);
-    const later = { ...entry, entryId: digest("future-entry").slice(7), turn: "future-turn", submittedAt: new Date(Date.now() + 60000).toISOString() };
+    // This deliberately fabricated late legacy original must not inherit another turn's accounting relation.
+    const { familyId: _family, accountingAnchor: _anchor, predecessor: _predecessor, ...legacyOriginal } = entry;
+    const later = { ...legacyOriginal, entryId: digest("future-entry").slice(7), turn: "future-turn", submittedAt: new Date(Date.now() + 60000).toISOString() };
     writeFileSync(join(contextStateRoot(f.root), "prompt-entries", `${later.entryId}.json`), JSON.stringify(later));
     turnMarker(f, later);
     assert.equal(f.run("task", "create", "--outcome", "Earlier command").contextEntry.reason, "entry-after-binding-request");
@@ -313,8 +335,9 @@ test("ambiguous or later prompt entries cannot be guessed into a binding", async
   } finally { f.cleanup(); }
 });
 
-test("interrupted preparation is not repeated when the native turn is replayed", async () => {
+test("interrupted preparation returns current local facts without repeating paid selection or inventing a packet", async () => {
   const f = fixture();
+  const fetch = globalThis.fetch; let calls = 0; globalThis.fetch = async () => { calls++; throw Error("No paid retry is permitted"); };
   try {
     await promptContext("codex", f.event, f.root, { environment: {}, assetRoot: assets });
     const id = f.entryId(), root = contextStateRoot(f.root), routeCount = readdirSync(join(root, "routes")).length;
@@ -322,9 +345,13 @@ test("interrupted preparation is not repeated when the native turn is replayed",
     rmSync(join(root, "prompt-entries", `${id}.json`));
     const output = await promptContext("codex", f.event, f.root, { environment: {}, assetRoot: assets });
     assert.match((output as any).hookSpecificOutput.additionalContext, /No selection was repeated/);
-    assert.equal(readdirSync(join(root, "routes")).length, routeCount);
+    assert.match((output as any).hookSpecificOutput.additionalContext, /Current task facts/);
+    assert.doesNotMatch((output as any).hookSpecificOutput.additionalContext, /Native entry reference \(for --entry\)/);
+    assert.equal(readdirSync(join(root, "routes")).length, routeCount + 1, "One deterministic local guidance receipt is retained");
     assert.equal(readdirSync(join(root, "prompt-entries")).length, 0);
-  } finally { f.cleanup(); }
+    assert.equal(readdirSync(join(root, "prompt-packets")).length, 0); assert.equal(calls, 0);
+    assert.equal(existsSync(join(root, DECISION_BUDGET_FILE)), false);
+  } finally { globalThis.fetch = fetch; f.cleanup(); }
 });
 
 test("a refused newer turn prevents task attribution to an older question", async () => {
@@ -396,11 +423,16 @@ test("a throwing analytics observer cannot change task-create success", () => {
 
 test("concurrent duplicate hooks prepare only once", async () => {
   const f = fixture();
+  const fetch = globalThis.fetch; let calls = 0; globalThis.fetch = async () => { calls++; throw Error("No duplicate transport is permitted"); };
   try {
     const pending = promptContext("codex", f.event, f.root, { environment: {}, assetRoot: assets });
     const duplicate = await promptContext("codex", f.event, f.root, { environment: {}, assetRoot: assets });
     assert.match((duplicate as any).hookSpecificOutput.additionalContext, /No selection was repeated/);
     assert.match((await pending as any).hookSpecificOutput.additionalContext, /parser.ts/);
-    assert.equal(readdirSync(join(contextStateRoot(f.root), "routes")).length, 1);
-  } finally { f.cleanup(); }
+    assert.doesNotMatch((duplicate as any).hookSpecificOutput.additionalContext, /Native entry reference \(for --entry\)/);
+    assert.equal(readdirSync(join(contextStateRoot(f.root), "routes")).length, 2, "The duplicate only retains a deterministic local guidance receipt");
+    const entries = readdirSync(join(contextStateRoot(f.root), "prompt-entries")); assert.equal(entries.length, 1);
+    assert.equal(readPromptEntry(f.root, entries[0]!.slice(0, -5)).status, "prepared"); assert.equal(calls, 0);
+    assert.equal(existsSync(join(contextStateRoot(f.root), DECISION_BUDGET_FILE)), false);
+  } finally { globalThis.fetch = fetch; f.cleanup(); }
 });

@@ -2,7 +2,7 @@
 import { join } from "node:path";
 import { digest, durableJson, object } from "./core.ts";
 import { contextStateRoot } from "./context-command.ts";
-import { currentTaskRefresh, latestSessionPrompt, promptEntryTaskBinding, readPromptEntry } from "./context-observations.ts";
+import { currentTaskRefresh, latestSessionPrompt, promptEntryTaskBinding, readPromptEntry, promptAccountingFamily } from "./context-observations.ts";
 import { sessionId, workContext } from "../../harness/src/store/location.ts";
 import { resolveTaskContext, taskBindingReceipt } from "./decision-task-binding.ts";
 import { DatabaseSync } from "node:sqlite";
@@ -24,7 +24,9 @@ export function expansionIdentity(workspace: string, entryId: string, caller?: s
     throw new ContextRouteError("entry-task-mismatch", "Context expansion task association is missing, closed or mismatched");
   const frozen = object(entry.scope);
   if (frozen.workspace !== entry.workspace || typeof frozen.taskId !== "string" || typeof frozen.taskRevision !== "string") throw new Error("Context entry accounting scope is unavailable");
-  return { session, scope: current.context ? { workspace, taskId: current.context.taskId, taskRevision: current.context.revision } : frozen as unknown as BudgetScope,
+  const accounting = promptAccountingFamily(workspace, entry);
+  return { session, familyId: accounting.familyId, anchorReady: accounting.ready,
+    scope: current.context ? { workspace, taskId: current.context.taskId, taskRevision: current.context.revision } : frozen as unknown as BudgetScope,
     transitionId: refresh?.id ?? null,
     revision: current.context ? `task:${current.context.taskId}@${current.context.revision}` : frozen.taskRevision as string };
 }
@@ -32,6 +34,10 @@ export function expansionIdentity(workspace: string, entryId: string, caller?: s
 /** Select the next existing continuation slot; admission still owns concurrency and spending. */
 export function nextContextExpansion(workspace: string, entryId: string, request?: string): 1 | 2 {
   let database: DatabaseSync | undefined;
+  try {
+    const entry = readPromptEntry(workspace, entryId), accounting = promptAccountingFamily(workspace, entry);
+    entryId = accounting.familyId;
+  } catch { /* Admission still validates the actual family; an unavailable cursor grants no slot. */ }
   try {
     database = new DatabaseSync(join(contextStateRoot(workspace), DECISION_BUDGET_FILE), { readOnly: true });
     database.exec("PRAGMA busy_timeout=100");

@@ -40,6 +40,7 @@ import { workContext } from "../../harness/src/store/location.ts";
 import { inspectStartupHookSource } from "./startup-hook-source.ts";
 import { projectContextMetric } from "./telemetry-projection.ts";
 import { runtimeExecutionIdentity } from "./runtime-execution-identity.ts";
+import { readTaskFacts } from "./task-facts.ts";
 import { contextExcerptBudget } from "./checkers/context-router.ts";
 import { sessionId } from "../../harness/src/store/location.ts";
 import { declaredDocuments } from "./checkers/document-links.ts";
@@ -57,7 +58,8 @@ export interface ContextRouteOptions extends DecisionOptions {
   retrievalEvent?: string;
   /** Storage-degraded native entry: deterministic context remains usable without paid advice or a durable receipt. */
   localOnly?: boolean;
-  family?: { id: string; step: number; scope: BudgetScope; revision: string; identity?: ContextFamilyIdentity; transitionId?: string | null; automaticRefresh?: boolean };
+  family?: { id: string; entryId?: string; step: number; scope: BudgetScope; revision: string; identity?: ContextFamilyIdentity;
+    transitionId?: string | null; automaticRefresh?: boolean; nativeSteering?: boolean };
 }
 
 type MetadataSelection = Awaited<ReturnType<typeof selectContextMetadata>>;
@@ -151,11 +153,13 @@ export async function contextRouteCommand(args: string[], root: string,
   const timing = new ContextTiming(options.operationStartedAt), controller = new AbortController();
   const timer = setTimeout(() => controller.abort("context-operation-deadline"), Math.max(0, timing.deadline - performance.now()));
   const signal = options.signal ? AbortSignal.any([options.signal, controller.signal]) : controller.signal;
+  let replayOnly = false;
   try {
     root = workContext(root).worktree;
     const replayEntry = args.length === 2 && args[0] === "--entry" ? args[1]
       : args.length === 1 && args[0]!.startsWith("--entry=") ? args[0]!.slice("--entry=".length) : undefined;
     if (replayEntry !== undefined && !options.family && !taskContext) {
+      replayOnly = true;
       const reused = readPreparedPrompt(root, replayEntry, assetRoot, options.session);
       if (!reused.route) throw new ContextRouteError("entry-packet-unavailable", "This entry has no reusable route. Use its required originals or a declared expansion.");
       return { ...reused.route, reuse: { status: "validated-entry-replay", turn: String(reused.entry.turn),
@@ -164,7 +168,7 @@ export async function contextRouteCommand(args: string[], root: string,
     return await capturedContextRoute(args, root, assetRoot, suppliedProvider, { ...options, signal }, timing, taskContext);
   }
   catch (error) {
-    throw recordContextFailure(root, error);
+    throw recordContextFailure(root, error, replayOnly ? false : null);
   } finally { clearTimeout(timer); }
 }
 
@@ -202,12 +206,17 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
       throw new Error("Use context-route --entry <entry-id> --expansion 1|2 with the current purpose and optional paths or links");
     const selected = expansionIdentity(root, values.entry, options.session);
     options = { ...options, session: selected.session, promptEntry: true, workspaceCatalog: true,
-      family: { id: values.entry, step: Number(values.expansion), scope: selected.scope, revision: selected.revision, transitionId: selected.transitionId, automaticRefresh } };
+      localOnly: options.localOnly || !selected.anchorReady,
+      family: { id: selected.familyId, entryId: values.entry, step: Number(values.expansion), scope: selected.scope, revision: selected.revision, transitionId: selected.transitionId, automaticRefresh } };
   }
   const binding = resolveTaskContext(root, { ...(taskContext ? { context: taskContext } : {}),
     ...(values["decision-context"] ? { path: values["decision-context"] } : {}),
     ...(values["decision-task"] ? { taskId: values["decision-task"] } : {}), ...(values.revision ? { revision: values.revision } : {}),
     ...(options.session ? { session: options.session } : {}) });
+  const nativeBinding = options.family?.nativeSteering
+    ? taskBindingReceipt(resolveTaskContext(root, options.session === undefined ? {} : { session: options.session })) : null;
+  if (nativeBinding && (nativeBinding.taskId !== (binding.context?.taskId ?? null) || nativeBinding.revision !== (binding.context?.revision ?? null)))
+    throw new ContextRouteError("entry-task-changed", "The task changed before preparing the current native input.");
   if (!binding.context && (!values.task || !values.revision && !options.family)) throw new Error(`Task context unavailable (${binding.status}); create or resume this session's harness task, or supply explicit --task and --revision.`);
   const task = text(values.task ?? (binding.context ? decisionTaskPurpose(binding.context) : undefined), "task", CONTEXT_PROMPT_LIMIT),
     revision = text(values.revision ?? binding.context?.revision ?? options.family?.revision, "task revision");
@@ -302,7 +311,7 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
   const inactiveSelection = !!options.family &&
     (!settings.questionIds.DL03.includes("context.metadata-relevance/1") || !settings.legacy.allowedDataClasses.includes("metadata") ||
       !(settings.allowedMetadataPaths ?? []).length || metadataRuntime.eligibility("DL03", "context.metadata-relevance/1").providerUse !== "eligible");
-  if (options.family?.identity && !options.localOnly && !inactiveSelection &&
+  if (options.family?.identity && !options.family.nativeSteering && !options.localOnly && !inactiveSelection &&
       !["opened", "existing"].includes(openContextFamily(contextStateRoot(root), options.family.identity))) options = { ...options, localOnly: true };
   const admission = options.family && !options.localOnly && !inactiveSelection ? beginContextSelection(root, options.family.id, options.family.step, familyRequest) : null;
   if (admission && !admission.paid && !admission.replay) options = { ...options, localOnly: true };
@@ -422,8 +431,11 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
   }
   const receiptId = randomUUID();
   if (options.family && options.family.step > 0) {
-    const final = expansionIdentity(root, options.family.id, options.session);
-    if (digest(final.scope) !== digest(options.family.scope) || final.revision !== options.family.revision)
+    const changed = options.family.nativeSteering
+      ? digest(taskBindingReceipt(resolveTaskContext(root, options.session === undefined ? {} : { session: options.session }))) !== digest(nativeBinding)
+      : (() => { const final = expansionIdentity(root, options.family.entryId ?? options.family.id, options.session);
+        return digest(final.scope) !== digest(options.family!.scope) || final.revision !== options.family!.revision; })();
+    if (changed)
       throw new ContextRouteError("entry-task-changed", "The task changed while preparing context; refresh against the current binding.");
   }
   const identity = { revision, taskDigest: digest(task), configDigests, routingPaths, route: route.selected?.id ?? null,
@@ -468,13 +480,14 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
   const metadataSummary = metadataReceiptPreview(metadata);
   const familyCompleted = options.family && admission?.paid ? finishContextSelection(root, options.family.id, options.family.step, familyRequest,
     metadata?.cursor ?? { version: 1, generation: projection.generation, batches: [] }) : null;
-  const expansion = options.family ? { entry: options.family.id, step: options.family.step, status: admission?.status ?? "local-only", completed: familyCompleted,
+  const currentEntryId = options.family?.entryId ?? options.family?.id ?? null;
+  const expansion = options.family ? { entry: currentEntryId, familyId: options.family.id, step: options.family.step, status: admission?.status ?? "local-only", completed: familyCompleted,
     transitionId: options.family.transitionId ?? null,
     nextStep: options.family.step < 2 ? options.family.step + 1 : null, sharedAllowance: true, originalReadsAvailable: true } : null;
   const ambientSession = options.session ?? sessionId();
   const nativeSession = options.session ?? (binding.source === "session" ? ambientSession : null);
   let promptLink: { status: string; reason: string; entryId: string | null } = options.family
-    ? { status: "linked", reason: "native-entry", entryId: options.family.id }
+    ? { status: "linked", reason: "native-entry", entryId: currentEntryId }
     : { status: "unlinked", reason: ambientSession ? "binding-not-session-owned" : "session-unavailable", entryId: null };
   if (!options.family && binding.source === "session" && nativeSession) {
     try {
@@ -487,8 +500,13 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
     }
   }
   const execution = { workspace: root, worktreeLocator: workContext(root).locator,
-    nativeSession, entryId: options.family?.id ?? null, promptLink,
+    nativeSession, entryId: currentEntryId, familyId: options.family?.id ?? null, promptLink,
     definitionSource: inspectStartupHookSource(root).definitionRoot };
+  const taskFacts = nativeSession ? readTaskFacts(root, nativeSession, {
+    deadlineAt: timing.deadline, qualifyHistoricalChecks: false,
+    ...(binding.context ? { expected: { taskId: binding.context.taskId, revision: binding.context.revision,
+      ...(binding.attemptId ? { attemptId: binding.attemptId } : {}) } } : {}),
+  }) : null;
   const receipt = { version: 1, ...runtimeExecutionIdentity(), workspace: root, receiptId, execution, createdAt: new Date().toISOString(), ...identity, selection, expansion,
     timing: timing.snapshot(metadata?.providerCallMs ?? 0, projection.status.elapsedMs),
     projection: projectionReceiptPreview(projection, admittedPaths),
@@ -506,7 +524,7 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
   try { writeContextRecord(join(contextStateRoot(root), "routes", `${receiptId}.json`), receipt); }
   catch (error) { if (!options.localOnly || !options.promptEntry) throw error; receiptPersisted = false; }
   if (receiptPersisted) projectContextMetric(contextStateRoot(root), { id: receiptId, workspace: root, capturedAt: receipt.createdAt,
-    kind: "route", entryId: options.family?.id ?? null, familyId: options.family?.id ?? null, routeId: receiptId,
+    kind: "route", entryId: currentEntryId, familyId: options.family?.id ?? null, routeId: receiptId,
     taskId: binding.context?.taskId ?? null, taskRevision: binding.context?.revision ?? null, status: receipt.outcome,
     reason: metadata?.reason ?? selection.reason, counts: {
       eligible: metadata?.coverage.eligibleCount ?? null, permitted: metadata?.coverage.permittedCount ?? null,
@@ -532,7 +550,7 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
     decisions: [(relevanceAdvice as ContextAdvice | null)?.decision?.receiptId, optional?.decision?.receiptId,
       ...(metadata?.decisions.map(item => item.receiptId) ?? []), ...(passageAdvice?.decisions.map(item => item.receiptId) ?? [])].filter((id): id is string => typeof id === "string") });
   if (staleSources.length) throw new Error("Context sources changed while preparing the routed packet");
-  return { ...packet, execution, route, routingPaths, receiptId, receiptPersisted, inputDigest: receipt.inputDigest, revision, source: identity.source,
+  return { ...packet, execution, taskFacts, route, routingPaths, receiptId, receiptPersisted, inputDigest: receipt.inputDigest, revision, source: identity.source,
     timing: receipt.timing,
     projection: receipt.projection,
     expansion: expansion ? { ...expansion, argv: expansion.nextStep ? ["project-governance", "context-route", "--entry", expansion.entry,

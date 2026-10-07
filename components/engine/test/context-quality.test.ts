@@ -84,6 +84,50 @@ test("separate requested sections fit one bounded packet with exact source range
   }
 });
 
+test("a deep table row retains its columns without unrelated preceding rows", () => {
+  const text = "# Interval contract\n| Source | Input unit | Stored unit |\n| --- | --- | --- |\n" +
+    Array.from({ length: 36 }, (_, index) => `| unrelated channel ${index} | bytes | bytes |\n`).join("") +
+    "| Radio stream | milliseconds | seconds |\n";
+  const facts = extractSourceFacts("docs/intervals.md", Buffer.from(text));
+  const original = { id: "docs/intervals.md", sourceDigest: facts.digest, excerpt: text };
+  const row = facts.spans.find(span => span.kind === "table-row" && span.name.startsWith("Radio stream"))!;
+  assert.ok(row); assert.deepEqual(row.context?.map(span => [span.start, span.end]), [[2, 3]]);
+  for (const preferred of [[], [row]]) {
+    const excerpt = contextExcerpt(original, "Find the radio stream stored unit", 260, facts.spans, preferred);
+    assert.match(excerpt.excerpt, /Source \| Input unit \| Stored unit/);
+    assert.match(excerpt.excerpt, /Radio stream \| milliseconds \| seconds/);
+    assert.equal(excerpt.excerpt.includes("unrelated channel"), false);
+    assert.deepEqual(excerpt.sourceRanges?.map(range => [range.firstLine, range.lastLine]), [[2, 3], [40, 40]]);
+    assert.deepEqual(excerpt.sourceUnits?.map(unit => [unit.kind, unit.complete]), [["table-columns", true], ["table-row", true]]);
+    assert.ok(Buffer.byteLength(excerpt.excerpt) <= 260);
+  }
+  const insufficient = contextExcerpt(original, "Find the radio stream stored unit", 128, facts.spans, [row]);
+  assert.equal(insufficient.sourceUnits?.some(unit => unit.kind === "table-row" && unit.complete), false,
+    "A row without complete columns cannot claim complete evidence");
+});
+
+test("table facts ignore fenced/frontmatter text and preserve escaped cells and header identities", () => {
+  const text = "---\nsummary: |\n  | Wrong | Header |\n  | --- | --- |\n  | hidden | hidden |\n---\n" +
+    "```md\n| Wrong | Header |\n| --- | --- |\n| hidden | hidden |\n```\n" +
+    "# Literal table\n| Source | Contract |\n| :--- | ---: |\n| Radio\\|stream | `seconds|milliseconds` |\n";
+  const facts = extractSourceFacts("docs/escaped.md", Buffer.from(text));
+  const rows = facts.spans.filter(span => span.kind === "table-row");
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0]!.name, "Radio\\|stream | `seconds|milliseconds`");
+  const excerpt = contextExcerpt({ id: "docs/escaped.md", sourceDigest: facts.digest, excerpt: text }, "Radio stream contract", 256, facts.spans, rows);
+  assert.match(excerpt.excerpt, /Source \| Contract/); assert.match(excerpt.excerpt, /Radio\\\|stream/);
+  assert.equal(excerpt.excerpt.includes("hidden"), false);
+});
+
+test("table extraction limits stay explicit and cannot displace later section ranges", () => {
+  const text = "# Table\n| Key | Value |\n| --- | --- |\n" + Array.from({ length: 120 }, (_, index) => `| row ${index} | value |\n`).join("") +
+    "# Later decisive rule\nThe replacement owns its own lock.\n";
+  const facts = extractSourceFacts("docs/table-and-rule.md", Buffer.from(text));
+  assert.equal(facts.spans.length, 96);
+  assert.deepEqual(facts.spans.filter(span => span.kind === "heading").map(span => span.name), ["Table", "Later decisive rule"]);
+  assert.equal(JSON.parse(facts.descriptor!).spanLimitReached, true);
+});
+
 test("test labels describe behavior without evaluating expressions; capped sections stop at the next boundary", () => {
   const facts = extractSourceFacts("src/session.test.ts", Buffer.from("const fixture = {};\ntest('cancels only the owned session', () => {});\nit.skip(`keeps replacement alive`, () => {});\ntest(getLabel(), () => {});\n"));
   const descriptor = JSON.parse(facts.descriptor!);

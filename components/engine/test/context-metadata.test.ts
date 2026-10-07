@@ -13,6 +13,7 @@ import { digest } from "../src/core.ts";
 import { readDecisionBudget, decisionBudgetStoreStatus, contextBudgetScope } from "../src/decision-budget.ts";
 import { selectContextPassages } from "../src/context-passage-advice.ts";
 import { sourceDescription } from "../src/context-source-index.ts";
+import { contextQuality41Development } from "./fixtures/context-quality-frozen.ts";
 
 const syntheticSubject = (methods: Record<string, unknown> = {}) => ({
   root: tmpdir(), source: () => ({ file_type: "regular" }),
@@ -24,6 +25,32 @@ const settings = (overrides: Record<string, unknown> = {}) => profileDecisionSet
   mode: "auto", allowed_data_classes: ["metadata"], allowed_metadata_paths: ["src/**"],
   consumers: { DL03: { mode: "auto", questions: ["context.metadata-relevance/1"] } }, ...overrides,
 } } });
+
+test("current mixed request and labelled task background reach metadata questions without a status shortlist", async t => {
+  const root = mkdtempSync(join(tmpdir(), "metadata-current-turn-")); t.after(() => rmSync(root, { recursive: true, force: true }));
+  const fixture = contextQuality41Development.find(item => item.id === "4-1-mixed-status-fix")!, sources = fixture.qualityLabels!.sources;
+  const indexed = syntheticSubject({ root, readBatch: (paths: string[]) => new Map(paths.map(path => [path, Buffer.from(sources.find(item => item.candidateId === path)!.text)])) });
+  const configured = settings({ allowed_data_classes: ["metadata", "source"], allowed_metadata_paths: ["**"], allowed_source_paths: ["**"] });
+  const seen = new Set<string>();
+  const runtime = new DecisionRuntime(configured, root, { coordinationRoot: root, token: "fixture", fetch: async (_url, init) => {
+    const wire = JSON.parse(String(init?.body));
+    assert.equal(wire.state.purpose, fixture.request.purpose);
+    assert.match(wire.state.instructions, /current request takes priority/iu);
+    assert.match(wire.state.instructions, /bound-task intent is background/iu);
+    assert.match(wire.state.instructions, /weak descriptions are not proof of irrelevance/iu);
+    assert.equal(JSON.stringify(wire).includes("authored-labels"), false);
+    return Response.json({ model: configured.legacy.model, answers: Object.fromEntries(Object.entries(wire.questions).map(([name, raw]) => {
+      seen.add(wireMetadataEvidence(wire, raw).id); return [name, { type: "noul", noul: 0.6 }];
+    })) });
+  } });
+  const paths = sources.map(item => item.candidateId), purpose = fixture.request.purpose;
+  const catalog = contextMetadataCatalog(paths, purpose, [], [], new Set());
+  const result = await selectContextMetadata(indexed, catalog, purpose, runtime,
+    { workspace: root, taskId: "mixed-current-turn", taskRevision: "1" }, digest("source"), "mixed-current-turn");
+  assert.equal(result.coverage.complete, true); assert.equal(result.coverage.answeredCount, paths.length);
+  assert.deepEqual([...seen].sort(), paths.slice().sort(), "Status wording does not remove implementation, tests or previous background from the inventory");
+  assert.deepEqual(result.order, catalog.candidates.map(item => item.path), "Uncertain advice retains the ordinary baseline");
+});
 
 test("opt-in passage selection retains calls and bytes in the same retrieval allowance", async t => {
   const root = mkdtempSync(join(tmpdir(), "metadata-passage-reserve-")); t.after(() => rmSync(root, { recursive: true, force: true }));

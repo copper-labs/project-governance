@@ -14,13 +14,16 @@ import { report, touch, recordPaths } from "./ops/concurrency.ts";
 import { resume, reconcile, exportTask, importHistory } from "./ops/continuity.ts";
 import { adapterBlock, initRepo } from "./ops/adapter.ts";
 import type { TaskItem, TaskStatus, Usage } from "./model/types.ts";
+import { parsePlanReference, type PlanReference } from "./model/plan-reference.ts";
 const HELP = `harness — task continuity and evidence, not an agent or process supervisor
   init [--apply] [--file AGENTS.md|CLAUDE.md]   preview or install host routing
   task create --outcome TEXT --scope PATH [--constraint TEXT] [--acceptance TEXT] [--exploring]
+              [--plan-path PATH --plan-batch ID]
   task list [--all]
   task show|fork --task ID [--outcome TEXT]
   task revise --task ID --expected-version N [--note TEXT] [--constraint TEXT] [--acceptance TEXT]
               [--scope PATH] [--ruled-out TEXT] [--revoke N] [--status STATUS] [--authority-ref REF]
+              [--plan-path PATH --plan-batch ID]
   resume --task ID [--session ID] [--parent-attempt ID] [--after N] [--budget BYTES]
   checkpoint --task ID --summary TEXT --next TEXT [--evidence ID] [--subject DIGEST]
   context get --task ID [--at worktree|staged|REV] [--path PATH] [--mandatory PATH]
@@ -46,7 +49,7 @@ Global: --db PATH (default: Git common dir/harness/harness.db), --session ID
 Check run/result exit codes: 0 success, 1 established failed assertions, 2 blocked/refused/invalid/unconfirmed, 3 pending.
 Check cancel reports cancellation status: 0 acknowledged/terminal, 3 pending, 2 refused/unknown.\n`;
 const BOOLEANS = new Set(["all", "exploring", "apply", "include-artifacts", "release", "help", "staged"]);
-const ALLOWED = new Set([...BOOLEANS, "file", "outcome", "scope", "constraint", "acceptance", "task", "expected-version", "note", "ruled-out", "open-question", "revoke", "status", "authority-ref", "session", "parent-attempt", "after", "budget", "summary", "next", "evidence", "subject", "at", "path", "mandatory", "artifact", "offset", "length", "bytes", "mode", "request-file", "executor", "state-root", "wait", "action", "target", "source", "conflict", "digest", "db", "stage"]);
+const ALLOWED = new Set([...BOOLEANS, "file", "outcome", "scope", "constraint", "acceptance", "task", "expected-version", "note", "ruled-out", "open-question", "revoke", "status", "authority-ref", "session", "parent-attempt", "after", "budget", "summary", "next", "evidence", "subject", "at", "path", "mandatory", "artifact", "offset", "length", "bytes", "mode", "request-file", "executor", "state-root", "wait", "action", "target", "source", "conflict", "digest", "db", "stage", "plan-path", "plan-batch"]);
 function parse(argv: string[]) {
     const flags: Record<string, string[]> = {}, words: string[] = [], command: string[] = [];
     for (let i = 0; i < argv.length; i++) {
@@ -79,10 +82,12 @@ export interface TaskBindingObservation {
     workspace: string; session: string; taskId: string; revision: string; attemptId: string;
     requestedAt: string;
 }
-interface ContinuityCommandOptions {
+export interface ContinuityCommandOptions {
     groups?: readonly string[];
     /** Optional analytics after a successful bind; it cannot change task authority or its result. */
     observeBinding?: (binding: TaskBindingObservation) => unknown;
+    /** The engine owns source parsing; a resolved identity does not establish completion. */
+    resolvePlanReference?: (workspace: string, path: string, batch: string) => PlanReference;
 }
 function commandHelp(groups?: readonly string[]): string {
     if (!groups) return HELP;
@@ -117,7 +122,17 @@ function main(argv: string[], options: ContinuityCommandOptions = {}): void {
     }
     if (options.groups && !options.groups.includes(group))
         throw new Error("This continuity command requires the unified workflow/check or host-instructions/startup surface");
+    const hasPlan = Boolean(flags["plan-path"] || flags["plan-batch"]);
+    if (hasPlan && (group !== "task" || !["create", "revise"].includes(verb ?? "")))
+        throw new Error("--plan-path and --plan-batch are only valid for task create or revise");
+    if (hasPlan && (flags["plan-path"]?.length !== 1 || flags["plan-batch"]?.length !== 1))
+        throw new Error("--plan-path and --plan-batch must appear together exactly once");
+    if (hasPlan && !options.resolvePlanReference)
+        throw new Error("Plan references require the unified engine's plan resolver");
     const where = workContext(process.cwd()), root = where.worktree;
+    const planReference = hasPlan ? parsePlanReference(options.resolvePlanReference!(root, require("plan-path"), require("plan-batch"))) : null;
+    if (planReference && (planReference.path !== one("plan-path") || planReference.batch !== one("plan-batch")))
+        throw new Error("Plan resolver returned a different path or batch");
     let who = sessionId(one("session")), taskId = one("task") ?? null;
     const store = new Store(one("db") ? resolve(one("db")!) : defaultDbPath(root));
     const workspaceId = store.workspace(where.locator, root);
@@ -182,7 +197,7 @@ function main(argv: string[], options: ContinuityCommandOptions = {}): void {
         if (group === "doctor")
             return emit({ ok: true, node: process.version, governanceVersion: process.env["GOVERNANCE_CONTINUITY_VERSION"] ?? null, repositoryId: store.repositoryId(), workspaceId, sessionIdentity: who ? "available" : "unknown", executor: existsSync(process.env["GOVERNANCE_CONTINUITY_EXECUTOR"] ?? join(root, ".governance/runtime/bin/harness-agent")) ? "present; not qualified" : "not installed here; pass --executor", hostHooks: "unqualified; use an explicit host probe before installation", tokens: "native incremental observations only; otherwise unknown" });
         if (group === "task" && verb === "create") {
-            const task = store.createTask(require("outcome"), [...(flags["scope"] ?? [root]).map(p => item("scope", resolve(root, p), "operator")), ...(flags["constraint"] ?? []).map(p => item("constraint", p, "operator")), ...(flags["acceptance"] ?? []).map(p => item("acceptance", p, "operator"))], { ...where, ...(who ? { session: who } : {}), mode: flags["exploring"] ? "explore" : "implement" });
+            const task = store.createTask(require("outcome"), [...(flags["scope"] ?? [root]).map(p => item("scope", resolve(root, p), "operator")), ...(flags["constraint"] ?? []).map(p => item("constraint", p, "operator")), ...(flags["acceptance"] ?? []).map(p => item("acceptance", p, "operator")), ...(planReference ? [item("plan-reference", JSON.stringify(planReference), "operator")] : [])], { ...where, ...(who ? { session: who } : {}), mode: flags["exploring"] ? "explore" : "implement" });
             taskId = task.taskId;
             if (who)
                 store.bind(taskId, who, workspaceId, root);
@@ -204,6 +219,7 @@ function main(argv: string[], options: ContinuityCommandOptions = {}): void {
             const task = needTask();
             require("expected-version");
             const added: Omit<TaskItem, "seq" | "revoked">[] = [];
+            if (planReference) added.push(item("plan-reference", JSON.stringify(planReference), "operator"));
             for (const [flag, kind, provenance] of [["note", "handoff", "hypothesis"], ["ruled-out", "ruled-out", "hypothesis"], ["open-question", "open-question", "hypothesis"], ["constraint", "constraint", "operator"], ["acceptance", "acceptance", "operator"], ["scope", "scope", "operator"]] as const)
                 for (const body of flags[flag] ?? [])
                     added.push(item(kind, flag === "scope" ? resolve(root, body) : body, provenance));

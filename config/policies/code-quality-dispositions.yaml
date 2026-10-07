@@ -387,3 +387,111 @@ dispositions:
     task binding, native dispatch, original replay and final cleanup. Pure source labels, scoring, transport and
     owned native parent handling already have helpers. Extracting the remaining phase loop would distribute
     the proof identity without isolating another responsibility. This applies to the test helper only.
+- finding: quality.large-function
+  path: components/engine/scripts/verify-context-quality.mjs
+  symbol: verifyContextQuality
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex focused staged-source cohesion review
+  approved_on: '2026-10-07'
+  responsibility: Qualify one frozen installed context-selection experiment across exact runtime, condition and arm identities.
+  rationale: The trial fold shares frozen cases, verified stages, original calls and per-row assessments through
+    final stage readback. Archive capture, staging, fixture inference and scoring already have separate owners.
+    Keeping the remaining coordinator together exposes the no-call arm and unknown outcome boundaries;
+    splitting by length would distribute the same experiment identity rather than isolate another duty.
+- finding: quality.large-function
+  path: components/engine/scripts/verify-context-quality.mjs
+  symbol: renderContextQualityReport
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex focused staged-source cohesion review
+  approved_on: '2026-10-07'
+  responsibility: Render qualified frozen selection originals through their exact installed presentation owners without provider dispatch.
+  rationale: Original verification, installed rendering and final hash revalidation share one retained-owner
+    map and captured-original set. The network prohibition is restored in the same finally boundary.
+    Archive inspection, rendering and quality scoring already have independent owners; extracting the
+    row fold would distribute the same provenance and no-call lifetime without improving testability.
+- finding: quality.large-function
+  path: components/engine/scripts/verify-conversational-facts.mjs
+  symbol: verifyConversationalFacts
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex focused staged-source cohesion review
+  approved_on: '2026-10-07'
+  responsibility: Prove one installed conversation lifecycle across binding, replay, steering, facts delivery and cleanup.
+  rationale: The scenarios carry original tasks, checkpoints, failed checks and native entry identities across
+    one disposable installation history and its isolated siblings. Assessment, custody snapshots, archive
+    staging and native transport already have helpers. The final cleanup settles all owned hosts and readers;
+    splitting the history would duplicate setup or hide the state transitions this proof must preserve.
+- finding: quality.large-function
+  path: components/engine/src/context-doctor.ts
+  symbol: contextDoctor
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex focused staged-source cohesion review
+  approved_on: '2026-10-07'
+  responsibility: Aggregate passive context readiness from current configuration and existing local observations.
+  rationale: Workspace alignment, route budgets, disclosure eligibility and hook source feed one readiness
+    result without probes or mutations. Each inspection already has a named owner. Keeping the final fold
+    together makes degraded configuration distinct from unobserved provider availability and host use;
+    extracting it by length would only pass the same findings and readiness fields between helpers.
+- finding: quality.large-function
+  path: components/engine/src/context-excerpts.ts
+  symbol: contextExcerpt
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex focused staged-source cohesion review
+  approved_on: '2026-10-07'
+  responsibility: Fit exact original source units into one excerpt allowance while preserving range and completeness identity.
+  rationale: Preferred-unit admission, atomic table context, adjacent joining and fallback share original
+    lines, admitted parts and serialized byte accounting. Span scoring, cluster discovery and partial windows
+    already have separate owners. Keeping the admission fold visible preserves judgment order and prevents
+    later units from evicting earlier ones without inventing a second mutable fitting protocol.
+- finding: quality.large-function
+  path: components/engine/src/release-evaluation-capture.ts
+  symbol: captureReleaseEvaluation
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex focused staged-source cohesion review
+  approved_on: '2026-10-07'
+  responsibility: Publish one explicitly selected evaluation manifest with exact canonical task lineage and original evidence links.
+  rationale: Selected references, task revisions, store identity and final revalidation share one capture
+    lifetime before immutable manifest publication. Bounded reads, provider cost validation and evaluation
+    interpretation already have independent owners. Keeping the remaining capture together exposes the
+    no-inferred-acceptance and changed-original refusals without competing snapshot or publication owners.
+- finding: quality.large-function
+  path: components/engine/src/task-facts.ts
+  symbol: readTaskFacts
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex focused staged-source cohesion review
+  approved_on: '2026-10-07'
+  responsibility: Observe one bound task snapshot from canonical originals without executing, collecting or changing task state.
+  rationale: Binding, task revision, plan identity and final cursor recheck share one read-only store lifetime.
+    Workflow facts, plan parsing and historical check qualification already have independent owners.
+    Keeping the remaining fold together exposes unavailable and historical evidence while refusing a
+    changed association; moving it by artifact kind would distribute the same snapshot consistency boundary.
+- finding: quality.large-function
+  path: components/engine/test/fixtures/release-evaluation-producers.mjs
+  symbol: verifyEvaluationProducers
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex focused staged-source cohesion review
+  approved_on: '2026-10-07'
+  responsibility: Qualify installed producer identity and its synthetic task-outcome capture through original receipts.
+  rationale: Check, decision, exposure, usage and task transition exercise one exact installed generation
+    and linked evaluation shape. All assertions use their existing production owners, retain synthetic
+    acceptance labels and leave development benefit unknown. Keeping the fixture together exposes the
+    cross-producer identity join and restores its environment and store within one cleanup boundary.
+- finding: quality.large-file
+  path: components/engine/test/context-observations.test.ts
+  symbol: <file>
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex focused staged-source cohesion review
+  approved_on: '2026-10-07'
+  responsibility: Prove context observation provenance and incremental native usage attribution without private prompt disclosure.
+  rationale: Named independent cases reuse one small original-entry and transcript fixture to exercise
+    deduplication, cursor recovery, deferred unknown ranges, steering ambiguity and generation identity.
+    The same observation boundary also qualifies external reads and neutral Stop delivery. Keeping these
+    related cases together preserves navigation and shared fixture ownership; no test depends on another.

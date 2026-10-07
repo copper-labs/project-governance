@@ -12,6 +12,26 @@ import { currentTaskPromptEntry } from "./context-observations.ts";
 import { readContextRecord } from "./context-records.ts";
 import { worktreeBytes } from "./change-subject.ts";
 
+export interface PreparedContextDiagnostic {
+  causeCode: string;
+  sourceKind?: "configuration" | "required" | "skill" | "optional";
+  sourcePathDigest?: string;
+}
+
+/** Safe causes identify the failed check without exporting source or parser diagnostics. */
+export class PreparedContextValidationError extends Error {
+  readonly diagnostic: PreparedContextDiagnostic;
+  constructor(message: string, causeCode: string, sourceKind?: PreparedContextDiagnostic["sourceKind"], path?: string) {
+    super(message);
+    this.diagnostic = { causeCode, ...(sourceKind ? { sourceKind } : {}), ...(path ? { sourcePathDigest: digest(path) } : {}) };
+  }
+}
+
+function preparedRead<T>(read: () => T, causeCode: string, sourceKind?: PreparedContextDiagnostic["sourceKind"], path?: string): T {
+  try { return read(); }
+  catch { throw new PreparedContextValidationError("Prepared context input is unavailable; expected a bounded regular file.", causeCode, sourceKind, path); }
+}
+
 /** Deliver the existing context packet before provider dispatch; no second context selector. */
 export async function providerContext(workspace: string, context: DecisionTaskContext | undefined, options: DecisionOptions = {}, assetRoot?: string) {
   const outside = (reason: string) => ({ text: "", delivery: { status: "not-delivered", reason, used: null,
@@ -47,25 +67,36 @@ export async function providerContext(workspace: string, context: DecisionTaskCo
 /** Recheck captured sources at the actual native launch, including candidates the packet omitted. */
 export function validateProviderContext(workspace: string, context: Record<string, unknown>, assembled: string) {
   if (context.status !== "prepared-for-native-input") return;
-  if (typeof context.receipt !== "string" || fileDigest(context.receipt) !== context.receiptDigest ||
-      typeof context.deliveredBytes !== "number" || !Number.isSafeInteger(context.deliveredBytes) || context.deliveredBytes < 0) throw new Error("Prepared context identity changed");
+  if (typeof context.receipt !== "string") throw new PreparedContextValidationError("Prepared context identity changed", "receipt-reference-invalid");
+  if (preparedRead(() => fileDigest(context.receipt as string), "receipt-unavailable") !== context.receiptDigest)
+    throw new PreparedContextValidationError("Prepared context identity changed", "receipt-digest-changed");
+  if (typeof context.deliveredBytes !== "number" || !Number.isSafeInteger(context.deliveredBytes) || context.deliveredBytes < 0)
+    throw new PreparedContextValidationError("Prepared context identity changed", "delivery-size-invalid");
   const bytes = Buffer.from(assembled), content = bytes.subarray(Math.max(0, bytes.length - context.deliveredBytes)).toString("utf8");
-  if (digest(content) !== context.contentDigest) throw new Error("Prepared context was not delivered intact");
-  const receipt = readContextRecord(dirname(context.receipt), context.receipt);
-  if (receipt.inputDigest !== context.inputDigest || receipt.ready !== true) throw new Error("Prepared context receipt changed");
-  for (const [path, hash] of Object.entries(object(receipt.configDigests))) {
-    if (digest(Buffer.from(narrativeFile(workspace, path)).toString("base64")) !== hash) throw new Error("Context configuration changed before dispatch");
+  if (digest(content) !== context.contentDigest) throw new PreparedContextValidationError("Prepared context was not delivered intact", "delivery-content-changed");
+  const receipt = preparedRead(() => readContextRecord(dirname(context.receipt as string), context.receipt as string), "receipt-unreadable");
+  if (receipt.inputDigest !== context.inputDigest || receipt.ready !== true)
+    throw new PreparedContextValidationError("Prepared context receipt changed", "receipt-identity-changed");
+  if (!Array.isArray(receipt.context) || !Array.isArray(receipt.skills) || !Array.isArray(receipt.optionalSources))
+    throw new PreparedContextValidationError("Prepared context receipt changed", "receipt-shape-invalid");
+  const configDigests = preparedRead(() => object(receipt.configDigests), "receipt-shape-invalid");
+  for (const [path, hash] of Object.entries(configDigests)) {
+    const current = preparedRead(() => narrativeFile(workspace, path), "configuration-unavailable", "configuration", path);
+    if (digest(Buffer.from(current).toString("base64")) !== hash)
+      throw new PreparedContextValidationError("Context configuration changed before dispatch", "configuration-changed", "configuration", path);
   }
-  const sources = [...(receipt.context as unknown[]).map(raw => ({ raw, root: workspace })),
-    ...(receipt.skills as unknown[]).map(raw => ({ raw, root: String(object(raw).path).startsWith(".governance/") ? workspace : String(context.skillAssetRoot) }))];
-  for (const { raw, root } of sources) {
-    const source = object(raw), path = String(source.path ?? source.id);
-    const current = narrativeFile(root, path);
-    if (`sha256:${createHash("sha256").update(current).digest("hex")}` !== source.sourceDigest) throw new Error("Prepared source changed before dispatch");
+  const sources = [...(receipt.context as unknown[]).map(raw => ({ raw, root: workspace, kind: "required" as const })),
+    ...(receipt.skills as unknown[]).map(raw => ({ raw, root: String(preparedRead(() => object(raw), "receipt-shape-invalid").path).startsWith(".governance/") ? workspace : String(context.skillAssetRoot), kind: "skill" as const }))];
+  for (const { raw, root, kind } of sources) {
+    const source = preparedRead(() => object(raw), "receipt-shape-invalid"), path = String(source.path ?? source.id);
+    const current = preparedRead(() => narrativeFile(root, path), "source-unavailable", kind, path);
+    if (`sha256:${createHash("sha256").update(current).digest("hex")}` !== source.sourceDigest)
+      throw new PreparedContextValidationError("Prepared source changed before dispatch", "source-changed", kind, path);
   }
   for (const raw of receipt.optionalSources as unknown[]) {
-    const source = object(raw), current = worktreeBytes(workspace, String(source.id));
+    const source = preparedRead(() => object(raw), "receipt-shape-invalid"), path = String(source.id);
+    const current = preparedRead(() => worktreeBytes(workspace, path), "source-unavailable", "optional", path);
     if (current.type !== "regular" || `sha256:${createHash("sha256").update(current.bytes).digest("hex")}` !== source.sourceDigest)
-      throw new Error("Prepared source changed before dispatch");
+      throw new PreparedContextValidationError("Prepared source changed before dispatch", "source-changed", "optional", path);
   }
 }

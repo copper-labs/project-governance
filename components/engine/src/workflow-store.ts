@@ -2,9 +2,11 @@ import type { DiagnosticEpisode, DiagnosticOwner, DiagnosticAttempt, DiagnosticP
 import { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
 import { Store } from "../../harness/src/store/store.ts";
+import { SCHEMA_VERSION } from "../../harness/src/store/schema.ts";
 import { withinScope } from "../../harness/src/ops/authority.ts";
+import { lstatSync, realpathSync } from "node:fs";
 import { resolve } from "node:path";
-import { canonical, digest, text } from "./core.ts";
+import { canonical, digest, object, text } from "./core.ts";
 import { recipeDigest, type RunBinding, type RunState, type StageResult, type StageState } from "./workflow-types.ts";
 
 export interface WorkflowRun {
@@ -12,6 +14,87 @@ export interface WorkflowRun {
   owner: string | null; cancelRequested: boolean; createdAt: string; updatedAt: string;
 }
 export interface WorkflowStage { id: string; state: StageState; result: StageResult | null }
+export interface WorkflowRunFacts {
+  runId: string; state: RunState;
+  stages: Array<{ id: string; state: StageState; resultDigest: string | null; exitCode: number | null;
+    cleanup: "confirmed" | "unknown" | null; log: string | null }>;
+}
+export interface WorkflowFacts {
+  status: "observed" | "unavailable";
+  byAction: Map<string, WorkflowRunFacts>;
+  unavailable: string[];
+  omitted: string[];
+}
+const STAGE_STATES = new Set(["pending", "running", "succeeded", "failed", "cancelled", "blocked", "unknown"]);
+const RUN_STATES = new Set(["queued", "running", "reconciling", "succeeded", "failed", "cancelled", "blocked", "unknown"]);
+
+/** Observe bounded original workflow outcomes without opening the writable constructor or collecting results. */
+export function readWorkflowFacts(path: string, selected: { workspace: string; taskId: string;
+  actions: Array<{ actionId: string; taskVersion: number }> }): WorkflowFacts {
+  const facts: WorkflowFacts = { status: "unavailable", byAction: new Map(), unavailable: [],
+    omitted: ["Workflow facts inspect only the latest 64 recorded runs; earlier runs and uncollected results remain unknown."] };
+  let db: DatabaseSync | undefined;
+  try {
+    if (selected.actions.length > 64 || new Set(selected.actions.map(action => action.actionId)).size !== selected.actions.length ||
+      selected.actions.some(action => !action.actionId || !Number.isSafeInteger(action.taskVersion) || action.taskVersion < 1))
+      throw new Error("Invalid selected workflow actions");
+    const workspace = realpathSync(selected.workspace), stat = lstatSync(path);
+    if (!stat.isFile() || stat.isSymbolicLink() || realpathSync(path) !== path) throw new Error("Workflow store is not canonical");
+    db = new DatabaseSync(path, { readOnly: true });
+    db.exec("PRAGMA busy_timeout=100; BEGIN");
+    if (Number(db.prepare("SELECT value FROM meta WHERE key='schema_version'").get()?.value) !== SCHEMA_VERSION ||
+      !["1", "2", "3"].includes(String(db.prepare("SELECT value FROM meta WHERE key='engine_schema'").get()?.value))) {
+      facts.unavailable.push("workflow-schema-unavailable"); return facts;
+    }
+    const columns: Record<string, string[]> = { engine_run: ["id", "binding", "state"], engine_stage: ["run_id", "id", "state", "result"],
+      action: ["action_id", "task_id", "task_version"] };
+    for (const [table, required] of Object.entries(columns)) {
+      const present = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(row => String(row.name)));
+      if (required.some(column => !present.has(column))) { facts.unavailable.push("workflow-tables-unavailable"); return facts; }
+    }
+    const actions = new Map(selected.actions.map(action => [action.actionId, action.taskVersion]));
+    // Reverse rowid traversal bounds discovery without adding an index or scanning older recipes.
+    const window = db.prepare(`SELECT rowid AS cursor,id,state,
+      CASE WHEN json_valid(binding) THEN json_extract(binding,'$.actionId') END AS action_id,
+      CASE WHEN json_valid(binding) THEN json_extract(binding,'$.taskId') END AS task_id,
+      CASE WHEN json_valid(binding) THEN json_extract(binding,'$.taskVersion') END AS task_version,
+      CASE WHEN json_valid(binding) THEN json_extract(binding,'$.recipe.workspace') END AS workspace
+      FROM engine_run ORDER BY rowid DESC LIMIT 64`).all();
+    if (window.length === 64 && db.prepare("SELECT rowid FROM engine_run WHERE rowid<? ORDER BY rowid DESC LIMIT 1").get(Number(window[63]!.cursor)))
+      facts.omitted.push("Additional earlier workflow runs exist; their count, bindings and outcomes were not inspected.");
+    const stages = db.prepare("SELECT id,state,result FROM engine_stage INDEXED BY sqlite_autoindex_engine_stage_1 WHERE run_id=? ORDER BY rowid LIMIT 129");
+    const originalAction = db.prepare("SELECT task_id,task_version FROM action WHERE action_id=?");
+    for (const row of window) {
+      const actionId = String(row.action_id), version = actions.get(actionId);
+      if (version === undefined || row.task_id !== selected.taskId || row.task_version !== version || row.workspace !== workspace) continue;
+      const action = originalAction.get(actionId);
+      if (!action || action.task_id !== selected.taskId || action.task_version !== version) continue;
+      if (facts.byAction.has(actionId)) { facts.byAction.delete(actionId); facts.unavailable.push(`workflow-action-ambiguous:${actionId}`); continue; }
+      if (facts.unavailable.includes(`workflow-action-ambiguous:${actionId}`)) continue;
+      try {
+        if (!RUN_STATES.has(String(row.state))) throw new Error("Invalid workflow state");
+        const retained = stages.all(String(row.id));
+        if (!retained.length || retained.length > 128) throw new Error("Incomplete workflow stages");
+        const stageFacts = retained.map(stage => {
+          if (!STAGE_STATES.has(String(stage.state))) throw new Error("Invalid stage state");
+          const result = stage.result === null ? null : object(JSON.parse(String(stage.result)));
+          if (result && (result.state !== stage.state || !["confirmed", "unknown"].includes(String(result.cleanup)) ||
+            result.exitCode !== null && !Number.isSafeInteger(result.exitCode) || typeof result.log !== "string")) throw new Error("Invalid stage result");
+          return { id: String(stage.id), state: String(stage.state) as StageState, resultDigest: result ? digest(result) : null,
+            exitCode: result?.exitCode === null || !result ? null : Number(result.exitCode),
+            cleanup: result ? result.cleanup as "confirmed" | "unknown" : null, log: result ? String(result.log) : null };
+        });
+        facts.byAction.set(actionId, { runId: String(row.id), state: String(row.state) as RunState, stages: stageFacts });
+      } catch { facts.unavailable.push(`workflow-result-unavailable:${actionId}`); }
+    }
+    for (const actionId of actions.keys()) if (!facts.byAction.has(actionId) &&
+      !facts.unavailable.some(reason => reason.endsWith(`:${actionId}`))) facts.unavailable.push(`workflow-not-observed-in-window:${actionId}`);
+    facts.status = "observed";
+    db.exec("COMMIT");
+    return facts;
+  } catch { facts.byAction.clear(); facts.unavailable.push("workflow-facts-unavailable"); return facts; }
+  finally { db?.close(); }
+}
 const RUN_EDGES: Record<RunState, RunState[]> = {
   queued: ["running", "cancelled", "blocked"], running: ["reconciling", "succeeded", "failed", "cancelled", "blocked", "unknown"],
   reconciling: ["succeeded", "failed", "cancelled", "unknown"], unknown: ["reconciling"],

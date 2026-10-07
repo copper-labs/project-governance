@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-06
 summary: Adopts captured-candidate lint packs with real Ruff and ESLint backends, visible setup states and narrow batch checks.
 ---
 
@@ -70,3 +70,15 @@ The first adapters qualify file-local rules and declarative config. Dynamic or t
 dependencies cannot be captured stay `needs-setup`; green output cannot conceal that limit. Native
 violations and infrastructure failures remain distinct. Repair a group of related findings, then
 recheck only its affected owners unless broader proof has a declared reason.
+
+## Keep file ownership honest
+
+A commit needs a declared owner that actually checks each changed file. The shipped Java owners
+check naming and physical source size; they do not prove compilation, behavior or Java lint. A new
+Java source root still needs project-owned lint coverage under the first-source rule above. The
+JSONL format owner checks whitespace; record syntax and schemas remain project-owned obligations.
+
+When a new file type is unowned, inspect the existing checker and project contract before adding a
+narrow pack mapping. Include the checker in the same captured-candidate proof. Adding a pattern to
+a pack whose checker ignores that extension provides no validation. Keep unrelated unknown types
+blocked until their actual owner is declared; do not widen a pack just to clear the commit gate.

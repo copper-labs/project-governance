@@ -120,7 +120,9 @@ custom-command input manifests cannot establish current candidate freshness by t
 Every required pack must contain an applicable passed command. A lint pack must report at least one
 checked file; a zero-work or entirely not-applicable run cannot complete verification.
 
-Normalize only parsed machine-owned plan slots when assessing a later bookkeeping-only change.
+Normalize parsed machine-owned plan slots when assessing a later bookkeeping-only change.
+The approved 4.1 refinement also normalizes explicitly marked commentary; see its
+[definition boundary](engine-4-1-context-quality.md#exact-task-to-plan-reference).
 Never ignore an entire plan, mask changed requirements, rewrite retained receipts or certify a new
 whole-tree digest using old evidence. Verification establishes the declared executed checks, not
 general product acceptance. Keep historical results and their limits visible.
@@ -148,6 +150,7 @@ Machine ownership is one `governance-plan` JSON fence and explicit item/evidence
 declares version, specification digests, batch dependencies and typed items. Marked checkboxes and
 evidence arrays are the only mutable slots. All original source, native command and task identities
 remain in their existing records. Normalized bookkeeping permits no new whole-tree freshness claim.
+Explicit 4.1 commentary regions are human-owned notes, separate from these updater-owned slots.
 
 ## 2b. Structure specification references as a separate workstream
 
@@ -159,8 +162,9 @@ Plans reference a specification path and criterion ID from their typed items. Th
 intended behavior; the plan owns implementation progress, check mappings and changing evidence.
 Do not duplicate completion state in both documents. Bind proof references to captured specification
 content; a changed requirement must not inherit evidence solely because its ID stayed the same.
-A whole-spec digest is the conservative first iteration. Add finer invalidation only if observed
-need justifies it.
+A whole-spec digest is the conservative 4.0 iteration. The approved 4.1 refinement exempts only
+explicit commentary regions, keeping all unmarked prose and criteria bound. It retains exact original
+file captures and does not infer whether a prose change alters a requirement.
 
 Code can check unique and resolvable IDs, coverage of declared in-scope criteria by plan items,
 configured stage/pack references and qualifying evidence. Existing schema checks, compilers, linters

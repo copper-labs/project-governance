@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -71,13 +71,16 @@ test("generated ESLint ownership executes each tree's local tool after copying t
       f.write(profilePath, stringify({ lint: proposal.profile, continuity: { decisions: { mode: "off" } } })); f.git("add", ".");
       f.write("config/validation/packs/metadata.yaml", stringify({ id: "metadata-owner", enforcement: "blocking", stages: ["pre-commit"], path_globs: ["*.yaml", "*.json", ".gitignore"], commands: [{ builtin: "format" }] })); f.git("add", "config/validation/packs/metadata.yaml");
     }
-    assert.equal((await ordinary(first)).checked.status, "passed");
+    const initial = await ordinary(first);
+    assert.equal(initial.checked.status, "passed", JSON.stringify({ termination: initial.checked.termination_reason,
+      packs: initial.checked.results.map(row => ({ pack: row.pack_id, status: row.status, findings: row.commands.flatMap(command => command.findings) })) }));
     unlinkSync(join(first.root, "node_modules/eslint/bin/eslint.js"));
     second.write("src/example.ts", "const value: number=1; const object={one:value,one:2};\n"); second.git("add", "src/example.ts");
     const local = await ordinary(second); assert.equal(local.checked.status, "failed");
     const command = local.checked.results.find(pack => pack.pack_id === "lint-eslint-src")!.commands[0]!;
     const detail = JSON.parse(readFileSync((command.lint_evidence as { path: string }).path, "utf8"));
-    assert.ok(detail.native_results.every((result: { argv: string[] }) => result.argv[1] === join(second.root, "node_modules/eslint/bin/eslint.js")));
+    const localTool = join(realpathSync(second.root), "node_modules/eslint/bin/eslint.js");
+    assert.deepEqual(detail.native_results.map((result: { argv: string[] }) => result.argv[1]), [localTool, localTool]);
     assert.ok(command.findings.some(finding => finding.rule_id === "lint.eslint.no-dupe-keys"));
   } finally { first.clean(); second.clean(); }
 });

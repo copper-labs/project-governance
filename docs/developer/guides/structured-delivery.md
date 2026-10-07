@@ -11,7 +11,7 @@ summary: Uses stable plan items, exact specification references and original nat
 
 # Update delivery plans without model bookkeeping
 
-The next major runtime provides a typed progress updater. It reads a selected batch and edits only
+The compiled runtime provides a typed progress updater. It reads a selected batch and edits only
 its marked checkboxes and evidence arrays. It never runs a check, stages files, commits or accepts
 a product requirement. Installed older runtimes retain their existing commands until adoption.
 
@@ -23,10 +23,30 @@ stable ID. A verification item names the actual configured stage and pack IDs, n
 Use item prerequisites and batch dependencies to keep unproved downstream work visibly incomplete.
 
 For a separately owned specification, start with the specification template. Declare criteria in
-its `governance-spec` fence. Add its repository-relative `docs/**.md` path, whole-file SHA256 and
-in-scope criterion IDs to the plan, then reference those criteria from its items. Changing any spec
-text invalidates the binding. Code validates references and coverage; tests and review still judge
-whether the implementation meets the intended behavior.
+its `governance-spec` fence. Add its repository-relative `docs/**.md` path, definition digest and
+in-scope criterion IDs to the plan, then reference those criteria from its items. In 4.1, obtain both
+the binding digest and exact observed file digest deterministically:
+
+```sh
+project-governance implementation-plan inspect --specification docs/specs/feature.md
+```
+
+Without marked commentary, the definition digest remains the whole-file SHA256. Code validates
+references and coverage; tests and review still judge whether the behavior meets the requirement.
+
+Put changing commentary or current/next notes inside an explicit region:
+
+```markdown
+<!-- governance:notes progress -->
+Current/next: the narrow checks passed; complete the declared review.
+<!-- /governance:notes progress -->
+```
+
+Only the region's contents are excluded from plan/specification definition identity. Its markers,
+unmarked rationale, requirements and check declarations stay bound. Each region needs a unique
+matching ID; malformed or nested regions and concealed machine declarations refuse. Fenced examples
+are literal. Requirements and approvals must never go in notes. Exact file digests, compare-and-swap
+updates and native input captures still detect edits; existing check results do not certify new source.
 
 The existing documentation pack checks deliberately structured plans when a plan or bound spec
 changes. Older unstructured documents stay exempt. A completed verification records historical
@@ -38,6 +58,33 @@ Fresh completion always needs qualifying originals. A required pack that did no 
 including lint with zero checked files, cannot mark verification complete.
 
 ## Inspect and record the batch
+
+Bind the selected plan batch when creating or revising the task. Supply both flags together:
+
+```sh
+project-governance harness task create --outcome "Repair reconnect" --scope src --plan-path docs/exec-plans/active/feature.md --plan-batch B1
+```
+
+The runtime validates the exact batch before writing the task. The reference preserves its normalized
+definition digest, so checkbox updates keep the association while requirement changes make it stale.
+Replace an existing reference through the normal authorized task revision. A task fork does not
+silently inherit this worktree's active plan reference.
+
+For a progress question, every normal prompt packet includes a read-only snapshot from the exact
+session and worktree. No wording classifier is needed. To inspect the same facts directly:
+
+```sh
+project-governance task-facts --session <exact-session-id>
+```
+
+The snapshot separates caller-declared progress, historical checks and acceptance. Blocked or
+terminal tasks remain readable without becoming executable. Missing or stale associations stay
+explicit; the reader never guesses a sibling task or changes a binding. Required guidance takes
+priority when packet space is limited. A repeated delivery of the same native entry replays the
+original snapshot; a new turn observes current progress. Moving a plan to the completed directory
+requires an explicit task revision replacing its path. A missing plan stays `plan-missing`; no search
+guesses its new location. The prompt shows compact original outcomes and defers full historical
+check qualification to the explicit reader, keeping progress preparation within the existing operation.
 
 ```sh
 project-governance implementation-plan inspect --path docs/exec-plans/active/feature.md --batch B1

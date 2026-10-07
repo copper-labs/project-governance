@@ -81,5 +81,5 @@ export function runtimeDoctor(workspace: string, registry: string) {
     }
   } catch { add("lint.coverage-unavailable", "Declared lint coverage could not be inspected; run lint setup and reconcile its retained requirements."); }
   return { version: 1, scope: "compiled-installation", status: findings.length ? "failed" : "passed", selection, findings,
-    context, lint, execution_readback: "not-performed", active_readers: "reported-without-releasing", mutations: "none" };
+    contextReadiness: context.readiness, context, lint, execution_readback: "not-performed", active_readers: "reported-without-releasing", mutations: "none" };
 }

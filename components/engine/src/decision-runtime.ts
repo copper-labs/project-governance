@@ -233,8 +233,8 @@ export class DecisionRuntime {
 
     const identity = requestIdentity(request);
     const retained = this.#retained(key);
-    // Replaying a paid event needs neither a provider slot nor another budget reservation.
-    if (retained?.requestIdentity === identity && ["reserved", "duplicate"].includes(retained.budget.state))
+    // Replaying a paid event also binds its exact transmitted question wording, without resetting spending.
+    if (retained?.requestIdentity === identity && retained.payloadDigest === payloadDigestValue && ["reserved", "duplicate"].includes(retained.budget.state))
       return { ...retained, requestId, reason: Object.keys(retained.answers).length ? "repeated-observation" : `repeated-${retained.reason}`,
         receiptId: key, latencyMs: performance.now() - started };
     // The reservation identity is the consumer-group event key, so one event cannot be spent twice.
@@ -260,7 +260,7 @@ export class DecisionRuntime {
       ...(ask.budgetPartition ? { partition: ask.budgetPartition, invocationId: ask.budgetInvocationId } : {}) };
     if (reservation.state === "duplicate") {
       const retained = this.#retained(key);
-      return retained && retained.requestIdentity === identity ? { ...retained, requestId,
+      return retained && retained.requestIdentity === identity && retained.payloadDigest === payloadDigestValue ? { ...retained, requestId,
         reason: Object.keys(retained.answers).length ? "repeated-observation" : `repeated-${retained.reason}`, receiptId: key, latencyMs: performance.now() - started }
         : fallback("repeated-observation-unavailable", { budget, requestIdentity: identity });
     }

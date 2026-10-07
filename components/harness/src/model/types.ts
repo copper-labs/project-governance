@@ -2,7 +2,7 @@
 export type Provenance = "operator" | "observed" | "hypothesis";
 export type TaskStatus = "open" | "needs-input" | "accepted" | "cancelled";
 export type TaskMode = "implement" | "explore";
-export type TaskItemKind = "constraint" | "acceptance" | "scope" | "open-question" | "ruled-out" | "handoff";
+export type TaskItemKind = "constraint" | "acceptance" | "scope" | "open-question" | "ruled-out" | "handoff" | "plan-reference";
 export interface TaskItem {
     seq: number;
     kind: TaskItemKind;

@@ -70,6 +70,8 @@ import { checkDecisionAdvice, type CheckAdviceOptions } from "./decision-check-a
 import { resolveTaskContext, taskBindingReceipt } from "./decision-task-binding.ts";
 import { resolveDecisionScope } from "./decision-scope.ts";
 import { implementationPlanCommand } from "./implementation-plan-command.ts";
+import { readTaskFacts, resolvePlanReference } from "./task-facts.ts";
+import { captureReleaseEvaluation } from "./release-evaluation-capture.ts";
 import { implementationPlanFindings, parseImplementationPlan } from "./implementation-plan.ts";
 import { updateImplementationProgress } from "./plan-progress.ts";
 import { worktreeBytes } from "./change-subject.ts";
@@ -165,9 +167,11 @@ Checks:
     [--implementation-plan <docs/exec-plans/path.md> --batch <id>]
   implementation-plan inspect --path <plan> --batch <id>
   implementation-plan update --path <plan> --request <json> [--staged|--base-ref <ref>]
+  task-facts --session <exact-session-id>
   lint setup [--root <path>] [--include-dependencies] [--apply --plan-digest <digest>]
   doctor --capability lint
   release-evaluation report --manifest <json> [--format json|markdown]
+  release-evaluation capture --request <json> --output-directory <outside-checkout>
   check-output --run <id> [--log-pilot deterministic|jev]
   check-status --run <run-id> [--full] | check-cancel --run <run-id>
   check-output --run <run-id>
@@ -197,7 +201,13 @@ Use the owning command contract for structured request fields.
     }
     if (command === "harness") {
       // The canonical parser owns global flags and help as well as task/history operations.
-      return continuityCommand(args.slice(1), {groups: ["governance", "task", "resume", "checkpoint", "context", "artifact", "budget", "paths", "status", "reconcile", "usage", "export", "import", "events"], observeBinding: associatePromptTask});
+      return continuityCommand(args.slice(1), {groups: ["governance", "task", "resume", "checkpoint", "context", "artifact", "budget", "paths", "status", "reconcile", "usage", "export", "import", "events"], observeBinding: associatePromptTask, resolvePlanReference});
+    }
+    if (command === "task-facts") {
+      const { values } = parseArgs({ args: args.slice(1), strict: true, allowPositionals: false, options: { session: { type: "string" } } });
+      if (!values.session) throw new Error("Exact native session required for read-only task facts");
+      const facts = readTaskFacts(process.cwd(), values.session);
+      console.log(JSON.stringify({ ...facts, association: { ...facts.association, source: "explicit-session-argument" } })); return 0;
     }
     if (command === "implementation-plan") { console.log(JSON.stringify(implementationPlanCommand(args.slice(1), process.cwd()))); return 0; }
     if (command === "lint-adapter") { const result = await lintAdapterCommand(args.slice(1)); console.log(JSON.stringify(result.value)); return result.exitCode; }
@@ -213,6 +223,12 @@ Use the owning command contract for structured request fields.
       if (!values.manifest || !["json", "markdown"].includes(values.format)) throw new Error("Evaluation manifest and json or markdown format required");
       const report = readReleaseEvaluation(contextStateRoot(process.cwd()), values.manifest);
       console.log(values.format === "markdown" ? releaseEvaluationMarkdown(report) : JSON.stringify(report)); return 0;
+    }
+    if (command === "release-evaluation" && args[1] === "capture") {
+      const { values } = parseArgs({ args: args.slice(2), strict: true, allowPositionals: false,
+        options: { request: { type: "string" }, "output-directory": { type: "string" } } });
+      if (!values.request || !values["output-directory"]) throw new Error("Explicit outcome request and new outside-checkout output directory required");
+      console.log(JSON.stringify(captureReleaseEvaluation(process.cwd(), values.request, values["output-directory"]))); return 0;
     }
     if (command === "hook") return main(["check", "--trigger", "hook", ...hookCheckArguments(realpathSync(process.cwd()), args[1] ?? "", args.slice(2))]);
     if (command === "docs") {
@@ -529,7 +545,8 @@ Use the owning command contract for structured request fields.
     }
   } catch (error) {
     // CLI parsing errors contain flags, not file contents. Source-loading diagnostics remain private.
-    console.error(JSON.stringify(error instanceof ContextRouteError ? { status: "failed", code: error.code, error: error.message, receipt: error.receiptPath }
+    console.error(JSON.stringify(error instanceof ContextRouteError ? { status: "failed", code: error.code, error: error.message, receipt: error.receiptPath,
+      ...(error.diagnostic ? { diagnostic: error.diagnostic } : {}), ...(error.recovery ? { recovery: error.recovery } : {}) }
       : { status: "failed", error: error instanceof TypeError ? "Invalid invocation" : "Command could not complete; inspect its operation receipt when available." }));
     return 2;
   }

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Store } from "../src/store/store.ts";
-import { ExecutionStateUnavailable, RevisionConflict } from "../src/model/types.ts";
+import { ExecutionStateUnavailable, RevisionConflict, type TaskItem } from "../src/model/types.ts";
 const newStore = () => new Store(":memory:");
 test("a revision carries unrevoked constraints forward", () => {
     const s = newStore();
@@ -118,6 +118,25 @@ test("two sessions are distinguishable in one shared store", () => {
     s.close();
 });
 
+test("exact task revision provenance survives unrelated events and refuses ambiguity", () => {
+    const s = newStore();
+    try {
+        const task = s.createTask("Finish the accepted slice", []);
+        for (let i = 0; i < 120; i++) s.appendEvent(task.taskId, "observation", { i });
+        s.reviseTask(task.taskId, [], { status: "accepted", authorityRef: "operator:accepted-exact-slice" });
+        const event = s.taskRevisionEvent(task.taskId, 2)!;
+        const detail = event.detail as Record<string, unknown>;
+        assert.equal(event.taskId, task.taskId);
+        assert.equal(event.kind, "task-revision");
+        assert.equal(detail.authorityRef, "operator:accepted-exact-slice");
+        assert.equal(detail.version, 2);
+        assert.equal(s.taskRevisionEvent(task.taskId, 3), null);
+        assert.throws(() => s.taskRevisionEvent(task.taskId, 0), /invalid task revision/);
+        s.appendEvent(task.taskId, "task-revision", { version: 2, status: "accepted", authorityRef: "other" });
+        assert.throws(() => s.taskRevisionEvent(task.taskId, 2), /ambiguous task revision provenance/);
+    } finally { s.close(); }
+});
+
 
 test("read-only authority inspection neither creates a missing store nor permits writes", async () => {
     const { mkdtempSync, rmSync, readFileSync, existsSync } = await import("node:fs");
@@ -131,4 +150,76 @@ test("read-only authority inspection neither creates a missing store nor permits
         assert.throws(() => reader.createTask("No writes", [])); reader.close();
         assert.deepEqual(readFileSync(path), bytes);
     } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+const planItem = (batch = "F1"): Omit<TaskItem, "seq" | "revoked"> => ({ kind: "plan-reference", provenance: "operator",
+    body: JSON.stringify({ version: 1, path: "docs/exec-plans/active/example.md", batch, definition_digest: `sha256:${"a".repeat(64)}` }) });
+
+test("plan replacement is versioned, explicit, and validates the final active set", () => {
+    const s = newStore();
+    try {
+        assert.throws(() => s.createTask("duplicate", [planItem(), planItem("F2")]), /one active plan reference/);
+        assert.equal(s.listTasks().length, 0);
+        const original = s.createTask("linked", [planItem()]);
+        const carried = s.reviseTask(original.taskId, [], { expectedVersion: 1 });
+        assert.equal(carried.items[0]!.body, original.items[0]!.body);
+        assert.throws(() => s.reviseTask(original.taskId, [planItem("F2")], { expectedVersion: 2 }), /one active plan reference/);
+        assert.equal(s.readTask(original.taskId)!.version, 2, "refusal writes no new revision");
+        assert.throws(() => s.reviseTask(original.taskId, [planItem("F2")], { expectedVersion: 2, revoke: [0] }), /authority reference/);
+        const replaced = s.reviseTask(original.taskId, [planItem("F2")], { expectedVersion: 2, revoke: [0], authorityRef: "host:change-batch" });
+        assert.equal(replaced.version, 3);
+        assert.equal(replaced.items[0]!.revoked, true);
+        assert.equal(JSON.parse(replaced.items[1]!.body).batch, "F2");
+        assert.equal(s.readTask(original.taskId, 1)!.items[0]!.revoked, false, "old revisions retain their original association");
+        assert.throws(() => s.reviseTask(original.taskId, [planItem("F3")], { expectedVersion: 2, revoke: [1], authorityRef: "host:stale" }), RevisionConflict);
+        assert.equal(s.readTask(original.taskId)!.version, 3);
+        const malformed = { ...planItem(), body: JSON.stringify({ version: 1, path: "../other.md", batch: "F1", definition_digest: `sha256:${"a".repeat(64)}` }) };
+        assert.throws(() => s.reviseTask(original.taskId, [malformed], { expectedVersion: 3, revoke: [1], authorityRef: "host:invalid" }), /safe structured-plan path/);
+        assert.equal(s.readTask(original.taskId)!.version, 3);
+    } finally { s.close(); }
+});
+
+test("forks choose their own plan while retaining exact parent history", () => {
+    const s = newStore();
+    try {
+        const parent = s.createTask("linked", [planItem(), { kind: "constraint", provenance: "operator", body: "preserve behavior" }], { worktree: "/repo/main" });
+        for (const worktree of ["/repo/main", "/repo/child"]) {
+            const child = s.forkTask(parent.taskId, { worktree });
+            assert.equal(child.items.some(item => item.kind === "plan-reference"), false);
+            assert.equal(child.parentTask, parent.taskId);
+            assert.equal(child.parentVersion, 1);
+            assert.equal(child.items[0]!.origin, `${parent.taskId}@1`);
+            assert.equal(s.readTask(child.parentTask!, child.parentVersion!)!.items[0]!.body, parent.items[0]!.body);
+            const associated = s.reviseTask(child.taskId, [planItem("F2")], { expectedVersion: 1 });
+            assert.equal(associated.items.filter(item => item.kind === "plan-reference" && !item.revoked).length, 1);
+        }
+    } finally { s.close(); }
+});
+
+test("bounded task readers return recent records without mixing tasks or changing default history", () => {
+    const s = newStore();
+    try {
+        const task = s.createTask("bounded observations", []), other = s.createTask("other", []);
+        const evidenceIds: string[] = [];
+        for (let index = 0; index < 4; index++) {
+            s.insertAction({ actionId: `bounded-${index}`, taskId: task.taskId, taskVersion: 1, operation: "read", scope: ["/tmp"],
+                destination: null, policyRevision: "p1", status: "proposed", expectedInputs: [], intendedOutputs: [], reconcile: null, refusedReason: null });
+            evidenceIds.push(s.recordEvidence({ taskId: task.taskId, actionId: null, artifactId: null, claim: `claim-${index}`,
+                observed: "recorded", establishes: "historical observation", confirmation: "unconfirmed", criticality: "execution" })!.evidenceId);
+        }
+        s.insertAction({ actionId: "other-action", taskId: other.taskId, taskVersion: 1, operation: "read", scope: ["/tmp"],
+            destination: null, policyRevision: "p1", status: "proposed", expectedInputs: [], intendedOutputs: [], reconcile: null, refusedReason: null });
+        s.recordEvidence({ taskId: other.taskId, actionId: null, artifactId: null, claim: "other", observed: "recorded",
+            establishes: "other task", confirmation: "unconfirmed", criticality: "execution" });
+        const cursor = s.latestCursor(task.taskId);
+        assert.deepEqual(s.listActions(task.taskId).map(action => action.actionId), ["bounded-0", "bounded-1", "bounded-2", "bounded-3"]);
+        assert.deepEqual(s.listActions(task.taskId, 2).map(action => action.actionId), ["bounded-3", "bounded-2"]);
+        assert.deepEqual(s.listEvidence(task.taskId).map(evidence => evidence.evidenceId), evidenceIds);
+        assert.deepEqual(s.listEvidence(task.taskId, 2).map(evidence => evidence.evidenceId), evidenceIds.slice(-2).reverse());
+        assert.equal(s.latestCursor(task.taskId), cursor);
+        for (const limit of [0, -1, 1001, 1.5, NaN]) {
+            assert.throws(() => s.listActions(task.taskId, limit), /read limit/);
+            assert.throws(() => s.listEvidence(task.taskId, limit), /read limit/);
+        }
+    } finally { s.close(); }
 });

@@ -131,11 +131,29 @@ test("inactive installation verifies identity and preserves a failed-generation 
     await assert.rejects(completePreparedRuntimeOperation(freshOperation),/Launcher changed since backup/);
     assert.equal(readFileSync(freshLauncher,"utf8"),"authored launcher");
     rmSync(freshLauncher);
-    const freshResult=await completePreparedRuntimeOperation(freshOperation);
+    let diagnosticCalls=0;
+    const failedDiagnostic=()=>{diagnosticCalls++;throw new Error("injected passive diagnostic failure");};
+    const freshResult=await completePreparedRuntimeOperation(freshOperation,failedDiagnostic);
     assert.equal(freshResult.state.maintenance,null);
+    assert.equal(freshResult.contextReadiness.status,"unavailable");
+    assert.equal(JSON.parse(readFileSync(join(freshOperation,"completed.json"),"utf8")).result.contextReadiness.status,"unavailable");
+    assert.equal(freshResult.contextReadiness.basis,"current-configuration-only");
+    assert.equal(freshResult.contextReadiness.providerAvailability,"not-probed");
+    assert.equal(freshResult.contextReadiness.hostConsumption,"not-observed");
+    assert.equal(freshResult.contextReadiness.observation,"activation-completion-snapshot");
+    assert.equal(Number.isFinite(Date.parse(freshResult.contextReadiness.observedAt)),true);
     assert.equal(JSON.parse(readFileSync(freshLock,"utf8")).schema_version,2);
     assert.equal(statSync(freshLauncher).mode & 0o777,0o700);
-    assert.deepEqual(await completePreparedRuntimeOperation(freshOperation),freshResult);
+    assert.deepEqual(await completePreparedRuntimeOperation(freshOperation,failedDiagnostic),freshResult);
+    assert.equal(diagnosticCalls,1,"Replay retains completion-time diagnostics instead of inspecting current configuration again");
+    const freshReaders=new RuntimeGenerations(join(fresh,"installation.sqlite"));
+    try {
+      const reader=freshReaders.acquire("concurrent-readback");
+      const replay=await completePreparedRuntimeOperation(freshOperation,failedDiagnostic);
+      assert.deepEqual(replay.contextReadiness,freshResult.contextReadiness);
+      assert.equal(replay.state.readers.length,1,"Existing activation validation preserves actual current ownership");
+      freshReaders.release(reader.token,reader.owner);
+    } finally {freshReaders.close();}
     const next = stageRuntimeArchive(archive, lock, stages);
     const registryPath = join(root, "generations.sqlite");
     const generations = new RuntimeGenerations(registryPath), other = new RuntimeGenerations(registryPath);

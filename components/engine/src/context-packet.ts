@@ -1,6 +1,6 @@
 import { procedureExcerpt, procedureAdvisoryExcerpt } from "./context-procedures.ts";
 import { lexicalContextOrder } from "./context-ranking.ts";
-import { contextExcerpt } from "./context-excerpts.ts";
+import { contextExcerpt, type Span } from "./context-excerpts.ts";
 import { canonical, digest, text } from "./core.ts";
 import { CONTEXT_PATH_LIMIT, CONTEXT_PROMPT_LIMIT } from "./context-limits.ts";
 import type { Candidate, DecisionOptions, DecisionProvider, DecisionRequest, DecisionResult } from "./decisions.ts";
@@ -10,7 +10,7 @@ import { NOUL_REGIONS } from "./decision-runtime.ts";
 export interface ContextPacketRequest {
   taskRevision: string; purpose: string; required: Candidate[]; optional: Candidate[]; maximumBytes: number; optionalExcerptBytes?: number;
   priorityIds?: string[];
-  sourceSpans?: Record<string, Array<{ name: string; start: number; end: number }>>;
+  sourceSpans?: Record<string, Span[]>;
   passageJudgments?: Record<string, PassageJudgment>;
   passageUnitOrder?: Record<string, PassageUnitOrder>;
   passageExclusions?: Record<string, WholeFilePassageExclusion>;

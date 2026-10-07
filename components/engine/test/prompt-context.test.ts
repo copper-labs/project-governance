@@ -6,10 +6,67 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promptContext, renderPromptContext } from "../src/prompt-context.ts";
 import { contextStateRoot } from "../src/context-command.ts";
+import { digest } from "../src/core.ts";
 import { PROJECT_DEFAULTS } from "../src/runtime-project-defaults.ts";
 import { Store } from "../../harness/src/store/store.ts";
 import { defaultDbPath, workContext } from "../../harness/src/store/location.ts";
 import { contextBudget } from "../src/checkers/context-router.ts";
+import { TASK_FACTS_MARKER, type TaskFacts } from "../src/task-facts.ts";
+import { promptPacketIdentity } from "../src/prompt-context-budget.ts";
+
+test("mature task facts cannot displace an already-selected decisive original", () => {
+  const facts: TaskFacts = { version: 1, observed_at: "2026-10-06T20:00:00.000Z",
+    association: { status: "associated", taskId: "owned-reconnect-task", attemptId: "same-attempt", workspaceId: "same-workspace", boundRevision: 4, observedRevision: 4 },
+    task: { outcome: "Repair reconnect and preserve cleanup.", status: "needs-input", mode: "single",
+      acceptance_authority: "recorded lifecycle; host-reported, not independently authenticated", execution_permission: "not granted by this snapshot" },
+    plan: { status: "linked", path: "docs/exec-plans/reconnect.md", batch: "B3", recorded_definition_digest: "sha256:definition",
+      observed_definition_digest: "sha256:definition", observed_file_digest: "sha256:current-file" },
+    checkpoint: { checkpointId: "latest-original", taskVersion: 4, attemptId: "same-attempt", summary: "Awaiting the device owner.", next: "Run the focused reconnect proof." },
+    actions: Array.from({ length: 24 }, (_, index) => ({ actionId: `original-action-${index}`, taskVersion: 4, status: "authorized", operation: "check",
+      workflowRun: { runId: `original-run-${index}`, state: "failed", stages: [{ id: "reconnect", state: "failed", exitCode: 1,
+        cleanup: "unknown", log: `/fixture/retained/original-run-${index}/logs/reconnect-command.log` }] },
+      resultProvenance: "recorded original only; no collection or cleanup action" })),
+    unavailable: ["device-proof-not-recorded"], omitted: ["Earlier actions and uncollected results are not inspected."] };
+  const decisive = { id: "src/reconnect.ts", sourceDigest: "sha256:decisive-original", sourceRange: { start: 31, end: 47, complete: true },
+    excerpt: "The decisive reconnect cleanup original.\n" + "Exact source: keep café and signal cleanup.\n".repeat(84) };
+  const required = "Required original rules: never turn missing device proof into acceptance.\n";
+  const packet = { receiptId: "original-route", ready: true, execution: { workspace: "/fixture/owned-workspace", worktreeLocator: "original-worktree" },
+    entries: [{ path: "policy.md", content: required, sourceDigest: "sha256:required-original" }],
+    route: { primary: ["policy.md"], active: [], budget: contextBudget({ primary_context_tokens: 1500, active_plan_context_tokens: 500,
+      expansion_context_tokens: 1500, total_context_tokens: 3500 }) }, skills: { entries: [] }, blockers: [],
+    optional: { entries: [decisive] } } as any;
+  const history = { state: "unavailable" as const, candidates: [], inspected: 0, omissions: [] };
+  const readFacts = (text: string) => JSON.parse(text.slice(text.indexOf(TASK_FACTS_MARKER) + TASK_FACTS_MARKER.length).split("\n")[0]!);
+  const before = digest(facts), factsOnly = renderPromptContext({ ...packet, optional: { entries: [] } }, history, "entry", "", facts);
+  assert.deepEqual(readFacts(factsOnly.text), facts, "This history fits alone; the regression is ordering, not an oversized snapshot");
+  const result = renderPromptContext(packet, history, "entry", "", facts);
+  assert.deepEqual(result.delivered, [decisive.id], "Paid/selected decisive evidence must survive the task history");
+  assert.ok(result.text.includes(required)); assert.ok(result.text.includes(JSON.stringify(decisive.excerpt)));
+  assert.ok(result.text.includes(decisive.sourceDigest)); assert.ok(Buffer.byteLength(result.text) <= 14000);
+  const reduced = readFacts(result.text);
+  assert.deepEqual(reduced.association, facts.association); assert.equal(reduced.task.status, "needs-input");
+  assert.equal(reduced.task.execution_permission, "not granted by this snapshot");
+  assert.equal(reduced.plan.observed_file_digest, facts.plan!.observed_file_digest); assert.equal(reduced.checkpoint.checkpointId, facts.checkpoint!.checkpointId);
+  assert.equal(reduced.unavailable_summary.original_digest, digest(facts.unavailable)); assert.equal(reduced.unavailable_summary.other_count, 1);
+  assert.ok(reduced.unavailable.includes("task-facts-packet-space"));
+  assert.match(reduced.omitted.join(" "), /required guidance and selected evidence/);
+  assert.equal("factsRendering" in result && result.factsRendering.detail, "reduced");
+  assert.equal("factsRendering" in result && result.factsRendering.reason, "preserve-required-guidance-and-selected-evidence");
+  assert.equal("factsRendering" in result && result.factsRendering.digest, digest(TASK_FACTS_MARKER + JSON.stringify(reduced) + "\n"));
+  assert.equal(reduced.actions, undefined); assert.equal(digest(facts), before, "Presentation must not mutate the retained original facts");
+  assert.deepEqual(promptPacketIdentity(result.text, 14000), { packetDigest: digest(result.text), packetBytes: Buffer.byteLength(result.text), packetLimitBytes: 14000 });
+  assert.equal(result.factsDelivered, true);
+  packet.route.budget = contextBudget({ total_context_tokens: 6000 });
+  const roomy = renderPromptContext(packet, history, "entry", "", facts);
+  assert.deepEqual(roomy.delivered, [decisive.id]); assert.deepEqual(readFacts(roomy.text), facts, "Full facts return when originals and detail fit together");
+  assert.equal("factsRendering" in roomy && roomy.factsRendering.detail, "full");
+  packet.route.budget = contextBudget({ primary_context_tokens: 1500, active_plan_context_tokens: 500, expansion_context_tokens: 1500, total_context_tokens: 3500 });
+  packet.optional.entries = [{ ...decisive, excerpt: "x".repeat(10500) }];
+  const oversized = renderPromptContext(packet, history, "entry", "", facts);
+  assert.deepEqual(oversized.delivered, []);
+  assert.deepEqual("optionalOmissions" in oversized && oversized.optionalOmissions, [{ path: decisive.id, reason: "native-task-facts-reservation" }]);
+  assert.equal(readFacts(oversized.text).task.status, facts.task!.status);
+});
 
 test("raw prompt delivers source before a task exists, then a follow-up reuses the exact host binding", async () => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "prompt-context-"))), old = process.env.XDG_STATE_HOME;
@@ -27,6 +84,10 @@ test("raw prompt delivers source before a task exists, then a follow-up reuses t
     const folder = join(contextStateRoot(root), "prompt-entries");
     const saved = JSON.parse(readFileSync(join(folder, readdirSync(folder)[0]!), "utf8"));
     assert.equal(saved.scopeKind, "provisional-session"); assert.equal(saved.confirmedModelUse, null);
+    const delivered = (first as any).hookSpecificOutput.additionalContext;
+    assert.equal(saved.packetDigest, digest(delivered));
+    assert.equal(saved.packetBytes, Buffer.byteLength(delivered));
+    assert.equal(saved.packetLimitBytes, 14000);
     assert.ok(!JSON.stringify(saved).includes("unique-private-prompt"));
     const originalFetch = globalThis.fetch, originalToken = process.env.JEV_TOKEN;
     writeFileSync(join(root, "config/governance/profile.yaml"), JSON.stringify({ context_router: { default_route: "project", routes: [{ id: "project" }] },
@@ -92,6 +153,18 @@ test("oversized required context is a blocker, never silently truncated guidance
   assert.match(shadow.text, /Shadow JEV assessment/); assert.match(shadow.text, /Shadow results were not applied/);
 });
 
+test("quoted facts marker cannot impersonate the renderer's explicit delivery flag", () => {
+  const marker = "Current task facts (read-only snapshot; declarations are not proof):\n";
+  const packet = { receiptId: "route", ready: true, entries: [{ path: "policy.md", content: "Required guide", sourceDigest: "digest" }],
+    route: { primary: ["policy.md"], active: [], budget: contextBudget(undefined) }, skills: { entries: [] }, blockers: [],
+    optional: { entries: [{ id: "quoted.ts", sourceDigest: "quoted", excerpt: marker }] } } as any;
+  const history = { state: "unavailable" as const, candidates: [], inspected: 0, omissions: [] };
+  const output = renderPromptContext(packet, history, "entry");
+  assert.ok(output.text.includes("Current task facts")); assert.equal(output.factsDelivered, false);
+  const facts = { version: 1 as const, observed_at: "2026-10-05", association: { status: "session-unbound" }, unavailable: [], omitted: [] };
+  assert.equal(renderPromptContext(packet, history, "entry", "", facts).factsDelivered, true);
+});
+
 test("native delivery honors the declared envelope above the old cap, with required skills intact", () => {
   const packet = { receiptId: "route", ready: true, entries: [{ path: "policy.md", content: "A".repeat(28_000), sourceDigest: "digest" }],
     route: { primary: ["policy.md"], active: [], budget: contextBudget({ primary_context_tokens: 8000, total_context_tokens: 12000 }), budgetAuthority: { nativePacketBytes: 48000 } },
@@ -131,6 +204,8 @@ test("mixed native owners retain their individual limits through delivery and re
       const folder = join(contextStateRoot(root), "prompt-entries");
       const entry = readdirSync(folder).map(file => JSON.parse(readFileSync(join(folder, file), "utf8"))).find(item => item.turn === String(total));
       assert.equal(entry.packetLimitBytes, expected);
+      assert.equal(entry.packetDigest, digest(output));
+      assert.equal(entry.packetBytes, Buffer.byteLength(output));
       assert.deepEqual(await promptContext("codex", event, root, { environment: {}, assetRoot: assets }), first);
     }
   } finally {
