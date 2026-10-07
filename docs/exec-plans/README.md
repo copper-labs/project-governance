@@ -21,6 +21,10 @@ shows existing project-owned checks; it does not require a check after every edi
 
 ## Active
 
+- [Decision providers and image evaluation](active/2026-10-06-decision-providers-and-image-evaluation.md)
+  is a design-only draft for provider adapters, supplied-image evaluation and agent/test integration.
+  Implementation, live qualification and publication remain separate work.
+
 - [Next major verification and semantic review](active/2026-10-04-major-verification-feedback.md)
   records the published 4.0.0 implementation, installed journeys, multilingual JEV advice,
   early checks and known-fault detection. Deliberate field adoption remains separate.

@@ -66,6 +66,11 @@ startup updates through its tracked profile; major releases and integration chan
 
 ## Unified development direction
 
+The draft [decision providers and image evaluation specification](specs/engine-decision-providers-and-image-evaluation.md)
+and [implementation plan](exec-plans/active/2026-10-06-decision-providers-and-image-evaluation.md)
+propose interchangeable JEV/OpenAI adapters and a reusable text/image evaluation operation.
+This is design work; it does not enable providers or change current release ownership.
+
 The [next major verification and semantic review specification](specs/engine-4-verification-feedback.md)
 and [delivery plan](exec-plans/active/2026-10-04-major-verification-feedback.md) define the current
 development sequence: installed workflow proof, multilingual JEV advice, focused batch checks,
