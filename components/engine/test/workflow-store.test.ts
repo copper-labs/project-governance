@@ -100,6 +100,16 @@ test("recipe boundaries reject injected operations, forward dependencies and cha
     assert.throws(() => parseRecipe(raw), /dependencies must precede/);
     raw.stages[0].dependsOn = []; raw.operations.check.env = { JEV_TOKEN: "not-a-secret-test" };
     assert.throws(() => parseRecipe(raw), /credentials/);
+    raw.operations.check.env = { OPENAI_API_KEY: "not-a-secret-test" };
+    assert.throws(() => parseRecipe(raw), /credentials/);
+    for (const name of ["ANTHROPIC_API_KEY", "GOOGLE_API_KEY", "API_KEY", "anthropic_api_key"]) {
+      raw.operations.check.env = { [name]: "not-a-secret-test" };
+      assert.throws(() => parseRecipe(raw), /credentials/, "recipes must reject API-key values before durable workflow binding");
+    }
+    raw.operations.check.env = {}; raw.operations.check.credentialEnv = ["OPENAI_API_KEY"];
+    assert.deepEqual(parseRecipe(raw).operations.check!.credentialEnv, ["OPENAI_API_KEY"]);
+    raw.operations.check.credentialEnv = ["OTHER_API_KEY"];
+    assert.throws(() => parseRecipe(raw), /credential/);
   } finally { f.close(); }
 });
 

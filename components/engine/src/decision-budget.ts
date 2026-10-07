@@ -274,3 +274,71 @@ export function decisionBudgetStoreStatus(stateRoot: string) {
       retention: "ordinary identities retained; context family accounting and cursors expire after 15 minutes; audit receipts retained" };
   }
 }
+
+/** Typed evaluation claims share this ledger without appearing in task/resume APIs. */
+export interface EvaluationReservation extends Omit<BudgetReservation, "state"> {
+  state: ReservationState | "conflict"; window: string | null; requestIdentity: string | null;
+}
+const EVALUATION_NAMESPACE = "@supplied-evaluation/v1";
+const evaluationPrefix = (evaluationId: string) => `evaluation:${digest(evaluationId).slice(7)}:`;
+function evaluationScope(workspace: string, window: string): BudgetScope {
+  return { workspace: realpathSync(workspace), taskId: EVALUATION_NAMESPACE, taskRevision: window };
+}
+function claimRow(database: DatabaseSync, workspace: string, prefix: string) {
+  return database.prepare("SELECT r.id,r.event,s.revision,s.calls,s.bytes FROM reservation r JOIN scope s ON s.id=r.scope WHERE s.workspace=? AND s.task=? AND substr(r.event,1,?)=? LIMIT 2").all(workspace, EVALUATION_NAMESPACE, prefix.length, prefix);
+}
+function retainedClaim(rows: ReturnType<typeof claimRow>, base: EvaluationReservation): EvaluationReservation | null {
+  if (!rows.length) return null;
+  if (rows.length !== 1) return base;
+  const row = rows[0]!, identity = String(row.event).slice(evaluationPrefix(base.eventId).length);
+  if (!/^sha256:[a-f0-9]{64}$/u.test(identity) || !/^\d{4}-\d{2}-\d{2}$/u.test(String(row.revision))) return base;
+  return { ...base, state: "duplicate", reservationId: String(row.id), window: String(row.revision), requestIdentity: identity,
+    calls: Number(row.calls), bytes: Number(row.bytes) };
+}
+/** Read stable identity across every charged day. Missing answers never permit a second attempt. */
+export function readEvaluationClaim(stateRoot: string, workspace: string, evaluationId: string, limits: DecisionBudgetLimits): EvaluationReservation | null {
+  if (!existsSync(join(stateRoot, DECISION_BUDGET_FILE))) return null;
+  const base: EvaluationReservation = { state: "unavailable", reservationId: null, eventId: evaluationId, calls: null, bytes: null, limits, window: null, requestIdentity: null };
+  let database: DatabaseSync | undefined;
+  try {
+    database = open(budgetPath(stateRoot, false), 50, true);
+    const version = Number(database.prepare("PRAGMA user_version").get()!.user_version);
+    // This recognized generation predates evaluation claims; the dispatch transaction owns migration.
+    if (version === 1) return null;
+    if (version !== 2) return base;
+    return retainedClaim(claimRow(database, realpathSync(workspace), evaluationPrefix(evaluationId)), base);
+  } catch { return base; } finally { database?.close(); }
+}
+/** Identity claim and workspace/day aggregation commit together immediately before one dispatch. */
+export function reserveEvaluationCall(stateRoot: string, workspace: string, evaluationId: string, requestIdentity: string, requestBytes: number,
+  limits: DecisionBudgetLimits, options: { now?: () => number; busyTimeoutMs?: number } = {}): EvaluationReservation {
+  const base: EvaluationReservation = { state: "unavailable", reservationId: null, eventId: evaluationId, calls: null, bytes: null, limits, window: null, requestIdentity: null };
+  const now = (options.now ?? Date.now)(), busy = options.busyTimeoutMs ?? 250;
+  if (!Number.isSafeInteger(now) || now < 0 || !evaluationId || evaluationId.length > 128 ||
+      !/^sha256:[a-f0-9]{64}$/u.test(requestIdentity) || !Number.isSafeInteger(requestBytes) || requestBytes < 1 ||
+      !Number.isSafeInteger(limits.maxCalls) || limits.maxCalls < 1 || !Number.isSafeInteger(limits.maxRequestBytes) || limits.maxRequestBytes < 1 ||
+      !Number.isSafeInteger(busy) || busy < 0 || busy > 1000) return base;
+  let database: DatabaseSync | undefined;
+  try {
+    const root = realpathSync(workspace), window = new Date(now).toISOString().slice(0, 10), scope = evaluationScope(root, window), id = budgetScopeId(scope);
+    database = open(budgetPath(stateRoot, true), busy); database.exec("BEGIN IMMEDIATE");
+    try {
+      migrate(database);
+      const previous = retainedClaim(claimRow(database, root, evaluationPrefix(evaluationId)), base);
+      if (previous) { database.exec("COMMIT"); return previous.state === "duplicate" && previous.requestIdentity !== requestIdentity ? { ...previous, state: "conflict" } : previous; }
+      // Midnight closes the old window, preserving every claim and its original counters forever.
+      database.prepare("UPDATE scope SET closed=1 WHERE workspace=? AND task=? AND revision<?").run(root, EVALUATION_NAMESPACE, window);
+      const counters = database.prepare("SELECT calls,bytes,closed FROM scope WHERE id=?").get(id);
+      const calls = Number(counters?.calls ?? 0), bytes = Number(counters?.bytes ?? 0), current = { ...base, window, requestIdentity, calls, bytes };
+      if (counters?.closed === 1) { database.exec("COMMIT"); return current; }
+      if (calls >= limits.maxCalls || requestBytes > limits.maxRequestBytes - bytes) { database.exec("COMMIT"); return { ...current, state: "exhausted" }; }
+      if (!counters) database.prepare("INSERT INTO scope VALUES(?,?,?,?,0,0,0,?)").run(id, root, EVALUATION_NAMESPACE, window, now);
+      const event = evaluationPrefix(evaluationId) + requestIdentity, reservationId = digest({ scope: id, eventId: event }).slice(7, 39);
+      database.prepare("INSERT INTO reservation VALUES(?,?,?,?,?)").run(reservationId, id, event, requestBytes, now);
+      database.prepare("UPDATE scope SET calls=calls+1,bytes=bytes+?,updated=? WHERE id=?").run(requestBytes, now, id);
+      database.exec("COMMIT");
+      return { ...current, state: "reserved", reservationId, calls: calls + 1, bytes: bytes + requestBytes };
+    } catch (error) { try { database.exec("ROLLBACK"); } catch {} throw error; }
+  } catch (error) { return error instanceof BudgetStoreCapacityError ? { ...base, unavailableReason: "store-capacity" } : base; }
+  finally { database?.close(); }
+}

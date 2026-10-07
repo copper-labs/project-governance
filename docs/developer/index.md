@@ -14,7 +14,7 @@ summary: Routes evaluators, operators, contributors, and agents through the shor
 Project Governance selects checks affected by a repository change and owns their execution evidence.
 The current compiled TypeScript npm package adds durable workflows and optional decision advice.
 Existing wheel installations retain their owner until deliberate adoption. Current source work follows
-the 4.1 plan below; retained wheel journeys apply only to their installed generation.
+the 4.2 plan below; retained wheel journeys apply only to their installed generation.
 
 ## Evaluate Or Operate The Runtime
 
@@ -30,9 +30,11 @@ is described in the [charter](../../CHARTER.md#runtime-authority).
 
 ## Contribute To The Runtime
 
-For 4.1 source work, use the approved [context-quality specification](../specs/engine-4-1-context-quality.md)
-and active [delivery plan](../exec-plans/active/2026-10-05-4-1-context-quality.md). They bind exact
-task/plan linkage and proof mappings. Existing installed releases remain unchanged until adoption.
+For 4.2 source work, use the approved [decision-provider and evaluator specification](../specs/engine-decision-providers-and-image-evaluation.md)
+and [delivery plan](../exec-plans/active/2026-10-06-decision-providers-and-image-evaluation.md).
+The [optional browser-testing plan](../exec-plans/active/2026-10-06-optional-computer-use-testing.md)
+adds caller-owned model-free fixtures. Installed 4.1 releases retain their qualified task/plan
+linkage and proof mappings until deliberate adoption.
 Use [root source instructions](../../AGENTS.md) for compiled commands and the retained source Git
 hook boundary. Current implementation owners are `components/engine` and `components/harness`.
 
@@ -83,7 +85,7 @@ entry reuse, procedure opt-in, actual semantic coverage and unknown outcome evid
 
 Agents read [catalog.yaml](catalog.yaml) and select an exact capability id, alias, or symbol.
 Retained entries such as `first-governed-check` and `change-runtime` still describe Python owners;
-current compiled source work starts with the root instructions and 4.1 plan above. An installed
+current compiled source work starts with the root instructions and 4.2 plan above. An installed
 runtime returns the catalog reference, guides and local sources:
 
 ```sh

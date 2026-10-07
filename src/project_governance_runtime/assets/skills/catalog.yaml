@@ -27,6 +27,15 @@ canonical_roots:
   pattern_packs: .governance/runtime/skills/pattern-packs
 
 standard_skills:
+  - id: evaluate-evidence
+    category: governance
+    path: .governance/runtime/skills/evaluate-evidence/SKILL.md
+    description: Evaluate explicitly supplied text or local images through the installed advisory command.
+    activation:
+      mode: governed
+      default_level: recommended
+    applicability:
+      task_terms: [evaluate supplied evidence, visual test checkpoint, evaluate-evidence]
   - id: test-execution
     category: governance
     path: .governance/runtime/skills/test-execution/SKILL.md

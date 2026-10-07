@@ -23,3 +23,9 @@ test("delivery commands enter the managed generation with their actual mutation 
   assert.equal(managedCommandEffect("release-evaluation", ["capture"]), "write");
   assert.equal(managedCommandEffect("task-facts", ["--session", "exact-chat"]), "read");
 });
+
+test("supplied evaluator invocation reserves a write generation for budgets and immutable receipts", () => {
+  assert.equal(managedCommandEffect("evaluate", ["--request-file", "request.json"]), "write");
+  assert.equal(managedCommandEffect("evaluate", ["--request-file", "local-only.json"]), "write",
+    "A local-only result still enters the same conservative write owner");
+});

@@ -2,7 +2,7 @@
 id: spec.engine-optional-computer-use-testing
 title: Optional Computer Use and Combined Visual Testing
 type: spec
-status: draft
+status: approved
 owner: project-governance
 created: 2026-10-06
 updated: 2026-10-06
@@ -21,9 +21,10 @@ assertions and independently assigned visual labels establish whether the experi
 Start with scripted tasks and single-call grounding. This gives us realistic combined tests while
 making failures reproducible.
 
-This is a proposed experimental extension. The operator authorized specifications, plans, Opus
-5.5 medium review, reconciliation, simplification and a local documentation commit. Runtime
-implementation, model installation and live or paid experiments are future work. The operator has
+This is an optional experimental extension. The operator authorized specifications, plans, Opus
+5.5 medium review, reconciliation, simplification and a local documentation commit, then included
+model-free implementation in 4.2. Model installation and live or paid experiments remain separately
+scoped work. The operator has
 confirmed permission for experimental use of the 27B weights; the runtime does not acquire or
 redistribute them.
 
@@ -175,7 +176,9 @@ roots. Do not assume an external artifact directory is admissible; prove it agai
 Page content and model output are untrusted. They cannot broaden the allowed origin, invoke another
 tool, update a baseline or change a required check. The runner restricts browser navigation and
 network activity to the disposable fixture; requests to OpenAI occur only through the separately
-authorized evaluator, outside the browser. Independent checks continue after model failure.
+authorized evaluator, outside the browser. Independent checks continue after ordinary model
+unavailability. Existing native process-failure, dependency and fail-fast rules remain effective;
+this optional caller does not override them.
 
 ## Realistic synthetic scenarios
 
@@ -246,16 +249,16 @@ before deliberate adoption. This plan does not select a release or change instal
 
 ## Research basis
 
-Verified 2026-10-06. H Company's [local inference guide](https://hub.hcompany.ai/models-api/local-inference)
+Verified 2026-10-06 and refreshed 2026-10-07 UTC. H Company's [local inference guide](https://hub.hcompany.ai/models-api/local-inference)
 lists Holo4 GGUF/llama.cpp and vLLM formats; the measured speed material on that page is Holo3.1.
 The [27B model](https://huggingface.co/Hcompany/Holo4-27B) and
 [GGUF artifacts](https://huggingface.co/Hcompany/Holo4-27B-GGUF/tree/main) identify the candidate.
 Its [grounding guide](https://hub.hcompany.ai/models-api/element-localization) defines single-call
 localization and image-relative coordinates. These are provider contracts, not measured pilot proof.
 
-OpenAI's [Decisions guide](https://developers.openai.com/api/docs/guides/decisions) and
-[request reference](https://developers.openai.com/api/reference/resources/decisions/methods/create)
-define typed predicates/choices/scores and supplied images. The
+OpenAI's [Decisions guide](https://developers.openai.com/api/docs/guides/decisions) and its endpoint
+OpenAPI schema define typed predicates/choices/scores and supplied images. The request-reference
+page was unavailable during verification; the guide and schema own the implemented contract. The
 [vision guide](https://developers.openai.com/api/docs/guides/images-vision) explains image preparation
 and model-dependent detail. Refresh supported profiles and
 [Decisions pricing](https://developers.openai.com/api/docs/pricing) before live comparison; do not

@@ -50,6 +50,26 @@ test("contradictory distributions invalidate only the affected answer", () => {
   assert.equal(parsed.answers["yes"]?.status, "answered");
 });
 
+test("JEV choice dictionaries retain prototype-like supplied values and reject contradictions", () => {
+  for (const value of ["__proto__", "constructor", "toString"]) {
+    const scoped = { questions: [{ ...request.questions[1]!, candidates: [
+      { id: value, description: "Supplied option" }, { id: "other", description: "Other option" },
+    ] }] };
+    const raw = (probability: number) => JSON.parse(JSON.stringify({ model: "jev-1.13.0", answers: {
+      pick: { type: "choice", choice: value, confidence: 1,
+        probabilities: Object.fromEntries([[value, probability], ["other", 1 - probability], ["unknown", 0]]) },
+    } }));
+    const answered = parseDecisionEnvelope(raw(1), scoped, definitions, "jev-1.13.0", "payload").answers["pick"]!;
+    assert.equal(answered.status, "answered");
+    if (answered.status === "answered" && answered.shape === "choice") {
+      assert.equal(Object.hasOwn(answered.probabilities!, value), true);
+      assert.equal(answered.probabilities![value], 1);
+      assert.equal(JSON.parse(JSON.stringify(answered.probabilities))[value], 1);
+    }
+    assert.equal(parseDecisionEnvelope(raw(0), scoped, definitions, "jev-1.13.0", "payload").answers["pick"]?.status, "invalid");
+  }
+});
+
 test("request validation rejects invalid binding, vocabulary and bounds before serialization", async () => {
   const { validateDecisionRequest } = await import("../src/decision-schema.ts");
   const registered = Object.fromEntries(Object.entries(definitions).map(([key, definition]) => [`fixture.${key}/1`, { ...definition, id: `fixture.${key}/1` }]));

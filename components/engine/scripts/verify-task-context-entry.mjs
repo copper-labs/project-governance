@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { existsSync, readFileSync, watch, writeFileSync } from 'node:fs';
+import { verifyJevProviderIdentity } from './verify-log-pilot.mjs';
 
 /** Public installed commands: register once, select before reading, capture intent through detach. */
 export async function verifyTaskContextEntry({ repo, temporary, run, write, git, environment }) {
@@ -29,7 +30,11 @@ export async function verifyTaskContextEntry({ repo, temporary, run, write, git,
     assert.equal(packet.ready, true);
     assert.equal(packet.selection.binding.taskId, task.taskId);
     assert.equal(packet.selection.binding.source, 'session');
-    assert.equal(packet.optional.decision.method, 'jev');
+    assert.equal(packet.version, 3); assert.equal(packet.optional.decision.method, 'provider');
+    verifyJevProviderIdentity(packet.optional.decision.provider);
+    const routeOriginal = JSON.parse(readFileSync(packet.receipt, 'utf8'));
+    assert.equal(routeOriginal.optional.decision.version, 3);
+    assert.deepEqual(routeOriginal.optional.decision.provider, packet.optional.decision.provider, 'Public selection must preserve its original provider identity');
     assert.ok(packet.optional.entries.some(entry => entry.id === 'src/example.test.ts'));
     assert.equal(packet.entries[0].content, 'Preserve all required proof, failures and cleanup ownership.\n');
     const planned = run(['plan', '--stage', 'pilot-check', '--base-ref', 'HEAD']);

@@ -2,6 +2,7 @@ import { verifyTaskContextEntry } from "./verify-task-context-entry.mjs";
 import { verifyProviderSelection } from "./verify-provider-selection.mjs";
 import { verifyDecisionConcurrency } from "./verify-decision-concurrency.mjs";
 import { verifyDecisionObservers } from "./verify-decision-observers.mjs";
+import { verifyEvaluationPilot } from "./verify-evaluation-pilot.mjs";
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, realpathSync, mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, rmSync } from 'node:fs';
@@ -11,7 +12,9 @@ import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 /** Compiled public-command proof with fake inference and real native check execution. */
-export async function verifyDecisionPilot(packageRoot) {
+export async function verifyDecisionPilot(packageRoot, { generationDirectory } = {}) {
+  assert.ok(typeof generationDirectory === 'string' && generationDirectory.length > 0,
+    'Installed decision proof requires an explicit verified staged generation. Usage: node verify-decision-pilot.mjs <installed-package-root> <verified-generation-directory>');
   const cli = join(resolve(packageRoot), 'dist/engine/src/cli.js');
   assert.ok(existsSync(cli), 'Build or install the package before running pilot proof');
   const temporary = realpathSync(mkdtempSync(join(tmpdir(), 'governance-decision-pilot-')));
@@ -111,8 +114,9 @@ export async function verifyDecisionPilot(packageRoot) {
     environment.JEV_TOKEN = "fixture-only";
     const providerSelection = await verifyProviderSelection({ packageRoot, repo, temporary, run, write, environment, callsPath });
     const taskEntry = await verifyTaskContextEntry({ repo, temporary, run, write, git, environment });
+    const evaluationPilot = await verifyEvaluationPilot(packageRoot, { generationDirectory });
     finished = true;
-    return { status: 'passed', taskEntry, providerSelection, logPilot: observers.logPilot, consumers: ['DL01', 'DL02', 'DL07', ...observers.consumers].sort(), native_checks: 'passed', native_check_authority_unchanged: true, provider: 'fixture' };
+    return { status: 'passed', taskEntry, providerSelection, logPilot: observers.logPilot, evaluationPilot, consumers: ['DL01', 'DL02', 'DL07', ...observers.consumers].sort(), native_checks: 'passed', native_check_authority_unchanged: true, provider: 'fixture' };
   } finally {
     await cleanupPilot(packageRoot, temporary, state, finished);
   }
@@ -135,5 +139,6 @@ async function cleanupPilot(packageRoot, temporary, state, finished) {
     assert.equal(active(), false, 'Native writers must stop before proof cleanup');
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  console.log(JSON.stringify(await verifyDecisionPilot(process.argv[2] ?? process.cwd())));
+  console.log(JSON.stringify(await verifyDecisionPilot(process.argv[2] ?? process.cwd(),
+    { generationDirectory: process.argv[3] })));
 }

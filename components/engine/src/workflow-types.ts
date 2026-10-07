@@ -1,5 +1,5 @@
 import { androidEmulatorAdapter, type AndroidEmulatorAdapter } from "./android-emulator.ts";
-import { credentialNames } from "./credential-environment.ts";
+import { credentialNames, nonCredentialEnvironment } from "./credential-environment.ts";
 import { isAbsolute, relative, resolve } from "node:path";
 import { realpathSync } from "node:fs";
 import { digest, fileDigest, object, text } from "./core.ts";
@@ -60,12 +60,9 @@ export function parseRecipe(raw: unknown): Recipe {
     const cwd = realpathSync(resolve(workspace, text(op["cwd"], "cwd")));
     const rel = relative(workspace, cwd);
     if (rel === ".." || rel.startsWith("../") || isAbsolute(rel)) throw new Error("operation cwd exceeds workspace");
-    const env: Record<string, string> = {};
-    for (const [key, val] of Object.entries(object(op["env"] ?? {}, "env"))) {
+    const env = nonCredentialEnvironment(op["env"] ?? {});
+    for (const key of Object.keys(env)) {
       if (key.startsWith("PROJECT_GOVERNANCE_WORKFLOW_")) throw new Error("workflow environment is engine-owned");
-      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) || typeof val !== "string" || val.includes("\0")) throw new Error("invalid environment entry");
-      if (/TOKEN|SECRET|PASSWORD|CREDENTIAL|PRIVATE_KEY/i.test(key)) throw new Error("credentials cannot be embedded in recipes");
-      env[key] = val;
     }
     const codes = op["expectedExitCodes"] ?? [0];
     if (!Array.isArray(codes) || !codes.length || codes.some(v => !Number.isInteger(v) || v < 0 || v > 255)) throw new Error("invalid expected exit codes");

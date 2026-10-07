@@ -16,6 +16,54 @@ export function logPilotTaskContext(workspace) {
     requirement: 'Diagnose the owner mismatch while preserving complete failure, result and cleanup evidence',
     acceptance: [], sourcePaths: ['tools/long-log-native.mjs'] };
 }
+/** Thin presentations still retain exact identity instead of qualifying unknown historical providers. */
+export function verifyJevProviderIdentity(provider) {
+  assert.deepEqual({ id: provider.id, adapterVersion: provider.adapterVersion,
+    requestedModel: provider.requestedModel, returnedModel: provider.returnedModel, modelIdentity: provider.modelIdentity },
+  { id: 'jev', adapterVersion: 'jev-text-1', requestedModel: 'jev-1.13.0', returnedModel: 'jev-1.13.0', modelIdentity: 'exact-version' });
+  assert.match(provider.configurationDigest, /^sha256:[a-f0-9]{64}$/u); return provider;
+}
+
+/** Current provider delivery needs an exact adapter/model identity, not a historical method label. */
+export function verifyJevProviderDecision(decision, consumerId) {
+  assert.equal(decision.version, 3); assert.equal(decision.sourceVersion, undefined, 'A new installed decision must not be a historical projection');
+  assert.equal(decision.method, 'provider'); assert.equal(decision.consumerId, consumerId);
+  assert.equal(decision.providerCalled, true); assert.equal(decision.delivered, true);
+  verifyJevProviderIdentity(decision.provider); assert.equal(decision.model, decision.provider.returnedModel);
+  assert.match(decision.requestIdentity, /^sha256:[a-f0-9]{64}$/u); assert.match(decision.payloadDigest, /^sha256:[a-f0-9]{64}$/u);
+  assert.deepEqual(decision.usage, { inputTokens: 100, outputTokens: 10 }, 'Native fixture usage must survive the provider-neutral projection');
+  return decision.provider;
+}
+
+/** A compact log view binds to its full receipt; fields omitted by that view stay with their owner. */
+export function verifyLogProviderProjection(output, receipt, { replay = false } = {}) {
+  assert.equal(output.version, 3); assert.equal(output.effect, 'advise'); assert.equal(receipt.version, 3);
+  const decision = output.decision, original = receipt.outcome;
+  verifyJevProviderDecision(original, 'DL13'); assert.equal(original.effect, 'advise');
+  assert.equal(receipt.configDigest, original.provider.configurationDigest); assert.equal(receipt.receiptId, decision.receiptId);
+  const fields = ['consumerId', 'requestId', 'receiptId', 'provider', 'method', 'reason', 'delivered', 'providerCalled', 'model', 'usage', 'latencyMs', 'budget', 'scopeState'];
+  const expected = Object.fromEntries(fields.map(key => [key, key === 'receiptId' ? receipt.receiptId : original[key]]));
+  if (replay) {
+    assert.equal(decision.reason, 'repeated-observation'); assert.equal(typeof decision.requestId, 'string'); assert.ok(decision.requestId);
+    assert.notEqual(decision.requestId, original.requestId, 'Replay is a new observation of the same immutable decision');
+    assert.ok(Number.isFinite(decision.latencyMs) && decision.latencyMs >= 0);
+    // These three fields describe the current observation; paid identity and accounting remain exact.
+    Object.assign(expected, { reason: decision.reason, requestId: decision.requestId, latencyMs: decision.latencyMs });
+  }
+  assert.deepEqual(decision, expected,
+    'Compact output must preserve exactly the fields its retained decision owner exposes');
+  return original.provider;
+}
+
+function linkedLogDecision(response, runId) {
+  assert.equal(response.episode.status, 'recorded');
+  const episodePath = response.episode.episode.path, episodeBytes = readFileSync(episodePath), episode = JSON.parse(episodeBytes),
+    receiptId = response.outputs[0].decision.receiptId;
+  assert.equal(hash(episodeBytes), response.episode.episode.digest); assert.equal(episode.caller, 'check-output'); assert.equal(episode.native.runId, runId);
+  assert.ok(episode.decisionLinks.some(link => link.receiptId === receiptId)); assert.match(receiptId, /^[a-f0-9]{32}$/u);
+  const path = join(dirname(dirname(episodePath)), 'decisions', `${receiptId}.json`), bytes = readFileSync(path), receipt = JSON.parse(bytes);
+  assert.equal(receipt.receiptId, receiptId); return { path, bytes, digest: hash(bytes), receipt };
+}
 const LOG_TEXT = ['Native log fixture started', ...Array.from({ length: 40 }, (_, index) => `DEBUG progress ${index} ${'.'.repeat(160)}`),
   ...LOG_PILOT_REQUIRED, 'Native log fixture finished'].join('\n\n') + '\n';
 
@@ -87,14 +135,19 @@ export function verifyInstalledLogPilot({ packageRoot, repo, temporary, run, wri
   assert.equal(deterministic.pilot.arm, 'deterministic'); assert.equal(deterministic.decision, null);
   assert.equal(callsFor(callsPath, 'DL13'), beforeNative, 'The controlled deterministic arm must spend no model call');
   const deterministicProof = verifyLogPilotOutput(deterministic, original, receipt);
-  const advised = run(['check-output', '--run', checked.run_id, '--log-pilot', 'jev'], 1).outputs[0];
+  const advisedResponse = run(['check-output', '--run', checked.run_id, '--log-pilot', 'jev'], 1), advised = advisedResponse.outputs[0],
+    linked = linkedLogDecision(advisedResponse, checked.run_id);
   assert.equal(advised.pilot.arm, 'jev'); assert.equal(advised.decision.consumerId, 'DL13');
-  assert.equal(advised.decision.providerCalled, true); assert.equal(advised.decision.delivered, true); assert.equal(advised.decision.method, 'jev');
+  const providerIdentity = verifyLogProviderProjection(advised, linked.receipt);
+  assert.deepEqual(linked.receipt.outcome.scope, { workspace: repo, taskId: taskContext.taskId, taskRevision: taskContext.revision });
   assert.equal(callsFor(callsPath, 'DL13'), beforeNative + 1, 'The JEV arm must issue exactly one intercepted fixture request');
   const jevProof = verifyLogPilotOutput(advised, original, receipt);
   // This fixture answers every optional question negatively; matching packets prove wiring, not benefit.
   assert.equal(advised.selection.text, deterministic.selection.text);
-  const replay = run(['check-output', '--run', checked.run_id, '--log-pilot', 'jev'], 1).outputs[0];
+  const replayResponse = run(['check-output', '--run', checked.run_id, '--log-pilot', 'jev'], 1), replay = replayResponse.outputs[0],
+    replayLinked = linkedLogDecision(replayResponse, checked.run_id);
+  verifyLogProviderProjection(replay, replayLinked.receipt, { replay: true }); assert.deepEqual(replay.decision.provider, providerIdentity);
+  assert.deepEqual(readFileSync(linked.path), linked.bytes, 'Presentation/replay must preserve the full original decision receipt');
   assert.equal(replay.decision.receiptId, advised.decision.receiptId); assert.equal(callsFor(callsPath, 'DL13'), beforeNative + 1);
   assert.deepEqual(readFileSync(resultPath), resultBytes); assert.equal(readFileSync(receipt.log, 'utf8'), original);
   const proof = { version: 1, kind: 'installed-dl13-long-log-proof', status: 'passed', run_id: checked.run_id,
@@ -104,8 +157,9 @@ export function verifyInstalledLogPilot({ packageRoot, repo, temporary, run, wri
     package_version: packageManifest.version, launcher: { path: launcher, digest: launcherDigest },
     native_result: { path: resultPath, digest: hash(resultBytes), status: retained.status, request_digest: command.request_digest },
     no_pilot: { delivered: false, provider_calls: 0, original_preserved: true },
-    arms: [{ arm: 'deterministic', provider_calls: 0, ...deterministicProof }, { arm: 'jev', provider_calls: 1, decision_receipt: advised.decision.receiptId, ...jevProof }],
-    replay: { additional_provider_calls: 0, decision_receipt: replay.decision.receiptId }, provider: 'intercepted-fixture-only',
+    arms: [{ arm: 'deterministic', provider_calls: 0, ...deterministicProof }, { arm: 'jev', provider_calls: 1, decision_receipt: advised.decision.receiptId,
+      decision_original: { path: linked.path, digest: linked.digest }, ...jevProof }],
+    replay: { additional_provider_calls: 0, decision_receipt: replay.decision.receiptId }, provider: 'intercepted-fixture-only', provider_identity: providerIdentity,
     semantic_accuracy: 'unqualified', accepted_task_benefit: 'unqualified', token_savings: null,
     retention: 'Original references were verified during proof and follow the existing temporary verifier retention policy' };
   const proofPath = join(temporary, 'installed-log-pilot-proof.json'); writeFileSync(proofPath, JSON.stringify(proof, null, 2) + '\n');

@@ -23,7 +23,10 @@ following publication of the qualified 4.1 release. The design, Opus 5.5 medium 
 reconciliation and separate simplification pass are complete. The 4.1 source and archive are frozen
 at their release identity; new runtime changes belong to 4.2. Preserve normal hooks and make local
 commits at completed coherent seams. Paid inference, 4.2 publication and adopter changes remain
-separate actions. One writer owns shared decision contracts; support work is read-only.
+separate actions. One writer owns shared decision contracts. The independent B3 credential boundary
+may be implemented in its existing execution owners while B2 proceeds; final integration and package
+proof still depend on B2's settled interface. Root owns documentation, assets, package metadata and
+installed proof. The optional browser pilot owns disjoint caller fixtures, not shared runtime code.
 
 ## Fixed decisions and source owners
 
@@ -46,6 +49,7 @@ separate actions. One writer owns shared decision contracts; support work is rea
 | Provider codec and preparation | `decision-schema.ts`, `decision-request-preparation.ts`, `decision-transport.ts`, `decision-admission.ts` |
 | Accounting, identity and retained usage | `decision-scope.ts`, `decision-budget.ts`, `decision-telemetry.ts`, `decision-episodes.ts`, `release-evaluation-cost.ts` |
 | Generic command and narrow public entry | `cli.ts`, one evaluation entry module, `package.json` exports and current package-asset owner |
+| Pinned launcher execution | Existing `runtime-invocation.ts` write-command admission and generation lifecycle; public-entry proof uses that owner |
 | Project check execution/evidence | `check-worker.ts`, `check-run.ts`, `native-check-command.ts`, `credential-environment.ts`, `command-argv.ts`, `checker-results.ts`; project scripts retain navigation/capture |
 | Documentation and installed proof | Existing packaged skill resources, developer catalog after acceptance, `verify-decision-pilot.mjs` and `verify-package.mjs` |
 
@@ -64,7 +68,7 @@ and verify the Git executable inherited by fixtures before the checkpoint.
 Author each batch's source, bindings and meaningful fixtures together; run focused checks once at
 batch completion. Repeat failed/invalidated owners, or run early for a named blocking uncertainty.
 Existing hooks remain effective. Retain original proof and update implementation/verification/
-closeout boxes at each batch or handoff. B1 is implemented and locally verified; B2/B3 remain open. One independent
+closeout boxes at each batch or handoff. B1–B3 are implemented, mechanically verified and independently reviewed. One independent
 implementation review consumes B3 proof; commits/publication remain separately authorized.
 
 ## B1 — Interchangeable text providers
@@ -146,40 +150,40 @@ seam. Default cadence remains batch completion, with failed or invalidated owner
 
 Implementation:
 
-- [ ] Add explicit generic-entry admission without dynamic registration or weakening existing
+- [x] Add explicit generic-entry admission without dynamic registration or weakening existing
   consumer enablement: typed registered/supplied branches, validated request-local questions,
   fixed advice-only effect and disabled/enabled generic setting. Add supplied-evidence permission.
-- [ ] Extend the existing budget store for evaluation scopes while preserving old counters/receipts.
+- [x] Extend the existing budget store for evaluation scopes while preserving old counters/receipts.
   Use typed reserved keys with unchanged version-2 storage and one host-derived workspace/window
   aggregate allowance. Bind stable evaluation IDs to exact requests; new IDs/processes or changed
   settings cannot reset spending. Task/run association is verified provenance only.
-- [ ] Persist the workspace/evaluation-ID request claim independently of daily charges, in the same
+- [x] Persist the workspace/evaluation-ID request claim independently of daily charges, in the same
   reservation transaction. Midnight/closed-window replay without a receipt cannot dispatch again;
   changed input conflicts. Close prior window scopes while retaining dispatch guards.
-- [ ] Capture bounded static PNG/JPEG/WebP inputs under approved roots; verify actual media,
+- [x] Capture bounded static PNG/JPEG/WebP inputs under approved roots; verify actual media,
   dimensions, immutable bytes and serialized expansion. No fetching, animation or conversion.
   Declare/document fixed adapter request limits; operators set daily spending, disclosure and
   roots rather than a second set of image/question/duration allowances.
-- [ ] Extend the existing provider pool for OpenAI byte/image admission and call/concurrency pacing;
+- [x] Extend the existing provider pool for OpenAI byte/image admission and call/concurrency pacing;
   token estimate remains null and cost uses native usage. Preserve JEV text preparation/pacing.
-- [ ] Implement the versioned JSON request/result and `project-governance evaluate --request-file`.
+- [x] Implement the versioned JSON request/result and `project-governance evaluate --request-file`.
   Define the narrow evaluation-only export; keep trusted-host authority APIs out of it.
-- [ ] Retain per-question outcome, coverage, artifact provenance, native usage/timing and receipt
+- [x] Retain per-question outcome, coverage, artifact provenance, native usage/timing and receipt
   identity. Shared v3 Score has one computed score; retain native score and validate agreement.
   Always print the result envelope; exit 0 permits only answered/unknown/refused, otherwise exit 1.
-- [ ] Author synthetic image, taskless invocation, disclosure, limits, refusal, replay/conflict,
+- [x] Author synthetic image, taskless invocation, disclosure, limits, refusal, replay/conflict,
   interrupted dispatch and CLI/library boundary regressions alongside the implementation.
 
 Verification:
 
-- [ ] Run B2 owner suites plus existing budget/scope/runtime/preparation regressions and typecheck.
-- [ ] Cover spec R3/R4's identity, rejection and answer cases; add interrupted/missing-receipt
+- [x] Run B2 owner suites plus existing budget/scope/runtime/preparation regressions and typecheck.
+- [x] Cover spec R3/R4's identity, rejection and answer cases; add interrupted/missing-receipt
   replay across midnight, new IDs within the same daily allowance, old storage coexistence and
   unconditional structured CLI failure output. Preserve declared evidence layouts and task absence.
 
 Closeout:
 
-- [ ] Freeze the public request/result/exit contract and package export before B3. Record original
+- [x] Freeze the public request/result/exit contract and package export before B3. Record original
   proof, failure cases and model-alias/image-token-estimation limits.
 
 | Trigger | Exact checkpoint command | Scope/claim | Repeat only when |
@@ -187,9 +191,15 @@ Closeout:
 | B2 complete | `node --test --test-concurrency=2 components/engine/test/decision-budget.test.ts components/engine/test/decision-scope.test.ts components/engine/test/decision-runtime.test.ts components/engine/test/decision-schema.test.ts components/engine/test/decision-transport.test.ts` plus frozen new evaluation/image suites | Existing accounting and new generic/image request, CLI, export and reuse boundaries | Changed accounting/preparation/public-entry inputs or failed proof |
 | B2 complete | `npm run typecheck` | Canonical types and public-entry integration | Relevant typed source/dependency changes or failure |
 
-The new owning suites are created in this batch; record their actual paths and exact invocation
-before verification, not a passing claim against nonexistent files. Proof state: not run. Split
-early for unresolved operation identity, legacy storage encoding or filesystem/disclosure behavior.
+The new owning suites are `evaluation-budget.test.ts`, `evaluation-command.test.ts`,
+`evaluation-images.test.ts` and `evaluation-runtime.test.ts` under `components/engine/test`.
+The frozen checkpoint also includes existing budget, scope, runtime, schema, transport, admission,
+provider, settings, outcome and cancellation suites. Distinct proof covers 105 passing cases and
+no-emit typecheck. A reader challenge reproduced parent replacement, FIFO input, request growth
+and forged cached task association. Corrections bind bounded nonblocking reads to inspected file
+identities and cached association to the original request. Original failures and replacement proof
+remain outside source; retries are not counted as new cases. Container checks do not decode pixels.
+Live service compatibility and visual accuracy remain unqualified.
 
 ## B3 — Agent/test integration and installed boundary proof
 
@@ -203,40 +213,40 @@ early for unresolved operation identity, legacy storage encoding or filesystem/d
 
 Implementation:
 
-- [ ] Package a small agent skill using the existing native command tool; describe taskless evaluation,
+- [x] Package a small agent skill using the existing native command tool; describe taskless evaluation,
   explicit disclosure, ad hoc advisory questions, outcomes and failure handling. No MCP service.
-- [ ] Provide a synthetic project test-wrapper fixture using the existing custom-check/evidence
+- [x] Provide a synthetic project test-wrapper fixture using the existing custom-check/evidence
   seam. It owns capture conditions, baseline references and interpretation, emits valid checker
   JSON and links the evaluation receipt to the original run.
-- [ ] Wire explicit custom-command credential-name declarations through detached worker and native
+- [x] Wire explicit custom-command credential-name declarations through detached worker and native
   command filtering. Keep host-owned values only in declared environments; support standard
   adapter-declared exact key names. Prove absent declarations deny forwarding, one absent value
   affects only its declaring command, and canary values never persist.
-- [ ] Exercise the wrapper on success, known defect, uncertainty, refusal and provider outage;
+- [x] Exercise the wrapper on success, known defect, uncertainty, refusal and provider outage;
   native failures remain failures. Required visual assertion examples never treat unusable answers
   as pass or not-applicable. Fixture answers qualify wiring, not visual-model accuracy.
-- [ ] Add accepted command/library guidance to the developer catalog and indexes. Explain advisory
+- [x] Add accepted command/library guidance to the developer catalog and indexes. Explain advisory
   first use, project-owned qualification and semantic-versus-pixel comparison without claiming
   a UI capture backend or qualified screenshot detector.
-- [ ] Extend installed proof for one taskless fixture evaluation with text/image through CLI and
+- [x] Extend installed proof for one taskless fixture evaluation with text/image through CLI and
   the narrow library outside the checkout, packaged skill/assets and the real credential canary.
   Source suites own default/disclosure/answer cases; existing installed pilot remains constituent
   proof rather than a duplicate matrix.
 
 Verification:
 
-- [ ] Run `npm run test:engine` once on the stable candidate; it includes the integration and decision
+- [x] Run `npm run test:engine` once on the stable candidate; it includes the integration and decision
   pilot source suites. Include new wrapper/export/credential regressions in their owning paths.
-- [ ] Build one exact archive and verify clean installation, exports/assets and invocation from
+- [x] Build one exact archive and verify clean installation, exports/assets and invocation from
   outside the source checkout. Use real configured fixture transport, never paid inference.
-- [ ] Complete one independent implementation review and reconcile material findings against
+- [x] Complete one independent implementation review and reconcile material findings against
   original evidence. Recheck affected changes; broaden only for a named invalidated boundary.
 
 Closeout:
 
-- [ ] Complete R1–R6 mechanical mapping and R7 evidence-limit review; consolidate source docs and
+- [x] Complete R1–R6 mechanical mapping and R7 evidence-limit review; consolidate source docs and
   original command evidence. Record implementation readiness separately from publication/adoption.
-- [ ] Leave live service compatibility, visual accuracy, required-project-gate adoption and
+- [x] Leave live service compatibility, visual accuracy, required-project-gate adoption and
   accepted-task benefit explicitly unqualified until a separately authorized comparison.
 
 | Trigger | Exact checkpoint command/runbook | Scope/claim | Repeat only when |
@@ -253,7 +263,7 @@ node components/engine/scripts/verify-package.mjs <one-exact-archive.tgz> .
 Use a fresh empty output directory if that example path already exists. Replace the placeholder
 with the one archive produced by the build and record its SHA256. The final `.` supplies the
 qualified lint-tool root; an unavailable-tool shortcut is not package qualification. These are
-future commands, not executed proof. Serial wait on the original process; explicit checkpoint
+reproduction commands; executed originals remain in the external evidence record. Serial wait on the original process; explicit checkpoint
 deadline and evidence location belong to the actual invocation. Wait timeout alone is not failure.
 
 The installed proof must exercise the real CLI → detached check worker → native command filtering
@@ -261,7 +271,28 @@ path with a synthetic credential canary and fixture endpoint, then inspect retai
 its absence. `verify-package.mjs` already invokes `verifyDecisionPilot` from
 `verify-decision-pilot.mjs`; extend that constituent proof instead of running a second pilot command.
 
-Proof state: not run. One stable-candidate impacted sign-off under normal source hook authority
+The integrated source checkpoint ran 1,109 cases: 1,107 passed and two failures were retained.
+One failure was the checkpoint's Python path lacking PyYAML; the configured source environment
+passes that two-case owner. The other exposed a credential guard rejecting the existing startup
+coordination identity. Its correction preserves the original hook admission and passes 23 focused
+cases, including real synthetic preparation and apply. Final no-emit typecheck passes. The optional
+caller's 38-case focused replacement retains missing-answer denominators and bounds final readback.
+These reconciled checkpoints are distinct from a single all-green invocation; unchanged passing
+owners were not rerun. No live provider, accepted development or savings claim follows from them.
+
+The final exact archive passes clean installation and the complete installed pipeline, including
+20 evaluator cases. The pinned launcher reaches the evaluator through a verified stage, records its
+write effect and releases the invocation reader. A registered but unselected optional experiment
+leaves real startup, task/checkpoint resume and an unrelated native check intact, with its command,
+dependency and network tripwires untouched. Eleven intercepted provider dispatches qualify wiring;
+none are external inference. Original failures and intermediate archives remain distinct from this
+final candidate. The obsolete source-only pilot convenience script was removed: canonical package
+proof supplies a verified stage, and standalone proof scripts reject missing stage input before
+fixture execution. See the [implementation reconciliation](../../reviews/2026-10-07-decision-evaluation-implementation-reconciliation.md).
+
+Independent implementation review and its targeted recheck are complete. Material findings are
+closed; smaller code/documentation/accounting corrections have focused original proof. One
+stable-candidate impacted sign-off under normal source hook authority
 follows implementation when required; an invoked hook counts instead of duplicating its gate.
 Do not run full CI or rebuild unrelated adopters as a documentation/design checkpoint.
 
@@ -315,7 +346,8 @@ Document authoring, Opus 5.5 medium design review, focused reconciliation and th
 simplification pass are complete. See the [design reconciliation](../../reviews/2026-10-06-decision-providers-design-reconciliation.md)
 and [simplification decisions](../../reviews/2026-10-06-decision-providers-simplification.md).
 Implementation is authorized for 4.2. B1's provider seam, accounting/readers and reuse boundaries
-are implemented and locally verified against frozen synthetic cases. Normal source hooks govern
-the local batch commit. B2 generic/image evaluation and B3 integration, installed proof and final
-independent implementation review remain pending. Live beta compatibility, visual accuracy and
+are implemented and locally verified against frozen synthetic cases. B2's generic/image entry and
+immutable accounting are also verified. B3 integration and final installed proof are complete;
+independent review is reconciled. This implementation scope is complete; publication and adoption
+remain separate. Live beta compatibility, visual accuracy and
 ordinary accepted-task benefit remain unqualified.

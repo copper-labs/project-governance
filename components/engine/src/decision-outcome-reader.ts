@@ -16,8 +16,16 @@ export function readDecisionOutcome(raw: unknown): Record<string, unknown> & {
         modelIdentity: "historical-unknown", configurationDigest: typeof receipt.configDigest === "string" ? receipt.configDigest : null },
       usage: { inputTokens: count(usage.inputTokens), outputTokens: count(usage.outputTokens) } };
   }
+  if (!["baseline", "provider"].includes(String(outcome.method))) throw new Error("decision-method-invalid");
+  const { identity, usage } = readDecisionProviderObservation(outcome);
+  return { ...outcome, version: 3, method: outcome.method as "baseline" | "provider", provider: identity as unknown as DecisionProviderIdentity,
+    usage: usage as unknown as DecisionUsage };
+}
+
+/** Shared conservative native identity/usage validation for registered and supplied receipts. */
+export function readDecisionProviderObservation(outcome: Record<string, unknown>) {
   const identity = object(outcome.provider);
-  if (!["baseline", "provider"].includes(String(outcome.method)) || !["jev", "openai"].includes(String(identity.id)) ||
+  if (!["jev", "openai"].includes(String(identity.id)) ||
       typeof identity.adapterVersion !== "string" || !identity.adapterVersion || typeof identity.requestedModel !== "string" || !identity.requestedModel ||
       identity.returnedModel !== null && typeof identity.returnedModel !== "string" ||
       !["exact-version", "mutable-alias"].includes(String(identity.modelIdentity)) || typeof identity.configurationDigest !== "string") throw new Error("decision-provider-identity-invalid");
@@ -26,6 +34,5 @@ export function readDecisionOutcome(raw: unknown): Record<string, unknown> & {
   for (const key of ["cachedInputTokens", "cacheWriteInputTokens"]) if (typeof usage[key] === "number" && typeof usage.inputTokens === "number" && Number(usage[key]) > Number(usage.inputTokens)) throw new Error("decision-usage-subset-invalid");
   if (typeof usage.reasoningTokens === "number" && typeof usage.outputTokens === "number" && usage.reasoningTokens > usage.outputTokens) throw new Error("decision-usage-subset-invalid");
   if (usage.inputTokens === undefined || usage.outputTokens === undefined) throw new Error("decision-native-usage-missing");
-  return { ...outcome, version: 3, method: outcome.method as "baseline" | "provider", provider: identity as unknown as DecisionProviderIdentity,
-    usage: usage as unknown as DecisionUsage };
+  return { identity: identity as unknown as DecisionProviderIdentity, usage: usage as unknown as DecisionUsage };
 }

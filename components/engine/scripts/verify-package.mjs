@@ -51,7 +51,7 @@ try {
   const beforeStaging = readFileSync(join(pkg, "package.json"));
   const staging = await verifyExplicitStaging(pkg, archive, manifest, root);
   assert.deepEqual(readFileSync(join(pkg, "package.json")), beforeStaging, "Staging must preserve the installed parent package");
-  const pilot = await verifyDecisionPilot(pkg);
+  const pilot = await verifyDecisionPilot(pkg, { generationDirectory: staging.generationDirectory });
   const experiments = await verifyDecisionExperiments(pkg);
   const prompt = await verifyRc6Prompt(pkg, archive);
   const greenfield = await verifyGreenfield(pkg, archive);
@@ -86,5 +86,5 @@ async function verifyExplicitStaging(pkg, archive, manifest, root) {
   assert.throws(() => stageRuntimeArchive(archive, { ...lock, artifact: { ...lock.artifact, integrity: 'sha512-' + Buffer.alloc(64).toString('base64') } }, join(root, 'bad-hash')), /integrity mismatch/);
   const evaluationProducers = await verifyEvaluationProducers(result.directory, root);
   const checkRecovery = await verifyCheckRecovery(pkg, result.directory, lock, root);
-  return { status: 'passed', activation: 'isolated recovery fixture only', checkRecovery, evaluationProducers, sourceIdentity: 'synthetic fixture only; not release provenance' };
+  return { status: 'passed', generationDirectory: result.directory, activation: 'isolated recovery and evaluator fixtures only', checkRecovery, evaluationProducers, sourceIdentity: 'synthetic fixture only; not release provenance' };
 }

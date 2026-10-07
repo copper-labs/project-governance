@@ -1,5 +1,27 @@
 version: 1
 capabilities:
+  - id: supplied-evidence-evaluation
+    title: Ask advisory questions about supplied text and images
+    aliases: [image-evaluation, visual-checkpoints, evaluation-api]
+    tasks:
+      - configure explicit supplied-evidence disclosure and a shared daily allowance
+      - invoke the evaluator without creating a task or granting execution authority
+      - interpret partial answers while preserving native failures and missing proof
+    symbols: [project-governance evaluate, evaluateEvidence, EVALUATION_API_VERSION]
+    reference: docs/specs/engine-decision-providers-and-image-evaluation.md
+    guides:
+      - docs/developer/guides/supplied-evidence-evaluation.md
+      - docs/exec-plans/active/2026-10-06-decision-providers-and-image-evaluation.md
+      - docs/exec-plans/active/2026-10-06-optional-computer-use-testing.md
+    sources:
+      - components/engine/src/evaluation-api-v1.ts
+      - components/engine/src/evaluation-command.ts
+      - components/engine/src/evaluation-images.ts
+      - components/engine/src/evaluation-preparation.ts
+      - components/engine/src/evaluation-outcome-reader.ts
+      - components/engine/src/evaluation-schema.ts
+      - components/engine/src/decision-budget.ts
+      - components/engine/src/decision-runtime.ts
   - id: structured-delivery
     title: Update structured delivery plans from original check evidence
     aliases: [implementation-plans, plan-progress, specification-links]

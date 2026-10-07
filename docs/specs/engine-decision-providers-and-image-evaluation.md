@@ -13,9 +13,9 @@ summary: Extends the existing decision runtime with explicit JEV and OpenAI adap
 
 ## Problem and intended behavior
 
-The shared decision runtime still constructs `JevDecisionClient`, and its preparation, configuration,
-model validation and answer decoding assume TypeSafe. The older `DecisionProvider` interface does
-not make the current shared runtime interchangeable. The runtime also accepts text evidence only.
+Before 4.2, the shared decision runtime constructed `JevDecisionClient`, and its preparation,
+configuration, model validation and answer decoding assumed TypeSafe. The older `DecisionProvider`
+interface did not make that runtime interchangeable. It also accepted text evidence only.
 
 Make the provider an explicit adapter beneath the existing runtime. Retain JEV and add OpenAI
 Decisions. Existing registered consumers keep their meaning and behavior; deliberate configuration
@@ -107,6 +107,20 @@ Document fixed adapter limits before implementation verification. Count base64/J
 preserve current JEV text bounds and never truncate images silently. Missing enablement/permission
 or daily allowance is unavailable; an oversized request is rejected before dispatch.
 
+The initial OpenAI admission bounds are 128 static images, 10 MiB per image and aggregate original
+image bytes, 16 MiB for the complete serialized request, 64 questions, 254 supplied choice values
+plus the reserved unknown choice, and 10 score levels. One request admits at most 256 evidence
+items. Static image containers have a 16,384-pixel side and 64-megapixel guardrail; container
+validation does not decode or transform pixel data. The existing operation deadline owns the
+whole request; no short per-call deadline is added. The shared provider pool retains four concurrent
+calls and 960 calls per minute, with a 32 MiB/second serialized-byte pacing policy for OpenAI.
+These are local admission policies, not claims about the account's service limits. Image-token
+estimates remain null. JEV retains its 64 KiB serialized and existing text-estimate bounds.
+
+Daily generic allowances are explicitly declared finite safe integers. They do not inherit the
+registered task/context configuration ceiling; a day of calls is a different scope from one
+context operation. Provider admission and immutable dispatch claims still constrain each request.
+
 Record requested model, returned model and adapter/configuration identity. JEV keeps its existing
 exact version validation. Initially OpenAI requests `gpt-6-luna` and accepts that exact returned
 alias. Any additional returned snapshot identity requires an exact documented mapping in the
@@ -134,6 +148,8 @@ internal descriptor retains the original reference, digest, media type, dimensio
 ID and role. First delivery supports static PNG, JPEG and WebP; reject animation, remote URLs,
 unreadable/unsupported images and path/symlink escapes explicitly. Do not fetch remote media,
 follow image-embedded instructions or automatically transform an image.
+Use workspace-relative paths or canonical absolute paths. A system alias such as `/tmp` may
+resolve through a symlink; it does not bypass the image segment checks or approved-root boundary.
 
 Roles such as `actual` and `reference` describe the evidence. They do not grant trust. All questions
 in one request evaluate the same admitted evidence set. Per-question names or evidence references
@@ -186,6 +202,15 @@ the retained receipt without another call. Changed identity under the same evalu
 conflict, not permission to send again. Interrupted dispatch with no usable answer remains
 unavailable/outcome-unknown; do not promise exactly-once remote inference or automatic replay.
 
+For generic evaluation, relevant configuration means settings that change the semantic provider
+request. Registered-consumer modes, task/context budgets and daily spending allowances do not
+change that input identity. Changing an allowance cannot charge or dispatch an unchanged retained
+ID again. Current enablement, disclosure, roots and local-only checks still govern every invocation;
+revoking admission denies reuse rather than changing the original request's meaning.
+Recognized version-1 budget stores have no evaluation claims. Read-only claim lookup returns no
+claim; the existing dispatch reservation owns migration and preserves the old counters. Unknown
+store versions fail closed.
+
 Reuse requires the same admission and current permission checks. A previously stored answer does
 not broaden disclosure or effects. Retain both semantic input identity and the distinct local
 artifact provenance; do not hash a larger unseen input as proof it was evaluated.
@@ -196,6 +221,9 @@ The envelope includes evaluation and receipt identities, provider/requested/retu
 per-question outcomes, native usage and timing, input coverage and failure reasons. Retain raw
 valid probabilities and the interpretation identity even when the caller abstains. Do not record
 image bytes, base64, credentials or unrestricted question/evidence bodies in ordinary telemetry.
+
+The request and narrow `evaluation/v1` library surface are version 1. The public result uses the
+shared version-3 supplied-evaluation envelope; its version is not the request's schema version.
 
 New version-3 outcomes/receipts use `method: baseline|provider` plus explicit provider/adapter
 identity. Method describes delivery; `providerCalled` separately records shadow/failed dispatch.

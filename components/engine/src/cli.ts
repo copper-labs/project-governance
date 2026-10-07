@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { evaluationCommand } from "./evaluation-command.ts";
 import { RELEASE_VERSION } from "./release-version.ts";
 import { durableJson } from "./core.ts";
 import { checkSummary } from "./check-summary.ts";
@@ -185,6 +186,7 @@ Project setup and context:
   harness --help            Task, history and continuity commands
 
 Operations:
+  evaluate --request-file <local JSON>
   telemetry | context-evaluate | resource-status | resource-maintenance
   workflow-wait | workflow-diagnose | workflow-recover-observation | workflow-resume-cleanup
   command-resume-cleanup | command-recover | command-reconcile
@@ -199,6 +201,7 @@ Use the owning command contract for structured request fields.
   --help, -h, help           Show this help without opening project state`);
       return 0;
     }
+    if (command === "evaluate") { const value = await evaluationCommand(args.slice(1), process.cwd()); console.log(JSON.stringify(value.result)); return value.exitCode; }
     if (command === "harness") {
       // The canonical parser owns global flags and help as well as task/history operations.
       return continuityCommand(args.slice(1), {groups: ["governance", "task", "resume", "checkpoint", "context", "artifact", "budget", "paths", "status", "reconcile", "usage", "export", "import", "events"], observeBinding: associatePromptTask, resolvePlanReference});

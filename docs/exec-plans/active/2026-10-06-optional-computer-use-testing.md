@@ -20,9 +20,11 @@ Three realistic synthetic scenarios expose wrong actions and convincing but inco
 success. Independent state assertions and visual labels own truth.
 
 The operator authorized documentation, Opus 5.5 medium review, reconciliation, a subsequent
-simplification pass and a local commit on 2026-10-06. This plan proposes implementation; it does not
-authorize code, downloads, model-service startup, paid experiments, publication or adopter edits.
-The decision-provider/image-evaluator delivery proceeds under its separately owned authorization.
+simplification pass and a local commit on 2026-10-06. The operator then included this plan in the
+4.2 implementation on the same day. B1/B2 model-free implementation and focused local verification
+are authorized. B3 model acquisition, service startup and live or paid experiments remain separately
+scoped actions. Publication and adopter edits are not selected. The decision-provider/image-evaluator
+delivery proceeds under its separately owned authorization.
 
 ## Dependencies and source fit
 
@@ -42,6 +44,13 @@ The decision-provider/image-evaluator delivery proceeds under its separately own
 
 Resolve touched modules against the specification's owner table at implementation time.
 
+The reusable caller example lives under `components/engine/test/fixtures/optional-computer-use/`,
+with its contract tests in `components/engine/test/optional-computer-use.test.ts`. It is excluded
+from the installed runtime. Browser dependencies belong to an external caller setup; the engine's
+dependency list stays unchanged. One writer owns this fixture; one writer owns shared evaluator
+contracts. They may develop the independent B1 fixtures in parallel, then integrate B2 against
+the settled evaluator interface and reuse its installed proof.
+
 ## B1 — Optional local grounding and a qualified fixture runner
 
 Requirements: R1–R3. No live model is needed for this batch. It can proceed against fixture responses
@@ -49,29 +58,30 @@ while the evaluator entry is delivered separately.
 
 Implementation:
 
-- [ ] Implement the caller command/configuration using the existing custom-check seam. Map optional
+- [x] Implement the caller command/configuration using the existing custom-check seam. Map optional
   absence to warning plus an advisory not-run finding; required absence to failed plus a blocking
   finding. Never emit not-applicable or a bare warning that normalizes to passed.
-- [ ] Implement a bounded loopback-only grounding adapter with strict response validation,
+- [x] Implement a bounded loopback-only grounding adapter with strict response validation,
   cancellation and configured/observed identity. Passive inspection never calls a model.
-- [ ] Bind scripted target/action, capture token, geometry and budgets. Keep hidden oracle data and
+- [x] Bind scripted target/action, capture token, geometry and budgets. Keep hidden oracle data and
   labels out of model requests. Define exactly which runner generation/change events invalidate
   a capture before dispatch, rather than promise arbitrary browser freshness detection.
-- [ ] Qualify click/type/scroll, fresh capture, origin/network restriction, cleanup and exactly-once
+- [x] Qualify click/type/scroll, fresh capture, origin/network restriction, cleanup and exactly-once
   action/readback behavior in one disposable local browser runner. No external effects.
-- [ ] Author the local setup run book with explicit model revision/quantization/projector and serving
+- [x] Author the local setup run book with explicit model revision/quantization/projector and serving
   version, observed-identity limits, passive/readiness/smoke commands and teardown instructions.
   Check Holo4 support for the selected llama.cpp version before presenting a tested start command.
 
 Verification checkpoint:
 
-- [ ] Focused caller tests cover absent/disabled dependencies, invalid selected configuration,
+- [x] Focused caller tests cover absent/disabled dependencies, invalid selected configuration,
   stopped service, model incompatibility, malformed coordinates, redirects, timeout and cancellation.
-- [ ] Runner fixtures prove device-scale mapping, boundary coordinates, stale capture rejection,
+- [x] Runner fixtures prove device-scale mapping, boundary coordinates, stale capture rejection,
   overlay/delayed-render changes, restricted targets and lost acknowledgment after actual mutation.
-- [ ] One caller regression proves an unselected experiment leaves core startup/resume and an
-  unrelated native check functional with no dependencies or network; inspect the unchanged core
-  installation boundary. Test selected warning/failed mapping through the real installed custom
+- [x] One caller regression proves an unselected experiment leaves core startup/resume and an
+  unrelated native check functional without Holo, hosted API access or optional browser/image
+  dependencies, and with no model network calls; inspect the unchanged core installation boundary.
+  Test selected warning/failed mapping through the real installed custom
   command owner. Do not rebuild the engine or invent installed absence fixtures for unchanged code.
 
 ## B2 — Combined scenarios and image preparation with fixture providers
@@ -81,33 +91,35 @@ and use fixture transports; no model call is a prerequisite for this checkpoint.
 
 Implementation:
 
-- [ ] Wire named checkpoint questions through the evaluator entry. Reuse disclosure, roots,
+- [x] Wire named checkpoint questions through the evaluator entry. Reuse disclosure, roots,
   credentials, operation/dispatch identity, accounting, native usage and partial-answer semantics.
-- [ ] Add the form, settings and canvas tasks from the spec with hidden state oracles, independent
+- [x] Add the form, settings and canvas tasks from the spec with hidden state oracles, independent
   visual-label fixtures and targeted good/bad variants. Deterministic fixture assertions catch each
   intended fault without either model. Record unseen captures as unlabeled until reviewed.
-- [ ] Retain checkpoints from one Holo action run per trial, then evaluate those frozen images in a
+- [x] Retain checkpoints from one Holo action run per trial, then evaluate those frozen images in a
   separate command. Compare native outcomes with paired Decisions advice, not two independent
   browser executions. Use a deterministic fixture test for wiring proof; advice does not alter actions.
-- [ ] Reuse the evaluator plan's frozen image comparison protocol. Caller-side preparation retains
+- [x] Reuse the evaluator plan's frozen image comparison protocol. Caller-side preparation retains
   transforms and matching reference/current settings, leaves Holo capture geometry untouched and
   rejects use of crops to certify properties outside the selected region.
-- [ ] Produce one project experiment report from existing artifacts with the spec's R5 measures,
+- [x] Produce one project experiment report from existing artifacts with the spec's R5 measures,
   unresolved actions and identities. Unknown usage/cost stays unknown.
 
 Verification checkpoint:
 
-- [ ] Test Holo loss before action, Decisions failure/refusal after action, independent native failure,
-  exhausted budgets and cancellation. Continue unrelated checks and preserve missing required proof.
-- [ ] Assert request payloads exclude hidden oracle state and correctness labels. Verify a false
+- [x] Test Holo loss before action, Decisions failure/refusal after action, independent native failure,
+  exhausted budgets and cancellation. Continue unrelated checks after ordinary model unavailability
+  and preserve missing required proof. Existing native process-failure, dependency and fail-fast
+  rules still apply; a native command exiting with failure does not promise later pack execution.
+- [x] Assert request payloads exclude hidden oracle state and correctness labels. Verify a false
   success toast, wrong target and duplicate-submission risk cannot become a native
   pass because models agree. No evaluator answer can grant a new action, update a baseline or waive
   a required check. A local-only lane cannot dispatch to OpenAI.
-- [ ] Prove the real installed custom-command/evaluator path admits the caller artifact layout and
+- [x] Prove the real installed custom-command/evaluator path admits the caller artifact layout and
   retains warning/failed findings. Reuse original evaluator B3 forwarding proof; add a caller canary
   proving the browser/Holo driver never receives the OpenAI credential and artifacts never retain it.
   No archive rebuild for this project-only delivery; any shared gap needs separate package proof.
-- [ ] Independent QA reviews the frozen B1/B2 change and original focused/installed proof. Reconcile
+- [x] Independent QA reviews the frozen B1/B2 change and original focused/installed proof. Reconcile
   material findings before closing model-free implementation. No broad adopter rebuild or full CI
   merely for these documents.
 
@@ -154,11 +166,44 @@ current source). Prove the installed caller command boundary without rebuilding 
 code. Any named shared gap needs separate acceptance, owning tests and package proof where relevant;
 reuse original evaluator evidence.
 
-No CLI name, startup flag or test path invented by this plan is an executable contract today.
-At implementation, the run book must record exact supported commands, environment, deadlines,
-artifact location and original results for model-free, local-model and combined lanes separately.
+The [caller run book](../../../components/engine/test/fixtures/optional-computer-use/README.md)
+records the implemented commands, explicit browser dependencies, deadlines and setup boundaries.
+The retained model-free checkpoint passed 38 cases with a real disposable browser and caller-owned
+image preparation, with no skipped browser cases. Its exact source hashes remain with that original.
+The later advice-link correction changes the evaluator helper and its test file; five focused
+current cases, whole typecheck and installed caller proof cover those changes. Real-browser cases
+do not call that helper, and their owning behavior is unchanged. Grounding and evaluation answers are fixtures.
+Missing answers remain in report denominators; stalled final readback remains unresolved under the
+same run deadline. No model startup command is presented as tested. Local-model and combined
+live lanes still need their own original commands, evidence and qualification.
 Source hooks retain their existing Python owner until deliberate cutover. Documentation review and
 hook validation do not establish runtime, model setup or visual accuracy.
+
+The shared evaluator's final 20-case installed constituent proves approved artifact layout,
+declared process-only credentials, warning/failed mapping and native authority. Its unselected
+experiment case uses real installed startup, resume and impacted native check owners in one
+synthetic workspace. Task/checkpoint identity, staged custody and package contents remain intact;
+optional command, dependency and network tripwires remain untouched. Only that fixture's session
+is closed normally. Five focused advice-link cases additionally bind results to the retained image
+ID/type/digest. See the [implementation reconciliation](../../reviews/2026-10-07-decision-evaluation-implementation-reconciliation.md).
+
+## Deferred onboarding follow-up
+
+On 2026-10-06 the operator deferred onboarding improvements until after initial testing. Use the
+observed setup friction to decide whether small caller-owned demo/configuration helpers earn their
+cost. No onboarding guide or helper implementation is selected by this note.
+
+When revisited, use one short guide reached from existing installation guidance and the developer
+index/catalog, with an on-demand agent walkthrough. Present three optional paths: a model-free
+browser demo, Decisions evaluation of existing screenshots, and local Holo setup. Normal harness
+use must require none of them. Reading or routing the guide does not install tools, start services
+or call models. R1 remains the availability contract; the B1 installed regression above must pass
+before model-free integration closes.
+
+Nine focused source tests passed with API keys and optional browser/image dependency bindings
+removed. They cover default-off settings, zero dispatch when disabled/unconfigured, optional versus
+required absence, passive inspection, and native-result independence from evaluator availability.
+These tests do not close the pending installed startup/resume/custom-command proof.
 
 ## Rollback and current action
 
@@ -168,5 +213,7 @@ Do not downgrade a runtime, delete accounting/state or reinterpret a skip as suc
 
 Documentation design review, [reconciliation](../../reviews/2026-10-06-optional-computer-use-design-reconciliation.md)
 and the subsequent [simplification pass](../../reviews/2026-10-06-optional-computer-use-simplification.md)
-are complete. The authorized delivery is a local documentation commit. All implementation and
-experimental proof above remains unchecked. No release or adopter migration is selected.
+are complete. B1/B2 model-free implementation, focused proof and installed integration are complete.
+Independent implementation QA is reconciled with the 4.2 evaluator. Checkboxes distinguish
+implemented behavior from proof. B3 local-model and combined live qualification remain future work.
+No release or adopter migration is selected.

@@ -40,7 +40,7 @@ export class ProviderPool {
       setSqliteStoreCapacity(this.#db);
       this.#db.exec("BEGIN IMMEDIATE");
       const version = Number(this.#db.prepare("PRAGMA user_version").get()!.user_version);
-      if (version !== 0 && version !== 1) throw new Error("provider-coordination-schema");
+      if (version !== 0 && version !== 1 && version !== 2) throw new Error("provider-coordination-schema");
       if (!version) {
         if (this.#db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().length) throw new Error("provider-coordination-schema");
         this.#db.exec(`
@@ -50,6 +50,12 @@ export class ProviderPool {
           CREATE TABLE health (identity TEXT PRIMARY KEY, auth INTEGER NOT NULL, until INTEGER NOT NULL);
           PRAGMA user_version=1;
         `);
+      }
+      if (version < 2) {
+        this.#db.exec("ALTER TABLE calls ADD COLUMN bytes INTEGER NOT NULL DEFAULT 0");
+        // Retained native token counts cannot reconstruct serialized bytes. Bound one old minute conservatively.
+        this.#db.prepare("UPDATE calls SET bytes=?").run(this.#policy.maxRequestBytes);
+        this.#db.exec("PRAGMA user_version=2");
       }
       this.#db.exec("COMMIT");
     } catch (error) { try { this.#db.exec("ROLLBACK"); } catch { /* The transaction may not have opened. */ } this.#db.close(); throw error; }
@@ -79,12 +85,13 @@ export class ProviderPool {
       if (reason) return { state: "suppressed", reason };
       const active = Number(this.#db.prepare("SELECT count(*) AS n FROM leases").get()!.n);
       if (active >= this.#policy.concurrency) return { state: "wait", reason: "concurrency", waitMs: 10 };
-      const rate = this.#db.prepare("SELECT count(*) AS requests,coalesce(sum(CASE WHEN at>? THEN tokens ELSE 0 END),0) AS tokens,min(at) AS oldest FROM calls").get(now - 1000)!;
+      const rate = this.#db.prepare("SELECT count(*) AS requests,coalesce(sum(CASE WHEN at>? THEN tokens ELSE 0 END),0) AS tokens,coalesce(sum(CASE WHEN at>? THEN bytes ELSE 0 END),0) AS bytes,min(at) AS oldest FROM calls").get(now - 1000, now - 1000)!;
       if (Number(rate.requests) >= this.#policy.requestsPerMinute) return { state: "wait", reason: "rate", waitMs: Math.max(1, Math.min(100, Number(rate.oldest) + 60000 - now)) };
       if (this.#policy.estimatedInputTokensPerSecond !== null && Number(rate.tokens) + tokens > this.#policy.estimatedInputTokensPerSecond) return { state: "wait", reason: "rate", waitMs: 25 };
+      if (this.#policy.serializedBytesPerSecond !== undefined && Number(rate.bytes) + tokens > this.#policy.serializedBytesPerSecond) return { state: "wait", reason: "rate", waitMs: 25 };
       const id = randomUUID();
       this.#db.prepare("INSERT INTO leases VALUES (?,?)").run(id, now + leaseMs);
-      this.#db.prepare("INSERT INTO calls VALUES (?,?,?,NULL)").run(id, now, tokens);
+      this.#db.prepare("INSERT INTO calls VALUES (?,?,?,NULL,?)").run(id, now, tokens, tokens);
       return { state: "admitted", id, active: active + 1 };
     });
   }
@@ -93,9 +100,10 @@ export class ProviderPool {
   dispatch(id: string, credential: string, now: number, leaseMs: number, failureScope = credential): boolean {
     return this.#transaction(() => {
       if (this.#suppression(credential, now, failureScope)) return false;
-      const own = this.#db.prepare("SELECT tokens FROM calls WHERE id=?").get(id);
-      const rate = this.#db.prepare("SELECT count(*) AS requests,coalesce(sum(CASE WHEN at>? THEN tokens ELSE 0 END),0) AS tokens FROM calls WHERE id<>? AND at>?").get(now - 1000, id, now - 60000)!;
+      const own = this.#db.prepare("SELECT tokens,bytes FROM calls WHERE id=?").get(id);
+      const rate = this.#db.prepare("SELECT count(*) AS requests,coalesce(sum(CASE WHEN at>? THEN tokens ELSE 0 END),0) AS tokens,coalesce(sum(CASE WHEN at>? THEN bytes ELSE 0 END),0) AS bytes FROM calls WHERE id<>? AND at>?").get(now - 1000, now - 1000, id, now - 60000)!;
       if (!own || Number(rate.requests) >= this.#policy.requestsPerMinute || this.#policy.estimatedInputTokensPerSecond !== null && Number(rate.tokens) + Number(own.tokens) > this.#policy.estimatedInputTokensPerSecond) return false;
+      if (this.#policy.serializedBytesPerSecond !== undefined && Number(rate.bytes) + Number(own.bytes) > this.#policy.serializedBytesPerSecond) return false;
       if (this.#db.prepare("UPDATE leases SET expires=? WHERE id=? AND expires>?").run(now + leaseMs, id, now).changes !== 1) return false;
       this.#db.prepare("UPDATE calls SET at=? WHERE id=?").run(now, id);
       return true;

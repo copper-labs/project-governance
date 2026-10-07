@@ -12,11 +12,15 @@ import { modelRoutingSettings, type ModelRoutingSettings } from "./model-routing
 
 export interface ConsumerSetting { mode: DecisionMode; effect: DecisionEffect; effectSource: "declared" | "default" }
 export interface DecisionBudgetLimits { maxCalls: number; maxRequestBytes: number }
+export interface EvaluationSettings {
+  enabled: boolean; provider: DecisionProviderId; model: string;
+  allowedArtifactRoots: string[]; dailyBudget: DecisionBudgetLimits | null;
+}
 export interface DecisionSettings {
   /** The existing top-level mode is the global ceiling over every consumer. */
   mode: DecisionMode;
   provider: DecisionProviderId;
-  evaluation: { enabled: false; provider: DecisionProviderId; model: string };
+  evaluation: EvaluationSettings;
   legacy: DecisionConfig;
   consumers: Record<DecisionConsumerId, ConsumerSetting>;
   budget: DecisionBudgetLimits;
@@ -71,13 +75,25 @@ export function profileDecisionSettings(profile: unknown): DecisionSettings {
   const root = object(profile, "profile");
   const settings = root["continuity"] === undefined ? {} : object(object(root["continuity"], "continuity")["decisions"] ?? {}, "continuity.decisions");
   const generic = settings["evaluation"] === undefined ? {} : object(settings["evaluation"], "continuity.decisions.evaluation");
-  for (const key of Object.keys(generic)) if (!["enabled", "provider", "model"].includes(key)) throw new Error("Unknown generic evaluation setting");
-  if (generic.enabled !== undefined && generic.enabled !== false) throw new Error("Generic evaluation is not enabled in this delivery batch");
+  for (const key of Object.keys(generic)) if (!["enabled", "provider", "model", "allowed_artifact_roots", "daily_budget"].includes(key)) throw new Error("Unknown generic evaluation setting");
+  if (generic.enabled !== undefined && typeof generic.enabled !== "boolean") throw new Error("Invalid generic evaluation enablement");
   const genericProvider = generic.provider ?? "openai";
   if (genericProvider !== "jev" && genericProvider !== "openai") throw new Error("Unsupported evaluation provider");
   const genericModel = generic.model ?? (genericProvider === "openai" ? "gpt-6-luna" : "jev-1.13.0");
   if (typeof genericModel !== "string" || !decisionProviderAdapter(genericProvider).validModel(genericModel)) throw new Error("Invalid evaluation model");
-  const evaluation = { enabled: false as const, provider: genericProvider as DecisionProviderId, model: genericModel };
+  const roots = generic.allowed_artifact_roots ?? [];
+  if (!Array.isArray(roots) || roots.length > 256 || roots.some(value => typeof value !== "string" || !value || value.length > 4096 || /[\x00-\x1f]/u.test(value))) throw new Error("Invalid evaluation artifact roots");
+  let dailyBudget: DecisionBudgetLimits | null = null;
+  if (generic.daily_budget !== undefined) {
+    const daily = object(generic.daily_budget, "evaluation daily budget");
+    if (Object.keys(daily).some(key => !["max_calls", "max_request_bytes"].includes(key)) ||
+        !Number.isSafeInteger(daily.max_calls) || Number(daily.max_calls) < 1 ||
+        !Number.isSafeInteger(daily.max_request_bytes) || Number(daily.max_request_bytes) < 1) throw new Error("Invalid evaluation daily budget");
+    dailyBudget = { maxCalls: Number(daily.max_calls), maxRequestBytes: Number(daily.max_request_bytes) };
+  }
+  if (generic.enabled === true && !dailyBudget) throw new Error("Enabled evaluation requires a finite daily budget");
+  const evaluation: EvaluationSettings = { enabled: generic.enabled === true, provider: genericProvider as DecisionProviderId, model: genericModel,
+    allowedArtifactRoots: [...new Set(roots as string[])], dailyBudget };
   const declared = settings["consumers"] === undefined ? {} : object(settings["consumers"], "continuity.decisions.consumers");
   for (const key of Object.keys(declared)) if (!(DECISION_CONSUMER_IDS as readonly string[]).includes(key)) throw new Error(`Unknown decision consumer: ${key}`);
   const notes: string[] = [];

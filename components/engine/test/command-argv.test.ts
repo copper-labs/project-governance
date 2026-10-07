@@ -12,3 +12,10 @@ test("command declarations preserve quoting and literal shell characters without
   assert.throws(() => resolveCommandArgv({ run: ["tool"], shell: true }, { stage: "pre-pr" }));
   assert.throws(() => resolveCommandArgv([], { stage: "pre-pr" }));
 });
+
+test("custom command declarations admit credential names without embedding values", () => {
+  assert.deepEqual(resolveCommandArgv({ run: ["tool"], credentialEnv: ["OPENAI_API_KEY"], stages: ["pre-commit"] }, { stage: "pre-commit" }), ["tool"]);
+  assert.throws(() => resolveCommandArgv({ run: ["tool"], credentialEnv: ["OTHER_API_KEY"] }, { stage: "pre-commit" }), /credential/);
+  assert.throws(() => resolveCommandArgv({ run: ["tool"], credentialEnv: { OPENAI_API_KEY: "fixture" } }, { stage: "pre-commit" }), /credential/);
+  assert.throws(() => resolveCommandArgv({ run: ["tool"], env: { OPENAI_API_KEY: "fixture" } }, { stage: "pre-commit" }), /Unsupported command/);
+});

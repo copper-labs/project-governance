@@ -5,7 +5,7 @@ import { CodexStream } from "./codex-stream.ts";
 import { GeminiStream } from "./gemini-stream.ts";
 import { ClaudeStream } from "./claude-stream.ts";
 import { ProviderFrames } from "./provider-frames.ts";
-import { credentialEnvironment } from "./credential-environment.ts";
+import { credentialEnvironment, credentialNames, nonCredentialEnvironment } from "./credential-environment.ts";
 import { ResourceRegistry, type Lease } from "./resources.ts";
 import type { ProviderAssignment } from "./provider-assignment.ts";
 import { providerRuntime } from "./provider-runtime.ts";
@@ -53,7 +53,18 @@ const ENVIRONMENT = ["PATH", "HOME", "USER", "LOGNAME", "TMPDIR", "TMP", "TEMP",
 export function commandEnvironment(extra: Record<string, string>): Record<string, string> {
   const env: Record<string, string> = {};
   for (const key of ENVIRONMENT) if (process.env[key] !== undefined) env[key] = process.env[key]!;
-  return { ...env, ...extra };
+  return { ...env, ...nonCredentialEnvironment(extra) };
+}
+
+/** Startup lease identity is durable native coordination; startupHookAdmission still owns its authority. */
+function nativeOperationEnvironment(request: CommandRequest): Record<string, string> {
+  if (request.provider !== undefined) return nonCredentialEnvironment(request.operation.env);
+  const raw = object(request.operation.env, "environment");
+  if (!Object.hasOwn(raw, "GOVERNANCE_STARTUP_TOKEN")) return nonCredentialEnvironment(raw);
+  const token = raw.GOVERNANCE_STARTUP_TOKEN;
+  if (typeof token !== "string" || token.includes("\0")) throw new Error("invalid environment entry");
+  const ordinary = { ...raw }; delete ordinary.GOVERNANCE_STARTUP_TOKEN;
+  return { ...nonCredentialEnvironment(ordinary), GOVERNANCE_STARTUP_TOKEN: token };
 }
 
 /** Keep process identity even after exit so fast children have a complete launch record. */
@@ -168,6 +179,8 @@ export async function waitCommand(directory: string, requestDigest: string, mill
 }
 
 export function validateCommandRequest(request: CommandRequest): void {
+  nativeOperationEnvironment(request);
+  credentialNames(request.operation.credentialEnv);
   if (request.executionIdentity !== undefined) {
     const identity = object(request.executionIdentity, "command execution identity");
     if (Object.keys(identity).some(key => !["runtimeVersion", "archiveDigest"].includes(key))) throw new Error("Invalid command execution identity fields");
@@ -254,7 +267,7 @@ async function execute(directory: string, expectedDigest: string): Promise<void>
   durableJson(join(directory, "launch.json"), { version: 1, requestDigest: expectedDigest,
     state: "intent", host: hostname(), owner: { pid: process.pid, fingerprint }, startedAt });
   const child = spawn(request.operation.argv[0]!, request.operation.argv.slice(1), {
-    cwd: request.operation.cwd, env: { ...commandEnvironment(request.operation.env), ...credentialEnvironment(request.operation.credentialEnv) }, detached: true, stdio: [request.stdin === undefined ? "ignore" : "pipe", "pipe", "pipe"],
+    cwd: request.operation.cwd, env: { ...commandEnvironment({}), ...nativeOperationEnvironment(request), ...credentialEnvironment(request.operation.credentialEnv) }, detached: true, stdio: [request.stdin === undefined ? "ignore" : "pipe", "pipe", "pipe"],
   });
   const group = child.pid;
   if (group) {

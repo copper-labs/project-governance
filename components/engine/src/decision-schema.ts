@@ -226,13 +226,14 @@ function probabilities(value: unknown, expected: string[]): Record<string, numbe
   const raw = object(value, "answer distribution");
   if (Object.keys(raw).sort().join("\0") !== [...expected].sort().join("\0")) throw new Error("provider invented or omitted a supplied option");
   let total = 0;
-  const distribution: Record<string, number> = {};
-  for (const [key, probability] of Object.entries(raw)) {
+  const entries = Object.entries(raw);
+  for (const [, probability] of entries) {
     if (typeof probability !== "number" || !Number.isFinite(probability) || probability < 0 || probability > 1) throw new Error("invalid probability");
-    distribution[key] = probability; total += probability;
+    total += probability;
   }
   if (Math.abs(total - 1) > 0.002) throw new Error("invalid probability distribution");
-  return distribution;
+  // Define own data properties so a supplied choice cannot invoke a prototype setter.
+  return Object.fromEntries(entries) as Record<string, number>;
 }
 function confidence(value: unknown): number {
   if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1) throw new Error("invalid native confidence");
@@ -251,7 +252,7 @@ export function decisionNativeUsage(raw: unknown): { inputTokens: number | null;
   return { inputTokens: count(usage.input_tokens), outputTokens: count(usage.output_tokens) };
 }
 
-export function parseDecisionEnvelope(raw: unknown, request: DecisionRequest2, definitions: Record<string, QuestionDefinition>, model: string, payloadDigest: string): DecisionEnvelope {
+export function parseDecisionEnvelope(raw: unknown, request: { questions: Array<Pick<QuestionInstance, "name" | "definitionId" | "candidates">> }, definitions: Record<string, Pick<QuestionDefinition, "shape" | "levels">>, model: string, payloadDigest: string): DecisionEnvelope {
   const body = object(raw, "provider response");
   if (body["model"] !== model) throw new Error("provider model mismatch");
   const answersRaw = object(body["answers"], "provider answers");

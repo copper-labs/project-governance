@@ -6,11 +6,13 @@ import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { digest, durableJson, fileDigest } from "./core.ts";
 import { commandEnvironment } from "./process-owner.ts";
+import { credentialEnvironment } from "./credential-environment.ts";
+import { commandCredentialNames } from "./command-argv.ts";
 import { checkRunRoot, runChecks } from "./check-run.ts";
 import { ValidationSubject, type ChangeScope } from "./change-subject.ts";
 import { PackagedCheckerAssets } from "./checker-assets.ts";
 import type { Packs } from "./pack-configuration.ts";
-import type { ValidationPlan } from "./planning.ts";
+import { commandApplies, type ValidationPlan } from "./planning.ts";
 import type { BuiltinCheckRequest } from "./builtin-checks.ts";
 import { retainRuntimeReader, releaseRuntimeReader, type RuntimeReader } from "./runtime-reader.ts";
 import type { DecisionTaskContext } from "./decision-task-context.ts";
@@ -24,9 +26,24 @@ interface CheckWork extends CheckObservationContext {
   decisionContext?: DecisionTaskContext;
   taskBinding?: TaskBindingReceipt;
 }
+function selectedCredentialEnvironment(packs: Packs, plan: ValidationPlan): Record<string, string> {
+  const names = new Set<string>();
+  if (plan.status === "ready") for (const id of plan.execution_order) {
+    const pack = packs[id]; if (!pack) throw new Error("Planned pack is unavailable");
+    for (const command of pack.commands) {
+      if (plan.stage && !commandApplies(command, plan.stage)) continue;
+      for (const name of commandCredentialNames(command)) names.add(name);
+    }
+  }
+  const environment: Record<string, string> = {};
+  // Missing keys belong to each declaring command's result, not detached worker admission.
+  for (const name of names) Object.assign(environment, credentialEnvironment([name], { required: false }));
+  return environment;
+}
 /** Reserve a single detached owner before launching. Reconnection only observes the returned run ID. */
 export function dispatchChecks(packs: Packs, plan: ValidationPlan, request: Omit<BuiltinCheckRequest, "id" | "assets"> & { assets: PackagedCheckerAssets }, options: { root?: string; deadlineMs?: number; decisionContext?: DecisionTaskContext; taskBinding?: TaskBindingReceipt } & CheckObservationContext = {}) {
   const observation = checkObservationContext(options.trigger, options.expectedStatus);
+  const environment = { ...commandEnvironment({}), ...selectedCredentialEnvironment(packs, plan) };
   const root = options.root ?? checkRunRoot(); mkdirSync(root, { recursive: true, mode: 0o700 });
   const runsRoot = realpathSync(root), id = randomUUID(), directory = join(runsRoot, id); mkdirSync(directory, { mode: 0o700 });
   const work: CheckWork = { version: 1, ...observation, id, root: request.subject.root, runsRoot, assetsRoot: request.assets.root, workerDigest: fileDigest(WORKER),
@@ -39,7 +56,7 @@ export function dispatchChecks(packs: Packs, plan: ValidationPlan, request: Omit
     narrative: { ...(request.commit ? { commit: request.commit } : {}), ...(request.pullRequest ? { pullRequest: request.pullRequest } : {}) } };
   durableJson(join(directory, "dispatch.json"), work);
   durableJson(join(directory, "run.json"), { version: 1, id, root: work.root, state: "queued", ...(work.trigger ? { trigger: work.trigger } : {}), ...(work.expectedStatus ? { expected_status: work.expectedStatus } : {}), started_at: new Date().toISOString(), plan, scope: work.scope, owner: null });
-  const child = spawn(process.execPath, [WORKER, "--worker", directory, digest(work)], { detached: true, stdio: "ignore", env: commandEnvironment({}) });
+  const child = spawn(process.execPath, [WORKER, "--worker", directory, digest(work)], { detached: true, stdio: "ignore", env: environment });
   child.on("error", () => { /* Reservation remains unresolved; never launch a replacement on missing acknowledgment. */ });
   child.unref();
   return { run_id: id, run_directory: directory };

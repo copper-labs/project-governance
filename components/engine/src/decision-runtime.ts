@@ -1,3 +1,8 @@
+import { evaluationConfigurationDigest, prepareEvaluationRequest, verifyEvaluationAssociation } from "./evaluation-preparation.ts";
+import { parseEvaluationRequest, type EvaluationRequest, type EvaluationResult } from "./evaluation-schema.ts";
+import { readEvaluationClaim, reserveEvaluationCall, type EvaluationReservation } from "./decision-budget.ts";
+import { readEvaluationOutcome } from "./evaluation-outcome-reader.ts";
+import type { DecisionRequest2 } from "./decision-schema.ts";
 import { configuredDecisionProvider, sameConfiguredDecisionProvider, decisionProviderAdapter, type DecisionProviderIdentity, type DecisionUsage } from "./decision-providers.ts";
 import { readDecisionOutcome } from "./decision-outcome-reader.ts";
 import { prepareDecisionRequest } from "./decision-request-preparation.ts";
@@ -152,6 +157,109 @@ export class DecisionRuntime {
     catch { return null; }
   }
 
+  async #execute(admission: {
+    kind: "registered"; request: DecisionRequest2;
+  } | { kind: "supplied"; request: EvaluationRequest }, client: DecisionClient, model: string, body: string,
+    payloadDigest: string, deadlineMs: number, signal: AbortSignal | undefined, beforeDispatch: () => boolean,
+    onDispatch: () => void, deadlineAt?: number) {
+    const transport = await client.ask(body, deadlineMs, signal, beforeDispatch, onDispatch, "provider", deadlineAt);
+    if (!transport.ok) return { transport, envelope: null, invalid: false };
+    try {
+      const envelope = admission.kind === "registered" ? client.adapter.decode(transport.raw, admission.request, DECISION_QUESTIONS, model, payloadDigest)
+        : client.adapter.decodeSupplied(transport.raw, admission.request.questions, model, payloadDigest);
+      return { transport, envelope, invalid: false };
+    } catch { return { transport, envelope: null, invalid: true }; }
+  }
+
+  /** Explicit supplied evidence uses the same paid lifecycle, with taskless daily admission. */
+  async evaluate(raw: unknown, workspace: string): Promise<EvaluationResult> {
+    const started = performance.now(), requestId = randomUUID();
+    const config = this.settings.evaluation, evaluationConfigDigest = evaluationConfigurationDigest(this.settings);
+    const base: EvaluationResult = { version: 3, kind: "supplied-evaluation", evaluationId: null, requestId, receiptId: null,
+      requestIdentity: null, payloadDigest: null, provider: configuredDecisionProvider(config.provider, config.model, evaluationConfigDigest),
+      effect: "advise", status: "unavailable", reason: "evaluation-unavailable", providerCalled: false, answers: {}, evidence: [], association: null,
+      coverage: { captured: 0, omitted: [], truncated: false, unavailable: [], limits: [] }, budget: null,
+      usage: { inputTokens: null, outputTokens: null }, tokenEstimate: null, timing: { preparationMs: 0, providerMs: 0, totalMs: 0 } };
+    let request: EvaluationRequest, root: string, key: string | null = null;
+    const finish = (reason: string, status: EvaluationResult["status"] = "unavailable") => {
+      base.reason = reason; base.status = status; base.timing.totalMs = performance.now() - started;
+      if (key && this.#options.receipts !== false && base.budget?.state === "reserved") {
+        try { durableJson(join(this.stateRoot, "supplied-evaluations", `${key}.json`), { version: 3, ...this.#executionIdentity,
+          configDigest: this.settings.configDigest, createdAt: new Date().toISOString(), receiptId: key, outcome: { ...base, receiptId: key } }); base.receiptId = key; } catch { /* The durable claim still blocks another attempt. */ }
+      }
+      return base;
+    };
+    try { request = parseEvaluationRequest(raw); base.evaluationId = request.evaluationId; root = realpathSync(workspace); }
+    catch { base.provider = null; return finish("evaluation-request-invalid", "invalid"); }
+    key = digest({ workspace: root, evaluationId: request.evaluationId }).slice(7, 39);
+    const unavailable = (reason: string, status: EvaluationResult["status"] = "unavailable") => {
+      for (const question of request.questions) base.answers[question.name] = { status: status === "invalid" ? "invalid" : status === "unsupported" ? "unsupported" : "unavailable", reason };
+      return finish(reason, status);
+    };
+    if (this.settings.mode === "off") return unavailable("global-off");
+    if (!config.enabled) return unavailable("evaluation-disabled");
+    if (!this.settings.legacy.allowedDataClasses.includes("supplied-evidence")) return unavailable("supplied-evidence-disclosure-disabled");
+    if (!config.dailyBudget) return unavailable("evaluation-daily-budget-unavailable");
+    if (request.localOnly) return unavailable("hosted-provider-local-only");
+    if (!verifyEvaluationAssociation(root, request)) return unavailable("evaluation-association-unverified", "invalid");
+    base.association = request.association ?? null;
+    if (request.evidence.some(item => item.type === "image") && !decisionProviderAdapter(config.provider).modalities.includes("image")) return unavailable("unsupported-modality", "unsupported");
+    let prepared: ReturnType<typeof prepareEvaluationRequest>;
+    try { prepared = prepareEvaluationRequest(root, request, this.settings); }
+    catch (error) {
+      // Error categories are code-owned; OS paths, raw evidence and provider messages are not telemetry.
+      const allowed = /^(?:image-|evaluation-)[a-z-]+$/u;
+      const reason = error instanceof Error && allowed.test(error.message) ? error.message : "evaluation-evidence-unavailable";
+      base.coverage.unavailable = request.evidence.map(item => item.id);
+      return unavailable(reason, reason.includes("unsupported") ? "unsupported" : "invalid");
+    }
+    Object.assign(base, { evidence: prepared.evidence, requestIdentity: prepared.requestIdentity, payloadDigest: prepared.payloadDigest, tokenEstimate: prepared.tokenEstimate });
+    base.coverage.captured = prepared.evidence.length; base.timing.preparationMs = performance.now() - started;
+    const retained = (claim: EvaluationReservation): EvaluationResult => {
+      base.budget = claim;
+      if (claim.state !== "duplicate") return unavailable("evaluation-budget-unavailable");
+      if (claim.requestIdentity !== prepared.requestIdentity) return unavailable("evaluation-identity-conflict", "invalid");
+      try {
+        const path = join(this.stateRoot, "supplied-evaluations", `${key}.json`);
+        if (statSync(path).size > 4 * 1024 * 1024) throw new Error("receipt too large");
+        const result = readEvaluationOutcome(JSON.parse(readFileSync(path, "utf8")), request, prepared.requestIdentity, prepared.payloadDigest, base.provider!, claim);
+        return { ...result, requestId, receiptId: key, evidence: prepared.evidence, reason: "repeated-evaluation", budget: claim,
+          timing: { preparationMs: base.timing.preparationMs, providerMs: 0, totalMs: performance.now() - started } };
+      } catch { return unavailable("repeated-evaluation-outcome-unavailable"); }
+    };
+    const claim = readEvaluationClaim(this.stateRoot, root, request.evaluationId, config.dailyBudget);
+    if (claim) return retained(claim);
+    const signal = this.#options.signal;
+    if (signal?.aborted) return unavailable(decisionCancellationReason(signal));
+    const client = this.#options.client ?? new DecisionClient({ ...this.#options,
+      provider: config.provider, healthScope: digest({ stateRoot: this.stateRoot, config: evaluationConfigDigest }) });
+    if (client.adapter.id !== config.provider) return unavailable("provider-client-mismatch");
+    if (!client.tokenPresent) return unavailable("missing-token");
+    const deadlineAt = started + CONTEXT_OPERATION_MS;
+    if (performance.now() >= deadlineAt) return unavailable("operation-deadline");
+    const execution = await this.#execute({ kind: "supplied", request }, client, config.model, prepared.body, prepared.payloadDigest,
+      CONTEXT_OPERATION_MS, signal, () => {
+        base.budget = reserveEvaluationCall(this.stateRoot, root, request.evaluationId, prepared.requestIdentity, prepared.requestBytes, config.dailyBudget!,
+          { ...(this.#options.now ? { now: this.#options.now } : {}), busyTimeoutMs: Math.max(0, Math.min(1000, this.#options.busyTimeoutMs ?? 250, Math.floor(deadlineAt - performance.now()))) });
+        return base.budget.state === "reserved";
+      }, () => { base.providerCalled = true; }, deadlineAt);
+    const { transport, envelope } = execution;
+    base.timing.providerMs = transport.timing.totalMs; base.timing.transport = transport.timing;
+    const reservation = base.budget as EvaluationReservation | null;
+    if (reservation && ["duplicate", "conflict"].includes(reservation.state)) return retained(reservation.state === "conflict" ? { ...reservation, state: "duplicate" } : reservation);
+    if (reservation?.state === "exhausted") return unavailable("evaluation-daily-budget-exhausted");
+    if (reservation?.state === "unavailable") return unavailable(reservation.unavailableReason === "store-capacity" ? "budget-store-capacity" : "evaluation-budget-unavailable");
+    if (!transport.ok) return unavailable(transport.reason);
+    const rawModel = transport.raw && typeof transport.raw === "object" && !Array.isArray(transport.raw) ? (transport.raw as Record<string, unknown>).model : null;
+    base.provider = { ...base.provider!, returnedModel: typeof rawModel === "string" && rawModel.length <= 128 ? rawModel : null };
+    base.usage = client.adapter.usage(transport.raw);
+    if (!envelope) return unavailable("invalid-provider-envelope", "invalid");
+    base.provider = { ...base.provider, returnedModel: envelope.model }; base.usage = envelope.usage; base.answers = envelope.answers;
+    if (signal?.aborted) return unavailable(decisionCancellationReason(signal));
+    const values = Object.values(base.answers), valid = values.filter(answer => ["answered", "unknown", "refused"].includes(answer.status)).length;
+    return finish(valid === values.length ? "evaluated" : "invalid-question-answers", valid === values.length ? "complete" : valid ? "partial" : "invalid");
+  }
+
   async ask(ask: DecisionAsk): Promise<DecisionOutcome> {
     try { if (ask.scope) ask = { ...ask, scope: { ...ask.scope, workspace: realpathSync(ask.scope.workspace) } }; }
     catch { ask = { ...ask, scope: null }; }
@@ -247,13 +355,14 @@ export class DecisionRuntime {
     const providerDeadline = metadata || passage ? CONTEXT_OPERATION_MS : this.settings.legacy.deadlineMs;
     const deadlineAt = ask.deadlineAt ?? started + providerDeadline;
     if (performance.now() >= deadlineAt) return fallback("deadline", { requestIdentity: identity });
-    const transport = await this.#client.ask(body, providerDeadline, signal, () => {
+    const execution = await this.#execute({ kind: "registered", request }, this.#client, this.settings.legacy.model, body, payloadDigestValue, providerDeadline, signal, () => {
       const budgetScope = ask.budgetFamily ? contextFamilyScope(ask.scope!.workspace, ask.budgetInvocationId!)
         : ask.budgetPartition ? contextBudgetScope(ask.scope!, ask.budgetInvocationId!) : ask.scope!;
       admittedReservation = reserveDecisionCall(this.stateRoot, budgetScope, key, requestBytes, limits,
         { ...(ask.budgetFamily ? { familyId: ask.budgetInvocationId! } : {}), busyTimeoutMs: Math.max(0, Math.min(1000, this.#options.busyTimeoutMs ?? 250, Math.floor(deadlineAt - performance.now()))) });
       return admittedReservation.state === "reserved";
-    }, () => { base.providerCalled = true; }, "provider", ask.deadlineAt);
+    }, () => { base.providerCalled = true; }, ask.deadlineAt);
+    const transport = execution.transport;
     base.transport = transport.timing;
     const reservation = admittedReservation;
     if (!reservation) return fallback(transport.ok ? "admission-unavailable" : transport.reason,
@@ -276,11 +385,9 @@ export class DecisionRuntime {
     if (!transport.ok) return fallback(transport.reason, { ...prepared, failureStage: transport.failureStage });
     const rawModel = transport.raw && typeof transport.raw === "object" && !Array.isArray(transport.raw) ? (transport.raw as Record<string, unknown>).model : null;
     base.provider = { ...base.provider, returnedModel: typeof rawModel === "string" && rawModel.length <= 128 ? rawModel : null };
-    let answers: Record<string, QuestionOutcome>, usage: DecisionOutcome["usage"], model: string;
-    try {
-      const envelope = decisionProviderAdapter(this.settings.provider).decode(transport.raw, request, DECISION_QUESTIONS, this.settings.legacy.model, payloadDigestValue);
-      answers = envelope.answers; usage = envelope.usage; model = envelope.model;
-    } catch { return fallback("invalid-or-unavailable", { ...prepared, usage: decisionProviderAdapter(this.settings.provider).usage(transport.raw), failureStage: "answer-validation" }); }
+    const envelope = execution.envelope;
+    if (!envelope) return fallback("invalid-or-unavailable", { ...prepared, usage: decisionProviderAdapter(this.settings.provider).usage(transport.raw), failureStage: "answer-validation" });
+    const { answers, usage, model } = envelope;
     if (signal?.aborted) return fallback(decisionCancellationReason(signal), { ...prepared, usage });
     const usable = Object.values(answers).some(answer => answer.status === "answered");
     const outcome: DecisionOutcome = { ...base, ...prepared, answers, usage, model,

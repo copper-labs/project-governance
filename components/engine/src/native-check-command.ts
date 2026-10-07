@@ -1,7 +1,8 @@
 import { accessSync, constants, readFileSync, realpathSync, statSync } from "node:fs";
 import { delimiter, isAbsolute, join, resolve } from "node:path";
 import { submitCommand, waitCommand, cancelCommand, type CommandReceipt } from "./process-owner.ts";
-import { normalizeCheck } from "./checker-results.ts";
+import { findingSummary, normalizeCheck, type Finding } from "./checker-results.ts";
+import { CredentialUnavailableError, nonCredentialEnvironment } from "./credential-environment.ts";
 import { safeSubjectPath } from "./change-subject.ts";
 
 /** Resolve the executable once; an empty PATH segment never grants implicit current-directory lookup. */
@@ -33,11 +34,22 @@ export function commandCheckResult(receipt: CommandReceipt, directory: string, a
   return { ...result, ...(input_manifest ? { input_manifest } : {}) };
 }
 /** Run one native checker through the durable owner; an uncertain result is never retried. */
-export async function runNativeCheckCommand(options: { directory: string; id: string; root: string; argv: string[]; deadlineMs: number; env: Record<string, string>; cancelled?: () => boolean }) {
+export async function runNativeCheckCommand(options: { directory: string; id: string; root: string; argv: string[]; deadlineMs: number; env: Record<string, string>; credentialEnv?: string[]; cancelled?: () => boolean }) {
   if (!options.argv.length) throw new Error("Validation command is empty");
+  nonCredentialEnvironment(options.env);
   const argv = [commandExecutable(options.argv[0]!, options.root), ...options.argv.slice(1)];
-  const submitted = submitCommand(options.directory, { id: options.id,
-    operation: { argv, cwd: options.root, env: options.env, expectedExitCodes: [0], effect: "local" }, deadlineMs: options.deadlineMs, outputLimit: 8 * 1024 * 1024 });
+  let submitted: ReturnType<typeof submitCommand>;
+  try {
+    submitted = submitCommand(options.directory, { id: options.id,
+      operation: { argv, cwd: options.root, env: options.env, ...(options.credentialEnv === undefined ? {} : { credentialEnv: options.credentialEnv }), expectedExitCodes: [0], effect: "local" }, deadlineMs: options.deadlineMs, outputLimit: 8 * 1024 * 1024 });
+  }
+  catch (error) {
+    if (!(error instanceof CredentialUnavailableError)) throw error;
+    const findings: Finding[] = [{ rule_id: "checker.credential-unavailable", severity: "blocking", message: `Required custom checker credential unavailable: ${error.credentialName}` }];
+    return { argv, ...findingSummary(findings), status: "failed", findings, exit_code: null,
+      termination_reason: "credential-unavailable", failure_kind: "credential-unavailable", process_failure: false, integrity_failure: false,
+      stdout: JSON.stringify({ status: "failed", findings }), stderr: "" };
+  }
   const expires = Date.now() + options.deadlineMs + 5000;
   let cancellationSent = false;
   while (Date.now() < expires) {

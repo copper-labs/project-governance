@@ -19,7 +19,7 @@ export interface TransportTiming {
   activeConcurrency: number; dispatched: boolean; attemptId: string | null;
   requestBytes: number;
   coordinationIssues: string[];
-  poolLimits: { concurrency: number; estimatedInputTokensPerSecond: number | null; requestsPerMinute: number };
+  poolLimits: { concurrency: number; estimatedInputTokensPerSecond: number | null; requestsPerMinute: number; serializedBytesPerSecond?: number };
 }
 export type TransportOutcome = ({ ok: true; raw: unknown } |
   { ok: false; reason: string; failureStage: DecisionFailureStage }) & { timing: TransportTiming };
@@ -71,7 +71,7 @@ export class DecisionClient {
     const started = performance.now(), operationDeadline = deadlineAt ?? started + deadlineMs;
     const timing: TransportTiming = { admissionMs: 0, httpMs: 0, totalMs: 0, rateWaitMs: 0, slotWaitMs: 0, coordinationWaitMs: 0,
       activeConcurrency: 0, dispatched: false, attemptId: null, httpStatus: null, requestBytes: Buffer.byteLength(body), coordinationIssues: [],
-      poolLimits: { concurrency: this.adapter.policy.concurrency, estimatedInputTokensPerSecond: this.adapter.policy.estimatedInputTokensPerSecond, requestsPerMinute: this.adapter.policy.requestsPerMinute } };
+      poolLimits: { concurrency: this.adapter.policy.concurrency, estimatedInputTokensPerSecond: this.adapter.policy.estimatedInputTokensPerSecond, requestsPerMinute: this.adapter.policy.requestsPerMinute, ...(this.adapter.policy.serializedBytesPerSecond === undefined ? {} : { serializedBytesPerSecond: this.adapter.policy.serializedBytesPerSecond }) } };
     let httpStart: number | null = null, httpEnd: number | null = null;
     const done = (outcome: { ok: true; raw: unknown } | { ok: false; reason: string; failureStage: DecisionFailureStage }): TransportOutcome => {
       timing.totalMs = performance.now() - started;

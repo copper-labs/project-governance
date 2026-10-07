@@ -21,8 +21,7 @@
     "test:continuity": "npm --prefix components/harness test",
     "test:decision-pilot": "node --test 'components/engine/test/decision*.test.ts' components/engine/test/context-route-command.test.ts components/engine/test/context-packet.test.ts",
     "test": "npm run test:engine && npm run test:continuity && node --test 'components/engine/scripts/*.test.mjs'",
-    "pack:engine": "npm run build && node components/engine/scripts/pack-engine.mjs",
-    "verify:decision-pilot": "npm run build && node components/engine/scripts/verify-decision-pilot.mjs ."
+    "pack:engine": "npm run build && node components/engine/scripts/pack-engine.mjs"
   },
   "dependencies": {
     "ajv": "8.20.0",
@@ -40,6 +39,10 @@
     "project-governance": "dist/engine/src/cli.js"
   },
   "exports": {
+    "./evaluation/v1": {
+      "types": "./dist/engine/src/evaluation-api-v1.d.ts",
+      "import": "./dist/engine/src/evaluation-api-v1.js"
+    },
     "./host/v1": {
       "types": "./dist/engine/src/host-api-v1.d.ts",
       "import": "./dist/engine/src/host-api-v1.js"

@@ -5,6 +5,7 @@ import { spawn } from "node:child_process";
 import { processLiveFingerprint } from "../src/process-owner.ts";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { randomUUID } from "node:crypto";
 import { commandExecutable, runNativeCheckCommand } from "../src/native-check-command.ts";
 import { commandProcesses } from "../src/command-owner-recovery.ts";
 
@@ -36,6 +37,43 @@ test("native check verdicts preserve exit failure, structured output and timeout
     while(owners.some(owner=>processLiveFingerprint(owner.pid)===owner.fingerprint) && Date.now()<deadline)
       await new Promise(resolve=>setTimeout(resolve,50));
     assert.ok(owners.every(owner=>processLiveFingerprint(owner.pid)!==owner.fingerprint),"Recorded writers must exit before removing test evidence");
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("missing checker credentials fail admission without losing completed native proof", async () => {
+  const root = mkdtempSync(join(tmpdir(), "native-check-credential-")), name = "ENGINE_NATIVE_TOKEN", previous = process.env[name];
+  process.env[name] = randomUUID();
+  try {
+    const options = { id: "declared", root, directory: join(root, "declared"), argv: [process.execPath, "-e", "if(!process.env.ENGINE_NATIVE_TOKEN)process.exit(7);console.log(JSON.stringify({status:'passed',findings:[]}))"],
+      deadlineMs: 3000, env: {}, credentialEnv: [name] };
+    const original = await runNativeCheckCommand(options);
+    assert.equal(original.status, "passed");
+    delete process.env[name];
+    const replay = await runNativeCheckCommand(options);
+    assert.ok("command_receipt" in replay && "command_receipt" in original);
+    assert.deepEqual(replay.command_receipt, original.command_receipt);
+    assert.equal(replay.request_digest, original.request_digest);
+    const missing = await runNativeCheckCommand({ ...options, id: "missing", directory: join(root, "missing") });
+    assert.equal(missing.status, "failed"); assert.equal(missing.findings[0]?.rule_id, "checker.credential-unavailable");
+    assert.equal(missing.process_failure, false); assert.equal(missing.integrity_failure, false);
+    assert.equal(missing.exit_code, null); assert.equal(existsSync(join(root, "missing")), false);
+    await assert.rejects(runNativeCheckCommand({ ...options, directory: join(root, "embedded"), env: { OPENAI_API_KEY: randomUUID() }, credentialEnv: [] }), /credentials cannot be embedded/);
+    assert.equal(existsSync(join(root, "embedded")), false);
+    await assert.rejects(runNativeCheckCommand({ ...options, directory: join(root, "startup-override"),
+      env: { GOVERNANCE_STARTUP_TOKEN: randomUUID() }, credentialEnv: [] }), /credentials cannot be embedded/);
+    assert.equal(existsSync(join(root, "startup-override")), false, "custom checker overrides cannot supply startup maintenance identity");
+    for (const name of ["ANTHROPIC_API_KEY", "GOOGLE_API_KEY", "anthropic_api_key"])
+      await assert.rejects(runNativeCheckCommand({ ...options, directory: join(root, name),
+        env: { [name]: randomUUID() }, credentialEnv: [] }), /credentials cannot be embedded/);
+  } finally {
+    if (previous === undefined) delete process.env[name]; else process.env[name] = previous;
+    const owners = ["owner.json", "guardian.json"].flatMap(name => {
+      const path = join(root, "declared", name); return existsSync(path) ? [JSON.parse(readFileSync(path, "utf8"))] : [];
+    });
+    const deadline = Date.now() + 5000;
+    while (owners.some(owner => processLiveFingerprint(owner.pid) === owner.fingerprint) && Date.now() < deadline) await pause(50);
+    assert.ok(owners.every(owner => processLiveFingerprint(owner.pid) !== owner.fingerprint));
     rmSync(root, { recursive: true, force: true });
   }
 });

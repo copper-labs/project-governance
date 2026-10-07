@@ -4,6 +4,7 @@ import { parse } from "yaml";
 import { object, text } from "./core.ts";
 import type { ValidationSubject } from "./change-subject.ts";
 import { parseLintDeclaration } from "./lint-configuration.ts";
+import { commandCredentialNames } from "./command-argv.ts";
 
 export interface Pack extends Record<string, unknown> {
   id: string; enforcement: "advisory" | "blocking"; commands: unknown[];
@@ -53,6 +54,7 @@ export function mergePacks(documents: Array<{ source: string; value: Record<stri
     if (!id) throw new Error(`${source}: id is required`);
     if (!["advisory", "blocking"].includes(String(value["enforcement"]))) throw new Error(`${source}: enforcement must be advisory or blocking`);
     if (!Array.isArray(value["commands"]) || !value["commands"].length) throw new Error(`${source}: commands must be a non-empty list`);
+    for (const command of value.commands) commandCredentialNames(command);
     if (value.lint !== undefined) {
       value.lint = parseLintDeclaration(value.lint);
       if (value.commands.length !== 1) throw new Error(`${source}: a lint backend has one grouped adapter command`);

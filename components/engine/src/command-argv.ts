@@ -1,3 +1,5 @@
+import { credentialNames, nonCredentialEnvironment, rejectEmbeddedCredentialFields } from "./credential-environment.ts";
+
 /** Tokenize legacy quoted command declarations without invoking a shell or expanding variables. */
 export function commandTokens(source: string): string[] {
   const tokens: string[] = []; let token = "", started = false, quote: "'" | '"' | null = null;
@@ -21,12 +23,22 @@ export function commandTokens(source: string): string[] {
   return tokens;
 }
 export interface CommandBindings { stage: string; commit_message_file?: string; pr_body_file?: string; pr_title?: string }
+/** Only custom commands declare process-only credentials; built-ins retain their own admission. */
+export function commandCredentialNames(entry: unknown): string[] {
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [];
+  const record = entry as Record<string, unknown>;
+  rejectEmbeddedCredentialFields(Object.fromEntries(Object.entries(record).filter(([name]) => name !== "credentialEnv")));
+  if (Object.hasOwn(record, "env")) nonCredentialEnvironment(record["env"]);
+  if (Object.hasOwn(record, "credentialEnv") && Object.hasOwn(record, "builtin")) throw new Error("Built-in commands cannot declare credential environment references");
+  return credentialNames(record["credentialEnv"]);
+}
 /** Substitutions replace entire tokens only; missing required inputs never dispatch an incomplete command. */
 export function resolveCommandArgv(entry: unknown, bindings: CommandBindings): string[] {
   let raw: unknown = entry;
   if (entry && typeof entry === "object" && !Array.isArray(entry)) {
     const record = entry as Record<string, unknown>;
-    if (Object.keys(record).some(key => !["run", "stages"].includes(key))) throw new Error("Unsupported command fields");
+    if (Object.keys(record).some(key => !["run", "stages", "credentialEnv"].includes(key))) throw new Error("Unsupported command fields");
+    commandCredentialNames(record);
     raw = record["run"];
   }
   const tokens = typeof raw === "string" ? commandTokens(raw) : raw;
