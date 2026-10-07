@@ -21,6 +21,10 @@ shows existing project-owned checks; it does not require a check after every edi
 
 ## Active
 
+- [Optional computer use and combined visual testing](active/2026-10-06-optional-computer-use-testing.md)
+  plans model-free integration, local Holo setup and realistic combined Decisions scenarios as
+  separate proof checkpoints. Design and review do not authorize implementation or live experiments.
+
 - [Decision providers and image evaluation](active/2026-10-06-decision-providers-and-image-evaluation.md)
   is a design-only draft for provider adapters, supplied-image evaluation and agent/test integration.
   Implementation, live qualification and publication remain separate work.

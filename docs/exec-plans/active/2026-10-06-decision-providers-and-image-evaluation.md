@@ -262,6 +262,30 @@ defective cases, dynamic-content and incomplete-capture cases. Report false pass
 uncertainty/refusal, p50/p95 end-to-end wall time, observed provider usage/cost and any accepted-task
 benefit. Include failed calls/retries; do not treat summed parallel duration as elapsed time.
 
+Optional local Holo grounding combined with Decisions checkpoints is owned by the
+[optional computer-use specification](../../specs/engine-optional-computer-use-testing.md) and
+[plan](2026-10-06-optional-computer-use-testing.md). It does not turn `evaluate_evidence` into an
+executor or extend the current recipes' permitted effects.
+
+Include a caller-owned image optimization comparison. Start with the same frozen captures at
+original resolution and two smaller aspect-preserving sizes, without upscaling. Then compare a
+relevant-region crop at native resolution and supported image-detail settings on the promising
+candidate. Compare PNG with compressed encodings separately; fewer uploaded bytes do not establish
+fewer billable image tokens. Keep paired reference/current images under matching preparation.
+
+Use frozen human labels and known subtle defects, including small validation text, clipped labels,
+wrong values and missing controls. Full-resolution model answers are another comparison arm, not
+ground truth. Report false passes, false alarms, refusal/uncertainty, preprocessing and end-to-end
+latency, observed native input usage and total workflow cost, including higher-resolution follow-ups.
+Select the cheapest preparation that meets the assertion's declared quality requirement; provider
+confidence alone cannot justify accepting reduced detail or omitting a follow-up.
+
+The test runner retains original and evaluated artifacts, dimensions, crop/resize/encoding settings
+and requested detail. These explicit derivatives do not add automatic preprocessing to the evaluator.
+Keep control-image geometry separate from evaluation preparation; any transformed control image
+needs verified coordinate mapping. Image optimization remains part of this separately scoped live
+comparison, not a new core dependency or permission to run paid experiments now.
+
 Provider prices, account access and model identities require current readback at that checkpoint.
 An alias does not establish reproducible weights. Do not launch a paid baseline, threshold-fitting
 experiment or adopter test under this document-authoring authorization. A project keeps capture,

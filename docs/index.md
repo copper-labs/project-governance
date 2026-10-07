@@ -77,6 +77,12 @@ startup updates through its tracked profile; major releases and integration chan
 
 ## Compiled Runtime Contracts
 
+The proposed [optional computer-use specification](specs/engine-optional-computer-use-testing.md)
+and [implementation plan](exec-plans/active/2026-10-06-optional-computer-use-testing.md) define local
+Holo grounding, project-owned browser execution and Decisions checkpoint experiments. They include
+realistic synthetic scenarios and honest coverage when tools are absent. Runtime and live proof
+remain future work.
+
 The draft [decision providers and image evaluation specification](specs/engine-decision-providers-and-image-evaluation.md)
 and [implementation plan](exec-plans/active/2026-10-06-decision-providers-and-image-evaluation.md)
 propose interchangeable JEV/OpenAI adapters and a reusable text/image evaluation operation.
