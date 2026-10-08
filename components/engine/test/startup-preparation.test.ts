@@ -1,3 +1,4 @@
+import { removeRuntimeFixture } from "./fixtures/remove-runtime-fixture.ts";
 import {test} from "node:test";
 import assert from "node:assert/strict";
 import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,realpathSync,rmSync} from "node:fs";
@@ -65,5 +66,5 @@ test("startup preparation joins saved discovery to inactive installation and reu
   assert.equal(tasks.owner(task.taskId)!.reader.revision,2);
   assert.deepEqual(await applyPreparedStartup(input,{...options,fetch:async()=>{throw new Error("must reuse");}}),applied);
   assert.equal(generations.state().revision,2);assert.equal(generations.state().readers.length,1);
- }finally{tasks?.close();generations?.close();rmSync(root,{recursive:true,force:true});}
+ }finally{tasks?.close();generations?.close();removeRuntimeFixture(root);}
 });

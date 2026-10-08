@@ -1,3 +1,4 @@
+import { removeRuntimeFixture } from "./fixtures/remove-runtime-fixture.ts";
 import { recoverStartupOwner } from "../src/startup-owner-recovery.ts";
 import { StartupTasks } from "../src/startup-tasks.ts";
 import { observeStartup } from "../src/startup-observation.ts";
@@ -666,11 +667,12 @@ test("inactive installation verifies identity and preserves a failed-generation 
     await assert.rejects(runtimeOperationCommand("init",["--request-file",initRequestPath,"--project-plan",initPlanPath,
       "--operation-directory",join(root,"second-init")]),/existing installation/);
     assert.equal(existsSync(join(root,"second-init")),false);
+    chmodSync(result.executable, statSync(result.executable).mode | 0o200);
     writeFileSync(result.executable, "throw new Error('changed payload must not execute');");
     assert.throws(() => inspectRuntimeGeneration(result.directory), /payload differs/);
     assert.equal(JSON.parse(readFileSync(join(result.directory, "installation.json"), "utf8")).state, "staged");
     assert.throws(() => stageRuntimeArchive(archive, { ...lock, version: "3.0.1" }, stages), /Candidate installation failed/);
     const records = readdirSync(stages).map(name => JSON.parse(readFileSync(join(stages, name, "installation.json"), "utf8")));
     assert.deepEqual(records.map(record => record.state).sort(), ["failed", "staged", "staged"]);
-  } finally { rmSync(root, { recursive: true, force: true }); }
+  } finally { removeRuntimeFixture(root); }
 });

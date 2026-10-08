@@ -5,7 +5,7 @@ type: spec
 status: approved
 owner: project-governance
 created: 2026-10-06
-updated: 2026-10-06
+updated: 2026-10-07
 summary: Extends the existing decision runtime with explicit JEV and OpenAI adapters and reusable evaluation of supplied text and images.
 ---
 
@@ -27,6 +27,20 @@ The operator approved implementation and focused local verification for release 
 qualified 4.1 release. The Opus 5.5 medium design review and subsequent simplification pass are
 complete. This document owns the intended behavior; batch evidence records what is implemented.
 Paid live qualification, 4.2 publication and changes to an adopter remain separate actions.
+
+### 4.2 release correction: stable local ownership
+
+The operator also approved including the native host-ownership correction in 4.2. A computer-name
+change must not interrupt ordinary continuation when its stable machine identity and required
+process evidence still match. Extend the existing ownership records and checks; do not add another
+runtime or loosen workspace, process, generation or cleanup checks. The
+[startup update contract](startup-runtime-updates.md) remains the lifecycle authority.
+
+The correction is integrated with reconciled independent review, focused ownership regressions and
+exact installed continuation/update-handoff proof. Historical records without stable identity
+retain their strict guard; installation alone must not infer their machine, rewrite a live owner or
+repair a conversation attachment. Any required historical reconciliation is explicit and based on
+original evidence at a safe handoff. Adopter activation remains separate from publication.
 
 ## Ownership and boundaries
 
@@ -341,7 +355,8 @@ live model benchmarks, runtime publication and adopter installation are outside 
     { "id": "R4", "claim": "Typed answers retain distributions, weighted scores, refusal and uncertainty; malformed, unsupported and unavailable outcomes remain distinct and cannot become a negative answer or passing assertion.", "verification": "mechanical" },
     { "id": "R5", "claim": "CLI, narrow library and packaged agent guidance invoke the same advisory evaluate_evidence operation without acquiring registered consumer effects, task authority or another executor.", "verification": "mechanical" },
     { "id": "R6", "claim": "A project-owned visual test integration retains original run/artifact conditions and evaluator receipts, preserves native outcomes and deliberately maps unusable required assertions to unresolved proof.", "verification": "mechanical" },
-    { "id": "R7", "claim": "Qualification and efficiency claims distinguish fixture correctness, live provider behavior, visual accuracy, accepted-task benefit and installed proof, preserving workload-specific uncertainty and model-alias limits.", "verification": "semantic" }
+    { "id": "R7", "claim": "Qualification and efficiency claims distinguish fixture correctness, live provider behavior, visual accuracy, accepted-task benefit and installed proof, preserving workload-specific uncertainty and model-alias limits.", "verification": "semantic" },
+    { "id": "R8", "claim": "Stable local machine identity prevents hostname-only continuation refusals while preserving native process, workspace, generation and cleanup guards; legacy ownership and upgrade handoff never release live owners or invent historical identity.", "verification": "mechanical" }
   ]
 }
 ```
@@ -363,6 +378,10 @@ live model benchmarks, runtime publication and adopter installation are outside 
   live comparison uses frozen human labels, known-good and defective screenshots, false passes,
   false alarms, abstention, p50/p95 wall time and observed native cost. No model labels its own
   correctness. Required use and empirical savings stay unqualified without that evidence.
+- R8: reproduce a changed hostname with unchanged machine/process identity, then test foreign
+  machines, unavailable identity, PID reuse, legacy records and live-owner refusal. Qualify the
+  integrated installed archive's startup, continuation and update handoff, preserving task binding
+  and conversation/workspace attachment. Synthetic proof is distinct from native adopter proof.
 
 The [implementation plan](../exec-plans/active/2026-10-06-decision-providers-and-image-evaluation.md)
 sets coherent batch checkpoints and installed proof. This design review launches no runtime tests,

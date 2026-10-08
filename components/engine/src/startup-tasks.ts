@@ -1,3 +1,4 @@
+import {validMachineIdentity} from "./machine-identity.ts";
 import {DatabaseSync} from "node:sqlite";
 import {lstatSync,mkdirSync} from "node:fs";
 import {dirname} from "node:path";
@@ -34,7 +35,7 @@ export class StartupTasks {
   return row?String(row.root):null;
  }
  bindOwner(taskId:string,host:StartupHostOwner,reader:RuntimeReader) {
-  if(host.provider!=="codex" || !host.host || !host.fingerprint || !Number.isSafeInteger(host.pid) || host.pid<2 ||
+  if((host.machineId!==undefined && !validMachineIdentity(host.machineId)) || host.provider!=="codex" || !host.host || !host.fingerprint || !Number.isSafeInteger(host.pid) || host.pid<2 ||
     reader.owner!==`startup-task:${taskId}` || !reader.token || !Number.isSafeInteger(reader.revision))throw new Error("Invalid startup owner binding");
   const binding=canonical({host,reader});
   this.#db.exec("BEGIN IMMEDIATE");

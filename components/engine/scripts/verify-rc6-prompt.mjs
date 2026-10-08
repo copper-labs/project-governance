@@ -499,8 +499,8 @@ export async function verifyRc6Prompt(packageRoot, archive, options = {}) {
     }
     const continuityUpgrade = await verifyWorktreeCutover({ packageRoot, archive, temporary, workspace, environment, lock, upgradeInputs });
     completed = true;
-    return { status: 'passed', continuityUpgrade, evidenceDirectory: upgradeInputs.candidate ? temporary : null, payloadMode: upgradeInputs.mode,
+    return { status: 'passed', continuityUpgrade, evidenceDirectory: temporary, payloadMode: upgradeInputs.mode,
       scope: 'Exact installed package, initial and linked-worktree hooks, stale sibling hook refusal, merged pin cutover, unborn prompt stdin, no-token fallback, compact metadata/procedure/source/assertion delivery through the native hook, exact no-dispatch packet replay, recoverable prompt reader, synthetic native-parent continuation with departed or live retained owners and lifecycle failure, distinct-version upgrade with retained tasks/checkpoints and isolated cleanup. Real desktop reattachment, native host trust/use and accepted ordinary development not tested.', sourceIdentity: 'synthetic host fixture; supplied archive and lock identities are reported separately' };
   } catch (error) { error.proofDirectory = temporary; console.error(`Installed prompt proof retained at ${temporary}`); throw error; }
-  finally { if (completed && !upgradeInputs.candidate) rmSync(temporary, { recursive: true, force: true }); }
+  finally { if (completed) console.error(`Installed prompt proof retained at ${temporary}`); }
 }

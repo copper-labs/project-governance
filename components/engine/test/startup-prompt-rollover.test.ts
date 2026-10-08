@@ -126,6 +126,7 @@ test("lifecycle refusals retain their safe originating code and native identity 
 for (const [message, cause] of [
   [RUNTIME_MAINTENANCE_MESSAGE, "runtime-maintenance"],
   [PROMPT_RUNTIME_LOCK_MESSAGE, "runtime-lock-mismatch"],
+  ["Installed runtime payload differs from staging receipt", "runtime-payload-mismatch"],
   ["PRIVATE UNKNOWN EXCEPTION", "lifecycle-cause-unclassified"],
 ] as const) test(`plain lifecycle errors record ${cause} without exposing their message`, async () => {
   const workspace = realpathSync(mkdtempSync(join(tmpdir(), "prompt-plain-error-"))), state = process.env.XDG_STATE_HOME;
@@ -173,4 +174,21 @@ test("submitted prompts refuse a foreign reservation, invalid stored owner and n
     const after = new StartupTasks(receipts);
     assert.deepEqual(after.owner(prior.taskId), { host, reader }); after.close();
   } finally { rmSync(workspace, { recursive: true, force: true }); }
+});
+
+test("renamed-machine prompt rollover preserves the old reader and refuses foreign identity",()=>{
+ const workspace=realpathSync(mkdtempSync(join(tmpdir(),"native-renamed-machine-")));
+ try {
+  const registry=join(workspace,"registry.sqlite"),receipts=join(workspace,"startup.sqlite");writeFileSync(registry,"");
+  const event={hook_event_name:"UserPromptSubmit",session_id:"fixture-chat",turn_id:"later-turn"};
+  const machineId="machine:sha256:"+"a".repeat(64),oldHost={provider:"codex" as const,host:"old-network-name",machineId,pid:123456,fingerprint:"old-start"};
+  const current={...oldHost,host:"new-network-name.local",pid:123457,fingerprint:"new-start"};
+  const tasks=new StartupTasks(receipts),prior=tasks.event("codex",event,workspace,digest("lock"));
+  if(prior.action!=="reserve")throw new Error("Expected reservation");
+  const reader={registry,token:"kept-reader",revision:1,directory:workspace,owner:`startup-task:${prior.taskId}`};
+  tasks.bindOwner(prior.taskId,oldHost,reader);tasks.close();
+  assert.equal(admitNativeAfterOwnerRollover(new StartupOwnerChanged("changed"),"codex",event,workspace,registry,receipts,{capture:()=>current}),true);
+  assert.throws(()=>admitNativeAfterOwnerRollover(new StartupOwnerChanged("changed"),"codex",event,workspace,registry,receipts,{capture:()=>({...current,machineId:"machine:sha256:"+"b".repeat(64)})}),(error:any)=>error.code==="native-owner-host-mismatch");
+  const after=new StartupTasks(receipts);assert.deepEqual(after.owner(prior.taskId),{host:oldHost,reader});after.close();
+ }finally{rmSync(workspace,{recursive:true,force:true});}
 });

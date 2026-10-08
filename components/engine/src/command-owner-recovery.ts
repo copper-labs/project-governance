@@ -1,3 +1,4 @@
+import {requireMachineIdentity,isLocalMachine,sameMachineIdentity} from "./machine-identity.ts";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, rmdirSync, statSync } from "node:fs";
 import { hostname } from "node:os";
@@ -50,7 +51,7 @@ export function recoverCommandOwner(directory: string, requestDigest: string, au
     if (existsSync(join(directory, "owner-recovery.json"))) throw new Error("Existing recovery evidence does not match; refusing replacement");
     const launch = read("launch.json"), owner = object(launch.owner), child = object(launch.child);
     if (launch.version !== 1 || launch.requestDigest !== requestDigest || launch.state !== "spawned" ||
-        launch.host !== hostname() || typeof launch.startedAt !== "string" || !Number.isFinite(Date.parse(launch.startedAt)) ||
+        !isLocalMachine(launch) || typeof launch.startedAt !== "string" || !Number.isFinite(Date.parse(launch.startedAt)) ||
         !Number.isSafeInteger(owner.pid) || Number(owner.pid) < 2 || !owner.fingerprint ||
         !Number.isSafeInteger(child.pid) || Number(child.pid) < 2 || child.processGroup !== child.pid || !child.fingerprint ||
         digest(read("owner.json")) !== digest({ pid: owner.pid, fingerprint: owner.fingerprint, requestDigest }))
@@ -72,7 +73,8 @@ export function recoverCommandOwner(directory: string, requestDigest: string, au
       logBytes: existsSync(log) ? statSync(log).size : 0 };
     durableJson(join(directory, "owner-recovery.json"), { version: 1, requestDigest, authority,
       mode: prior.receipt ? "cleanup-confirmation" : "owner-loss",
-      launchDigest: digest(launch), receiptDigest: digest(receipt), host: hostname(), observedAt: endedAt,
+      launchDigest: digest(launch), receiptDigest: digest(receipt), host: hostname(),
+      ...(launch.machineId === undefined ? {} : { machineId: requireMachineIdentity() }), observedAt: endedAt,
       ownerAbsent: true, groupAbsent: true, membersAbsent: true, membersDigest: members.digest });
     if (!prior.receipt) durableJson(join(directory, "result.json"), receipt);
     return observeCommand(directory, requestDigest);
@@ -88,7 +90,7 @@ export function hasConfirmedCommandCleanup(directory: string, receipt: CommandRe
   const launch = object(JSON.parse(narrativeFile(directory, "launch.json")));
   const members = recordedCommandMembers(directory, receipt.requestDigest, object(launch.child).processGroup);
   return evidence.membersAbsent === true && evidence.membersDigest === members.digest && (receipt.cleanup === "confirmed" || evidence.mode === "cleanup-confirmation") &&
-    evidence.host === launch.host && typeof evidence.authority === "string" && Boolean(evidence.authority.trim()) &&
+    sameMachineIdentity(launch,evidence) && typeof evidence.authority === "string" && Boolean(evidence.authority.trim()) &&
     evidence.version === 1 && evidence.requestDigest === receipt.requestDigest &&
     evidence.receiptDigest === digest(receipt) && evidence.launchDigest === digest(launch) &&
     evidence.ownerAbsent === true && evidence.groupAbsent === true;

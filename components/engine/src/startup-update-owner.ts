@@ -1,3 +1,4 @@
+import {requireMachineIdentity,isLocalMachine} from "./machine-identity.ts";
 import {mkdirSync,realpathSync,lstatSync} from "node:fs";
 import {join} from "node:path";
 import {hostname} from "node:os";
@@ -13,9 +14,10 @@ const identity=(journal:JournalIdentity)=>({requestDigest:journal.requestDigest,
 export async function withStartupUpdateOwner<T>(journal:JournalIdentity,run:()=>Promise<T>):Promise<T> {
  const directory=realpathSync(journal.directory),fingerprint=processFingerprint(process.pid);
  if(!fingerprint)throw new Error("Startup updater process identity unavailable");
+ const machineId=requireMachineIdentity();
  const claim=join(directory,"updater");
  mkdirSync(claim,{mode:0o700});
- const owner={version:1,...identity(journal),host:hostname(),pid:process.pid,fingerprint};
+ const owner={version:1,...identity(journal),host:hostname(),machineId,pid:process.pid,fingerprint};
  durableJson(join(claim,"owner.json"),owner);
  try{return await run();}
  finally {
@@ -30,7 +32,7 @@ export function requireStoppedStartupUpdater(journal:JournalIdentity) {
  if(realpathSync(claim)!==claim)throw new Error("Startup updater claim uses an alias");
  const owner=JSON.parse(narrativeFile(claim,"owner.json"));
  if(owner.version!==1 || owner.requestDigest!==journal.requestDigest || owner.token!==journal.token ||
-   owner.host!==hostname() || !Number.isSafeInteger(owner.pid) || owner.pid<2 ||
+   !isLocalMachine(owner) || !Number.isSafeInteger(owner.pid) || owner.pid<2 ||
    typeof owner.fingerprint!=="string" || !owner.fingerprint.trim())throw new Error("Startup updater ownership differs or is incomplete");
  const stopped=join(claim,"stopped.json");
  if(lstatSync(stopped,{throwIfNoEntry:false})) {

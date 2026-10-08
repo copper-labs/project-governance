@@ -16,3 +16,23 @@ test("startup preparation requires the exact recorded native ancestor",()=>{
   assert.throws(()=>requireCurrentStartupHost(owner,()=>observed),/Current native host differs/);
  assert.throws(()=>requireCurrentStartupHost(null,()=>owner),/identity required/);
 });
+
+test("native ownership survives a host label change when both captured machine identities match",()=>{
+ const machineId="machine:sha256:"+"a".repeat(64);
+ const owner={host:"old-network-name",machineId,provider:"codex" as const,pid:123,fingerprint:"same-start"};
+ const observed={...owner,host:"new-network-name.local"};
+ assert.deepEqual(requireCurrentStartupHost(owner,()=>observed),observed);
+ const {machineId:_id,...withoutIdentity}=observed;
+ for(const invalid of [{...observed,machineId:"machine:sha256:"+"b".repeat(64)},
+   withoutIdentity,{...observed,pid:124},{...observed,fingerprint:"reused-pid"}])
+  assert.throws(()=>requireCurrentStartupHost(owner,()=>invalid),/Current native host differs/);
+});
+
+test("machine-bound absence still requires exact local machine and positive PID absence",()=>{
+ const machineId="machine:sha256:"+"a".repeat(64);
+ const owner={host:"old-label",machineId,provider:"codex" as const,pid:123,fingerprint:"recorded"};
+ assert.equal(requireAbsentStartupHost(owner,()=>[],"new-label",machineId).absent,true);
+ assert.throws(()=>requireAbsentStartupHost(owner,()=>[],"old-label","machine:sha256:"+"b".repeat(64)),/identity required/);
+ assert.throws(()=>requireAbsentStartupHost(owner,()=>[],"old-label",null),/identity required/);
+ assert.throws(()=>requireAbsentStartupHost(owner,()=>[{pid:123,parent:1,group:123}],"new-label",machineId),/remains present/);
+});

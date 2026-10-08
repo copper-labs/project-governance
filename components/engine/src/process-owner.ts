@@ -1,3 +1,4 @@
+import {requireMachineIdentity} from "./machine-identity.ts";
 import { commandProcesses, recordedCommandMembers } from "./command-owner-recovery.ts";
 import { startCommandGuardian } from "./command-guardian.ts";
 import { deliverCommandCompletion, type CompletionTarget } from "./completion-delivery.ts";
@@ -219,7 +220,7 @@ async function execute(directory: string, expectedDigest: string): Promise<void>
       GOVERNANCE_GENERATION_TOKEN: generation.token, GOVERNANCE_GENERATION_OWNER: generation.owner });
     if (digest(current) !== digest(request.runtime)) throw new Error("Command destination runtime changed before execution");
   }
-  const fingerprint = processFingerprint(process.pid);
+  const machineId = requireMachineIdentity(), fingerprint = processFingerprint(process.pid);
   if (!fingerprint) throw new Error("command owner identity unavailable");
   durableJson(join(directory, "owner.json"), { pid: process.pid, fingerprint, requestDigest: expectedDigest });
   await startCommandGuardian(directory, expectedDigest);
@@ -265,7 +266,7 @@ async function execute(directory: string, expectedDigest: string): Promise<void>
   let bytes = 0, reason = "exit", requestedStop = false, closed = false, killTimer: ReturnType<typeof setTimeout> | undefined;
   // A crash between intent and acknowledgment is unresolved, never permission to replay.
   durableJson(join(directory, "launch.json"), { version: 1, requestDigest: expectedDigest,
-    state: "intent", host: hostname(), owner: { pid: process.pid, fingerprint }, startedAt });
+    state: "intent", host: hostname(), machineId, owner: { pid: process.pid, fingerprint }, startedAt });
   const child = spawn(request.operation.argv[0]!, request.operation.argv.slice(1), {
     cwd: request.operation.cwd, env: { ...commandEnvironment({}), ...nativeOperationEnvironment(request), ...credentialEnvironment(request.operation.credentialEnv) }, detached: true, stdio: [request.stdin === undefined ? "ignore" : "pipe", "pipe", "pipe"],
   });
@@ -273,7 +274,7 @@ async function execute(directory: string, expectedDigest: string): Promise<void>
   if (group) {
     try {
       durableJson(join(directory, "launch.json"), { version: 1, requestDigest: expectedDigest,
-        state: "spawned", host: hostname(), owner: { pid: process.pid, fingerprint }, startedAt,
+        state: "spawned", host: hostname(), machineId, owner: { pid: process.pid, fingerprint }, startedAt,
         child: { pid: group, processGroup: group, fingerprint: processFingerprint(group) } });
     } catch (error) {
       // This live owner still owns the freshly spawned group even if persistence fails.

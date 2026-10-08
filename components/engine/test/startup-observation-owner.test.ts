@@ -52,6 +52,25 @@ test("planned startup reservation replays its exact token and refuses changed ge
  }finally{generations.close();rmSync(root,{recursive:true,force:true});}
 });
 
+for (const shape of ["legacy-local", "legacy-foreign", "stable-renamed"] as const) test(`exited observation ${shape} retains its original machine guard`,()=>{
+ const root=realpathSync(mkdtempSync(join(tmpdir(),"observer-identity-"))),registry=join(root,"registry.sqlite"),generations=new RuntimeGenerations(registry);
+ try {
+  const db=new DatabaseSync(registry);db.prepare("UPDATE current SET revision=1,directory=? WHERE id=1").run(root);db.close();
+  const module=new URL("../src/startup-observation-owner.ts",import.meta.url).href;
+  const raw=execFileSync(process.execPath,["--input-type=module","-e",`import {startupObservationOwner} from ${JSON.stringify(module)};console.log(startupObservationOwner(${JSON.stringify(root)}));`],{encoding:"utf8",timeout:5000,stdio:"pipe"}).trim();
+  const prefix=raw.slice(0,raw.indexOf(":",raw.indexOf(":")+1)+1);
+  const identity=JSON.parse(Buffer.from(raw.slice(prefix.length),"base64url").toString("utf8"));
+  if(shape.startsWith("legacy"))delete identity.machineId;
+  if(shape!=="legacy-local")identity.host+="-renamed";
+  const owner=prefix+Buffer.from(JSON.stringify(identity)).toString("base64url"),reader=generations.acquire(owner);
+  if(shape==="legacy-foreign") {
+   assert.throws(()=>recoverStartupObservation(root,registry,reader.token,"fixture:legacy-foreign"),/identity differs/);
+   assert.equal(generations.state().readers.length,1);generations.release(reader.token,owner);
+  } else assert.equal(recoverStartupObservation(root,registry,reader.token,"fixture:original-guard").status,"released");
+  assert.equal(generations.state().readers.length,0);
+ }finally{generations.close();rmSync(root,{recursive:true,force:true});}
+});
+
 test("process exit after durable owner intent but before reader acquisition remains recoverable",()=>{
  const root=realpathSync(mkdtempSync(join(tmpdir(),"startup-intent-exit-"))),registry=join(root,"registry.sqlite"),receipts=join(root,"tasks.sqlite");
  const generations=new RuntimeGenerations(registry);

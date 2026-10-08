@@ -1,3 +1,4 @@
+import {sameMachineIdentity} from "./machine-identity.ts";
 import { realpathSync } from "node:fs";
 import { join } from "node:path";
 import { parse } from "yaml";
@@ -5,7 +6,7 @@ import { digest } from "./core.ts";
 import { narrativeFile } from "./narrative-inputs.ts";
 import { compiledRuntimeLock } from "./runtime-lock.ts";
 import { RUNTIME_MAINTENANCE_MESSAGE, RuntimeGenerations } from "./runtime-generations.ts";
-import { inspectRuntimeGeneration } from "./runtime-inspection.ts";
+import { inspectRuntimeGeneration, RUNTIME_PAYLOAD_MISMATCH_MESSAGE } from "./runtime-inspection.ts";
 import { startupObservationOwner } from "./startup-observation-owner.ts";
 import { startupEvent } from "./startup-event.ts";
 import { captureStartupHostOwner, requireAbsentStartupHost, type StartupHostOwner } from "./startup-host-owner.ts";
@@ -46,7 +47,7 @@ export function admitNativeAfterOwnerRollover(
   const current = (options.capture ?? captureStartupHostOwner)(provider);
   if (!current || current.provider !== "codex")
     throw new ContextRouteError("native-owner-unavailable", "The current native parent could not be verified.");
-  if (current.host !== prior.host.host)
+  if (!sameMachineIdentity(prior.host,current))
     throw new ContextRouteError("native-owner-host-mismatch", "The current native parent belongs to another host.");
   if (current.pid === prior.host.pid && current.fingerprint === prior.host.fingerprint)
     throw new ContextRouteError("startup-owner-unchanged", "The native parent did not change; inspect the original lifecycle refusal.");
@@ -107,6 +108,7 @@ export async function nativeOwnerRolloverResult(error: unknown, provider: string
     : failure instanceof StartupOwnerChanged ? "startup-owner-changed"
     : failure instanceof Error && failure.message === RUNTIME_MAINTENANCE_MESSAGE ? "runtime-maintenance"
     : failure instanceof Error && failure.message === PROMPT_RUNTIME_LOCK_MESSAGE ? "runtime-lock-mismatch"
+    : failure instanceof Error && failure.message === RUNTIME_PAYLOAD_MISMATCH_MESSAGE ? "runtime-payload-mismatch"
     : "lifecycle-cause-unclassified";
   let receiptPath: string | null = null;
   try { receiptPath = recordContextFailure(workspace, new ContextRouteError("prompt-lifecycle-unavailable", "Prompt lifecycle unavailable; inspect startup ownership and context doctor.",

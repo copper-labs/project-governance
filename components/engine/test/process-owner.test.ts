@@ -154,7 +154,7 @@ test("worker loss refuses live-group recovery and preserves unknown outcome afte
     const acknowledged = JSON.parse(readFileSync(launchPath, "utf8"));
     durableJson(launchPath, { ...acknowledged, state: "intent" });
     assert.throws(() => recoverCommandOwner(submitted.directory, submitted.requestDigest, "test:recovery"), /launch acknowledgment/);
-    durableJson(launchPath, { ...acknowledged, host: "other-host" });
+    durableJson(launchPath, { ...acknowledged, host: "other-host", machineId: "machine:sha256:" + "f".repeat(64) });
     assert.throws(() => recoverCommandOwner(submitted.directory, submitted.requestDigest, "test:recovery"), /launch acknowledgment/);
     durableJson(launchPath, acknowledged);
     assert.equal(processLiveFingerprint(owner.pid), owner.fingerprint);

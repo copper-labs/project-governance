@@ -5,7 +5,7 @@ type: spec
 status: draft
 owner: project-governance
 created: 2026-09-20
-updated: 2026-10-03
+updated: 2026-10-07
 summary: Approved workflow execution with explicit resource ownership, RN iOS simulator then physical-device proof, and bounded recovery.
 ---
 
@@ -20,6 +20,20 @@ The [local-CI contract](engine-local-ci-and-merge-contract.md) separates executi
 test target and defines when qualified local evidence can satisfy a protected merge check.
 The [capability boundary](engine-capability-boundaries.md) tests later external/release operations
 against this shared lifecycle. Those operations are not required in the first RN workflow.
+
+## Native custom checker executable paths
+
+The native check owner validates that a declared executable resolves to an executable regular file.
+It launches the absolute declared path, or the absolute path selected from explicit PATH directories.
+It does not replace that path with the symlink target: environment-aware interpreters can select
+their dependencies from the invoked location. Empty and relative PATH entries remain ineligible;
+missing, broken, non-executable and directory targets refuse dispatch.
+
+The existing durable command request records the actual launch path. Credential filtering, admission,
+deadline, cleanup and observation without replay remain with the native command owner. Existing
+recorded commands remain bound to their installed generation; this change neither migrates their
+identity nor retries uncertain effects. This narrow behavior does not change separate test-batch
+executable fingerprint requirements.
 
 ## One change, one workflow view
 
@@ -324,3 +338,13 @@ grace before declaring cleanup uncertain. Finish immediately when full enumerati
 do not add an unconditional delay or another retry. A live or reused recorded PID, invalid membership
 record or failed enumeration keeps cleanup unknown. This observation grants no new signaling
 authority. The guardian retains its existing independently verified owner-loss recovery path.
+
+### Stable machine identity for native ownership
+
+New command launch acknowledgments and diagnostic owners use the stable local machine identity
+specified by [startup ownership](startup-runtime-updates.md#stable-local-machine-ownership).
+A changed hostname alone does not defeat local recovery. A mismatched, invalid or missing stable
+identity on a machine-bound record still refuses recovery. Legacy records retain their literal host
+comparison; they are never relabelled automatically. Recovery evidence remains bound to the original
+launch and receipt digests, and complete positive absence of every recorded process is still required.
+No execution replay, process signaling or resource release authority is added.

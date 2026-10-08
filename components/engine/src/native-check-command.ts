@@ -5,11 +5,16 @@ import { findingSummary, normalizeCheck, type Finding } from "./checker-results.
 import { CredentialUnavailableError, nonCredentialEnvironment } from "./credential-environment.ts";
 import { safeSubjectPath } from "./change-subject.ts";
 
-/** Resolve the executable once; an empty PATH segment never grants implicit current-directory lookup. */
+/** Validate the target, preserving the launch path needed by environment-aware interpreters. */
 export function commandExecutable(value: string, root: string, searchPath = process.env["PATH"] ?? ""): string {
   const candidates = value.includes("/") ? [resolve(root, value)] : searchPath.split(delimiter).filter(part => part && isAbsolute(part)).map(part => join(part, value));
   for (const path of candidates) {
-    try { const full = realpathSync(path); if (!statSync(full).isFile()) continue; accessSync(full, constants.X_OK); return full; } catch { /* Try the next explicit search directory. */ }
+    try {
+      const full = realpathSync(path); if (!statSync(full).isFile()) continue;
+      accessSync(path, constants.X_OK);
+      // A Python venv symlink selects its environment through the invoked path, not its real target.
+      return resolve(path);
+    } catch { /* Try the next explicit search directory. */ }
   }
   throw new Error("Validation executable is unavailable");
 }

@@ -1,5 +1,5 @@
+import {isLocalMachine} from "./machine-identity.ts";
 import { mkdirSync, rmdirSync } from "node:fs";
-import { hostname } from "node:os";
 import { join, resolve } from "node:path";
 import { digest, durableJson, object, text } from "./core.ts";
 import { narrativeFile } from "./narrative-inputs.ts";
@@ -25,7 +25,7 @@ export async function restartCommandGuardian(directory: string, requestDigest: s
       return { state: "reconciled", reconciliation: reconcileCommand(directory, requestDigest) };
     const owner = read("owner.json"), guardian = read("guardian.json"), launch = read("launch.json");
     if (owner.requestDigest !== requestDigest || guardian.requestDigest !== requestDigest ||
-        launch.requestDigest !== requestDigest || launch.state !== "spawned" || launch.host !== hostname() ||
+        launch.requestDigest !== requestDigest || launch.state !== "spawned" || !isLocalMachine(launch) ||
         digest(launch.owner) !== digest({pid:owner.pid,fingerprint:owner.fingerprint}) ||
         !Number.isSafeInteger(owner.pid) || Number(owner.pid) < 2 || !owner.fingerprint ||
         !Number.isSafeInteger(guardian.pid) || Number(guardian.pid) < 2 || !guardian.fingerprint)

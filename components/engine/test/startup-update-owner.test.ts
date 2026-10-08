@@ -35,7 +35,14 @@ test("startup updater process loss requires complete local ownership and real pr
   const [code]=await once(child,"close");assert.equal(code,7,stderr);
   assert.equal(requireStoppedStartupUpdater(request).proof,"local-process-absent");
   const path=join(directory,"updater/owner.json"),owner=JSON.parse(readFileSync(path,"utf8"));
-  writeFileSync(path,JSON.stringify({...owner,host:owner.host+"-other"}));
+  writeFileSync(path,JSON.stringify({...owner,host:owner.host+"-renamed"}));
+  assert.equal(requireStoppedStartupUpdater(request).proof,"local-process-absent");
+  writeFileSync(path,JSON.stringify({...owner,machineId:"machine:sha256:"+"f".repeat(64)}));
+  assert.throws(()=>requireStoppedStartupUpdater(request),/ownership differs/);
+  const legacy={...owner};delete legacy.machineId;
+  writeFileSync(path,JSON.stringify(legacy));
+  assert.equal(requireStoppedStartupUpdater(request).proof,"local-process-absent");
+  writeFileSync(path,JSON.stringify({...legacy,host:legacy.host+"-other"}));
   assert.throws(()=>requireStoppedStartupUpdater(request),/ownership differs/);
  }finally{rmSync(directory,{recursive:true,force:true});}
 });

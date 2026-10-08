@@ -4,12 +4,13 @@ import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { hostname } from "node:os";
 import { digest, durableJson } from "../src/core.ts";
 import { processFingerprint, processLiveFingerprint, submitCommand, waitCommand } from "../src/process-owner.ts";
 import { recoverCommandOwner, hasConfirmedCommandCleanup } from "../src/command-owner-recovery.ts";
 import { reconcileCommand } from "../src/command-recovery.ts";
 
-for (const reason of ["exit", "cancelled"]) test(`later cleanup proof preserves ${reason} terminal bytes and cannot survive result drift`, async () => {
+for (const [reason, legacy] of [["exit", false], ["cancelled", false], ["exit", true]] as const) test(`later cleanup proof preserves ${reason} terminal bytes${legacy ? " for a legacy owner" : ""} and cannot survive result drift`, async () => {
   const root = mkdtempSync(join(tmpdir(), "terminal-cleanup-recovery-"));
   try {
     const job = submitCommand(join(root, "job"), { id: "terminal", operation: {
@@ -32,6 +33,14 @@ for (const reason of ["exit", "cancelled"]) test(`later cleanup proof preserves 
     assert.throws(() => reconcileCommand(job.directory, job.requestDigest), /confirmed cleanup/);
     const memberPath = join(job.directory, "group-members.json");
     const launch = JSON.parse(readFileSync(join(job.directory, "launch.json"), "utf8"));
+    if (legacy) {
+      delete launch.machineId; launch.host = hostname() + "-different";
+      durableJson(join(job.directory, "launch.json"), launch);
+      assert.throws(() => recoverCommandOwner(job.directory, job.requestDigest, "test:legacy-foreign-host"), /launch acknowledgment/);
+      assert.deepEqual(readFileSync(path), bytes);
+      launch.host = hostname();
+    } else launch.host = "previous-host-label";
+    durableJson(join(job.directory, "launch.json"), launch);
     const members = { version: 1, requestDigest: job.requestDigest, group: launch.child.processGroup, members: [], identityDigest: digest([]) };
     const liveMembers = [...members.members, { pid: process.pid, fingerprint: processFingerprint(process.pid) }];
     durableJson(memberPath, { ...members, members: liveMembers, identityDigest: digest(liveMembers) });
@@ -49,6 +58,13 @@ for (const reason of ["exit", "cancelled"]) test(`later cleanup proof preserves 
     assert.deepEqual(readFileSync(path), bytes);
     assert.equal(recovered.receipt?.state, "unknown"); assert.equal(recovered.receipt?.exitCode, 7);
     assert.equal(recovered.receipt?.cleanup, "unknown");
+    assert.equal(hasConfirmedCommandCleanup(job.directory, original), true);
+    const recoveryPath = join(job.directory, "owner-recovery.json");
+    const recovery = JSON.parse(readFileSync(recoveryPath, "utf8"));
+    if (legacy) assert.equal("machineId" in recovery, false, "Legacy absence proof must not require or infer a new machine identity");
+    durableJson(recoveryPath, { ...recovery, ...(legacy ? { host: hostname() + "-different" } : { machineId: "machine:sha256:" + "f".repeat(64) }) });
+    assert.equal(hasConfirmedCommandCleanup(job.directory, original), false);
+    durableJson(recoveryPath, recovery);
     assert.equal(hasConfirmedCommandCleanup(job.directory, original), true);
     assert.equal(reconcileCommand(job.directory, job.requestDigest).cleanupSource, "recovery-evidence");
     const proofPath = join(job.directory, "owner-recovery.json"), proofBytes = readFileSync(proofPath);

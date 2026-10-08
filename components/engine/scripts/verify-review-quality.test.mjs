@@ -145,7 +145,7 @@ test('existing outcome and release evaluators own repeated receipt and reservati
     const write = (name, value) => { const path = join(directory, name); durableJson(path, value); return { path, digest: fileDigest(path) }; };
     const scope = { workspace: directory, taskId: 'fixture', taskRevision: '1' }, receiptId = 'b'.repeat(32);
     const decision = write('receipt.json', { version: 2, receiptId, runtimeVersion: 'fixture', outcome: { version: 2, scope, consumers: ['DL01', 'DL02'],
-      mode: 'auto', delivered: true, reason: 'answered', providerCalled: true, model: 'fixture', latencyMs: 1,
+      mode: 'auto', method: 'jev', delivered: true, reason: 'answered', providerCalled: true, model: 'fixture', latencyMs: 1,
       budget: { reservationId: 'c'.repeat(32) }, usage: { inputTokens: 100, outputTokens: 10 } } });
     const makeEpisode = id => ({ id, scope, decisions: [receiptId, receiptId], decisionEvidence: [{ receiptId, ...decision }],
       caller: write(`${id}-caller.json`, { version: 1, id, scope, entryKind: 'check-plan', native: { subjectDigest: sha, planDigest: sha }, decisionLinks: [{ receiptId }] }),

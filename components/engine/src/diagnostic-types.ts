@@ -2,7 +2,7 @@ import type { RunBinding } from "./workflow-types.ts";
 import type { DecisionProviderIdentity } from "./decision-providers.ts";
 
 /** One owner and one cumulative submission allowance survive coordinator restarts. */
-export interface DiagnosticOwner { token: string; pid: number; fingerprint: string; host: string }
+export interface DiagnosticOwner { token: string; pid: number; fingerprint: string; host: string; machineId?: string }
 export interface DiagnosticAttempt {
   probeId: string; recipeDigest: string; childRunId: string;
   method: "baseline" | "jev" | "provider"; decisionReceiptId: string | null;

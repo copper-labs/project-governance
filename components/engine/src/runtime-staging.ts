@@ -1,4 +1,4 @@
-import { runtimeTree } from "./runtime-tree.ts";
+import { protectRuntimePayload } from "./runtime-payload-protection.ts";
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, chmodSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -40,7 +40,7 @@ export function stageRuntimeArchive(archive: string, input: CompiledRuntimeLock,
     }).trim();
     if (version !== `project-governance ${lock.version}`) throw new Error("Installed runtime version readback differs from lock");
     const result = { version: 1, state: "staged", directory, executable, lockDigest: digest(lock), lock,
-      archive: verified, dependencies, installedTree: runtimeTree(packageRoot), nodeVersion: process.versions.node, activation: "not-performed" };
+      archive: verified, dependencies, installedTree: protectRuntimePayload(packageRoot), nodeVersion: process.versions.node, activation: "not-performed" };
     deadline?.remaining();
     durableJson(receipt, result);
     return result;

@@ -7,6 +7,8 @@ import { verifyRuntimeDependencies } from "./runtime-dependencies.ts";
 import { runtimeTree } from "./runtime-tree.ts";
 import { digest, object } from "./core.ts";
 
+export const RUNTIME_PAYLOAD_MISMATCH_MESSAGE = "Installed runtime payload differs from staging receipt";
+
 /** Read-only preactivation inspection; never executes or activates a changed candidate. */
 export function inspectRuntimeGeneration(directory: string) {
   directory = realpathSync(directory);
@@ -18,7 +20,7 @@ export function inspectRuntimeGeneration(directory: string) {
   if (realpathSync(packageRoot) !== packageRoot || receipt.executable !== join(packageRoot, "dist/engine/src/cli.js")) throw new Error("Staged runtime path changed");
   const archive = verifyRuntimeArchive(join(directory, "runtime.tgz"), lock);
   const dependencies = verifyRuntimeDependencies(packageRoot), installedTree = runtimeTree(packageRoot);
-  if (digest(dependencies) !== digest(receipt.dependencies) || digest(installedTree) !== digest(receipt.installedTree)) throw new Error("Installed runtime payload differs from staging receipt");
+  if (digest(dependencies) !== digest(receipt.dependencies) || digest(installedTree) !== digest(receipt.installedTree)) throw new Error(RUNTIME_PAYLOAD_MISMATCH_MESSAGE);
   return { state: "verified", directory, executable: receipt.executable, lockDigest: receipt.lockDigest,
     runtimeVersion: lock.version, archiveDigest: archive.digest,
     installedTree, activation: "not-performed" };

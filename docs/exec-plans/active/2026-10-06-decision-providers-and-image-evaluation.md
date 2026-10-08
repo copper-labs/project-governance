@@ -5,15 +5,15 @@ type: exec-plan
 status: active
 owner: project-governance
 created: 2026-10-06
-updated: 2026-10-06
-summary: Plans three coherent batches for provider interchangeability, supplied-image evaluation and installed agent/test integration.
+updated: 2026-10-07
+summary: Plans provider and image evaluation delivery plus the stable local ownership correction required for 4.2.
 ---
 
 # Decision providers and image evaluation delivery
 
 ## Final state and authorization
 
-The [specification](../../specs/engine-decision-providers-and-image-evaluation.md) owns R1–R7.
+The [specification](../../specs/engine-decision-providers-and-image-evaluation.md) owns R1–R8.
 One existing decision runtime supports explicit JEV/OpenAI adapters and a reusable advisory
 `evaluate_evidence` operation for text/images. CLI, a narrow library export and agent guidance
 share that operation. A project test script can use it without another browser or check runner.
@@ -27,6 +27,10 @@ separate actions. One writer owns shared decision contracts. The independent B3 
 may be implemented in its existing execution owners while B2 proceeds; final integration and package
 proof still depend on B2's settled interface. Root owns documentation, assets, package metadata and
 installed proof. The optional browser pilot owns disjoint caller fixtures, not shared runtime code.
+
+On 2026-10-07, the operator approved including the stable local ownership correction in 4.2.
+B4 owns that additional release requirement. B1–B3's completed review and installed proof remain
+evidence for their source snapshot; they do not qualify the new ownership boundary.
 
 ## Fixed decisions and source owners
 
@@ -348,6 +352,139 @@ and [simplification decisions](../../reviews/2026-10-06-decision-providers-simpl
 Implementation is authorized for 4.2. B1's provider seam, accounting/readers and reuse boundaries
 are implemented and locally verified against frozen synthetic cases. B2's generic/image entry and
 immutable accounting are also verified. B3 integration and final installed proof are complete;
-independent review is reconciled. This implementation scope is complete; publication and adoption
-remain separate. Live beta compatibility, visual accuracy and
+independent review is reconciled. B1–B7 implementation and focused corrections are integrated.
+The final source cohort and exact archive proof close the remaining publication gates below. Adoption
+remains separate. Live beta compatibility, visual accuracy and
 ordinary accepted-task benefit remain unqualified.
+
+## B4 — Stable local ownership and upgrade continuity
+
+- Requirements: R8. Depends on settled B1–B3 source and existing startup/process owners.
+- Source owners: `startup-host-owner.ts`, `startup-prompt-rollover.ts`, existing startup/update and
+  process recovery owners; one local machine-identity reader. Extend their existing records.
+- Acceptance: changing only the hostname does not reject the same verified local machine/process.
+  Foreign identity, unavailable evidence, PID reuse and live ownership remain guarded. Installation
+  does not change native chat attachment or invent a historical identity.
+
+Implementation:
+
+- [x] Reproduce the hostname-only refusal and implement the correction in isolated canonical source.
+- [x] Keep hostname as a label; use a locally derived stable digest across affected ownership checks.
+- [x] Preserve legacy strict comparison, process ancestry, workspace/generation identity and cleanup.
+- [x] Integrate the reviewed owned patch without overwriting concurrent source or plan changes.
+
+Verification:
+
+- [x] Retain the isolated 55-case focused ownership batch, affected cleanup follow-up and typecheck.
+- [x] Reconcile independent review of the complete ownership correction, including legacy records.
+- [x] Run the affected integrated startup/process/cleanup owners and no-emit typecheck once the
+  coherent patch is settled; repeat only failed or invalidated proof.
+- [x] Qualify the exact 4.2 archive through fresh installed startup, continuation and update-handoff
+  fixtures. Assert preserved task binding, runtime pin consistency and no live-owner release.
+
+Closeout:
+
+- [x] Update the owning lifecycle contract and release notes; close R8 from original proof.
+- [x] Record readiness for publication separately from coordinated adopter activation and actual
+  native continuation. Historical owners needing reconciliation remain explicit adoption work.
+
+The completed isolated checkpoint is constituent proof. The integrated exact archive additionally
+passes installed ownership, two bound continuation arms and a published-4.1 update handoff with
+retained main/linked task histories and checkpoints. The review's legacy recovery correction has a
+failing prior-expression reproducer and 13 passing ownership cases. No unrelated provider/device
+test or automatic adopter upgrade belongs to this batch. Do not require a new conversation as a remedy.
+
+
+## B5 — Protect inactive installed payloads
+
+Observed installation drift can block ordinary prompt entry before context selection. This batch
+protects a freshly staged package from incidental writes and identifies integrity refusals safely.
+It does not ignore metadata, change installed payloads or release startup ownership.
+
+Implementation:
+
+- [x] Remove write bits after installation/readback; preserve exact executable/content identity.
+- [x] Record `runtime-payload-mismatch` through the existing native failure receipt boundary.
+- [x] Add synthetic write, explicit tamper, symlink, hard-link, replay and private-diagnostic regressions.
+- [x] Make owned test-fixture disposal explicit; keep live generations outside disposal helpers.
+
+Verification:
+
+- [x] Reproduce unprotected package writes and unclassified entry failures before correction.
+- [x] Run the coherent payload/staging/startup regression batch and no-emit typecheck (16 cases).
+- [x] Verify a fresh offline compiled archive installation, protected writes, exact tree and safe native cause.
+
+Closeout:
+
+- [x] Independent review and integration with other pending runtime ownership repairs.
+- [x] Qualify the final installed archive with protected writes, safe integrity cause and unchanged native cleanup.
+- [ ] Publish/read back the explicit release; adopter changes remain separate from monitoring.
+
+
+## B6 — Preserve checker executable environment
+
+Current: the executable-path correction is implemented and verified in isolation. The original
+launcher fails three of four focused cases; the corrected command suites pass all nine cases and
+the no-emit typecheck passes. A fresh offline bundled installation preserves virtual-environment
+dependencies, durable launch identity, confirmed cleanup and observation without repeat execution.
+Independent review and integration are complete. The final installed archive additionally verifies
+the venv-only dependency, one execution with replay observation and confirmed cleanup.
+
+- [x] Implement ordinary executable/PATH lookup without resolving away environment semantics.
+- [x] Prove explicit and PATH aliases, refusals, an offline Python virtual environment, original
+  native cleanup, durable launch identity and observation without replay.
+- [x] Run directly affected command/native-owner suites and no-emit typecheck at the completed batch.
+- [x] Qualify the compiled archive in a fresh offline synthetic installation.
+- [x] Complete independent review, integration and required release proof before adoption.
+
+The early checkpoint is `node --test components/engine/test/command-executable.test.ts`; it resolves
+the observed launcher ambiguity. The completed batch checkpoint adds `native-check-command.test.ts`
+and `command-argv.test.ts`, then `tsc --noEmit`. No project checks or provider probes are launched to
+fill monitoring gaps. Preserve command admission, credential filtering, retained owner evidence,
+cleanup and unknown-outcome rules. An old recorded operation is observed by its installed generation;
+this correction does not migrate or replay it.
+
+## B7 — Large sectioned-source quality regression
+
+- [x] Add one frozen synthetic source with distant essential sections, an indirectly described
+  helper, mandatory guidance, a high-confidence distractor and a near miss.
+- [x] Exercise real packet assembly and the existing labelled quality scorer without live inference.
+- [x] Prove that unchanged selected-file coverage cannot hide a missing decisive section; separately
+  detect omitted helper delivery. Classifier confidence earns no correctness credit.
+- [x] Run the two new cases and eleven existing scorer cases, then no-emit typecheck.
+- [x] Include the settled fixture in integrated source proof and release review/readiness.
+
+This is an assembly and measurement regression. It does not prove live selector accuracy, change a
+threshold or expand disclosure. Its labels come from the synthetic contract, independently of the
+selector. The fixture-only change does not invalidate unchanged archive bytes.
+
+## Final release checkpoint
+
+The full engine cohort initially passed 1,132 cases with one Python-oracle environment failure and
+16 deliberately unconfigured optional browser/image cases. The failed oracle passes with the
+source Python environment on the child PATH. Continuity passes all 82 cases. The script cohort
+initially passes 99 of 100; its stale version-two fixture omitted a required historical method field.
+That fixture is corrected without relaxing the reader. Both typechecks pass. Preserve these
+originals and their focused replacements; do not report one uninterrupted all-green invocation.
+
+Payload protection also exposed disposal of protected synthetic package directories in two
+installed verifiers. They now retain the originals after the same confirmed native session cleanup.
+This is assessment-only source and does not change the archive. Exact package proof must verify
+retained evidence and zero owners before publication. The existing runtime process checks are not
+weakened. The restricted sandbox's denied process inventory is retained separately as an invalid
+execution environment, not a runtime regression.
+
+- [x] Recheck the corrected repeated-cost fixture and close the unique source cohort.
+- [x] Complete final package proof and retain its original source/archive correspondence.
+- [ ] Commit with the normal authored narrative and source hooks, then publish/read back 4.2.0.
+
+The unique source cohort closes with 1,315 passing cases, 16 optional real-browser skips and both
+typechecks passing. Final package qualification passes staging, native prompt/continuity, greenfield,
+batch review, delivery, six real lint-backend cases, Python parsing and decision consumers. Retained
+originals and zero remaining fixture owners are verified. The same frozen archive passes the 20-case
+evaluator constituent, both bound continuation arms and published-4.1 upgrade handoff.
+
+Current action: commit and publish/read back the frozen archive through normal hooks. The
+[runtime repair reconciliation](../../reviews/2026-10-07-runtime-continuity-reconciliation.md) records
+the independent review and its narrow corrections. Publication does not activate adopters or claim
+live provider compatibility, visual accuracy, native chat reattachment or accepted-task benefit.

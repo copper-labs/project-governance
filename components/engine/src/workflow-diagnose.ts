@@ -1,3 +1,4 @@
+import {requireMachineIdentity,isLocalMachine} from "./machine-identity.ts";
 import { parseArgs } from "node:util";
 import { configuredDecisionProvider } from "./decision-providers.ts";
 import { randomUUID } from "node:crypto";
@@ -23,7 +24,7 @@ import type { DiagnosticEpisode, DiagnosticOwner } from "./diagnostic-types.ts";
 
 /** A failed liveness observation is not evidence that another coordinator may be replaced. */
 function ownerAlive(owner: DiagnosticOwner): boolean {
-  if (owner.host !== hostname()) return true;
+  if (!isLocalMachine(owner)) return true;
   const fingerprint = processLiveFingerprint(owner.pid);
   if (fingerprint) return fingerprint === owner.fingerprint;
   try { process.kill(owner.pid, 0); return true; }
@@ -34,10 +35,10 @@ function ownerAlive(owner: DiagnosticOwner): boolean {
 export async function diagnoseWorkflow(database: string, rawManifest: unknown,
   options: DecisionRuntimeOptions & { workersDirectory?: string; registryPath?: string; assignmentPath?: string } = {}) {
   if (!statSync(database).isFile()) throw new Error("Existing workflow ledger required");
-  const startedAt = Date.now(), store = new WorkflowStore(database), registryPath = options.registryPath ?? resourceRegistryPath();
+  const machineId = requireMachineIdentity(), startedAt = Date.now(), store = new WorkflowStore(database), registryPath = options.registryPath ?? resourceRegistryPath();
   let registry: ResourceRegistry;
   try { registry = new ResourceRegistry(registryPath); } catch (error) { store.close(); throw error; }
-  const owner: DiagnosticOwner = { token: randomUUID(), pid: process.pid, fingerprint: processFingerprint(process.pid) ?? "", host: hostname() };
+  const owner: DiagnosticOwner = { token: randomUUID(), pid: process.pid, fingerprint: processFingerprint(process.pid) ?? "", host: hostname(), machineId };
   if (!owner.fingerprint) { registry.close(); store.close(); throw new Error("Diagnostic coordinator identity unavailable"); }
   let episode: DiagnosticEpisode | null = null;
   try {

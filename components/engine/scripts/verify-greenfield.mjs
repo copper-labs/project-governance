@@ -97,7 +97,7 @@ export async function verifyGreenfield(packageRoot, archive, { live = false } = 
     const documentationEvidence = verifyDocumentationEvidence({ temporary, launcher, invoke, write, workspace });
     await verifyGenerationCleanup({ packageRoot, invokeHook, event, registry });
     sessionEnded = true; finished = true;
-    return { status: 'passed', suite: 'installed-greenfield', provider: live ? 'live' : 'fixture',
+    return { status: 'passed', suite: 'installed-greenfield', provider: live ? 'live' : 'fixture', evidenceDirectory: temporary,
       initialCommit: false, installation: 'passed', nativeEntry: 'passed', firstTask: 'context-delivery-passed', selectedEvidence: 'passed',
       providerProof: { metadata: full.metadata.decisions, coverage: compact.metadata.coverage,
         passages: full.selection.passageAdvice,
@@ -118,8 +118,7 @@ export async function verifyGreenfield(packageRoot, archive, { live = false } = 
         console.error(`Greenfield cleanup failed: ${error.message}`);
       }
     }
-    if (finished) rmSync(temporary, { recursive: true, force: true });
-    else console.error(`Greenfield evidence retained: ${temporary}`);
+    console.error(`Greenfield ${finished ? 'proof' : 'failure evidence'} retained: ${temporary}`);
   }
 }
 

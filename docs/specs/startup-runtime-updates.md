@@ -5,7 +5,7 @@ type: spec
 status: current
 owner: project-governance
 created: 2026-09-06
-updated: 2026-09-23
+updated: 2026-10-07
 summary: Define once-authorized compatible runtime adoption early in top-level tasks without disturbing existing implementation or unrelated work.
 ---
 
@@ -115,6 +115,16 @@ are not relocatable. Keep the exact runtime lock as durable authority and the st
 as an installation pointer. Initial conversion of an older real-directory installation is a
 deliberate bootstrap operation. Retained environments have no independent policy authority.
 
+Compiled staging removes write permission from the freshly installed inactive package tree before
+recording its installed-tree receipt. This prevents incidental metadata writes while preserving
+read/executable bits, internal symlinks and the exact integrity check. Protection refuses escaping
+links, hard-linked files and foreign-owned files before any permission mutation. Operation receipts and mutable
+state stay outside the protected package. Protection is not a security boundary against its owner
+restoring permissions. A changed package remains unusable; no file-name exclusion, installed repair
+or automatic restaging is implied. Deliberate disposal must own the inactive generation and restore
+directory write access before removal. Native prompt failures report `runtime-payload-mismatch`
+without exception text, prompt content or automatic owner release.
+
 Verify wheel identity, digest, target metadata, installation, and target configuration before
 activation. Materialize ignored skills without altering live root instructions. Ordinary automatic
 adoption changes only `config/governance/runtime.lock.yaml`; a wider tracked footprint is manual.
@@ -198,7 +208,7 @@ requirements. The installer reports them without claiming they have been satisfi
 Native event delivery must be qualified separately from writing the configuration file.
 
 Short observation readers record the hook process identity in the registry at acquisition, including
-local host, canonical workspace, PID, process fingerprint and nonce. Explicit `recover-observation`
+local machine identity, host label, canonical workspace, PID, process fingerprint and nonce. Explicit `recover-observation`
 may release the exact reader only after a successful process inventory proves that PID absent.
 PID reuse refuses recovery. Recovery never signals processes, repeats discovery or releases the
 parent task reservation. An absent reader reports no inferred observation outcome. This mechanism
@@ -207,6 +217,26 @@ New parent reservations persist that native binding and the intended exact reade
 registry acquisition. Acquisition verifies the planned generation and reuses only that token.
 An interruption before acquisition therefore leaves recoverable intent, not an unowned reader.
 If the native process cannot be identified, observation defers without reserving a parent task.
+
+### Stable local machine ownership
+
+New compiled ownership records bind a namespaced SHA-256 identity from the operating system's
+stable machine identifier. The hostname remains a display label. A label change alone must not
+invalidate native startup ancestry, prompt rollover, observation recovery or an update claim.
+The same identity is used by command cleanup and diagnostic coordination; PID, process fingerprint,
+workspace, generation, nonce and complete positive process-absence checks remain required.
+
+The local identity reader uses macOS IOPlatformUUID, Linux machine-id (with the documented D-Bus
+fallback), or Windows MachineGuid. It never writes the raw identifier or command errors into
+receipts. Missing or malformed identity refuses new ownership; it does not fall back to a name.
+This follows the distinction between [host identity and name](https://opentelemetry.io/docs/specs/semconv/resource/host/).
+Synthetic platform fixtures do not qualify native execution on those platforms.
+
+Existing records without a stable identity retain their exact hostname guard. Do not infer their
+original machine from today's host, rewrite active owners, or release a live reservation. Historical
+bindings that no longer match require an explicit, evidence-led reconciliation at a safe seam.
+Stable identity handles renaming; it does not solve cloned OS identities or authorize cross-host
+execution. No native chat attachment changes are part of this correction.
 
 Native stdin observations return Codex's `hookSpecificOutput` context envelope only for actionable
 initial discovery. Internal evidence stays in the receipt store; routine child/continuation/close
