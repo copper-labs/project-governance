@@ -76,7 +76,7 @@ Stages remain command boundaries, not selectable profiles:
 | --- | --- |
 | `commit-msg` | Commit-message policy only |
 | `pre-commit` | Staged index subject, including staged-only secret bytes |
-| `pre-push` | Branch-aware impacted subject; live publishable worktree-and-index secret scan |
+| `pre-push` | Native hook: exact pushed commit against the remote comparison; committed candidate plus live publishable worktree-and-index secret scan |
 | `pre-pr`, `ci-pr` | Branch-aware impacted subject; live publishable worktree-and-index secret scan |
 | `release` | Explicit all-mode checkout-wide subject |
 
@@ -90,6 +90,35 @@ irrelevant branch-comparison dependency without widening pack selection. This ke
 pull-request authoring fail-closed without replaying the branch-aware pre-push sign-off. The
 generic stage remains available for a deliberate adopter-owned boundary.
 
+Native pre-push accepts one bounded Git ref update and captures committed before/after blobs.
+The candidate comes from Git's stdin, even when it differs from HEAD. Existing remote updates use
+the supplied remote commit's merge base. A new branch requires the configured or upstream comparison;
+an unavailable base, multiple updates, deletions and noncommit objects refuse before dispatch.
+A zero-argument manual hook proof pins HEAD and requires the configured or upstream comparison.
+Ordinary manual checks keep their current worktree scope unless an exact `--candidate-ref` is supplied.
+Committed capture never imports unrelated staged, unstaged or untracked inputs. Required inputs still
+come from the immutable base plus candidate overlay; restored local files cannot fill a committed gap.
+Native project commands execute in the live checkout, so this packet does not claim isolated committed
+build proof. Source body/materialization limits remain unchanged, including for committed archives.
+
+Packet preparation failure records a fixed cause, source kind, side, record index, path digest and
+known size/limit. It records that commands did not start and leaves acceptance absent. The detached
+worker preserves the owning diagnostic and resolves only its own pre-command runtime reader.
+Execution exceptions continue retaining ownership when side effects or cleanup are uncertain.
+
+`check-reconcile` also resolves stopped preparation readers from one qualified published 4.2.0
+archive/tree/worker identity. It requires original dispatch, running intent, failure and empty regular
+worker claim bindings, recorded worker PID absence, no packet or command evidence, and a stable
+streamed input hash proving that a pinned regular file exceeded that original reader's limit. Packet
+absence alone grants no recovery. It rechecks original bytes, identity, witness and exact reservation
+before releasing only that reader. A separate preparation recovery receipt preserves all originals;
+check/task outcome remains unknown and no terminal check result is created. Other generations refuse.
+Remove this finite legacy lane after affected reservations are drained and supported installations no
+longer need it; new preparation failures resolve their own readers through the typed phase owner.
+
+The native pre-push secret scan unions the whole committed candidate graph with live worktree and
+index content, reusing identical pinned blob scans. A secret repaired only in a later HEAD, staged
+index or worktree cannot hide an earlier pushed candidate. Unchanged candidate blobs remain covered.
 The later-stage built-in secret scan is also a deliberate live exhaustive surface. Its pack result
 has no `subject_digest`; it is never attributed to the branch-aware changed digest shared by the
 other selected packs.

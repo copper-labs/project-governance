@@ -107,7 +107,7 @@ test("incomplete checks and extra native work cannot be reconciled from a termin
     durableJson(join(f.directory, "result.json"), { ...f.result, results: [] });
     assert.throws(f.reconcile, /Unbound native command/);
     rmSync(join(f.directory, "result.json"));
-    assert.throws(f.reconcile, /requires result.json/);
+    assert.throws(f.reconcile, /Stopped preparation evidence is unavailable or invalid/);
     assert.equal(f.generations.state().readers.length, 2);
   } finally { f.close(); }
 });

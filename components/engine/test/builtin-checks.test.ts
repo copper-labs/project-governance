@@ -75,3 +75,25 @@ test("later lifecycle secret checks widen a narrow candidate to the complete rep
     for (const stage of ["pre-push", "pre-pr", "ci-pr", "release"]) assert.equal((await runBuiltinCheck({ ...request, stage })).status, "failed", stage);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test("native push secrets cover the committed candidate and retain independent live scans", async () => {
+  const root = mkdtempSync(join(tmpdir(), "builtin-committed-secret-"));
+  const git = (...args: string[]) => execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+  try {
+    git("init", "-q"); git("config", "user.name", "Test"); git("config", "user.email", "test@example.invalid");
+    writeFileSync(join(root, "committed.txt"), "ghp_" + "Q".repeat(36)); git("add", "."); git("commit", "-qm", "shared base");
+    const base = git("rev-parse", "HEAD"), blob = git("rev-parse", "HEAD:committed.txt");
+    writeFileSync(join(root, "ordinary.txt"), "candidate\n"); writeFileSync(join(root, "added.txt"), "ghp_" + "S".repeat(36)); git("add", "."); git("commit", "-qm", "candidate"); const candidate = git("rev-parse", "HEAD");
+    writeFileSync(join(root, "committed.txt"), "repaired only in later HEAD\n"); writeFileSync(join(root, "added.txt"), "later clean\n"); git("add", "."); git("commit", "-qm", "later HEAD");
+    const cleanBlob = git("rev-parse", "HEAD:committed.txt"); git("replace", blob, cleanBlob);
+    const scope = resolveChangeScope(root, { baseRef: base, candidateRef: candidate });
+    const request = { id: "secrets", scope, subject: new ValidationSubject(root, scope), assets: new PackagedCheckerAssets(defaults), packIds: new Set(BUILTIN_CHECKS), stage: "pre-push", asOf: "2026-10-10T00:00:00Z" };
+    const committed = await runBuiltinCheck(request);
+    assert.equal(committed.status, "failed"); assert.ok(committed.findings.some(finding => finding.rule_id === "security.embedded-secret" && finding["path"] === "committed.txt"));
+    assert.ok(committed.findings.some(finding => finding.rule_id === "security.embedded-secret" && finding["path"] === "added.txt"));
+    assert.ok(!JSON.stringify(committed).includes("Q".repeat(36))); assert.ok(!JSON.stringify(committed).includes("S".repeat(36)));
+    writeFileSync(join(root, "live-only.txt"), "ghp_" + "R".repeat(36));
+    const live = await runBuiltinCheck(request);
+    assert.ok(live.findings.some(finding => finding.rule_id === "security.embedded-secret" && finding["path"] === "live-only.txt"));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});

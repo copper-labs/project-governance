@@ -35,7 +35,7 @@ import { kmpDoctorFindings } from "./checkers/kmp-doctor.ts";
 import { decisionTelemetryCommand } from "./decision-history.ts";
 import { contextStateRoot } from "./context-command.ts";
 import { installGitHooks, planGitHookInstallation } from "./git-hook-installation.ts";
-import { hookCheckArguments } from "./git-hooks.ts";
+import { hookCheckArguments, prePushCheckArguments } from "./git-hooks.ts";
 import { inspectRuntimeGeneration } from "./runtime-inspection.ts";
 import { invokeRuntimeGeneration } from "./runtime-invocation.ts";
 import { contextRouteCommand } from "./context-route-command.ts";
@@ -85,7 +85,7 @@ import { readReleaseEvaluation, releaseEvaluationMarkdown } from "./release-eval
 export function prepareCommand(args: string[], root: string, builtinDirectory: string, command: "plan" | "check" = "plan") {
   const { values, positionals } = parseArgs({ args, strict: true, allowPositionals: false, options: {
     stage: { type: "string" }, mode: { type: "string", default: "impacted" }, staged: { type: "boolean" },
-    "changed-path": { type: "string", multiple: true }, "base-ref": { type: "string" }, pack: { type: "string", multiple: true },
+    "changed-path": { type: "string", multiple: true }, "base-ref": { type: "string" }, "candidate-ref": { type: "string" }, pack: { type: "string", multiple: true },
     json: { type: "boolean" }, summary: { type: "boolean" },
     "decision-task": { type: "string" }, "decision-revision": { type: "string" },
     "decision-context": { type: "string" },
@@ -105,13 +105,15 @@ export function prepareCommand(args: string[], root: string, builtinDirectory: s
   const deadlineMs = timeout === undefined ? 300000 : Number(timeout) * 1000;
   if (!Number.isSafeInteger(deadlineMs) || deadlineMs <= 0 || deadlineMs > 86400000) throw new Error("Invalid timeout");
   const mode = values.mode, stage = values.stage ?? null, paths = values["changed-path"] ?? [], packs = values.pack ?? [];
-  const baseRef = values["base-ref"] ?? process.env["GOVERNANCE_BASE_REF"]?.trim();
+  const baseRef = values["base-ref"] ?? process.env["GOVERNANCE_BASE_REF"]?.trim(), candidateRef = values["candidate-ref"];
+  if (candidateRef !== undefined && (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(candidateRef) || /^0+$/u.test(candidateRef))) throw new Error("Candidate reference must be an exact commit object ID");
+  if (candidateRef && (mode === "all" || values.staged || paths.length || stage === "commit-msg")) throw new Error("Committed candidate cannot combine with all, staged, changed paths or commit-message scope");
   if (mode !== "all" && mode !== "impacted") throw new Error("--mode must be all or impacted");
   if (!stage && (!packs.length || mode === "all")) throw new Error("--stage is required for this selection");
   if (mode === "all" && (values.staged || paths.length || baseRef)) throw new Error("All mode cannot combine with a comparison scope");
   if (values.staged && (paths.length || baseRef || stage !== "pre-commit")) throw new Error("Staged scope requires pre-commit and cannot combine with paths or a base");
-  const scope = resolveChangeScope(root, { all: mode === "all" || stage === "commit-msg", staged: values.staged ?? (stage === "pre-commit" && !paths.length && !baseRef),
-    paths, ...(baseRef ? { baseRef } : {}) });
+  const scope = resolveChangeScope(root, { all: mode === "all" || stage === "commit-msg", staged: values.staged ?? (stage === "pre-commit" && !paths.length && !baseRef && !candidateRef),
+    paths, ...(baseRef ? { baseRef } : {}), ...(candidateRef ? { candidateRef } : {}) });
   const subject = new ValidationSubject(root, scope), registry = loadSubjectPacks(subject, builtinDirectory);
   const narrative = command === "check" ? narrativeInputs(root, {
     ...(typeof values["commit-message-file"] === "string" ? { commitFile: values["commit-message-file"] } : {}),
@@ -165,6 +167,7 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
 Checks:
   plan --stage <stage> --mode impacted|all [--summary] [--compare-run <run-id>]
   check --stage <stage> --mode impacted|all [--summary] [--json-output <path>]
+    [--candidate-ref <commit-oid> --base-ref <ref>]
     [--implementation-plan <docs/exec-plans/path.md> --batch <id>]
   implementation-plan inspect --path <plan> --batch <id>
   implementation-plan update --path <plan> --request <json> [--staged|--base-ref <ref>]
@@ -233,7 +236,11 @@ Use the owning command contract for structured request fields.
       if (!values.request || !values["output-directory"]) throw new Error("Explicit outcome request and new outside-checkout output directory required");
       console.log(JSON.stringify(captureReleaseEvaluation(process.cwd(), values.request, values["output-directory"]))); return 0;
     }
-    if (command === "hook") return main(["check", "--trigger", "hook", ...hookCheckArguments(realpathSync(process.cwd()), args[1] ?? "", args.slice(2))]);
+    if (command === "hook") {
+      const root = realpathSync(process.cwd()), hook = args[1] ?? "", hookArgs = args.slice(2);
+      const checkArgs = hook === "pre-push" ? await prePushCheckArguments(root, hookArgs) : hookCheckArguments(root, hook, hookArgs);
+      return main(["check", "--trigger", "hook", ...checkArgs]);
+    }
     if (command === "docs") {
       if (args[1] === "init") {
         const { values } = parseArgs({ args: args.slice(2), strict: true, allowPositionals: false, options: { "dry-run": { type: "boolean" } } });

@@ -2,7 +2,7 @@ import { execFileSync, spawn } from "node:child_process";
 import { constants, createReadStream, existsSync, fstatSync, lstatSync, openSync, closeSync, readdirSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { AnySchema } from "ajv";
-import { safeSubjectPath, readSubjectSource, type ChangeScope, type SubjectSource } from "../change-subject.ts";
+import { safeSubjectPath, readSubjectSource, ValidationSubject, type ChangeScope, type SubjectSource } from "../change-subject.ts";
 import type { Finding } from "../checker-results.ts";
 import { scanSecretChunks, secretResult, secretWaivers, type SecretScan } from "./secrets.ts";
 
@@ -87,10 +87,11 @@ async function scanPinned(root: string, source: SubjectSource): Promise<SecretSc
 }
 
 /** A full scan unions live and staged content. Narrow checks use the exact captured after-images only. */
-export async function checkSecrets(root: string, options: { scope: ChangeScope; waiverRegistry: unknown; waiverSchema: AnySchema; today: string }) {
+export async function checkSecrets(root: string, options: { scope: ChangeScope; candidateScope?: ChangeScope; waiverRegistry: unknown; waiverSchema: AnySchema; today: string }) {
   root = realpathSync(root);
   const { waivers, findings } = secretWaivers(options.waiverRegistry, options.waiverSchema, options.today);
   const images: Array<{ path: string; scan: SecretScan }> = [];
+  const scans = new Map<string, SecretScan>();
   const failed = (path: string, detail: string) => findings.push({ rule_id: "security.scan-unavailable", severity: "blocking", message: `${path}: ${detail}` } as Finding);
   try {
     if (options.scope.scope === "all") {
@@ -99,12 +100,24 @@ export async function checkSecrets(root: string, options: { scope: ChangeScope; 
         try { const scan = await scanFile(root, path); if (scan) images.push({ path, scan }); }
         catch { failed(path, "working-tree content could not be scanned"); }
       }
-      const scans = new Map<string, SecretScan>();
       for (const { path, oid } of sources.blobs) {
         try { let scan = scans.get(oid); if (!scan) { scan = await scanBlob(root, oid); scans.set(oid, scan); } images.push({ path, scan }); }
         catch { failed(path, "staged index blob could not be scanned"); }
       }
+      if (options.candidateScope) {
+        if (!options.candidateScope.candidate_ref) throw new Error("Committed candidate identity required");
+        const candidate = new ValidationSubject(root, options.candidateScope);
+        // Reuse immutable index-blob scans, but cover candidate-only and unchanged committed inputs.
+        for (const path of candidate.paths()) {
+          const source = candidate.source(path);
+          if (!source || source.kind !== "git") throw new Error("Candidate source is not a committed blob");
+          if (source.file_type !== "regular") continue;
+          try { let scan = scans.get(source.identity); if (!scan) { scan = await scanBlob(root, source.identity); scans.set(source.identity, scan); } images.push({ path, scan }); }
+          catch { failed(path, "committed candidate blob could not be scanned"); }
+        }
+      }
     } else {
+      if (options.candidateScope) throw new Error("Committed union requires the exhaustive scan");
       for (const record of options.scope.records) if (record.after) {
         try { images.push({ path: record.path, scan: await scanPinned(root, record.after) }); }
         catch { failed(record.path, "packet after-image could not be scanned"); }

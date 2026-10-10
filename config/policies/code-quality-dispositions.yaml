@@ -496,3 +496,16 @@ dispositions:
     deduplication, cursor recovery, deferred unknown ranges, steering ambiguity and generation identity.
     The same observation boundary also qualifies external reads and neutral Stop delivery. Keeping these
     related cases together preserves navigation and shared fixture ownership; no test depends on another.
+- finding: quality.large-function
+  path: components/engine/src/check-recovery.ts
+  symbol: reconcileStoppedPreparation
+  disposition: cohesion-accepted
+  owner: project-governance-maintainers
+  reviewer: Codex independent focused recovery architecture review
+  approved_on: '2026-10-10'
+  responsibility: Prove that one qualified legacy preparation run could not execute, preserve its originals and release only its exact reader.
+  rationale: Snapshot bindings, generation checks, the impossible-input witness, replay receipt and final
+    rechecks share one recovery consistency lifetime. Named local helpers expose the phases with the same
+    evidence context; streaming file inspection already has its own owner. Public refusal fixtures exercise
+    changed evidence before release. Further extraction would distribute that snapshot and reader-release
+    boundary through parameter plumbing without improving responsibility or testability.

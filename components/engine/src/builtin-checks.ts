@@ -83,7 +83,7 @@ export async function runBuiltinCheck(request: BuiltinCheckRequest) {
           isNewOrRenamed: scope.records.some(record => record.path === path && ["added", "renamed"].includes(record.status)) }));
         return checkNaming(candidates, mapping("code-quality"), mapping("code-quality-waivers"), today);
       }
-      case "secrets": return await checkSecrets(subject.root, { scope: ["pre-push", "pre-pr", "ci-pr", "release"].includes(request.stage) ? resolveChangeScope(subject.root, { all: true }) : scope, waiverRegistry: mapping("secret-waivers"), waiverSchema: assets.schema("secret-waivers"), today });
+      case "secrets": return await checkSecrets(subject.root, { scope: ["pre-push", "pre-pr", "ci-pr", "release"].includes(request.stage) ? resolveChangeScope(subject.root, { all: true }) : scope, ...(scope.candidate_ref ? { candidateScope: scope } : {}), waiverRegistry: mapping("secret-waivers"), waiverSchema: assets.schema("secret-waivers"), today });
       case "commit-message":
         if (!request.commit) return failures("Commit-message checking requires the exact message input.");
         return checkCommitMessage(request.commit.text, request.commit.path, request.commit.commentMarker);

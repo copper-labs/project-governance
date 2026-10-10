@@ -21,6 +21,10 @@ shows existing project-owned checks; it does not require a check after every edi
 
 ## Active
 
+- [Committed pre-push capture repair](active/2026-10-10-committed-pre-push-capture.md)
+  binds native checks to the actual pushed commit and preserves bounded preparation diagnostics.
+  Qualification and deliberate local candidate adoption remain separate from publication.
+
 - [Optional computer use and combined visual testing](active/2026-10-06-optional-computer-use-testing.md)
   plans model-free integration, local Holo setup and realistic combined Decisions scenarios as
   separate proof checkpoints. Design and review do not authorize implementation or live experiments.
