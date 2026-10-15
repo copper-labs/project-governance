@@ -5,7 +5,7 @@ type: governance
 status: current
 owner: project-governance
 created: 2026-08-15
-updated: 2026-10-06
+updated: 2026-10-15
 summary: Defines compiled proof reuse and exact manual publication, with retained legacy wheel guidance.
 ---
 
@@ -18,6 +18,11 @@ Node `>=24.16.0 <25`, and the schema-2 runtime lock. Package and canonical depen
 versions must match the exact stable, `MAJOR.MINOR.PATCH-rc.N`, or RC hotfix
 `MAJOR.MINOR.PATCH-rc.N.M` tag (positive N and M). Preview versions are local qualification artifacts;
 the release metadata builder refuses to publish them as stable releases.
+
+Stable releases are the default. Publish an RC only when the operator explicitly requests a release
+candidate. A general instruction to publish does not authorize a prerelease, and an RC-shaped local
+qualification artifact does not select the publication channel. Package the qualified implementation
+with its stable version and verify the stable/latest release before reporting completion.
 
 Release candidates publish with GitHub prerelease status and `latest: false`. Their update metadata
 is deliberate-only and pins `from_version` to the exact RC. Ordinary stable discovery excludes them.
