@@ -106,3 +106,24 @@ The normal source hook requested architectural judgment for the bounded legacy r
 Independent responsibility/readability/testability review accepted its single recovery lifetime,
 with streaming inspection already separated. The scoped version-2 decision is recorded in the
 existing code-quality policy; thresholds and runtime behavior are unchanged.
+
+## Stable publication
+
+On 2026-10-15 the operator explicitly authorized stable 4.2.1 publication. The package and canonical
+dependency lock use the stable version; executable source and dependencies remain the exact reviewed
+release-candidate implementation. Preserve its original source and review proof after hash verification.
+The release process permits that reuse while requiring new proof for the newly versioned archive.
+
+- [x] Verify source and dependency correspondence with the qualified candidate.
+- [x] Build and verify the stable archive, installed package and publication metadata owner.
+
+Checkpoint: metadata-owner tests and the exact stable archive's unchanged offline package verifier.
+Record source/archive correspondence, original proof, asset identities and remote readback outside
+this checkout. Keep adopter activation separate. The [stable notes](../../../.github/release-notes/4.2.1.md)
+describe this patch and its qualification limits.
+
+The stable archive passed the unchanged offline verifier, including installed entry, staging,
+greenfield, lint backends, recovery and host API proof. All packaged files match the qualified RC
+except its two version-bearing metadata files. The metadata owner's four cases passed. Publication
+uses normal source hooks, stable/latest flags and complete remote asset verification. Its final tag,
+source identity and remote readback belong in the external release record.
