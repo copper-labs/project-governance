@@ -5,7 +5,7 @@ type: exec-plan
 status: active
 owner: project-governance
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-15
 summary: Repairs native push input identity and preserves bounded preparation diagnostics.
 ---
 
@@ -13,7 +13,8 @@ summary: Repairs native push input identity and preserves bounded preparation di
 
 The operator authorized correction of a blocked adopter on 2026-10-10. The canonical repair uses
 an isolated worktree from the exact published 4.2 source. Adopter identities, original receipts and
-custody evidence remain outside this repository. No remote release is authorized by this plan.
+custody evidence remain outside this repository. On 2026-10-15, the operator authorized publication
+of the exact qualified 4.2.1-rc.1 candidate. Adopter activation remains separate.
 The [kernel contract](../../specs/governance-kernel.md) owns push subject and secret-scan boundaries.
 
 ## Coherent repair batch
@@ -25,7 +26,7 @@ The [kernel contract](../../specs/governance-kernel.md) owns push subject and se
 - [x] Verify focused subject, packet, hook, worker, check and secret-scan regressions and typecheck.
 - [x] Verify the hook boundary through compiled clean installation and exact archive proof.
 - [x] Record independent review and reconcile actionable findings.
-- [ ] Prepare an immutable local candidate and retain adopter update/readback separately.
+- [x] Prepare an immutable local candidate and retain adopter update/readback separately.
 
 Checkpoint: run affected checks once for this settled batch. The hook/executor contract change
 requires the complete engine, continuity and proof-script suites plus package qualification.
@@ -52,8 +53,8 @@ interface, not accepted development benefit or cost savings.
 Current: 1,147 engine, 82 continuity and 100 proof-script cases passed; 16 optional browser cases
 were skipped. Focused corrections, typecheck and build passed. A clean installed native push
 preserved an unrelated large archive and opposing live/index bytes, and refused both live-only and
-candidate-only secrets. Independent review corrections are verified. Next: final compiled/package
-proof, owned local commit, then deliberate adoption through the installed transition owner with preserved readers,
+candidate-only secrets. Independent review corrections, final compiled/package proof and the owned
+implementation commit are complete. Deliberate adoption uses the installed transition owner with preserved readers,
 task history, attachments and unrelated staged bytes. Live ownership is not stale merely because a
 chat is idle. An unresolved reader prevents activation until its owning recovery/handoff is qualified.
 
@@ -88,15 +89,18 @@ The recovery checkpoint passed seven top-level tests, including twelve child-onl
 refusal fixtures. The exact original compiled 4.2.0 reconciler refused the same synthetic incomplete
 run because `result.json` was absent, preserving both readers. The corrected owner then released
 only its check reader, kept original bytes and unknown outcome, and replayed safely. No-emit
-typecheck passed. A separate read-only final review found no actionable defect. This is source and exact-original recovery proof; final package/adoption proof
-remains the next boundary.
+typecheck passed. A separate read-only final review found no actionable defect. This is source and
+exact-original recovery proof; the final package checkpoint below is also complete. Adopter proof
+remains separate.
 
 The final local 4.2.1-rc.1 archive passed the unchanged offline package verifier. Its own installed
 native push passed all three archive/live-secret/candidate-secret cases. Its compiled recovery
 refused the original no-result shape through the old owner, then preserved original bytes and the
 parent while releasing only the synthetic stopped check reader. These controlled fixtures do not
 qualify ordinary adopter acceptance. Deliberate activation/readback remains outside this source
-checkpoint and requires the live native lifecycle handoff. No remote publication is authorized.
+checkpoint and requires the live native lifecycle handoff. The authorized publication reuses this
+frozen archive; release metadata, original proof and remote readback remain in the external release
+record. The [release notes](../../../.github/release-notes/4.2.1-rc.1.md) state its scope and limits.
 
 The normal source hook requested architectural judgment for the bounded legacy recovery function.
 Independent responsibility/readability/testability review accepted its single recovery lifetime,
