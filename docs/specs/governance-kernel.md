@@ -5,7 +5,7 @@ type: spec
 status: current
 owner: project-governance
 created: 2026-03-02
-updated: 2026-09-30
+updated: 2026-10-16
 summary: Contract for the package runtime, its configuration boundary, focused execution model, and bounded local telemetry.
 ---
 
@@ -134,7 +134,14 @@ records the implementation and clean-wheel release proof for this source contrac
   overlay; it never falls back to the live index or checkout. A deterministic `subject_digest`
   hashes sorted logical change records containing path status, normalized and previous paths,
   before/after identities and file types, and exact ranges without depending on temporary paths.
-  All mode is explicitly checkout-wide and has no content-bound digest.
+  In compiled-engine worktree capture, added payloads have no before-image and their entire streamed
+  line count is in scope, including a last line without a newline; an empty payload has no ranges.
+  Their ranges and digest do not change merely because the same bytes enter or leave the index.
+  The retained Python source-hook owner keeps its existing range behavior until deliberate cutover;
+  evidence digests are compared only within their owning runtime. Corrected 4.2.2 added-file digests
+  cannot reuse evidence bound to different 4.2.1 digests. The field and schema remain unchanged.
+  Staged scope still selects the actual staged images and rejects index drift. All mode is explicitly
+  checkout-wide and has no content-bound digest.
 - Findings use `blocking`, `advisory`, `accepted`, `waived`, or `suppressed`. A result may pass
   with nonempty accepted, waived, or suppressed findings; those findings remain visible. Nonzero
   exit, timeout, interruption, malformed output, missing required evidence, or an unknown state

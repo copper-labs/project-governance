@@ -488,3 +488,28 @@ Current action: commit and publish/read back the frozen archive through normal h
 [runtime repair reconciliation](../../reviews/2026-10-07-runtime-continuity-reconciliation.md) records
 the independent review and its narrow corrections. Publication does not activate adopters or claim
 live provider compatibility, visual accuracy, native chat reattachment or accepted-task benefit.
+
+## Stable 4.2.2 repair checkpoint
+
+This patch restores three existing contracts: captured directory links accept a trailing separator;
+new worktree files retain their full changed-line range regardless of live index membership; and
+startup replay preserves its durable owner when only the machine display label changes. Stable
+machine, process, session, reader and generation checks remain mandatory. No public schema,
+permission, model default, runtime authority or deliberate enforcement rule changes.
+
+- [x] Integrate the three previously reproduced corrections and regression cases on the published
+  stable 4.2.1 source, leaving unrelated source work and adopter installations untouched.
+- [x] Run the combined document-link, change-subject and startup-owner regression cohort and
+  no-emit typecheck after integration: 35 cases passed, with no skips.
+- [x] Complete independent review, reconcile material findings and qualify the exact stable archive
+  with the existing installed-package proof. Compiled repair regressions pass without skips;
+  unaffected continuity originals retain matching source, dependencies and toolchain bindings.
+
+Publication follows normal narrative/hooks. The external release record closes the final tag,
+source, archive, metadata and stable/latest readback gates against this committed candidate.
+Adoption remains a separate operator action.
+
+The returned-evidence additions for delayed command cleanup and packet replay diagnostics remain
+outside this patch checkpoint pending review of their public result contracts. The shared local
+runtime proposal is a separate design workstream. External evidence retains original failures,
+source hashes, review and archive proof; controlled fixtures are not ordinary accepted development.

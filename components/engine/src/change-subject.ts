@@ -266,6 +266,8 @@ export function resolveChangeScope(root: string, options: { staged?: boolean; al
         } else {
           const current = worktreeIdentity(root, record.path);
           record.after = { kind: "worktree", path: record.path, identity: current.identity, file_type: current.type };
+          // New worktree payloads are wholly in scope, independent of their live index membership.
+          if (record.status === "added") record.changed_ranges = current.lines ? [{ start: 1, end: current.lines }] : [];
         }
       }
     }

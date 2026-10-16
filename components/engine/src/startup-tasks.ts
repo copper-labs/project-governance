@@ -1,4 +1,4 @@
-import {validMachineIdentity} from "./machine-identity.ts";
+import {sameMachineIdentity,validMachineIdentity} from "./machine-identity.ts";
 import {DatabaseSync} from "node:sqlite";
 import {lstatSync,mkdirSync} from "node:fs";
 import {dirname} from "node:path";
@@ -42,10 +42,14 @@ export class StartupTasks {
   try {
    const task=this.#db.prepare("SELECT state FROM tasks WHERE id=?").get(taskId);
    if(task?.state!=="open")throw new Error("Open startup task required for owner binding");
-   const prior=this.#db.prepare("SELECT binding FROM owners WHERE task_id=?").get(taskId);
-   if(prior && prior.binding!==binding)throw new StartupOwnerChanged("Startup owner changed; reconcile the prior reservation");
+   const prior=this.owner(taskId);
+   // A stable machine may change its display name; retain the original binding and its digest.
+   const comparable=prior?.host.machineId && sameMachineIdentity(prior.host,host)
+    ? {...prior,host:{...prior.host,host:host.host}}:prior;
+   if(prior && canonical(comparable)!==binding)throw new StartupOwnerChanged("Startup owner changed; reconcile the prior reservation");
    if(!prior)this.#db.prepare("INSERT INTO owners VALUES(?,?)").run(taskId,binding);
    this.#db.exec("COMMIT");
+   return prior??{host,reader};
   }catch(error){this.#db.exec("ROLLBACK");throw error;}
  }
  owner(taskId:string):{host:StartupHostOwner;reader:RuntimeReader}|null {

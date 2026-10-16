@@ -56,8 +56,8 @@ export async function observeStartup(input:{provider:string;event:unknown;worksp
     owner:`startup-task:${preliminary.taskId}`};
   if(planned.registry!==registry)throw new Error("Startup reservation registry changed");
   // Persist intent first. A crash leaves either a recoverable binding or an exact replayable reader.
-  tasks.bindOwner(preliminary.taskId,host,planned);
-  tasks.reserveOwner(preliminary.taskId,{host,reader:planned},()=>{generations.reserveStartupTask(preliminary.taskId,planned);});
+  const bound=tasks.bindOwner(preliminary.taskId,host,planned);
+  tasks.reserveOwner(preliminary.taskId,bound,()=>{generations.reserveStartupTask(preliminary.taskId,planned);});
   if(!receipt.discover || !("taskId" in receipt))return receipt;
   try {
    const profile=parse(narrativeFile(workspace,"config/governance/profile.yaml"));

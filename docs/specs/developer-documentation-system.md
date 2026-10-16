@@ -5,7 +5,7 @@ type: spec
 status: current
 owner: project-governance
 created: 2026-08-21
-updated: 2026-10-01
+updated: 2026-10-16
 summary: Defines a minimal installable documentation structure, one human and agent corpus, exact catalog routing, research-enabled authoring, validation, and telemetry.
 ---
 
@@ -290,6 +290,9 @@ enforced for live documents.
 Live local links must still name captured repository targets. Absolute cross-repository filesystem
 references and missing generated outputs remain separate portability or missing-target findings;
 artifact classification must not grant external reads or turn them into valid local links.
+Directory links with or without a trailing `/` use the same captured descendant prefix; `./` names
+the repository root. A trailing separator on a regular file does not turn it into a directory.
+Missing or uncaptured descendants, sibling prefixes, symlinks and repository escapes remain invalid.
 
 ## Telemetry
 
