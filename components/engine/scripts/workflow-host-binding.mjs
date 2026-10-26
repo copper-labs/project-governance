@@ -59,7 +59,7 @@ export function inspectRequest(host, request) {
       packageDigest: api.fileDigest(join(host.root, 'package.json')), lockDigest: api.fileDigest(pin), launcherDigest: api.fileDigest(launcher) } };
 }
 
-function save(path, value) {
+export function save(path, value) {
   const temporary = `${path}.${randomUUID()}.tmp`;
   const fd = openSync(temporary, 'wx', 0o600);
   try { writeFileSync(fd, JSON.stringify(value, null, 2) + '\n'); fsyncSync(fd); } finally { closeSync(fd); }
@@ -95,11 +95,11 @@ export async function bindReviewedWorkflow(host, request, receiptPath, confirm) 
     }
     if (prior && !prior.binding) throw new Error('Interrupted action creation requires reconciliation; refusing duplicate action');
     const accepted = await confirm(snapshot);
-    if (accepted !== true) throw new Error('Operator did not approve workflow');
+    if (accepted !== true && !(accepted?.route === 'operator-cycle' && typeof accepted.authorityRef === 'string')) throw new Error('Operator did not approve workflow');
     if (host.api.digest(inspectRequest(host, request)) !== snapshotDigest) throw new Error('Workflow changed during operator review');
     store = new host.api.Store(snapshot.database);
     workflows ??= new host.api.WorkflowStore(snapshot.database);
-    const authorityRef = prior?.binding.authorityRef ?? `operator-dialog:${randomUUID()}`;
+    const authorityRef = prior?.binding.authorityRef ?? (accepted === true ? `operator-dialog:${randomUUID()}` : accepted.authorityRef);
     const actionRequest = { operation: 'check', scope: [snapshot.workspace], targets: [snapshot.workspace], destination: null, policyRevision: snapshot.policy.revision };
     let binding = prior?.binding;
     if (!binding) {
@@ -116,10 +116,11 @@ export async function bindReviewedWorkflow(host, request, receiptPath, confirm) 
       });
     }
     if (host.api.digest(inspectRequest(host, request)) !== snapshotDigest) throw new Error('Workflow changed before binding');
+    if (accepted !== true && host.api.digest(await confirm(snapshot)) !== host.api.digest(accepted)) throw new Error('Cycle authority changed before binding');
     workflows.authorizeWorkflow(binding);
     workflows.validateWorkflowBinding(binding);
     const receipt = { status: 'bound', snapshotDigest, snapshot, binding, approvedAt: new Date().toISOString(),
-      approvalRoute: 'operator-dialog', replayed: false };
+      approvalRoute: accepted === true ? 'operator-dialog' : 'operator-cycle', replayed: false };
     save(receiptPath, receipt);
     return receipt;
   } finally {
@@ -128,7 +129,7 @@ export async function bindReviewedWorkflow(host, request, receiptPath, confirm) 
 }
 
 /** No stdin, environment switch or --yes flag can answer the operator's native dialog. */
-async function confirmWithOperator(snapshot) {
+export async function confirmWithOperator(snapshot) {
   if (process.platform !== 'darwin') throw new Error('This operator entry is qualified only for macOS');
   const commands = Object.entries(snapshot.recipe.operations).map(([id, op]) => `${id}: ${JSON.stringify(op, null, 2)}`).join('\n');
   const text = `Approve this exact local workflow?\n\n${snapshot.workspace}\nTask ${snapshot.taskId} v${snapshot.taskVersion}\nSession ${snapshot.sessionId}\nRuntime ${snapshot.identity.version}\nOperation ${snapshot.operationId}\n\n${commands}\n\nClaims: ${snapshot.recipe.claims.join(', ')}\nResources: ${snapshot.recipe.resources.join(', ') || 'none'}\nInput files: ${snapshot.recipe.inputs.length}\nDigest: ${snapshot.recipeDigest}\n\nThis records approval only. It does not start the workflow.`;

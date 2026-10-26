@@ -385,3 +385,36 @@ The imported callback seam exists for trusted host tests only. Synthetic confirm
 proves plumbing, not human approval. Qualification includes refusal/replay tests,
 an installed public-CLI harmless workflow and the actual native operator entry.
 No adopter runtime update or remote release follows from these local proofs.
+
+### Bounded local iteration authorization
+
+`components/engine/scripts/workflow-cycle-authorization.mjs` extends the same host
+entry for an operator-approved build/fix/retest cycle. It adds no runtime installation
+or model self-approval switch. `enroll --request FILE --receipt FILE` presents one
+native operator dialog and records the approved envelope through the published
+Store ledger. The file is only a locator; ledger contents supply the actual bounds.
+A stable enrollment ID recovers a lost acknowledgement without a second prompt.
+
+The envelope fixes task/version/session/worktree, installed runtime identity, exact
+catalog operations, resource identities, each operation's required resources,
+input roots, immutable resource/custody guards, stage/run deadlines and an expiry
+of at most 24 hours. Generic shell/eval operations refuse. Source and test hashes
+may change within these bounds. Commands, device identities, guard bytes and limits
+may not. The host and selected source remain trusted; this is scoped host attribution,
+not an OS sandbox or cryptographic authentication against another same-account writer.
+
+`bind --request FILE --grant FILE` checks the ledger envelope and fresh source hashes,
+then uses the existing binding journal and installed WorkflowStore to authorize one
+exact successor. It does not prompt or dispatch. Operation IDs select stable receipt
+paths recorded with enrollment; exact replay returns the original action/binding.
+Changed inputs with a reused operation ID refuse. Interrupted creation preserves the
+existing reconciliation requirement. Call the normal installed workflow runner to
+submit the resulting binding; no tests or result acceptance are waived.
+
+`revoke --request FILE --grant FILE` advances the task revision and records revocation.
+That makes earlier task-bound workflow bindings stale, including undispatched ones.
+It intentionally invalidates all grants at that task revision. Existing process and
+resource cleanup still belongs to the workflow runner; revocation is not a process
+kill or permission to discard evidence. Task completion and expiry also refuse new
+cycle admission. The current enrollment entry requires a human native confirmation;
+chat text or a copied approval label is not an authenticated ingestion route.

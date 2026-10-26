@@ -79,3 +79,12 @@ The adapter lives at `components/engine/scripts/workflow-host-binding.mjs`; it d
 not consume a model-written approval file or treat an authority string as approval.
 Host qualification remains limited to the entry actually exercised. The general
 Codex callback integration is still separate work.
+
+For a bounded local build/fix/retest cycle, the canonical
+`components/engine/scripts/workflow-cycle-authorization.mjs` operator adapter records
+one envelope in the existing ledger and binds each successor through the same
+installed host API. Its receipt cannot widen ledger authority. Fixed commands,
+resource/custody guards, device identities, task/session/worktree, deadlines and expiry
+remain admission checks while source hashes may change. Normal exact workflow
+submission and evidence still apply. See the engine workflow contract's bounded local
+iteration authorization section for enrollment, replay and task-revision revocation.
