@@ -348,3 +348,40 @@ identity on a machine-bound record still refuses recovery. Legacy records retain
 comparison; they are never relabelled automatically. Recovery evidence remains bound to the original
 launch and receipt digests, and complete positive absence of every recorded process is still required.
 No execution replay, process signaling or resource release authority is added.
+
+### Operator workflow binding adapter
+
+The canonical `components/engine/scripts/workflow-host-binding.mjs` supplies a narrow
+macOS operator entry for installations exposing `@organta/project-governance/host/v1`.
+It loads that declared export from the worktree-selected installed package. It does
+not replace the installed runtime, add a public self-approval flag, or submit work.
+
+The request identifies `runtimePackage`, `workspace`, `taskId`, `taskVersion`,
+`sessionId`, `recipeFile` and a stable `operationId`. The adapter derives the ledger
+from Git, checks the current task/session/worktree/branch, project pin, local-check
+policy and actual input hashes, and resolves commands from the project catalog.
+The executable presents the exact commands, claims, resources and recipe digest
+in a macOS operator dialog. Cancellation or timeout creates no action. Request text,
+stdin, environment variables and chat approval labels cannot answer that dialog.
+Only a human may accept it; agent UI automation must not accept its own grant.
+
+After approval, the adapter rechecks identity and inputs, creates one local check
+action through the host API and binds the exact workflow. It returns a durable receipt.
+A receipt lock serializes concurrent calls. Exact replay validates the existing
+binding and returns the original action; it does not create authority. Changed
+requests refuse. An interrupted action-creation intent requires reconciliation;
+an interrupted binding retains its original action and requires operator review
+before binding. Stale locks are inspected against their recorded owner rather than
+removed blindly. No ledger writes bypass the published stores.
+
+Run the adapter with `--request REQUEST.json --receipt RECEIPT.json`. The receipt's
+binding supplies the existing public `workflow-submit` arguments. Binding creates
+no worker and acquires no build/device resource. The workflow owner still checks
+candidate identity, disk limits and device custody before submission.
+
+This is an operator-controlled entry, not a qualified native Codex approval callback
+or an authentication boundary against malicious code under the same OS account.
+The imported callback seam exists for trusted host tests only. Synthetic confirmation
+proves plumbing, not human approval. Qualification includes refusal/replay tests,
+an installed public-CLI harmless workflow and the actual native operator entry.
+No adopter runtime update or remote release follows from these local proofs.

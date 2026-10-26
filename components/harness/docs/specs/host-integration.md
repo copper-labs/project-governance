@@ -67,3 +67,15 @@ No duplicate model table or compulsory semantic classifier belongs in harness.
 An owned CLI/app may apply the same governance contracts with tighter lifecycle control. This remains
 a later option, not a second agent loop for the first release. Additional host adapters require an
 explicit new scope decision; they do not automatically follow the first pilot.
+
+## Operator-controlled workflow entry
+
+When the desktop host has no enrolled workflow-approval callback, the canonical
+[operator adapter](../../../../components/engine/scripts/workflow-host-binding.mjs) can bridge the
+existing installed `host/v1` API without changing the runtime pin. The owning
+[workflow contract](../../../../docs/specs/engine-workflow-and-device-contract.md#operator-workflow-binding-adapter)
+defines its request, native human confirmation, exact binding, replay and limits.
+The adapter lives at `components/engine/scripts/workflow-host-binding.mjs`; it does
+not consume a model-written approval file or treat an authority string as approval.
+Host qualification remains limited to the entry actually exercised. The general
+Codex callback integration is still separate work.
