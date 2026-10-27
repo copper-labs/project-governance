@@ -63,12 +63,13 @@ export function documentLinkIssues(subject: ValidationSubject, scope: ChangeScop
       const value = target.split("#")[0]!; if (!value || !local(target)) continue;
       const resolved = posix.normalize(posix.join(posix.dirname(path), value));
       if (value.startsWith("/") || resolved === ".." || resolved.startsWith("../") || value.includes("\\")) { errors.push(`${path}: link escapes repository: ${target}`); continue; }
-      if (resolved === ".") continue;
+      if (resolved === "." || resolved === "./") continue;
+      const directoryPrefix = resolved.endsWith("/") ? resolved : `${resolved}/`;
       // A symlink is not proof of a local target; the graph intentionally never follows one.
       if (pathSet.has(resolved)) {
         try { if (subject.source(resolved)?.file_type !== "regular") errors.push(`${path}: link target is not a regular captured file: ${target}`); }
         catch { errors.push(`${path}: link target cannot be read: ${target}`); }
-      } else if (!paths.some(candidate => candidate.startsWith(`${resolved}/`))) errors.push(`${path}: link target does not exist: ${target}`);
+      } else if (!paths.some(candidate => candidate.startsWith(directoryPrefix))) errors.push(`${path}: link target does not exist: ${target}`);
     }
   }
   return errors.sort();

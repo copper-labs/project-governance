@@ -10,6 +10,8 @@ export interface ContextFailureDiagnostic {
     stage: string; causeCode: string; sessionDigest?: string; turnDigest?: string;
     referenceDigest?: string; referenceBytes?: number;
     sourceKind?: string; sourcePathDigest?: string;
+    workspaceDigest?: string; historicalBindingDigest?: string; currentBindingDigest?: string;
+    historicalBindingStatus?: string; currentBindingStatus?: string;
 }
 export interface ContextRecovery {
   action: "refresh-current-entry"; entryId: string; sharedAllowance: true;

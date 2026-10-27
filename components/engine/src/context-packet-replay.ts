@@ -3,7 +3,7 @@ import { digest, fileDigest, object } from "./core.ts";
 import { contextStateRoot } from "./context-command.ts";
 import { readPromptEntry, latestSessionPrompt, promptEntryTaskBinding, promptAccountingFamily } from "./context-observations.ts";
 import { ContextRouteError } from "./context-route-errors.ts";
-import { resolveTaskContext } from "./decision-task-binding.ts";
+import { resolveTaskContext, taskBindingReceipt } from "./decision-task-binding.ts";
 import { sessionId } from "../../harness/src/store/location.ts";
 import { readContextRecord } from "./context-records.ts";
 import { PreparedContextValidationError, validateProviderContext } from "./provider-context.ts";
@@ -20,9 +20,13 @@ export function readPreparedPrompt(root: string, entryId: string, assetRoot: str
   if (entry.session !== session) throw new ContextRouteError("entry-session-mismatch", "This packet belongs to another chat. Use this session's native entry reference.");
   if (latestSessionPrompt(root, session).entry?.entryId !== entryId)
     throw new ContextRouteError("entry-superseded", "A newer or incomplete prompt supersedes this packet. Use current required originals; no selection was repeated.");
-  const historical = promptEntryTaskBinding(root, entry), current = resolveTaskContext(root, { session }).context;
+  const historical = promptEntryTaskBinding(root, entry), resolved = resolveTaskContext(root, { session }), current = resolved.context;
   if (historical && (historical.taskId !== current?.taskId || historical.revision !== current?.revision) || !historical && current)
-    throw new ContextRouteError("entry-task-changed", "Task changed; refresh context through the normal route within the same allowance.");
+    throw new ContextRouteError("entry-task-changed", "Task changed; refresh context through the normal route within the same allowance.",
+      { stage: "packet-replay", causeCode: "entry-task-binding-changed", referenceDigest: digest(entryId), referenceBytes: Buffer.byteLength(entryId),
+        sessionDigest: digest(session), turnDigest: digest(entry.turn), workspaceDigest: digest(root),
+        historicalBindingDigest: digest(historical), currentBindingDigest: digest(taskBindingReceipt(resolved)),
+        historicalBindingStatus: historical?.status ?? "unbound", currentBindingStatus: resolved.status });
   let packet: Record<string, unknown>;
   try { packet = readContextRecord(contextStateRoot(root), join("prompt-packets", `${entryId}.json`)); }
   catch { throw new ContextRouteError("entry-packet-unavailable", "The prepared packet is unavailable. Inspect current required originals; no selection was repeated."); }

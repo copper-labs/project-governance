@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { ValidationSubject, resolveChangeScope } from "../src/change-subject.ts";
@@ -39,6 +39,31 @@ const issues = (root: string, staged = false) => {
   const scope = resolveChangeScope(root, staged ? { staged: true } : { all: true });
   return documentLinkIssues(new ValidationSubject(root, scope), scope);
 };
+
+test("directory links accept captured descendants with trailing separators", () => fixture((root, write, git) => {
+  write("README.md", "[directory](tree/)\n[plain](tree)\n[normalized](tree/sub/../)\n[root](./)\n");
+  write("tree/file.txt", "Captured target\n");
+  assert.deepEqual(issues(root), []);
+  git("add", ".");
+  assert.deepEqual(issues(root, true), []);
+}));
+
+test("directory links retain missing, file, escape and captured-subject boundaries", () => fixture((root, write, git) => {
+  write("README.md", "[missing](tree/)\n[file](file.txt/)\n[escape](../outside/)\n[symlink](alias/)\n[symlink-file](linked.txt)\n");
+  write("treehouse/file.txt", "A sibling prefix is not a descendant\n");
+  write("file.txt", "A regular file is not a directory\n");
+  symlinkSync("treehouse", join(root, "alias"), "dir");
+  symlinkSync("file.txt", join(root, "linked.txt"));
+  git("add", ".");
+  write("tree/later.txt", "Unstaged additions cannot repair a captured link\n");
+  assert.deepEqual(issues(root, true), [
+    "README.md: link escapes repository: ../outside/",
+    "README.md: link target does not exist: alias/",
+    "README.md: link target does not exist: file.txt/",
+    "README.md: link target does not exist: tree/",
+    "README.md: link target is not a regular captured file: linked.txt",
+  ]);
+}));
 
 test("whole and staged checks preserve raw evidence and frozen copies without duplicate identities", () => fixture((root, write, git) => {
   write("docs/design.md", authored("design", "Design\n", "proposal"));

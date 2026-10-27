@@ -1,10 +1,10 @@
 /** One operator-approved iteration envelope; exact runs still use the installed workflow authority. */
-import { readFileSync, realpathSync, existsSync, mkdirSync, openSync, closeSync, writeFileSync, unlinkSync } from 'node:fs';
+import { readFileSync, realpathSync, existsSync, mkdirSync } from 'node:fs';
 import { resolve, dirname, join, relative, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
-import { loadHost, inspectRequest, bindReviewedWorkflow, save } from './workflow-host-binding.mjs';
+import { loadHost, inspectRequest, bindReviewedWorkflow, save, takeReceiptLock } from './workflow-host-binding.mjs';
 const read = path => JSON.parse(readFileSync(path, 'utf8'));
 const inside = (root, path) => { const p = relative(root, path); return p === '' || (!p.startsWith('../') && p !== '..' && !isAbsolute(p)); };
 const kind = 'operator-workflow-cycle-authorized';
@@ -18,13 +18,12 @@ function events(store, taskId) {
   }
 }
 async function locked(path, fn) {
-  const lock = path + '.lock', fd = openSync(lock, 'wx', 0o600);
-  writeFileSync(fd, String(process.pid)); closeSync(fd);
-  try { return await fn(); } finally { unlinkSync(lock); }
+  const release = takeReceiptLock(path);
+  try { return await fn(); } finally { release(); }
 }
 
 /** Enrollment captures fixed commands, guards, resources and clocks, not mutable source-file hashes. */
-function envelope(host, input, receiptPath) {
+function envelope(host, input, receiptPath, workspaceMode = false) {
   const s = inspectRequest(host, input.request), b = input.bounds;
   if (!input.enrollmentId || !b || !Number.isFinite(Date.parse(b.expiresAt)) || Date.parse(b.expiresAt) <= Date.now()
       || Date.parse(b.expiresAt) - Date.now() > 24 * 3600_000) throw new Error('A bounded, future cycle expiry is required');
@@ -40,8 +39,8 @@ function envelope(host, input, receiptPath) {
   });
   const operations = s.recipe.operations;
   for (const [id, op] of Object.entries(operations)) {
-    if (!['read', 'local'].includes(op.effect) || /(?:^|\/)(?:ba|z|fi|da)?sh$/.test(op.argv[0])
-        || op.argv.slice(1).some(arg => ['-c', '--eval', '-e', '-Command'].includes(arg))) throw new Error('Unrestricted shell/eval is not a cycle operation');
+    if (!workspaceMode && (!['read', 'local'].includes(op.effect) || /(?:^|\/)(?:ba|z|fi|da)?sh$/.test(op.argv[0])
+        || op.argv.slice(1).some(arg => ['-c', '--eval', '-e', '-Command'].includes(arg)))) throw new Error('Unrestricted shell/eval is not a cycle operation');
     if (!Array.isArray(b.requiredResources?.[id]) || b.requiredResources[id].some(r => !s.recipe.resources.includes(r)))
       throw new Error('Declare each operation resource requirement');
   }
@@ -125,7 +124,7 @@ export async function bindCycle(host, request, grantPath) {
     const receipt = await bindReviewedWorkflow(host, request, receiptPath, async () => {
       const fresh = readGrant(host, locator, request);
       return { route: 'operator-cycle', authorityRef: `operator-cycle:${fresh.eventId}` };
-    });
+    }, `operator-cycle:${current.eventId}`);
     return { ...receipt, receiptPath, cycleEventId: current.eventId };
   });
 }
@@ -146,11 +145,79 @@ export async function revokeCycle(host, request, grantPath) {
   });
 }
 
+/** Explicit workspace enrollment is a new review, never conversion of an existing cycle receipt. */
+export async function enrollWorkspace(host, input, receiptPath, confirm) {
+  if (!host.api.WorkflowStore.prototype.authorizeWorkflowGrant) throw new Error('Selected runtime does not support workspace workflow grants');
+  receiptPath = resolve(receiptPath);
+  return locked(receiptPath, async () => {
+    const { taskId, taskVersion, ...grant } = envelope(host, input, receiptPath, true);
+    host.api.validateWorkflowGrant(grant);
+    const workflows = new host.api.WorkflowStore(grant.database);
+    try {
+      const id = host.api.digest({ workspace: grant.workspace, enrollmentId: grant.enrollmentId });
+      const prior = workflows.readWorkflowGrant(id);
+      if (prior && (prior.grantDigest !== host.api.digest(grant) || prior.revokedAt)) throw new Error('Workspace enrollment already differs or is revoked');
+      if (!prior && await confirm({ ...grant, scope: 'workspace' }) !== true) throw new Error('Operator did not approve workspace workflow');
+      const { taskId: currentTask, taskVersion: currentVersion, ...current } = envelope(host, input, receiptPath, true);
+      if (currentTask !== taskId || currentVersion !== taskVersion || host.api.digest(current) !== host.api.digest(grant)) throw new Error('Workspace enrollment changed during review');
+      const record = workflows.authorizeWorkflowGrant(grant, { taskId, taskVersion });
+      const receipt = { status: 'enrolled', grantId: record.id, scope: 'workspace', bounds: record.grant };
+      save(receiptPath, receipt); return receipt;
+    } finally { workflows.close(); }
+  });
+}
+
+function workspaceGrant(host, request, locator) {
+  if (typeof locator.grantId !== 'string' || !locator.grantId) throw new Error('No matching workspace workflow grant');
+  const snapshot = inspectRequest(host, request), workflows = new host.api.WorkflowStore(snapshot.database);
+  try {
+    const record = workflows.readWorkflowGrant(locator.grantId);
+    if (!record || record.grant.workspace !== snapshot.workspace || record.grant.sessionId !== snapshot.sessionId) throw new Error('No matching workspace workflow grant');
+    if (host.api.digest(record.grant.identity) !== host.api.digest(snapshot.identity)) throw new Error('Workspace workflow runtime identity changed');
+    host.api.validateWorkflowGrantUse(record, snapshot.recipe, snapshot.sessionId);
+    return record;
+  } finally { workflows.close(); }
+}
+
+/** Reuse the reviewed workflow, but authorize a new action against the current task's own rules. */
+export async function bindWorkspace(host, request, grantPath) {
+  const locator = read(grantPath), record = workspaceGrant(host, request, locator);
+  return locked(record.grant.receiptPath, async () => {
+    const directory = join(record.grant.receiptPath + '.workspace-runs', host.api.digest(record.id).replace('sha256:', ''));
+    mkdirSync(directory, { recursive: true, mode: 0o700 });
+    const receiptPath = join(directory, host.api.digest(request.operationId).replace('sha256:', '') + '.json');
+    const receipt = await bindReviewedWorkflow(host, request, receiptPath, async () => {
+      const current = workspaceGrant(host, request, locator);
+      return { route: 'workspace-workflow', authorityRef: `workspace-workflow:${current.id}` };
+    }, `workspace-workflow:${record.id}`);
+    if (receipt.binding.authorityRef !== `workspace-workflow:${record.id}`) throw new Error('Workspace receipt authority mismatch');
+    return { ...receipt, receiptPath, grantId: record.id };
+  });
+}
+
+/** The grant itself is revoked, including actions already bound in other tasks. */
+export async function revokeWorkspace(host, request, grantPath) {
+  const locator = read(grantPath), workspace = realpathSync(request.workspace);
+  const git = (...args) => execFileSync('/usr/bin/git', ['-C', workspace, ...args], {encoding:'utf8',timeout:5000}).trim();
+  if (git('rev-parse','--show-toplevel') !== workspace) throw new Error('Exact worktree root required');
+  const database = realpathSync(join(git('rev-parse','--path-format=absolute','--git-common-dir'),'harness/harness.db'));
+  if (typeof locator.grantId !== 'string' || !request.sessionId) throw new Error('Grant locator and host session required');
+  const workflows = new host.api.WorkflowStore(database);
+  try {
+    const record = workflows.readWorkflowGrant(locator.grantId);
+    if (!record || record.grant.workspace !== workspace || record.grant.sessionId !== request.sessionId || record.grant.database !== database)
+      throw new Error('No matching workspace workflow grant');
+    workflows.revokeWorkflowGrant(record.id, `operator-workspace-revocation:${record.id}`);
+    return { status: 'revoked', grantId: record.id };
+  } finally { workflows.close(); }
+}
+
 async function confirmCycle(grant) {
   if (process.platform !== 'darwin') throw new Error('Cycle enrollment is qualified only for macOS');
-  const message = `Authorize this bounded local build/fix/retest cycle?\n\n${grant.workspace}\nTask ${grant.taskId} v${grant.taskVersion}\nSession ${grant.sessionId}\nUntil ${grant.expiresAt}\n\nCommands:\n${Object.entries(grant.operations).map(([id, op]) => id + ': ' + JSON.stringify(op.argv)).join('\n')}\n\nResources: ${grant.resources.join(', ') || 'none'}\nMaximum run: ${grant.maxRunMs} ms; stage: ${grant.maxStageMs} ms\nFrozen guards: ${grant.immutableInputs.map(x => x.path).join(', ')}\n\nSource/test edits inside the named worktree may be rebuilt without another prompt. Commands, guards, resources, runtime and limits cannot change. No publish, push, release or unrestricted shell. Each run retains fresh exact inputs and results.`;
+  const scope = grant.scope === 'workspace' ? 'Workspace workflow: reusable by current authorized tasks in this session. Every run gets a fresh task-bound action.' : `Task ${grant.taskId} v${grant.taskVersion}`;
+  const message = `Authorize this bounded local build/fix/retest workflow?\n\n${grant.workspace}\n${scope}\nSession ${grant.sessionId}\nUntil ${grant.expiresAt}\n\nCommands:\n${Object.entries(grant.operations).map(([id, op]) => id + ': ' + JSON.stringify(op.argv)).join('\n')}\n\nResources: ${grant.resources.join(', ') || 'none'}\nMaximum run: ${grant.maxRunMs} ms; stage: ${grant.maxStageMs} ms\nFrozen guards: ${grant.immutableInputs.map(x => x.path).join(', ')}\n\nSource/test edits inside the named worktree may be rebuilt without another prompt. Commands, guards, resources, runtime and limits cannot change. No publish, push, release or unrestricted shell. Each run retains fresh exact inputs and results.`;
   if (message.length > 12000) throw new Error('Cycle review is too large');
-  const script = 'on run argv\nset choice to display dialog (item 1 of argv) with title "Authorize bounded SDK test cycle" buttons {"Cancel", "Authorize cycle"} default button "Cancel" cancel button "Cancel" giving up after 120\nif gave up of choice then error "Enrollment timed out"\nreturn button returned of choice\nend run';
+  const script = 'on run argv\nset choice to display dialog (item 1 of argv) with title "Authorize bounded local workflow" buttons {"Cancel", "Authorize cycle"} default button "Cancel" cancel button "Cancel" giving up after 120\nif gave up of choice then error "Enrollment timed out"\nreturn button returned of choice\nend run';
   try { return (await promisify(execFile)('/usr/bin/osascript', ['-e', script, message], { timeout: 130000 })).stdout.trim() === 'Authorize cycle'; }
   catch { return false; }
 }
@@ -158,10 +225,12 @@ async function confirmCycle(grant) {
 if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     const [mode, flag, requestPath, outputFlag, path] = process.argv.slice(2);
-    if (!['enroll', 'bind', 'revoke'].includes(mode) || flag !== '--request' || outputFlag !== (mode === 'enroll' ? '--receipt' : '--grant') || !path || process.argv.length !== 7) throw new Error('Use enroll --request FILE --receipt FILE, or bind/revoke --request FILE --grant FILE');
-    const input = read(requestPath), request = mode === 'enroll' ? input.request : input, host = await loadHost(request.runtimePackage);
-    const result = mode === 'enroll' ? await enrollCycle(host, input, path, confirmCycle)
-      : mode === 'bind' ? await bindCycle(host, request, path) : await revokeCycle(host, request, path);
-    console.log(JSON.stringify({ status: result.status, eventId: result.eventId ?? result.cycleEventId, receipt: result.receiptPath ?? resolve(path), actionId: result.binding?.actionId, authorityRef: result.binding?.authorityRef, taskVersion: result.taskVersion }));
+    const enrolling = mode?.startsWith('enroll');
+    if (!['enroll', 'bind', 'revoke', 'enroll-workspace', 'bind-workspace', 'revoke-workspace'].includes(mode) || flag !== '--request' || outputFlag !== (enrolling ? '--receipt' : '--grant') || !path || process.argv.length !== 7) throw new Error('Use enroll[-workspace] --request FILE --receipt FILE, or bind/revoke[-workspace] --request FILE --grant FILE');
+    const input = read(requestPath), request = enrolling ? input.request : input, host = await loadHost(request.runtimePackage);
+    const run = { enroll: () => enrollCycle(host, input, path, confirmCycle), bind: () => bindCycle(host, request, path), revoke: () => revokeCycle(host, request, path),
+      'enroll-workspace': () => enrollWorkspace(host, input, path, confirmCycle), 'bind-workspace': () => bindWorkspace(host, request, path), 'revoke-workspace': () => revokeWorkspace(host, request, path) };
+    const result = await run[mode]();
+    console.log(JSON.stringify({ status: result.status, eventId: result.eventId ?? result.cycleEventId, grantId: result.grantId, receipt: result.receiptPath ?? resolve(path), actionId: result.binding?.actionId, authorityRef: result.binding?.authorityRef, taskVersion: result.taskVersion }));
   } catch (error) { console.error(JSON.stringify({ status: 'refused', error: error.message })); process.exitCode = 1; }
 }

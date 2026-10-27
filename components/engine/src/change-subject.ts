@@ -6,6 +6,15 @@ import { canonical } from "./core.ts";
 import { workingSourceUncertainty } from "./context-source-observation.ts";
 import { SOURCE_CAPTURE_MAX_BYTES, SOURCE_CAPTURE_BATCH_MAX_BYTES } from "./source-capture-limits.ts";
 
+/** A fixed diagnostic carries limits, never source bytes or an arbitrary exception message. */
+export class SourceReadLimitError extends Error {
+  readonly sizeBytes: number;
+  readonly limitBytes: number;
+  constructor(sizeBytes: number, limitBytes: number) {
+    super("subject exceeds bounded read budget"); this.sizeBytes = sizeBytes; this.limitBytes = limitBytes;
+  }
+}
+
 export interface SubjectSource { kind: "git" | "index" | "worktree"; path: string; ref?: string; identity: string; file_type: "regular" | "symlink" }
 export interface ChangeRecord {
   status: "added" | "deleted" | "modified" | "renamed"; path: string; previous_path: string | null;
@@ -16,6 +25,8 @@ export interface ChangeScope {
   base_ref: string | null; records: ChangeRecord[]; subject_digest: string | null;
   /** An explicitly empty base, never a fallback for an invalid comparison ref. */
   unborn?: true;
+  /** Exact pushed commit, when capture deliberately excludes live checkout and index bytes. */
+  candidate_ref?: string;
 }
 const hash = (bytes: Buffer | string) => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 
@@ -91,13 +102,15 @@ function worktreeChunks(root: string, path: string, limit: number, consume: (chu
   }
   const absolute = join(root, path), stat = lstatSync(absolute);
   if (stat.isSymbolicLink()) { consume(readlinkSync(absolute, { encoding: "buffer" })); return "symlink"; }
-  if (!stat.isFile() || stat.size > limit) throw new Error("worktree subject is not a bounded regular file");
+  if (!stat.isFile()) throw new Error("worktree subject is not a bounded regular file");
+  if (stat.size > limit) throw new SourceReadLimitError(stat.size, limit);
   const rel = relative(root, realpathSync(absolute));
   if (rel === ".." || rel.startsWith("../") || isAbsolute(rel)) throw new Error("worktree subject escaped repository");
   const fd = openSync(absolute, constants.O_RDONLY | constants.O_NOFOLLOW);
   try {
     const opened = fstatSync(fd);
-    if (!opened.isFile() || opened.size > limit) throw new Error("subject changed file type or exceeds budget");
+    if (!opened.isFile()) throw new Error("subject changed file type");
+    if (opened.size > limit) throw new SourceReadLimitError(opened.size, limit);
     // The opened size bounds even identity-only reads when a producer keeps appending.
     const readLimit = Math.min(limit, opened.size);
     let total = 0;
@@ -174,6 +187,9 @@ export function readSubjectSource(root: string, source: SubjectSource, limit = S
     return current.bytes;
   }
   if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(source.identity)) throw new Error("invalid subject blob identity");
+  const size = Number(gitText(root, ["cat-file", "-s", source.identity]));
+  if (!Number.isSafeInteger(size) || size < 0) throw new Error("Invalid subject blob size");
+  if (size > limit) throw new SourceReadLimitError(size, limit);
   const bytes = git(root, ["cat-file", "blob", source.identity], limit);
   if (bytes.length > limit) throw new Error("subject exceeds read budget");
   return bytes;
@@ -189,19 +205,22 @@ export function subjectDigest(records: ChangeRecord[]): string {
 }
 
 /** Resolve status, ranges and source identities twice so concurrent edits cannot form a mixed packet. */
-export function resolveChangeScope(root: string, options: { staged?: boolean; all?: boolean; paths?: string[]; baseRef?: string } = {}): ChangeScope {
+export function resolveChangeScope(root: string, options: { staged?: boolean; all?: boolean; paths?: string[]; baseRef?: string; candidateRef?: string } = {}): ChangeScope {
+  const candidate = options.candidateRef;
+  if (candidate && (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(candidate) || options.all || options.staged || options.paths?.length)) throw new Error("Committed candidate requires one exact commit and no live scope");
   if (options.all) return { kind: "project-governance-change-packet", version: 1, scope: "all", mode: "all", base_ref: null, records: [], subject_digest: null };
   const paths = [...new Set((options.paths ?? []).map(safeSubjectPath))].sort();
   const configured = options.baseRef || process.env["GOVERNANCE_BASE_REF"]?.trim();
   if (!options.staged && paths.length && !configured) throw new Error("explicit changed paths require a comparison base");
   let head: string;
-  try { head = gitText(root, ["rev-parse", "--verify", "HEAD^{commit}"]); }
+  try { head = gitText(root, ["rev-parse", "--verify", "--end-of-options", `${candidate ?? "HEAD"}^{commit}`]);
+    if (candidate && head !== candidate) throw new Error("Candidate must name a commit directly"); }
   catch (error) {
-    if (!unbornHead(root) || (!options.staged && configured && configured !== "HEAD")) throw error;
+    if (candidate || !unbornHead(root) || (!options.staged && configured && configured !== "HEAD")) throw error;
     return unbornScope(root, options.staged ?? false, paths);
   }
   const base = options.staged ? head : gitText(root, ["merge-base", head, gitText(root, ["rev-parse", "--verify", "--end-of-options", `${configured || "@{upstream}"}^{commit}`])]);
-  const diff = options.staged ? ["--cached", base] : [base, ...(paths.length ? ["--", ...paths.map(p => `:(literal)${p}`)] : [])];
+  const diff = options.staged ? ["--cached", base] : [base, ...(candidate ? [candidate] : []), ...(paths.length ? ["--", ...paths.map(p => `:(literal)${p}`)] : [])];
   const snapshot = (): ChangeRecord[] => {
     const tokens = decode(git(root, ["diff", "--name-status", "-z", "-M", "--no-ext-diff", "--diff-filter=ACDMRTUXB", ...diff])).split("\0").filter(Boolean);
     const records = new Map<string, ChangeRecord>();
@@ -211,7 +230,7 @@ export function resolveChangeScope(root: string, options: { staged?: boolean; al
       if (["U", "X", "B"].includes(code!)) throw new Error("unresolved Git change status");
       records.set(path, { status: previous ? "renamed" : code === "A" ? "added" : code === "D" ? "deleted" : "modified", path, previous_path: previous, before: null, after: null, changed_ranges: [] });
     }
-    const extras = options.staged ? [] : paths.length ? paths : decode(git(root, ["ls-files", "--others", "--exclude-standard", "-z"])).split("\0").filter(Boolean).map(safeSubjectPath);
+    const extras = options.staged || candidate ? [] : paths.length ? paths : decode(git(root, ["ls-files", "--others", "--exclude-standard", "-z"])).split("\0").filter(Boolean).map(safeSubjectPath);
     const beforeEntry = entries(root, "git", [...records.values()].filter(record => record.status !== "added").map(record => record.previous_path ?? record.path).concat(extras), base);
     if (!options.staged) {
       for (const path of extras) if (!records.has(path)) {
@@ -233,19 +252,22 @@ export function resolveChangeScope(root: string, options: { staged?: boolean; al
       const count = Number(match[2] ?? 1), start = Math.max(Number(match[1]), 1);
       if (count) records.get(current)?.changed_ranges.push({ start, end: start + count - 1 });
     }
-    const afterEntry = options.staged ? entries(root, "index", [...records.values()].filter(record => record.status !== "deleted").map(record => record.path)) : null;
+    const afterPaths = [...records.values()].filter(record => record.status !== "deleted").map(record => record.path);
+    const afterEntry = options.staged ? entries(root, "index", afterPaths) : candidate ? entries(root, "git", afterPaths, candidate) : null;
     for (const record of records.values()) {
       if (record.status !== "added") {
         record.before = beforeEntry(record.previous_path ?? record.path);
         if (!record.before) throw new Error("comparison before-image unavailable");
       }
       if (record.status !== "deleted") {
-        if (options.staged) {
+        if (options.staged || candidate) {
           record.after = afterEntry!(record.path);
-          if (!record.after) throw new Error("comparison index image unavailable");
+          if (!record.after) throw new Error("comparison after-image unavailable");
         } else {
           const current = worktreeIdentity(root, record.path);
           record.after = { kind: "worktree", path: record.path, identity: current.identity, file_type: current.type };
+          // New worktree payloads are wholly in scope, independent of their live index membership.
+          if (record.status === "added") record.changed_ranges = current.lines ? [{ start: 1, end: current.lines }] : [];
         }
       }
     }
@@ -254,7 +276,7 @@ export function resolveChangeScope(root: string, options: { staged?: boolean; al
   const records = snapshot();
   if (canonical(records) !== canonical(snapshot())) throw new Error("comparison subject changed while resolving");
   return { kind: "project-governance-change-packet", version: 1, scope: "changed", mode: options.staged ? "staged" : paths.length ? "explicit" : "changed",
-    base_ref: base, records, subject_digest: subjectDigest(records) };
+    base_ref: base, ...(candidate ? { candidate_ref: candidate } : {}), records, subject_digest: subjectDigest(records) };
 }
 
 
@@ -440,7 +462,7 @@ export class ValidationSubject {
     // Blob reads are immutable, but Git's staged diff still observes the current index.
     verifyIndex();
     const captured = source ? this.read(path, SOURCE_CAPTURE_MAX_BYTES) : null;
-    const diff = this.#scope.mode === "staged" ? ["--cached", this.#scope.base_ref] : [this.#scope.base_ref];
+    const diff = this.#scope.mode === "staged" ? ["--cached", this.#scope.base_ref] : [this.#scope.base_ref, ...(this.#scope.candidate_ref ? [this.#scope.candidate_ref] : [])];
     const bytes = this.#scope.unborn ? Buffer.alloc(0) : git(this.root, ["-c", "core.quotePath=false", "diff", `--unified=${context}`, "--no-color", "--no-ext-diff",
       "--no-textconv", "-M", ...diff as string[], "--", `:(literal)${path}`], limit);
     if (bytes.length > limit) throw new Error("captured diff exceeds read budget");

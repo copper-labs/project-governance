@@ -371,8 +371,12 @@ A receipt lock serializes concurrent calls. Exact replay validates the existing
 binding and returns the original action; it does not create authority. Changed
 requests refuse. An interrupted action-creation intent requires reconciliation;
 an interrupted binding retains its original action and requires operator review
-before binding. Stale locks are inspected against their recorded owner rather than
-removed blindly. No ledger writes bypass the published stores.
+before binding. A retained lock reports whether its recorded PID exists, is absent,
+or is unknown; PID existence is not verified process identity. The adapter never
+reclaims it automatically. The operator must inspect the original owner and receipt
+journal before recovery, preventing racing reclaimers from deleting a new live lock.
+Workspace revocation remains available without that lock. No ledger writes bypass
+the published stores.
 
 Run the adapter with `--request REQUEST.json --receipt RECEIPT.json`. The receipt's
 binding supplies the existing public `workflow-submit` arguments. Binding creates
@@ -398,7 +402,7 @@ A stable enrollment ID recovers a lost acknowledgement without a second prompt.
 The envelope fixes task/version/session/worktree, installed runtime identity, exact
 catalog operations, resource identities, each operation's required resources,
 input roots, immutable resource/custody guards, stage/run deadlines and an expiry
-of at most 24 hours. Generic shell/eval operations refuse. Source and test hashes
+of at most 24 hours. The legacy cycle filter retains its existing direct shell/eval refusals. Source and test hashes
 may change within these bounds. Commands, device identities, guard bytes and limits
 may not. The host and selected source remain trusted; this is scoped host attribution,
 not an OS sandbox or cryptographic authentication against another same-account writer.
@@ -418,3 +422,62 @@ resource cleanup still belongs to the workflow runner; revocation is not a proce
 kill or permission to discard evidence. Task completion and expiry also refuse new
 cycle admission. The current enrollment entry requires a human native confirmation;
 chat text or a copied approval label is not an authenticated ingestion route.
+
+### Reusable workspace workflow approval
+
+The explicit `enroll-workspace`, `bind-workspace` and `revoke-workspace` modes use
+one reviewed workflow across task revisions and successor tasks in the same
+worktree and host session. Task-cycle receipts retain their old scope. They are
+never promoted or interpreted as workspace approval.
+
+The trusted host presents the bounded native review before calling
+`WorkflowStore.authorizeWorkflowGrant`. The stored grant owns exact operations,
+runtime/worktree identity, input roots, immutable guards, required resources,
+limits and an expiry of at most 24 hours. The receipt holds a locator. Changing
+that file cannot change the database record. Enrollment acknowledgement recovery
+reuses the original record; changing bounds requires another enrollment and review.
+
+Each bind still runs current task authority checks and creates a fresh action for
+that task and revision. Scope withdrawal, closed tasks or action refusal override
+the reusable grant. Exact operation replay retains its original action and run;
+it cannot transfer an old task action to a new task.
+
+The workflow store checks the grant at binding, submission, worker claim and
+before each ordinary stage. Expiry or explicit grant revocation blocks queued and
+later work across all tasks using it. Already-running commands retain the existing
+bounded cancellation/cleanup contract. Cleanup is still available after revocation.
+Runtime, branch, command, resource, guard or limit changes refuse reuse.
+
+Workspace enrollment adds its table without advancing the shared engine schema.
+Each workspace action stores a domain-separated approval digest for the
+`workspace-workflow-1` contract. Older engines expect the ordinary binding digest
+and refuse these actions at authorization replay, submission, claim and ordinary
+stage start. Their existing actions, runs, cleanup and diagnostics remain usable
+in the same repository ledger. A reader must never rewrite a mismatched digest or
+fall back to task-cycle authority. Unpublished schema-4 preview stores are refused;
+there is no automatic downgrade or destructive database restore.
+
+Git identity and guard-file checks run before acquiring the database write lock.
+Inside the transaction the store rechecks the immutable grant digest, current task,
+policy, revocation and expiry. This preserves revocation races without holding the
+shared writer lock across Git subprocesses or bulk hashing. It does not make source
+files transactional; the existing executor owns input capture and freshness.
+
+Workspace run receipts live in a separate directory keyed by grant identity.
+Both completed and incomplete receipts must match the selected authority reference;
+operation replay cannot inherit another approval route. Revocation uses only the
+verified Git common database, stored workspace/session and grant locator. It does
+not require current task, branch, runtime pin, recipe or source bytes, and takes no
+receipt lock. A retained locator can revoke after the original receipt folder is
+removed. Revocation never grants execution or manufactures a replacement grant.
+
+Normal source/package proof and deliberate adopter installation remain required.
+Existing task-cycle approvals retain their original task/version scope. Known direct shell
+executables and inline Node/Python/Ruby/Perl evaluation forms are refused for new
+workspace grants. Compiler `-c` and pattern-tool `-e` options remain usable. Indirect
+wrappers and arbitrary scripts require operator inspection; this filter is not a sandbox: exact reviewed commands, runtime
+identity, guards, and trusted host ownership remain the authority boundary.
+
+The compiled archive ships both operator scripts under `dist/engine/assets/host/`.
+Use those entries with the selected installed package. The workspace modes require
+the corresponding host API; they refuse an older runtime before requesting approval.

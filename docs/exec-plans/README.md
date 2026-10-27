@@ -21,6 +21,10 @@ shows existing project-owned checks; it does not require a check after every edi
 
 ## Active
 
+- [Committed pre-push capture repair](active/2026-10-10-committed-pre-push-capture.md)
+  binds native checks to the actual pushed commit and preserves bounded preparation diagnostics.
+  Qualification and deliberate local candidate adoption remain separate from publication.
+
 - [Optional computer use and combined visual testing](active/2026-10-06-optional-computer-use-testing.md)
   plans model-free integration, local Holo setup and realistic combined Decisions scenarios as
   separate proof checkpoints. Design and review do not authorize implementation or live experiments.
@@ -158,3 +162,5 @@ shows existing project-owned checks; it does not require a check after every edi
   implementation and proof. Any shadow adoption is target-owned work outside this checkout.
 
 - [Ordinary task context and selection adoption](active/2026-09-22-task-context-entry.md) — post-RC4 integration repair under the major-adoption programme.
+
+- [Reusable workflow approval and execution diagnostics](active/2026-10-26-workflow-approval-repair.md) owns the bounded 4.3.0 release.

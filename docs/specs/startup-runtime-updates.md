@@ -5,7 +5,7 @@ type: spec
 status: current
 owner: project-governance
 created: 2026-09-06
-updated: 2026-10-07
+updated: 2026-10-16
 summary: Define once-authorized compatible runtime adoption early in top-level tasks without disturbing existing implementation or unrelated work.
 ---
 
@@ -237,6 +237,12 @@ original machine from today's host, rewrite active owners, or release a live res
 bindings that no longer match require an explicit, evidence-led reconciliation at a safe seam.
 Stable identity handles renaming; it does not solve cloned OS identities or authorize cross-host
 execution. No native chat attachment changes are part of this correction.
+
+Ordinary startup replay compares only the hostname as a display label when both records carry the
+same valid stable identity. All other host and reader fields must still match exactly. Replay
+returns the original durable binding for reservation acquisition; it does not rewrite the saved
+label, binding digest or history. The existing transaction still refuses SessionEnd or a generation
+change between binding and acquisition. Legacy bindings retain their exact comparison.
 
 Native stdin observations return Codex's `hookSpecificOutput` context envelope only for actionable
 initial discovery. Internal evidence stays in the receipt store; routine child/continuation/close

@@ -8,7 +8,7 @@ import { digest, durableJson, fileDigest } from "./core.ts";
 import { commandEnvironment } from "./process-owner.ts";
 import { credentialEnvironment } from "./credential-environment.ts";
 import { commandCredentialNames } from "./command-argv.ts";
-import { checkRunRoot, runChecks } from "./check-run.ts";
+import { CheckRunFailure, checkRunRoot, runChecks } from "./check-run.ts";
 import { ValidationSubject, type ChangeScope } from "./change-subject.ts";
 import { PackagedCheckerAssets } from "./checker-assets.ts";
 import type { Packs } from "./pack-configuration.ts";
@@ -73,8 +73,11 @@ async function worker(directory: string, expectedDigest: string) {
     // Native check completion resolves its generation obligation; exceptions retain it for reconciliation.
     const unresolved = result.results.some(pack => pack.commands.some(command => command.termination_reason === "cleanup-unknown" || command.termination_reason === "outcome-unknown"));
     if (!unresolved) releaseRuntimeReader(work.generation);
-  } catch {
-    durableJson(join(directory, "failure.json"), { version: 1, id: work.id, reason: "worker-incomplete", ended_at: new Date().toISOString() });
+  } catch (error) {
+    if (error instanceof CheckRunFailure) {
+      // Packet capture precedes every checker. Only that proven phase can resolve a reader here.
+      if (error.preparationFailed) releaseRuntimeReader(work.generation);
+    } else durableJson(join(directory, "failure.json"), { version: 1, id: work.id, reason: "worker-incomplete", ended_at: new Date().toISOString() });
     process.exitCode = 2;
   }
 }

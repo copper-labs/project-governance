@@ -364,6 +364,14 @@ lost, its immutable command receipt stays `unknown`. The workflow records failed
 dependent ordinary stages remain blocked. Resource release still requires the resource adapter's
 separate cleanup observation. A missing or mismatched cleanup proof retains the obligation.
 
+Native checks use the same bounded cleanup observer as workflow commands. After an immutable
+terminal receipt records uncertain cleanup, the caller may wait up to five seconds for independently
+bound guardian absence proof. It must not relaunch the checker, signal an unrelated process, rewrite
+the original receipt or infer cleanup from exit code zero. Known exit and valid cleanup proof permit
+normal verdict parsing; nonzero exits still fail and lost execution stays unknown. The check result
+retains the original receipt digest and recovery digest separately. Missing or mismatched proof
+keeps the check blocked and retains its ownership obligations.
+
 Until deliberate adopter cutover, CI exercises both runtime implementations and verifies the wheel
 as well as the compiled package. The 2.x tag channel retains wheel release support; the 3.x tag
 channel publishes the unified package. Neither channel runs without an explicitly authorized tag,

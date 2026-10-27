@@ -4,6 +4,7 @@ import { submitCommand, waitCommand, cancelCommand, type CommandReceipt } from "
 import { findingSummary, normalizeCheck, type Finding } from "./checker-results.ts";
 import { CredentialUnavailableError, nonCredentialEnvironment } from "./credential-environment.ts";
 import { safeSubjectPath } from "./change-subject.ts";
+import { settleWorkflowCommandCleanup } from "./workflow-command-cleanup.ts";
 
 /** Validate the target, preserving the launch path needed by environment-aware interpreters. */
 export function commandExecutable(value: string, root: string, searchPath = process.env["PATH"] ?? ""): string {
@@ -62,7 +63,12 @@ export async function runNativeCheckCommand(options: { directory: string; id: st
       cancelCommand(submitted.directory, submitted.requestDigest, `check-run:${options.id}`); cancellationSent = true;
     }
     const observed = await waitCommand(submitted.directory, submitted.requestDigest, Math.min(1000, expires - Date.now()));
-    if (observed.receipt) return { ...commandCheckResult(observed.receipt, submitted.directory, argv), command_receipt: observed.receipt, request_digest: submitted.requestDigest };
+    if (observed.receipt) {
+      // A guardian can publish bound absence proof just after the immutable exit receipt.
+      const settled = await settleWorkflowCommandCleanup(submitted.directory, observed.receipt, [0], Math.max(0, Math.min(5000, expires - Date.now())));
+      return { ...commandCheckResult(settled.receipt, submitted.directory, argv), command_receipt: settled.receipt,
+        ...(settled.recovery ? { cleanup_recovery: settled.recovery } : {}), request_digest: submitted.requestDigest };
+    }
   }
   return { ...normalizeCheck({ exit_code: -1, termination_reason: "outcome-unknown", stdout: "", stderr: "Native owner did not produce terminal evidence; reconnect to the original command." }, argv), request_digest: submitted.requestDigest };
 }

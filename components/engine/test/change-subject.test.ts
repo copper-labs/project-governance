@@ -196,3 +196,43 @@ test("an unrelated non-UTF8 tracked filename cannot break narrow change capture"
     }
   } finally { f.close(); }
 });
+
+
+test("new worktree subjects keep full ranges and identity across index-only transitions", () => {
+  const f = repository();
+  try {
+    for (const [path, text, count] of [["empty.ts", "", 0], ["single.ts", "export const value=1;", 1],
+      ["multi.ts", "first\nsecond\n", 2], ["binary.dat", "a\0b\n", 1]] as const) {
+      writeFileSync(join(f.root, path), text);
+      const untracked = resolveChangeScope(f.root, { baseRef: "HEAD", paths: [path] });
+      assert.deepEqual(untracked.records[0]!.changed_ranges, count ? [{ start: 1, end: count }] : []);
+      f.git("add", path);
+      const indexed = resolveChangeScope(f.root, { baseRef: "HEAD", paths: [path] });
+      assert.deepEqual(indexed.records, untracked.records);
+      assert.equal(indexed.subject_digest, untracked.subject_digest);
+      f.git("reset", "-q", "HEAD", "--", path);
+      assert.deepEqual(resolveChangeScope(f.root, { baseRef: "HEAD", paths: [path] }), untracked);
+      assert.equal(new ValidationSubject(f.root, untracked).read(path).toString(), text);
+    }
+    const broad = resolveChangeScope(f.root, { baseRef: "HEAD" });
+    f.git("add", "empty.ts", "single.ts", "multi.ts", "binary.dat");
+    assert.deepEqual(resolveChangeScope(f.root, { baseRef: "HEAD" }), broad);
+  } finally { f.close(); }
+});
+
+test("addition normalization retains staged selection and real-byte drift refusal", () => {
+  const f = repository();
+  try {
+    writeFileSync(join(f.root, "new.ts"), "first\n"); f.git("add", "new.ts");
+    const staged = resolveChangeScope(f.root, { staged: true });
+    const working = resolveChangeScope(f.root, { baseRef: "HEAD" });
+    f.git("reset", "-q", "HEAD", "--", "new.ts");
+    assert.equal(resolveChangeScope(f.root, { staged: true }).records.length, 0);
+    assert.notEqual(resolveChangeScope(f.root, { staged: true }).subject_digest, staged.subject_digest);
+    assert.deepEqual(resolveChangeScope(f.root, { baseRef: "HEAD" }), working);
+    writeFileSync(join(f.root, "new.ts"), "later\n");
+    assert.notEqual(resolveChangeScope(f.root, { baseRef: "HEAD" }).subject_digest, working.subject_digest);
+    assert.throws(() => new ValidationSubject(f.root, working).read("new.ts"), /changed after capture/u);
+    assert.equal(readSubjectSource(f.root, staged.records[0]!.after!).toString(), "first\n");
+  } finally { f.close(); }
+});

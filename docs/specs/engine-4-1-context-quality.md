@@ -297,6 +297,14 @@ distinguishes the original turn packet from an expansion. Human output labels bo
 A malformed supplied reference is refused without guessing another entry. Failure receipts identify
 the executing runtime; an unverified archive stays unknown. An unchanged-replay refusal records
 zero provider calls because validation fails before dispatch.
+A task-change refusal during packet replay records digest-only links to the entry reference,
+workspace, session, captured packet turn and historical/current task-binding metadata, plus each
+binding's readiness status. The existing failure original owns these diagnostics. Code uses only
+the observations already required by the replay guard; it performs no new scan or provider call.
+Missing current task context stays unavailable rather than becoming an inferred task. Session and
+latest-turn guards still run before these task diagnostics, so a foreign chat does not receive the
+packet's turn or task-binding joins. These fields explain a refusal; they do not admit refresh,
+change the shared allowance or establish model consumption or acceptance.
 
 A single finalization step records the final rendered packet digest, byte count and captured limit
 after successful, failed or blocked preparation has settled. It cannot replace those distinct statuses.

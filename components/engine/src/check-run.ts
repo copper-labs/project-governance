@@ -7,7 +7,7 @@ import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { digest, durableJson, fileDigest } from "./core.ts";
-import { materializeChangePacket } from "./change-packet.ts";
+import { materializeChangePacket, PacketCaptureError } from "./change-packet.ts";
 import { commandCredentialNames, resolveCommandArgv } from "./command-argv.ts";
 import { runNativeCheckCommand } from "./native-check-command.ts";
 import { checkCancellationRequested } from "./check-cancellation.ts";
@@ -19,6 +19,14 @@ import type { Packs } from "./pack-configuration.ts";
 import type { ValidationPlan } from "./planning.ts";
 import { prepareLintInputs } from "./lint-inputs.ts";
 import { runtimeExecutionIdentity } from "./runtime-execution-identity.ts";
+
+/** The owning runner persists its diagnostic before the worker handles this fixed failure. */
+export class CheckRunFailure extends Error {
+  readonly preparationFailed: boolean;
+  constructor(directory: string, preparationFailed: boolean) {
+    super(`Check execution incomplete; evidence retained at ${directory}`); this.preparationFailed = preparationFailed;
+  }
+}
 
 /** Keep check evidence outside the source tree so subsequent scans cannot select their own output. */
 export function checkRunRoot(): string {
@@ -41,8 +49,10 @@ export async function runChecks(packs: Packs, plan: ValidationPlan, request: Omi
   const deadline = options.deadlineAt ?? Date.now() + deadlineMs;
   if (!Number.isSafeInteger(deadline) || deadline <= 0) throw new Error("Invalid check deadline");
   durableJson(join(directory, "run.json"), { version: 1, id, ...executionIdentity, root: request.subject.root, started_at: startedAt, ...(options.trigger ? { trigger: options.trigger } : {}), ...(options.expectedStatus ? { expected_status: options.expectedStatus } : {}), state: "running", owner: { pid: process.pid, fingerprint: processFingerprint(process.pid) }, plan, scope: request.scope, packs_digest: digest(JSON.parse(JSON.stringify(packs))) });
+  let prepared = false;
   try {
     const packet = materializeChangePacket(request.subject.root, request.scope, join(directory, "packet"));
+    prepared = true;
     const cancelled = () => checkCancellationRequested(directory, id);
     const result = await executeChecks(packs, plan, { ...request, registry: packs, checkRunsRoot }, undefined, async (entry, packId, index) => {
       const packDirectory = join(directory, digest(packId).slice(7)); mkdirSync(packDirectory, { recursive: true, mode: 0o700 });
@@ -69,8 +79,10 @@ export async function runChecks(packs: Packs, plan: ValidationPlan, request: Omi
       projectRunMetric(parent, metric); }
     catch { /* Terminal execution evidence remains authoritative; telemetry reports the missing projection. */ }
     return receipt;
-  } catch {
-    durableJson(join(directory, "failure.json"), { version: 1, id, ...executionIdentity, status: "failed", reason: "check-orchestration-incomplete", ended_at: new Date().toISOString() });
-    throw new Error(`Check execution incomplete; evidence retained at ${directory}`);
+  } catch (error) {
+    durableJson(join(directory, "failure.json"), { version: 1, id, ...executionIdentity, status: "failed",
+      reason: prepared ? "check-orchestration-incomplete" : "change-packet-capture-failed", phase: prepared ? "execution" : "packet-capture",
+      ...(!prepared ? { commands_started: false } : {}), ...(error instanceof PacketCaptureError ? { capture: error.capture } : {}), ended_at: new Date().toISOString() });
+    throw new CheckRunFailure(directory, !prepared);
   }
 }

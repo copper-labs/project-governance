@@ -5,6 +5,10 @@ const destination = new URL('../../../dist/engine/assets/', import.meta.url);
 rmSync(destination, { recursive: true, force: true });
 mkdirSync(destination, { recursive: true });
 cpSync(new URL('./bootstrap-runtime.mjs', import.meta.url), new URL('bootstrap-runtime.mjs', destination));
+// Operator entry points ship with the runtime whose host API enforces their grants.
+mkdirSync(new URL('host/', destination));
+for (const name of ['workflow-host-binding.mjs', 'workflow-cycle-authorization.mjs'])
+  cpSync(new URL(name, import.meta.url), new URL('host/' + name, destination));
 for (const directory of ['defaults', 'packs']) cpSync(new URL(directory, source), new URL(directory, destination), { recursive: true, dereference: false });
 cpSync(new URL('assets/skills/', source), new URL('skills/', destination), { recursive: true, dereference: false });
 // Runtime-specific execution guidance must match the owner shipped in this package.

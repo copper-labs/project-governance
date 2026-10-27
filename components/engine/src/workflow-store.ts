@@ -8,6 +8,7 @@ import { lstatSync, realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { canonical, digest, object, text } from "./core.ts";
 import { recipeDigest, type RunBinding, type RunState, type StageResult, type StageState } from "./workflow-types.ts";
+import { validateWorkflowGrant, validateWorkflowGrantIdentity, validateWorkflowGrantUse, type WorkflowGrant, type WorkflowGrantRecord } from "./workflow-grant.ts";
 
 export interface WorkflowRun {
   id: string; binding: RunBinding; state: RunState; revision: number;
@@ -119,6 +120,9 @@ export class WorkflowStore {
           CREATE TABLE IF NOT EXISTS engine_action_binding (
             action_id TEXT PRIMARY KEY REFERENCES action(action_id), binding_digest TEXT NOT NULL
           ) STRICT;
+          CREATE TABLE IF NOT EXISTS engine_workflow_grant (
+            id TEXT PRIMARY KEY, record TEXT NOT NULL
+          ) STRICT;
           CREATE TABLE IF NOT EXISTS engine_run (
             id TEXT PRIMARY KEY, operation_id TEXT UNIQUE NOT NULL, binding TEXT NOT NULL,
             state TEXT NOT NULL, revision INTEGER NOT NULL, owner TEXT, cancel_requested INTEGER NOT NULL DEFAULT 0,
@@ -166,8 +170,25 @@ export class WorkflowStore {
     this.#db.prepare("INSERT INTO engine_projection VALUES('repository',1,0,1,'[]') ON CONFLICT(scope) DO UPDATE SET generation=generation+1,incomplete=1").run();
   }
 
-  #current(binding: RunBinding, requireBinding = true): void {
-    const task = this.#db.prepare("SELECT version,status FROM task WHERE task_id=? ORDER BY version DESC LIMIT 1").get(binding.taskId);
+  // A distinct binding digest makes legacy engines fail closed for these actions
+  // without disabling their unrelated runs in the shared repository ledger.
+  #bindingDigest(binding: RunBinding): string {
+    return binding.authorityRef.startsWith("workspace-workflow:")
+      ? digest({ contract: "workspace-workflow-1", binding }) : digest(binding);
+  }
+
+  /** Slow Git and file checks precede the write lock; mutable authority is rechecked inside it. */
+  #preflight(binding: RunBinding): string | null {
+    if (!binding.authorityRef.startsWith("workspace-workflow:")) return null;
+    const record = this.readWorkflowGrant(binding.authorityRef.slice("workspace-workflow:".length));
+    if (!record) throw new Error("No matching workspace workflow grant");
+    const task = this.#db.prepare("SELECT session FROM task WHERE task_id=? ORDER BY version DESC LIMIT 1").get(binding.taskId);
+    validateWorkflowGrantUse(record, binding.recipe, typeof task?.session === "string" ? task.session : null);
+    return record.grantDigest;
+  }
+
+  #current(binding: RunBinding, requireBinding = true, checkedGrantDigest: string | null = null): void {
+    const task = this.#db.prepare("SELECT version,status,session,worktree,branch FROM task WHERE task_id=? ORDER BY version DESC LIMIT 1").get(binding.taskId);
     const action = this.#db.prepare("SELECT * FROM action WHERE action_id=?").get(binding.actionId);
     if (!task || task["version"] !== binding.taskVersion || task["status"] !== "open") throw new Error("workflow task is stale or not open");
     if (!action || action["task_id"] !== binding.taskId || action["task_version"] !== binding.taskVersion ||
@@ -177,9 +198,17 @@ export class WorkflowStore {
     if (action["operation"] !== "check" || action["destination"] !== null) {
       throw new Error("workflow requires a local check action");
     }
+    if (binding.authorityRef.startsWith("workspace-workflow:")) {
+      const grant = this.readWorkflowGrant(binding.authorityRef.slice("workspace-workflow:".length));
+      if (!grant || grant.grant.database !== realpathSync(this.path) || typeof task.worktree !== "string" ||
+          realpathSync(task.worktree) !== grant.grant.workspace || task.branch !== grant.grant.identity.branch)
+        throw new Error("No matching workspace workflow grant");
+      if (checkedGrantDigest !== grant.grantDigest) throw new Error("Workflow grant changed after preflight");
+      validateWorkflowGrantUse(grant, binding.recipe, typeof task.session === "string" ? task.session : null, Date.now(), false);
+    }
     if (requireBinding) {
       const approved = this.#db.prepare("SELECT binding_digest FROM engine_action_binding WHERE action_id=?").get(binding.actionId);
-      if (!approved || approved["binding_digest"] !== digest(binding)) throw new Error("workflow does not match the host-approved action binding");
+      if (!approved || approved["binding_digest"] !== this.#bindingDigest(binding)) throw new Error("workflow does not match the host-approved action binding");
     }
     const scope = JSON.parse(String(action["scope"])) as string[];
     const recipe = binding.recipe;
@@ -190,13 +219,56 @@ export class WorkflowStore {
     }
   }
 
+  /** Trusted-host entry only: persist the reviewed envelope, never promote a task-cycle event. */
+  authorizeWorkflowGrant(grant: WorkflowGrant, issuer: { taskId: string; taskVersion: number }): WorkflowGrantRecord {
+    validateWorkflowGrant(grant); validateWorkflowGrantIdentity(grant);
+    if (grant.database !== realpathSync(this.path)) throw new Error("Workflow grant belongs to another store");
+    return this.#atomic(() => {
+      const task = this.#db.prepare("SELECT version,status,session,worktree,branch FROM task WHERE task_id=? ORDER BY version DESC LIMIT 1").get(issuer.taskId);
+      if (!task || task.version !== issuer.taskVersion || task.status !== "open" || task.session !== grant.sessionId ||
+          typeof task.worktree !== "string" || realpathSync(task.worktree) !== grant.workspace || task.branch !== grant.identity.branch) throw new Error("Workflow grant issuer task changed");
+      const id = digest({ workspace: grant.workspace, enrollmentId: grant.enrollmentId });
+      const previous = this.readWorkflowGrant(id);
+      if (previous) {
+        if (previous.grantDigest !== digest(grant) || previous.revokedAt) throw new Error("Workflow enrollment already differs or is revoked");
+        return previous;
+      }
+      const record: WorkflowGrantRecord = { id, revision: 1, grant, grantDigest: digest(grant),
+        issuedByTaskId: issuer.taskId, issuedByTaskVersion: issuer.taskVersion, createdAt: new Date().toISOString(),
+        revokedAt: null, revocationAuthority: null };
+      this.#db.prepare("INSERT INTO engine_workflow_grant VALUES(?,?)").run(id, canonical(record));
+      return record;
+    });
+  }
+
+  /** Receipts carry this locator; only the stored envelope supplies authority. */
+  readWorkflowGrant(id: string): WorkflowGrantRecord | null {
+    const row = this.#db.prepare("SELECT record FROM engine_workflow_grant WHERE id=?").get(id);
+    return row ? JSON.parse(String(row.record)) as WorkflowGrantRecord : null;
+  }
+
+  /** Revocation reaches every task using the grant and leaves cleanup available. */
+  revokeWorkflowGrant(id: string, authorityRef: string): WorkflowGrantRecord {
+    text(authorityRef, "workflow grant revocation authority");
+    return this.#atomic(() => {
+      const record = this.readWorkflowGrant(id);
+      if (!record) throw new Error("Unknown workspace workflow grant");
+      if (!record.revokedAt) {
+        record.revokedAt = new Date().toISOString(); record.revocationAuthority = authorityRef;
+        this.#db.prepare("UPDATE engine_workflow_grant SET record=? WHERE id=?").run(canonical(record), id);
+      }
+      return record;
+    });
+  }
+
   /** Trusted host adapter binds one authorized action to exact commands, inputs and run identity. */
   authorizeWorkflow(binding: RunBinding): void {
     text(binding.authorityRef, "host authority reference"); text(binding.operationId, "operation id");
     if (recipeDigest(binding.recipe) !== binding.recipeDigest) throw new Error("recipe digest mismatch");
+    const checkedGrantDigest = this.#preflight(binding);
     this.#atomic(() => {
-      this.#current(binding, false);
-      const hash = digest(binding);
+      this.#current(binding, false, checkedGrantDigest);
+      const hash = this.#bindingDigest(binding);
       const prior = this.#db.prepare("SELECT binding_digest FROM engine_action_binding WHERE action_id=?").get(binding.actionId);
       if (prior && prior["binding_digest"] !== hash) throw new Error("action already bound to a different workflow");
       this.#db.prepare("INSERT OR IGNORE INTO engine_action_binding VALUES(?,?)").run(binding.actionId, hash);
@@ -205,10 +277,13 @@ export class WorkflowStore {
 
   /** Submission persists exact identity before a worker exists; retries attach to the same run. */
   submit(binding: RunBinding): WorkflowRun {
-    return this.#atomic(() => this.#submit(binding));
+    // Exact replay only observes an existing run; claim still requires live authority.
+    const prior = this.#db.prepare("SELECT id FROM engine_run WHERE operation_id=?").get(binding.operationId);
+    const checkedGrantDigest = prior ? null : this.#preflight(binding);
+    return this.#atomic(() => this.#submit(binding, checkedGrantDigest));
   }
 
-  #submit(binding: RunBinding): WorkflowRun {
+  #submit(binding: RunBinding, checkedGrantDigest: string | null): WorkflowRun {
     text(binding.authorityRef, "host authority reference"); text(binding.operationId, "operation id");
     if (recipeDigest(binding.recipe) !== binding.recipeDigest) throw new Error("recipe digest mismatch");
     const encoded = canonical(JSON.parse(JSON.stringify(binding)));
@@ -217,7 +292,7 @@ export class WorkflowStore {
         if (prior["binding"] !== encoded) throw new Error("workflow submission identity conflict");
         return this.read(String(prior["id"]));
       }
-      this.#current(binding);
+      this.#current(binding, true, checkedGrantDigest);
       const id = randomUUID(), now = new Date().toISOString();
       this.#db.prepare("INSERT INTO engine_run VALUES(?,?,?,'queued',1,NULL,0,?,?)").run(id, binding.operationId, encoded, now, now);
       for (const stage of binding.recipe.stages) this.#db.prepare("INSERT INTO engine_stage VALUES(?,?,'pending',NULL)").run(id, stage.id);
@@ -236,8 +311,9 @@ export class WorkflowStore {
   /** Compare-and-set makes two observers harmless; no stale worker can advance a newer owner. */
   claim(id: string, expectedRevision: number, owner: string): WorkflowRun {
     text(owner, "worker owner");
+    const checkedGrantDigest = this.#preflight(this.read(id).binding);
     return this.#atomic(() => {
-      const run = this.read(id); this.#current(run.binding);
+      const run = this.read(id); this.#current(run.binding, true, checkedGrantDigest);
       if (run.state !== "queued" || run.revision !== expectedRevision || run.owner !== null) throw new Error("workflow already claimed or stale");
       this.#db.prepare("UPDATE engine_run SET state='running',owner=?,revision=revision+1,updated_at=? WHERE id=?")
         .run(owner, new Date().toISOString(), id);
@@ -261,6 +337,9 @@ export class WorkflowStore {
   }
 
   stage(id: string, owner: string, stageId: string, next: StageState, result: StageResult | null = null): void {
+    const binding = this.read(id).binding;
+    const checkedGrantDigest = next === "running" && !binding.recipe.stages.find(s => s.id === stageId)?.cleanup
+      ? this.#preflight(binding) : null;
     this.#atomic(() => {
       const run = this.read(id);
       if (run.owner !== owner || run.state !== "running") throw new Error("stale workflow owner");
@@ -270,7 +349,7 @@ export class WorkflowStore {
       if (next === "running") {
         if (prior.state !== "pending") throw new Error("stage cannot be replayed");
         if (!spec.cleanup) {
-          this.#current(run.binding);
+          this.#current(run.binding, true, checkedGrantDigest);
           if (run.cancelRequested) throw new Error("workflow cancellation requested");
           if (spec.dependsOn.some(dep => this.stages(id).find(s => s.id === dep)?.state !== "succeeded")) throw new Error("stage dependency is not satisfied");
         }
@@ -420,18 +499,19 @@ export class WorkflowStore {
   }
 
   /** Check existing host grants without minting or rebinding an action. */
-  validateWorkflowBinding(binding: RunBinding): void { this.#current(binding); }
+  validateWorkflowBinding(binding: RunBinding): void { this.#current(binding, true, this.#preflight(binding)); }
 
   /** Reserve the aggregate slot and native child in one transaction before any process dispatch. */
   reserveDiagnosticProbe(id: string, owner: string, revision: number, probe: DiagnosticProbe,
     selection: Pick<DiagnosticAttempt, "method" | "decisionReceiptId" | "provider">): DiagnosticEpisode {
+    const checkedGrantDigest = this.#preflight(probe.binding);
     return this.#atomic(() => {
       const record = this.#diagnosticOwned(id, owner, revision);
       if (Date.now() >= record.deadline || record.attempts.length >= 3 ||
           record.attempts.some(attempt => attempt.probeId === probe.id || attempt.recipeDigest === probe.binding.recipeDigest)) throw new Error("Diagnostic allowance exhausted or probe repeated");
-      this.#current(probe.binding);
+      this.#current(probe.binding, true, checkedGrantDigest);
       if (this.#db.prepare("SELECT id FROM engine_run WHERE operation_id=?").get(probe.binding.operationId)) throw new Error("Diagnostic child already exists outside this reservation");
-      const child = this.#submit(probe.binding);
+      const child = this.#submit(probe.binding, checkedGrantDigest);
       record.attempts.push({ probeId: probe.id, recipeDigest: probe.binding.recipeDigest, childRunId: child.id, ...selection });
       record.revision++;
       this.#db.prepare("UPDATE engine_diagnostic SET record=? WHERE id=?").run(canonical(record), id);

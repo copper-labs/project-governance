@@ -1,7 +1,7 @@
 /** Operator entry for the installed host API; never grants authority from request-file text. */
 import { execFileSync, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { readFileSync, writeFileSync, realpathSync, existsSync, openSync, closeSync, fsyncSync, renameSync, unlinkSync } from 'node:fs';
+import { readFileSync, writeFileSync, realpathSync, existsSync, openSync, closeSync, fsyncSync, renameSync, unlinkSync, fstatSync, lstatSync } from 'node:fs';
 import { join, dirname, relative, isAbsolute, resolve } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
@@ -66,17 +66,42 @@ export function save(path, value) {
   renameSync(temporary, path);
 }
 
+/** Keep uncertain ownership closed; a dead PID alone cannot safely arbitrate racing lock reclaimers. */
+export function takeReceiptLock(receiptPath) {
+  const lockPath = receiptPath + '.lock'; let fd;
+  try { fd = openSync(lockPath, 'wx', 0o600); }
+  catch (error) {
+    if (error.code !== 'EEXIST') throw error;
+    let observation = 'owner unknown';
+    try {
+      const pid = Number(readFileSync(lockPath, 'utf8'));
+      if (Number.isSafeInteger(pid) && pid > 1) {
+        try { process.kill(pid, 0); observation = `recorded PID ${pid} exists (identity unverified)`; }
+        catch (cause) { if (cause.code === 'ESRCH') observation = `recorded PID ${pid} is absent`; }
+      }
+    } catch { /* An unreadable or incomplete journal never authorizes taking ownership. */ }
+    throw new Error(`EEXIST: approval receipt lock retained; ${observation}. Inspect the original owner and receipt journal before operator recovery. No lock was removed.`, {cause:error});
+  }
+  const identity = fstatSync(fd);
+  try { writeFileSync(fd, String(process.pid)); fsyncSync(fd); } finally { closeSync(fd); }
+  return () => {
+    try { const current = lstatSync(lockPath); if (current.dev === identity.dev && current.ino === identity.ino) unlinkSync(lockPath); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+  };
+}
+
 /** Trusted caller seam. Tests supply synthetic confirmation; the executable uses only the native operator dialog. */
-export async function bindReviewedWorkflow(host, request, receiptPath, confirm) {
+export async function bindReviewedWorkflow(host, request, receiptPath, confirm, expectedAuthorityRef = null) {
   receiptPath = resolve(receiptPath);
   if (!existsSync(dirname(receiptPath))) throw new Error('Receipt parent must already exist');
-  const lockPath = receiptPath + '.lock', fd = openSync(lockPath, 'wx', 0o600);
-  writeFileSync(fd, String(process.pid)); closeSync(fd);
+  const release = takeReceiptLock(receiptPath);
   let store, workflows;
   try {
     const snapshot = inspectRequest(host, request), snapshotDigest = host.api.digest(snapshot);
     const prior = existsSync(receiptPath) ? read(receiptPath) : null;
     if (prior && prior.snapshotDigest !== snapshotDigest) throw new Error('Receipt belongs to changed workflow inputs or identity');
+    if (prior?.binding && expectedAuthorityRef !== null && prior.binding.authorityRef !== expectedAuthorityRef)
+      throw new Error('Receipt authority differs from the selected approval');
     if (prior?.binding) {
       workflows = new host.api.WorkflowStore(snapshot.database);
       try {
@@ -95,7 +120,11 @@ export async function bindReviewedWorkflow(host, request, receiptPath, confirm) 
     }
     if (prior && !prior.binding) throw new Error('Interrupted action creation requires reconciliation; refusing duplicate action');
     const accepted = await confirm(snapshot);
-    if (accepted !== true && !(accepted?.route === 'operator-cycle' && typeof accepted.authorityRef === 'string')) throw new Error('Operator did not approve workflow');
+    if (accepted !== true && !(['operator-cycle', 'workspace-workflow'].includes(accepted?.route) && typeof accepted.authorityRef === 'string')) throw new Error('Operator did not approve workflow');
+    if (expectedAuthorityRef !== null && (accepted === true || accepted.authorityRef !== expectedAuthorityRef))
+      throw new Error('Selected approval authority changed');
+    if (prior?.binding && accepted !== true && prior.binding.authorityRef !== accepted.authorityRef)
+      throw new Error('Pending receipt authority differs from the selected approval');
     if (host.api.digest(inspectRequest(host, request)) !== snapshotDigest) throw new Error('Workflow changed during operator review');
     store = new host.api.Store(snapshot.database);
     workflows ??= new host.api.WorkflowStore(snapshot.database);
@@ -120,11 +149,11 @@ export async function bindReviewedWorkflow(host, request, receiptPath, confirm) 
     workflows.authorizeWorkflow(binding);
     workflows.validateWorkflowBinding(binding);
     const receipt = { status: 'bound', snapshotDigest, snapshot, binding, approvedAt: new Date().toISOString(),
-      approvalRoute: accepted === true ? 'operator-dialog' : 'operator-cycle', replayed: false };
+      approvalRoute: accepted === true ? 'operator-dialog' : accepted.route, replayed: false };
     save(receiptPath, receipt);
     return receipt;
   } finally {
-    workflows?.close(); store?.close(); unlinkSync(lockPath);
+    workflows?.close(); store?.close(); release();
   }
 }
 
