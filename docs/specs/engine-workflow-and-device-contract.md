@@ -349,6 +349,76 @@ comparison; they are never relabelled automatically. Recovery evidence remains b
 launch and receipt digests, and complete positive absence of every recorded process is still required.
 No execution replay, process signaling or resource release authority is added.
 
+### Configured local development binding (4.4)
+
+The operator may deliberately select `workflow_authorization.mode: task` in
+`config/governance/profile.yaml`. The existing host binding adapter then creates an ordinary exact
+workflow binding through current task/action authority without a second human dialog. This is an
+explicit change in project policy, not authenticated consent inferred from a model-written file.
+Installing or updating the package never enables it. Missing configuration uses `operator` mode;
+malformed or unreadable configuration refuses. Unknown authorization fields refuse.
+
+```yaml
+workflow_authorization:
+  mode: task
+  resources: []
+  credential_env: []
+```
+
+`resources` lists exact permitted declared resource identities; `credential_env` lists permitted
+credential environment names using the existing credential-name validator. Omitted lists allow none.
+A recipe must request only listed resources and credentials and existing `read`/`local` operations.
+These declarations do not confine arbitrary project code or authenticate human intent. Host access
+controls, user restrictions, project custody guards and the current task's constraints still apply.
+Do not claim that a local label or credential filtering provides filesystem/network isolation.
+
+The installed `workflow-bind --request FILE --receipt FILE` command uses its own selected package
+and binds the request to the selected launcher's worktree. Direct CLI invocation requires its
+current directory to be that exact root. Managed launchers set the child's working directory to
+their baked worktree; relative request/receipt paths resolve from that root. It accepts the existing
+adapter request fields (`runtimePackage` is optional here and must match if supplied). It creates no
+worker. Its receipt supplies the ordinary `workflow-submit` action and authority reference. The
+standalone packaged adapter also uses configured selection; existing cycle and workspace enrollment
+commands retain their original explicit approval contracts.
+
+Older hosts without the new policy API retain native operator confirmation in the standalone adapter.
+Partial or malformed policy API support refuses.
+
+Task mode rechecks the normalized policy before binding, records `approvalRoute: task-policy`,
+`policyDigest` and `boundAt`, and uses the existing task ID as provenance. It does not record a human
+`approvedAt`, create a reusable grant, add expiry, or introduce a new execution-record format. The
+policy digest describes the binding decision, not a new execution-time revocation mechanism. Existing
+engines that understand ordinary exact bindings can read these records; no prefix claims otherwise.
+
+Each changed source/catalog/driver or current task revision requires a fresh operation ID and receipt,
+with current inputs and a fresh authorized action. It needs no new dialog while the chosen policy
+covers the declaration. Exact replay keeps the original action when current selection still permits that route, or when
+operator mode only reads back a completed receipt. Narrowed
+policy can refuse replay without revoking the underlying action. An operator receipt cannot replay
+through task policy: preserve its original route and receipt. Opt-out can read back an already bound
+task receipt without creating authority. Do not reuse a receipt for changed
+inputs, relabel a prior operator receipt as task policy, mutate in-flight commands, or replay completed
+stages. Current task/version/cancellation checks still run at dispatch and each ordinary stage;
+withdrawn scope stops later stages and cleanup remains available. Resources, process observation,
+deadlines and unknown-cleanup ownership retain their existing executor owners.
+
+Changing back to `operator` stops new policy bindings. It does not revoke already authorized actions.
+Use existing task withdrawal/cancellation for those actions and settle cleanup before a successor run.
+Interrupted receipt journals retain their existing reconciliation rules. Pending task-policy receipts
+retain route and policy digest; recovered binding time records successful readback, not a human click.
+Older incomplete receipts may lack that provenance and are never retroactively labelled as approved.
+If a task-policy journal has not yet authorized its binding and the project opts out, fresh native
+operator confirmation may finish that exact pending binding. The receipt then records the actual
+operator route while preserving the original action and opaque task provenance reference.
+Public refusal diagnostics name fixed causes without echoing private JSON/YAML/source excerpts. No project policy edit clears
+resource ownership, authorizes publication, changes a provider permission or upgrades an adopter.
+
+For a single already configured, demonstrably isolated check, prefer the existing pack/check route.
+That route has durable command observation but does not acquire workflow shared-resource leases.
+Never migrate a shared build/device command merely by renaming it a check. Structured plans help
+coordinated work; ordinary diagnostics require no new cadence exception or admission layer. Existing
+explicit project requirements, Git hooks and release qualification remain effective.
+
 ### Operator workflow binding adapter
 
 The canonical `components/engine/scripts/workflow-host-binding.mjs` supplies a narrow
@@ -360,7 +430,7 @@ The request identifies `runtimePackage`, `workspace`, `taskId`, `taskVersion`,
 `sessionId`, `recipeFile` and a stable `operationId`. The adapter derives the ledger
 from Git, checks the current task/session/worktree/branch, project pin, local-check
 policy and actual input hashes, and resolves commands from the project catalog.
-The executable presents the exact commands, claims, resources and recipe digest
+In default `operator` mode, the executable presents the exact commands, claims, resources and recipe digest
 in a macOS operator dialog. Cancellation or timeout creates no action. Request text,
 stdin, environment variables and chat approval labels cannot answer that dialog.
 Only a human may accept it; agent UI automation must not accept its own grant.
@@ -385,7 +455,7 @@ candidate identity, disk limits and device custody before submission.
 
 This is an operator-controlled entry, not a qualified native Codex approval callback
 or an authentication boundary against malicious code under the same OS account.
-The imported callback seam exists for trusted host tests only. Synthetic confirmation
+The imported callback seam is for trusted hosts; configured selection above is its supported policy caller. Synthetic confirmation
 proves plumbing, not human approval. Qualification includes refusal/replay tests,
 an installed public-CLI harmless workflow and the actual native operator entry.
 No adopter runtime update or remote release follows from these local proofs.

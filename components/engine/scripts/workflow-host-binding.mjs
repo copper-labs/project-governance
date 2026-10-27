@@ -1,4 +1,4 @@
-/** Operator entry for the installed host API; never grants authority from request-file text. */
+/** Installed host binding entry: explicit project policy or native operator confirmation. */
 import { execFileSync, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { readFileSync, writeFileSync, realpathSync, existsSync, openSync, closeSync, fsyncSync, renameSync, unlinkSync, fstatSync, lstatSync } from 'node:fs';
@@ -90,7 +90,7 @@ export function takeReceiptLock(receiptPath) {
   };
 }
 
-/** Trusted caller seam. Tests supply synthetic confirmation; the executable uses only the native operator dialog. */
+/** Trusted caller seam. Native confirmation and configured policy share exact action binding. */
 export async function bindReviewedWorkflow(host, request, receiptPath, confirm, expectedAuthorityRef = null) {
   receiptPath = resolve(receiptPath);
   if (!existsSync(dirname(receiptPath))) throw new Error('Receipt parent must already exist');
@@ -110,7 +110,7 @@ export async function bindReviewedWorkflow(host, request, receiptPath, confirm, 
         if (host.api.digest({ ...prior.binding, actionId: '', authorityRef: '' }) !== host.api.digest({
           taskId: snapshot.taskId, taskVersion: snapshot.taskVersion, operationId: snapshot.operationId,
           recipe: snapshot.recipe, recipeDigest: snapshot.recipeDigest, actionId: '', authorityRef: '' })) throw new Error('Receipt binding mismatch');
-        const replay = { ...prior, status: 'bound', replayed: true };
+        const replay = { ...prior, ...(prior.approvalRoute === 'task-policy' && !prior.boundAt ? { boundAt: new Date().toISOString() } : {}), status: 'bound', replayed: true };
         save(receiptPath, replay);
         return replay;
       } catch (error) {
@@ -120,7 +120,7 @@ export async function bindReviewedWorkflow(host, request, receiptPath, confirm, 
     }
     if (prior && !prior.binding) throw new Error('Interrupted action creation requires reconciliation; refusing duplicate action');
     const accepted = await confirm(snapshot);
-    if (accepted !== true && !(['operator-cycle', 'workspace-workflow'].includes(accepted?.route) && typeof accepted.authorityRef === 'string')) throw new Error('Operator did not approve workflow');
+    if (accepted !== true && !(['operator-cycle', 'workspace-workflow', 'task-policy'].includes(accepted?.route) && typeof accepted.authorityRef === 'string')) throw new Error('Operator did not approve workflow');
     if (expectedAuthorityRef !== null && (accepted === true || accepted.authorityRef !== expectedAuthorityRef))
       throw new Error('Selected approval authority changed');
     if (prior?.binding && accepted !== true && prior.binding.authorityRef !== accepted.authorityRef)
@@ -129,6 +129,8 @@ export async function bindReviewedWorkflow(host, request, receiptPath, confirm, 
     store = new host.api.Store(snapshot.database);
     workflows ??= new host.api.WorkflowStore(snapshot.database);
     const authorityRef = prior?.binding.authorityRef ?? (accepted === true ? `operator-dialog:${randomUUID()}` : accepted.authorityRef);
+    const provenance = { approvalRoute: accepted === true ? 'operator-dialog' : accepted.route,
+      ...(accepted?.route === 'task-policy' ? { policyDigest: accepted.policyDigest } : {}) };
     const actionRequest = { operation: 'check', scope: [snapshot.workspace], targets: [snapshot.workspace], destination: null, policyRevision: snapshot.policy.revision };
     let binding = prior?.binding;
     if (!binding) {
@@ -141,20 +143,75 @@ export async function bindReviewedWorkflow(host, request, receiptPath, confirm, 
         if (action.status !== 'authorized') throw new Error(action.refusedReason ?? 'Action refused');
         binding = { taskId: snapshot.taskId, taskVersion: snapshot.taskVersion, actionId: action.actionId,
           authorityRef, operationId: snapshot.operationId, recipe: snapshot.recipe, recipeDigest: snapshot.recipeDigest };
-        save(receiptPath, { status: 'binding-pending', snapshotDigest, snapshot, binding });
+        save(receiptPath, { status: 'binding-pending', snapshotDigest, snapshot, binding, ...provenance });
       });
     }
     if (host.api.digest(inspectRequest(host, request)) !== snapshotDigest) throw new Error('Workflow changed before binding');
     if (accepted !== true && host.api.digest(await confirm(snapshot)) !== host.api.digest(accepted)) throw new Error('Cycle authority changed before binding');
     workflows.authorizeWorkflow(binding);
     workflows.validateWorkflowBinding(binding);
-    const receipt = { status: 'bound', snapshotDigest, snapshot, binding, approvedAt: new Date().toISOString(),
+    const receipt = { status: 'bound', snapshotDigest, snapshot, binding,
+      ...(accepted?.route === 'task-policy' ? { boundAt: new Date().toISOString(), policyDigest: accepted.policyDigest } : { approvedAt: new Date().toISOString() }),
       approvalRoute: accepted === true ? 'operator-dialog' : accepted.route, replayed: false };
     save(receiptPath, receipt);
     return receipt;
   } finally {
     workflows?.close(); store?.close(); release();
   }
+}
+
+/** Reuse ordinary task/action bindings; policy selection never creates a reusable grant. */
+export async function bindConfiguredWorkflow(host, request, receiptPath, confirm = confirmWithOperator) {
+  if (host.api.workflowAuthorization === undefined && host.api.assertWorkflowAuthorization === undefined)
+    return bindReviewedWorkflow(host, request, receiptPath, confirm);
+  if (typeof host.api.workflowAuthorization !== 'function' || typeof host.api.assertWorkflowAuthorization !== 'function')
+    throw new Error('Selected runtime does not support configured workflow authorization');
+  const policy = host.api.workflowAuthorization(request.workspace);
+  if (policy.mode === 'operator') return bindReviewedWorkflow(host, request, receiptPath, confirm);
+  const snapshot = inspectRequest(host, request);
+  host.api.assertWorkflowAuthorization(policy, snapshot.recipe);
+  // The existing task is the provenance reference. No new authority prefix or execution format.
+  const authorityRef = snapshot.taskId;
+  return bindReviewedWorkflow(host, request, receiptPath, next => {
+    const current = host.api.workflowAuthorization(next.workspace);
+    if (current.digest !== policy.digest) throw new Error('Workflow authorization policy changed during binding');
+    host.api.assertWorkflowAuthorization(current, next.recipe);
+    return { route: 'task-policy', authorityRef, policyDigest: current.digest };
+  }, authorityRef);
+}
+
+/** Public diagnostics contain fixed reasons, never source/JSON/YAML parser excerpts. */
+export function workflowBindingRefusal(error) {
+  const message = error instanceof Error ? error.message : '';
+  const fixed = new Set([
+    'Task is stale or closed', 'Task session/worktree/branch mismatch', 'Workflow root exceeds task scope',
+    'Workflow resource is outside the configured task policy', 'Workflow credential is outside the configured task policy',
+    'Workflow authorization policy changed during binding', 'Receipt authority differs from the selected approval',
+    'Receipt belongs to changed workflow inputs or identity', 'Pending receipt authority differs from the selected approval',
+    'Interrupted action creation requires reconciliation; refusing duplicate action', 'Task changed before action creation',
+    'Workflow changed during operator review', 'Workflow changed before binding', 'Receipt binding mismatch',
+    'Operator did not approve workflow', 'Exact worktree root required', 'Stable operation ID required',
+    'Recipe worktree mismatch', 'Installed package differs from project pin', 'Package is not selected by this worktree launcher',
+    'Recipe policy differs from installed local-check policy', 'Receipt parent must already exist',
+    'Selected runtime does not support configured workflow authorization',
+    'Workflow binding requires the current worktree root', 'Workflow binding must use the invoked runtime package',
+    'Workflow binding requires a workspace path', 'Workflow binding requires --request and --receipt',
+    'This operator entry is qualified only for macOS', 'Review exceeds native dialog size; reduce workflow scope',
+    'Selected approval authority changed', 'Cycle authority changed before binding', 'Workflow profile must not use symlinks',
+    'Expected installed Governance package', 'Installed host/v1 export is unavailable',
+    'Host export escapes selected package', 'Unsupported host API',
+    'Usage: workflow-host-binding.mjs --request REQUEST.json --receipt RECEIPT.json',
+  ]);
+  let reason = fixed.has(message) ? message : 'Workflow binding refused; inspect the local request, recipe and receipt. No workflow was dispatched.';
+  if (error instanceof SyntaxError) reason = 'Invalid JSON in a local workflow input. Inspect the request, recipe, catalog, pin or receipt without changing existing authority.';
+  else if (String(error?.code).startsWith('ERR_PARSE_ARGS_')) reason = 'Workflow binding requires --request and --receipt with valid paths and no extra flags.';
+  else if (message.startsWith('EEXIST: approval receipt lock retained;')) reason = 'Approval receipt lock retained. Inspect the original owner and journal before recovery; no lock was removed.';
+  else if (message.startsWith('Stale input:')) reason = 'Stale workflow input. Capture current input hashes for a fresh run; preserve the original receipt.';
+  else if (/workflow authorization|workflow resource|Invalid credential environment references|Operator mode|project profile/iu.test(message)) reason = 'Invalid workflow authorization profile. Check mode, resources and credential_env; no policy was inferred.';
+  else if (/structured constraint|exceeds the task|outside declared scope|explicit task and action scope/iu.test(message)) reason = 'Current task constraints or scope refuse this check. Preserve those restrictions.';
+  else if (['ENOENT', 'EACCES', 'ELOOP'].includes(error?.code)) reason = 'Workflow input is missing, inaccessible or a forbidden symlink. Inspect the local paths and permissions.';
+  // A specific fixed reason takes precedence over the broader malformed-profile category.
+  return { status: 'refused', error: fixed.has(message) ? message : reason };
 }
 
 /** No stdin, environment switch or --yes flag can answer the operator's native dialog. */
@@ -175,8 +232,8 @@ if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.me
     const args = process.argv.slice(2);
     if (args.length !== 4 || args[0] !== '--request' || args[2] !== '--receipt') throw new Error('Usage: workflow-host-binding.mjs --request REQUEST.json --receipt RECEIPT.json');
     const request = read(args[1]), host = await loadHost(request.runtimePackage);
-    const receipt = await bindReviewedWorkflow(host, request, args[3], confirmWithOperator);
+    const receipt = await bindConfiguredWorkflow(host, request, args[3]);
     console.log(JSON.stringify({ status: receipt.status, receipt: resolve(args[3]), actionId: receipt.binding.actionId,
       operationId: receipt.binding.operationId, authorityRef: receipt.binding.authorityRef, replayed: receipt.replayed }));
-  } catch (error) { console.error(JSON.stringify({ status: 'refused', error: error.message })); process.exitCode = 1; }
+  } catch (error) { console.error(JSON.stringify(workflowBindingRefusal(error))); process.exitCode = 1; }
 }

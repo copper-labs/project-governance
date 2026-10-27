@@ -28,6 +28,9 @@ The retained wheel's responsibility split remains in
 [Governance Runtime Architecture](../architecture/governance-runtime.md); current compiled authority
 is described in the [charter](../../CHARTER.md#runtime-authority).
 
+Use [Local Development Without Duplicate Consent](guides/local-development.md) for the deliberately
+adopted 4.4 task-policy route, isolated checks and the shared-resource boundary.
+
 ## Contribute To The Runtime
 
 For 4.2 source work, use the approved [decision-provider and evaluator specification](../specs/engine-decision-providers-and-image-evaluation.md)

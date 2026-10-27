@@ -1,5 +1,20 @@
 version: 1
 capabilities:
+  - id: local-workflow-policy
+    title: Run local development with proportionate governance
+    aliases: [workflow-bind, trusted-development, minimum-guardrails]
+    tasks:
+      - distinguish isolated checks from shared-resource workflows
+      - deliberately adopt task-based binding without duplicate consent
+      - retain current task checks and honest per-run evidence
+    symbols: [project-governance workflow-bind, workflowAuthorization, bindConfiguredWorkflow]
+    reference: docs/specs/engine-workflow-and-device-contract.md
+    guides:
+      - docs/developer/guides/local-development.md
+    sources:
+      - components/engine/src/workflow-authorization.ts
+      - components/engine/scripts/workflow-host-binding.mjs
+      - components/engine/src/cli.ts
   - id: supplied-evidence-evaluation
     title: Ask advisory questions about supplied text and images
     aliases: [image-evaluation, visual-checkpoints, evaluation-api]

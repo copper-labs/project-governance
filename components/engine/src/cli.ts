@@ -58,7 +58,7 @@ import { realpathSync, existsSync } from "node:fs";
 import { resolveChangeScope, ValidationSubject } from "./change-subject.ts";
 import { loadSubjectPacks } from "./pack-configuration.ts";
 import { buildPlan } from "./planning.ts";
-import { join } from "node:path";
+import { join, resolve, dirname, basename } from "node:path";
 import { checkTelemetry, reviewCheckRun } from "./check-telemetry.ts";
 import { checkRunRoot } from "./check-run.ts";
 import { requestCheckCancellation } from "./check-cancellation.ts";
@@ -191,6 +191,7 @@ Project setup and context:
 Operations:
   evaluate --request-file <local JSON>
   telemetry | context-evaluate | resource-status | resource-maintenance
+  workflow-bind --request <json> --receipt <json>
   workflow-wait | workflow-diagnose | workflow-recover-observation | workflow-resume-cleanup
   command-resume-cleanup | command-recover | command-reconcile
     --directory <command-directory> --digest <request-digest> [--authority <authority>]
@@ -325,6 +326,31 @@ Use the owning command contract for structured request fields.
       const result = repositoryMap(new ValidationSubject(process.cwd(), scope));
       console.log(JSON.stringify({ ...result, source: { base: scope.base_ref, mode: scope.mode, changes: scope.subject_digest } }));
       return result.issues.length ? 2 : 0;
+    }
+    if (command === "workflow-bind") {
+      const adapterUrl = new URL("../assets/host/workflow-host-binding.mjs", import.meta.url);
+      const adapter = await import(adapterUrl.href);
+      try {
+        const { values } = parseArgs({ args: args.slice(1), strict: true, options: {
+          request: { type: "string" }, receipt: { type: "string" },
+        } });
+        if (!values.request || !values.receipt) throw new Error("Workflow binding requires --request and --receipt");
+        const path = resolve(values.request);
+        const request = JSON.parse(narrativeFile(dirname(path), basename(path)));
+        if (typeof request?.workspace !== "string" || !request.workspace.trim()) throw new Error("Workflow binding requires a workspace path");
+        if (realpathSync(request.workspace) !== realpathSync(process.cwd())) throw new Error("Workflow binding requires the current worktree root");
+        const packageRoot = realpathSync(fileURLToPath(new URL("../../../", import.meta.url)));
+        if (request.runtimePackage && realpathSync(request.runtimePackage) !== packageRoot) throw new Error("Workflow binding must use the invoked runtime package");
+        const host = await adapter.loadHost(packageRoot);
+        const result = await adapter.bindConfiguredWorkflow(host, request, values.receipt);
+        console.log(JSON.stringify({ status: result.status, approvalRoute: result.approvalRoute,
+          actionId: result.binding.actionId, authorityRef: result.binding.authorityRef,
+          operationId: result.binding.operationId, replayed: result.replayed, receipt: resolve(values.receipt) }));
+        return 0;
+      } catch (error) {
+        console.error(JSON.stringify(adapter.workflowBindingRefusal(error)));
+        return 1;
+      }
     }
     if (command === "workflow-diagnose") {
       const response = await withDecisionCancellation(options => workflowDiagnoseCommand(args.slice(1), options));

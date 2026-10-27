@@ -172,3 +172,6 @@ The [repository-index research](research/2026-09-25-repository-index-harness-pra
 comparisons and worktree/database boundaries. The
 [computer-use research](research/2026-09-25-jev-computer-use.md) remains exploratory; it does not
 declare another executor part of the current release.
+
+The approved [minimum useful governance plan](exec-plans/active/2026-10-27-minimum-useful-governance.md)
+owns the 4.4 local-workflow simplification and its release checkpoint.

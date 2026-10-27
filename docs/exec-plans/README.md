@@ -21,6 +21,10 @@ shows existing project-owned checks; it does not require a check after every edi
 
 ## Active
 
+- [Minimum useful governance](active/2026-10-27-minimum-useful-governance.md)
+  owns deliberate task-based local workflow binding, proportionate development guidance,
+  independent review and stable 4.4 qualification. Adopter activation remains separate.
+
 - [Committed pre-push capture repair](active/2026-10-10-committed-pre-push-capture.md)
   binds native checks to the actual pushed commit and preserves bounded preparation diagnostics.
   Qualification and deliberate local candidate adoption remain separate from publication.

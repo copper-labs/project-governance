@@ -76,7 +76,10 @@ existing installed `host/v1` API without changing the runtime pin. The owning
 [workflow contract](../../../../docs/specs/engine-workflow-and-device-contract.md#operator-workflow-binding-adapter)
 defines its request, native human confirmation, exact binding, replay and limits.
 The adapter lives at `components/engine/scripts/workflow-host-binding.mjs`; it does
-not consume a model-written approval file or treat an authority string as approval.
+not treat an authority string as approval. In 4.4, an explicitly adopted project policy file may
+select [task-based binding](../../../../docs/specs/engine-workflow-and-device-contract.md#configured-local-development-binding-44);
+that editable file is policy, not authenticated human approval. Older pinned hosts keep native
+operator confirmation through this adapter.
 Host qualification remains limited to the entry actually exercised. The general
 Codex callback integration is still separate work.
 

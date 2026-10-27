@@ -10,6 +10,7 @@ export type { Recipe, RunBinding, RunState } from "./workflow-types.ts";
 export type { WorkflowRun } from "./workflow-store.ts";
 export type { WorkflowGrant, WorkflowGrantRecord } from "./workflow-grant.ts";
 export { validateWorkflowGrant, validateWorkflowGrantUse } from "./workflow-grant.ts";
+export { workflowAuthorization, assertWorkflowAuthorization } from "./workflow-authorization.ts";
 export { digest, fileDigest } from "./core.ts";
 export { ResourceRegistry, resourceRegistryPath } from "./resources.ts";
 

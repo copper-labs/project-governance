@@ -4,8 +4,14 @@ Read the selected runtime's `test-execution/SKILL.md` through `skill-read` befor
 check or workflow. The project owns commands, prerequisites, assertions, devices and toolchains.
 The engine owns durable dispatch, resource coordination, observation and result receipts.
 
-Use detached checks for governed pack execution and authorized workflow recipes for build/device
-operations. Preserve the returned run identity and task/action authority. Submission replay must
+Use configured checks for genuinely isolated work and authorized workflow recipes for shared
+build/device resources or coordinated cleanup. Check execution does not acquire workflow leases.
+A small fix does not need new plan machinery or a diagnostic exception. Keep existing project
+requirements and consolidate broader proof at useful batch boundaries. Run normal hooks once at
+their boundary; reuse valid evidence instead of adding reassurance runs.
+Use the installed `workflow-bind` entry for fresh coordinated runs. Deliberately adopted task policy
+removes duplicate consent without changing task checks, resource custody or result evidence.
+Preserve the returned run identity and task/action authority. Submission replay must
 attach to the same operation; changed input is not permission to reuse stale evidence. Never launch
 another run solely because observation expired or a completion notice was duplicated.
 

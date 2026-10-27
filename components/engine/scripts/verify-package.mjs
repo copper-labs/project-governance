@@ -9,7 +9,7 @@ import { verifyEvaluationProducers } from "../test/fixtures/release-evaluation-p
 import { verifyCheckRecovery } from "./verify-check-recovery.mjs";
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { pathToFileURL } from 'node:url';
+import { pathToFileURL, fileURLToPath } from 'node:url';
 import { verifyDecisionPilot } from "./verify-decision-pilot.mjs";
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -51,6 +51,11 @@ try {
   const beforeStaging = readFileSync(join(pkg, "package.json"));
   const staging = await verifyExplicitStaging(pkg, archive, manifest, root);
   assert.deepEqual(readFileSync(join(pkg, "package.json")), beforeStaging, "Staging must preserve the installed parent package");
+  execFileSync(process.execPath, ['--test', fileURLToPath(new URL('./workflow-host-binding.test.mjs', import.meta.url))], {
+    encoding: 'utf8', timeout: 120000, env: { ...process.env,
+      GOVERNANCE_HOST_TEST_PACKAGE: join(staging.generationDirectory, 'node_modules/@organta/project-governance'),
+      GOVERNANCE_HOST_TEST_GENERATION: staging.generationDirectory },
+  });
   const pilot = await verifyDecisionPilot(pkg, { generationDirectory: staging.generationDirectory });
   const experiments = await verifyDecisionExperiments(pkg);
   const prompt = await verifyRc6Prompt(pkg, archive);
@@ -61,8 +66,8 @@ try {
     : { status: 'unqualified', reason: 'qualified-backend-tools-explicitly-unavailable', execution: 'not-performed' };
   const receipt = { status: installedLint.status === 'passed' ? 'passed' : 'unqualified', evidence_directory: root,
     staging, prompt, greenfield, batchReview, majorDelivery, installedLint, pythonParser, decisionPilot: pilot, experiments,
-    hostApi: 'passed', version: manifest.version, installedCommand: 'passed',
-    scope: 'offline installation and inactive staging, original evaluation producers, installed greenfield first-task, deterministic delivery/lint setup, explicit real-backend qualification and batch-before-review preparation proof, compiled Python source/comment analysis, public host API and decision consumers with fixture inference; not full semantic qualification, accepted ordinary tasks or release provenance; no live device or benefit claim' };
+    hostApi: 'passed', workflowBinding: 'passed', version: manifest.version, installedCommand: 'passed',
+    scope: 'offline installation and inactive staging, original evaluation producers, installed greenfield first-task, deterministic delivery/lint setup, explicit real-backend qualification and batch-before-review preparation proof, compiled Python source/comment analysis, public host API, configured workflow binding and decision consumers with fixture inference; not full semantic qualification, accepted ordinary tasks or release provenance; no live device or benefit claim' };
   writeFileSync(join(root, 'archive-proof-receipt.json'), JSON.stringify(receipt, null, 2) + '\n');
   console.log(JSON.stringify(receipt));
   if (receipt.status !== 'passed') process.exitCode = 2;
