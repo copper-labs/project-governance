@@ -6,6 +6,7 @@ import { inspectRuntimeGeneration } from "./runtime-inspection.ts";
 import { digest, text } from "./core.ts";
 
 export const RUNTIME_MAINTENANCE_MESSAGE = "Runtime admission stopped for maintenance";
+export interface InstallationStartupReader { token:string; owner:string; revision:number; directory:string }
 
 /** Installation coordination only; task state and execution authority remain in their existing ledgers. */
 export class RuntimeGenerations {
@@ -123,6 +124,9 @@ export class RuntimeGenerations {
     if (!/^startup-task:sha256:[a-f0-9]{64}$/u.test(reader.owner)) throw new Error("Startup reader required");
     return this.#transaction(() => {
       if (this.state().maintenance?.owner === `startup-update:${digest(reader)}`) return false;
+      const maintenance=this.state().maintenance;
+      if(maintenance && this.#db.prepare("SELECT 1 FROM completion_requirements WHERE token=? AND owner=? AND kind='startupHandoff' AND digest=?")
+        .get(String(maintenance.token),String(maintenance.owner),digest(reader)))return false;
       const row = this.#db.prepare("SELECT owner,revision FROM readers WHERE token=?").get(reader.token);
       if (row && (row.owner !== reader.owner || row.revision !== reader.revision)) throw new Error("Startup reader ownership changed");
       if (row) this.#db.prepare("DELETE FROM readers WHERE token=? AND owner=? AND revision=?").run(reader.token, reader.owner, reader.revision);
@@ -165,6 +169,51 @@ export class RuntimeGenerations {
       const token = operationToken ?? randomUUID();
       this.#db.prepare("INSERT INTO maintenance VALUES(1,?,?)").run(token, owner);
       return { token, owner, revision: state.revision };
+    });
+  }
+  /** Preserve the explicit operation's exclusion while exchanging its sole native parent reader. */
+  handoffInstallationReader(token:string,owner:string,reader:InstallationStartupReader,replayOnly=false) {
+    if(!/^startup-task:sha256:[a-f0-9]{64}$/u.test(reader.owner) || !reader.token || !reader.directory || !Number.isSafeInteger(reader.revision))
+      throw new Error("Exact installation startup reader required");
+    return this.#transaction(()=>{
+      const state=this.state(),identity=digest(reader);
+      if(state.maintenance?.token!==token || state.maintenance.owner!==owner ||
+        state.revision!==reader.revision || state.directory!==reader.directory)
+        throw new Error("Installation handoff ownership or generation changed");
+      const prior=this.#db.prepare("SELECT owner,digest FROM completion_requirements WHERE token=? AND kind='startupHandoff'").get(token);
+      if(prior) {
+        if(prior.owner!==owner || prior.digest!==identity || state.readers.length)throw new Error("Installation handoff replay differs");
+        return;
+      }
+      if(replayOnly)throw new Error("Absent parent recovery requires an already consumed installation handoff");
+      const held=state.readers[0];
+      if(state.readers.length!==1 || held?.token!==reader.token || held.owner!==reader.owner || held.revision!==reader.revision)
+        throw new Error("Installation handoff requires the sole recorded parent reader");
+      this.#db.prepare("INSERT INTO completion_requirements VALUES(?,?,'startupHandoff',?)").run(token,owner,identity);
+      this.#db.prepare("DELETE FROM readers WHERE token=? AND owner=? AND revision=?").run(reader.token,reader.owner,reader.revision);
+    });
+  }
+  cancelInstallationHandoff(token:string,owner:string,reader:InstallationStartupReader,closed=false) {
+    return this.#transaction(()=>{
+      const state=this.state(),receipt={kind:"installation-cancelled",startupReader:reader};
+      const prior=this.#db.prepare("SELECT owner,revision,receipt FROM finalizations WHERE token=?").get(token);
+      if(prior) {
+        if(prior.owner!==owner || prior.revision!==reader.revision || digest(JSON.parse(String(prior.receipt)))!==digest(receipt))
+          throw new Error("Installation cancellation replay differs");
+        return reader;
+      }
+      if(state.revision!==reader.revision || state.directory!==reader.directory ||
+        state.maintenance?.token!==token || state.maintenance.owner!==owner)
+        throw new Error("Installation cancellation requires the original drained generation");
+      const requirements=this.#db.prepare("SELECT owner,kind,digest FROM completion_requirements WHERE token=?").all(token);
+      const unconsumed=!requirements.length && state.readers.some(row=>row.token===reader.token && row.owner===reader.owner && row.revision===reader.revision);
+      const retiredBeforeConsumption=closed && !requirements.length && !state.readers.some(row=>row.token===reader.token || row.owner===reader.owner);
+      if(!unconsumed && !retiredBeforeConsumption && (state.readers.length || requirements.length!==1 || requirements[0]?.kind!=="startupHandoff" || requirements[0].owner!==owner || requirements[0].digest!==digest(reader)))
+        throw new Error("Installation cancellation requires the exact handoff before activation");
+      if(!unconsumed && !closed)this.#db.prepare("INSERT INTO readers VALUES(?,?,?)").run(reader.token,reader.revision,reader.owner);
+      this.#db.prepare("INSERT INTO finalizations VALUES(?,?,?,?)").run(token,owner,state.revision,JSON.stringify(receipt));
+      this.#db.prepare("DELETE FROM maintenance WHERE token=? AND owner=?").run(token,owner);
+      return reader;
     });
   }
   /** Exchange exactly one parent reservation for exclusion in a single SQLite transaction. */
@@ -272,16 +321,22 @@ export class RuntimeGenerations {
     const row = this.#db.prepare("SELECT revision,receipt FROM finalizations WHERE token=? AND owner=?").get(token, owner);
     return row ? { revision: Number(row.revision), receipt: JSON.parse(String(row.receipt)) } : null;
   }
-  finishMaintenance(token: string, owner: string, revision: number, receipt: { lockDigest: string; readback: string; workspace: string; preservedInputsDigest?: string; hostInstructionsDigest?: string; legacyHistoryDigest?: string }) {
+  finishMaintenance(token: string, owner: string, revision: number, receipt: { lockDigest: string; readback: string; workspace: string; preservedInputsDigest?: string; hostInstructionsDigest?: string; legacyHistoryDigest?: string }, startupReader?:InstallationStartupReader) {
     return this.#transaction(() => {
       const state = this.state();
       if (state.revision !== revision || state.readers.length || state.written) throw new Error("Activation readback no longer identifies a drained pre-write generation");
       for (const requirement of this.#db.prepare("SELECT owner,kind,digest FROM completion_requirements WHERE token=?").all(token)) {
-        const observed = requirement.kind === "preservedInputsDigest" ? receipt.preservedInputsDigest : requirement.kind === "hostInstructionsDigest" ? receipt.hostInstructionsDigest : requirement.kind === "legacyHistoryDigest" ? receipt.legacyHistoryDigest : undefined;
+        const observed = requirement.kind === "startupHandoff" && startupReader ? digest(startupReader) : requirement.kind === "preservedInputsDigest" ? receipt.preservedInputsDigest : requirement.kind === "hostInstructionsDigest" ? receipt.hostInstructionsDigest : requirement.kind === "legacyHistoryDigest" ? receipt.legacyHistoryDigest : undefined;
         if (requirement.owner !== owner || requirement.digest !== observed) throw new Error(requirement.kind === "preservedInputsDigest" ? "Forward repair preservation readback required" : requirement.kind === "legacyHistoryDigest" ? "Legacy history readback required" : "Host instruction completion readback required");
       }
+      if(startupReader) {
+        const held=this.#db.prepare("SELECT owner,digest FROM completion_requirements WHERE token=? AND kind='startupHandoff'").get(token);
+        if(held?.owner!==owner || held.digest!==digest(startupReader) || state.revision!==startupReader.revision+1 ||
+          !state.directory || state.directory===startupReader.directory)throw new Error("Installation successor reader differs");
+        this.#db.prepare("INSERT INTO readers VALUES(?,?,?)").run(startupReader.token,state.revision,startupReader.owner);
+      }
       if (this.#db.prepare("DELETE FROM maintenance WHERE id=1 AND token=? AND owner=?").run(token, owner).changes !== 1) throw new Error("Maintenance ownership mismatch");
-      this.#db.prepare("INSERT INTO finalizations VALUES(?,?,?,?)").run(token, owner, revision, JSON.stringify(receipt));
+      this.#db.prepare("INSERT INTO finalizations VALUES(?,?,?,?)").run(token, owner, revision, JSON.stringify({...receipt,...(startupReader?{startupReader}:{})}));
       return this.state();
     });
   }

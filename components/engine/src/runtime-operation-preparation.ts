@@ -30,7 +30,7 @@ export interface RuntimePreparation {
  * when applicable, throughout this call and the subsequent transition.
  */
 export async function prepareRuntimeOperation(input: RuntimePreparation, operationDirectory: string,
-  validateScope: () => void) {
+  validateScope: () => void, handoff?:()=>void) {
   if (input.mode !== undefined && !["init","update","repair"].includes(input.mode))throw new Error("Invalid installation mode");
   if(input.lockedCheckout!==undefined && (input.lockedCheckout!==true || input.mode!=="init"))throw new Error("Locked checkout requires explicit initial installation");
   if (input.mode === "repair" && (input.hostPlan || input.startupReceipts))throw new Error("Forward repair cannot change host instructions");
@@ -60,6 +60,7 @@ export async function prepareRuntimeOperation(input: RuntimePreparation, operati
   let maintenance;
   try {maintenance=generations.beginMaintenance(saved.owner,request.expectedRevision,saved.token);}
   finally{generations.close();}
+  handoff?.();
   const backup=await backupRuntimeOperation(request.registry,maintenance.token,maintenance.owner,
     request.inputs,join(directory,"backup"),validateScope);
   const prepared={version:1,state:"prepared",requestDigest:saved.requestDigest,workspace:request.workspace,

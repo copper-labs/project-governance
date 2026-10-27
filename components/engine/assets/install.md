@@ -78,6 +78,23 @@ Repeat the identical request and operation directory to resume. Changed input or
 requires reconciliation, not deleting receipts, stealing ownership or creating a second installation.
 An error can retain maintenance while recovery obligations remain unresolved.
 
+For an explicit compiled update blocked only by this chat's startup reader, 4.4.1 adds
+`--handoff-startup` to that same update invocation. Supply the worktree's `startupReceipts` store.
+The caller must still be the recorded native parent; other readers must drain. The operation
+temporarily consumes only that parent reservation and restores it on the verified successor.
+To use the repair from an older runtime, invoke the verified unpacked 4.4.1 compiled CLI with the
+original request, plan and operation directory. This preserves the staged candidate; it does not
+edit the old installed payload or replace the requested target version.
+
+Repeat that invocation to resume after interruption. Before activation, replace `--handoff-startup`
+with `--cancel-handoff` to restore the original reservation and end the attempt. Cancellation refuses
+after activation or another required mutation begins. Never delete a live reader, forge SessionEnd,
+or relabel a release as automatically compatible to get past this boundary.
+If the recorded native parent has exited, the same retained completion/cancellation route requires
+positive local process absence. It cannot take a new reader or recover a different live parent's
+operation. An open task whose dead owner has been restored still uses the existing startup
+absent-owner recovery to retire that reservation; no synthetic SessionEnd is needed.
+
 After completion, run the repository-local launcher with `doctor`. Verify the exact lock, launcher,
 required project workflow, retained evidence and cleanup. Init creates missing profile, facts, ignore
 and hook files, preserving authored files. Hook-file creation alone does not configure Git: inspect

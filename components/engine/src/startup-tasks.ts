@@ -66,6 +66,42 @@ export class StartupTasks {
    this.#db.exec("COMMIT");
   }catch(error){this.#db.exec("ROLLBACK");throw error;}
  }
+ /** Reconcile an explicit installation with native closure, including an older hook's retained history. */
+ completeInstallation(taskId:string,binding:NonNullable<ReturnType<StartupTasks["owner"]>>,operationToken:string,
+  lockDigest:string,cancelled:boolean,finalize:(closed:boolean)=>RuntimeReader,retire:(reader:RuntimeReader)=>void) {
+  const bindingDigest=digest(binding);
+  this.#db.exec("BEGIN IMMEDIATE");
+  try {
+   const task=this.#db.prepare("SELECT state,result,lock_digest FROM tasks WHERE id=?").get(taskId);
+   if(!task)throw new Error("Installation startup task missing");
+   const prior=task.result?JSON.parse(String(task.result)):null;
+   const status=cancelled?"installation-cancelled":"installation-updated";
+   if(prior?.operationToken===operationToken && prior.status===status) {
+    if(prior.previousBindingDigest!==bindingDigest || prior.lockDigest!==lockDigest || task.lock_digest!==lockDigest)
+     throw new Error("Installation startup replay differs");
+    this.#db.exec("COMMIT");return prior.reader as RuntimeReader;
+   }
+   const current=this.owner(taskId);
+   const retired=!current && task.state==="closed" && this.#db.prepare("SELECT binding FROM owner_history WHERE task_id=?").all(taskId)
+    .some(row=>{
+     const history=JSON.parse(String(row.binding));
+     return canonical(history)===canonical(binding) ||
+      (history.bindingDigest===bindingDigest && history.recovery?.reservation==="released" && canonical(history.binding)===canonical(binding));
+    });
+   if(!retired && (!current || digest(current)!==bindingDigest))throw new Error("Installation startup binding changed");
+   const reader=finalize(task.state==="closed"),old=binding.reader;
+   if(reader.registry!==old.registry || reader.owner!==old.owner || reader.token!==old.token ||
+    reader.revision!==old.revision+(cancelled?0:1) || (cancelled?reader.directory!==old.directory:reader.directory===old.directory))
+    throw new Error("Installation startup restoration differs");
+   const result={status,operationToken,lockDigest,previousBindingDigest:bindingDigest,reader};
+   this.#db.prepare("INSERT OR IGNORE INTO owner_history VALUES(?,?)").run(taskId,canonical({binding,priorResult:prior,installation:result}));
+   if(task.state==="closed") {
+    retire(reader);this.#db.prepare("DELETE FROM owners WHERE task_id=?").run(taskId);
+   }else this.#db.prepare("UPDATE owners SET binding=? WHERE task_id=?").run(canonical({host:binding.host,reader}),taskId);
+   this.#db.prepare("UPDATE tasks SET lock_digest=?,discovery='complete',result=? WHERE id=?").run(lockDigest,canonical(result),taskId);
+   this.#db.exec("COMMIT");return reader;
+  }catch(error){this.#db.exec("ROLLBACK");throw error;}
+ }
  /** Hold the task transaction across finalization so SessionEnd cannot retire the old binding midway. */
  completeUpdate(taskId:string,expectedBinding:string,lockDigest:string,commit:string,
   finalize:(binding:NonNullable<ReturnType<StartupTasks["owner"]>>)=>RuntimeReader,

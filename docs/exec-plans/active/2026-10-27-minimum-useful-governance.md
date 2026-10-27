@@ -82,3 +82,44 @@ Normal commit/push hooks and publication/readback are the remaining operational 
 checkpoint. Their completion belongs in the external release record, whose final source commit and
 archive identities cannot be known before this commit. No adopter is upgraded by publication.
 Concurrent recovery changes and the separate staged cadence candidate remain excluded.
+
+## Explicit update handoff repair
+
+4.4.0 publication and readback completed. A deliberate update can still block on the owning
+native chat's startup reservation after its command readers drain. The operator's implementation,
+review and release approval and continued approval-repair goal cover this correction. Target 4.4.1.
+
+Extend the explicit update route with an owning-parent handoff. Preserve the saved operation and
+candidate; bind native host, task, startup binding, reader, generation and maintenance token.
+Exchange only the sole parent reader under existing maintenance. Use the existing completion
+requirement ledger so an older completion path cannot reopen admission without restoring ownership.
+Serialize task finalization with native lifecycle events; retain replay evidence across both stores.
+Before activation, cancellation restores the old reservation. After activation, require completion
+or existing verified recovery; never discard writes. No forced process stop or automatic-update
+compatibility change. An explicit unpacked release entry supports adoption from older runtimes.
+
+- [x] Implement the explicit handoff and owning specification with focused failure/replay fixtures.
+- [x] Run runtime/startup owner tests and typecheck; qualify the real packaged update route.
+- [x] Run integrated release proof once, obtain Opus 5.5 high review and reconcile affected findings.
+- [ ] Commit through normal hooks and publish/read back the stable patch.
+
+The checkpoint covers another reader/session, changed binding/token/generation, native hook races,
+interruption at either ledger, cancellation, successor restoration and retained-operation replay.
+Use synthetic fixtures; do not mutate an adopter to obtain proof. Research basis: SQLite's
+[transaction contract](https://www.sqlite.org/lang_transaction.html) and
+[atomic commit description](https://www.sqlite.org/atomiccommit.html), reviewed 2026-10-27.
+Short immediate transactions serialize each ledger; cross-ledger completion must be idempotent.
+The pages expose no publication/update date. Their guarantees do not prove this implementation.
+
+The handoff correction is qualified. Initial integrated proof passed 1,171 engine, 82 continuity
+and 142 script cases, with 22 explicit skips. Review corrections passed 33 affected cases, then
+29 owner/recovery cases after the final history correction. Build and typecheck passed. The final
+exact archive passed five explicit-update scenarios, including an older retained candidate,
+absent-parent completion/cancellation and cancellation after owner recovery before consumption.
+Unchanged archive owners retain original proof; final compiled source correspondence is exact.
+
+Opus 5.5 high-effort review and focused rechecks closed all material findings. The last review
+found no actionable issue. A shared native host that remains alive still blocks absence proof;
+the original chat can complete or cancel. These fixtures establish neither ordinary development
+acceptance nor device/provider proof. Normal commit/push hooks and stable publication/readback
+remain operational steps, recorded externally against the final commit and archive.

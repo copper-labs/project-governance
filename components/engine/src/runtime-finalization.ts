@@ -6,7 +6,7 @@ import { execFileSync } from "node:child_process";
 import { realpathSync } from "node:fs";
 import { join } from "node:path";
 import { parse } from "yaml";
-import { RuntimeGenerations } from "./runtime-generations.ts";
+import { RuntimeGenerations, type InstallationStartupReader } from "./runtime-generations.ts";
 import { inspectRuntimeGeneration } from "./runtime-inspection.ts";
 import { runtimeLauncher } from "./runtime-launcher.ts";
 import { compiledRuntimeLock } from "./runtime-lock.ts";
@@ -15,7 +15,7 @@ import { digest } from "./core.ts";
 import { commandEnvironment } from "./process-owner.ts";
 
 /** Reopen admission only after the installed entry point and product lock agree with native readback. */
-export function finalizeRuntimeActivation(registry: string, workspace: string, token: string, owner: string, preservedInputsDigest?: string, hostInstructionsDigest?: string, history?: LegacyHistoryRequirement) {
+export function finalizeRuntimeActivation(registry: string, workspace: string, token: string, owner: string, preservedInputsDigest?: string, hostInstructionsDigest?: string, history?: LegacyHistoryRequirement, startupReader?:InstallationStartupReader) {
   workspace = realpathSync(workspace); registry = realpathSync(registry);
   assertNoWheelInterpreterDependency(workspace);
   assertNoLegacyStartupHooks(workspace);
@@ -33,6 +33,8 @@ export function finalizeRuntimeActivation(registry: string, workspace: string, t
     const lock = compiledRuntimeLock(parse(narrativeFile(workspace, lockPath)));
     if (digest(lock) !== installed.lockDigest || narrativeFile(workspace, launcher) !== runtimeLauncher(realpathSync(process.execPath), String(installed.executable), registry, workspace)) throw new Error("Activation entry point or lock changed");
     if (completed) {
+      if(digest((completed.receipt as unknown as {startupReader?:InstallationStartupReader}).startupReader??null)!==digest(startupReader??null))
+        throw new Error("Completed installation handoff differs");
       if (completed.receipt.legacyHistoryDigest !== legacyHistoryDigest) throw new Error("Completed legacy history identity changed");
       if (completed.receipt.hostInstructionsDigest !== hostInstructionsDigest) throw new Error("Completed host instruction identity changed");
       if (completed.receipt.lockDigest !== installed.lockDigest || (preservedInputsDigest !== undefined && completed.receipt.preservedInputsDigest !== preservedInputsDigest)) throw new Error("Completed activation identity changed");
@@ -42,6 +44,6 @@ export function finalizeRuntimeActivation(registry: string, workspace: string, t
       env: { ...commandEnvironment({}), GOVERNANCE_MAINTENANCE_PROBE: token } }).trim();
     if (readback !== `project-governance ${lock.version}`) throw new Error("Installed launcher version readback failed");
     if (history && verifyLegacyHistory(workspace,history) !== legacyHistoryDigest) throw new Error("Legacy history changed during activation readback");
-    return { state: generations.finishMaintenance(token, owner, state.revision, { lockDigest: installed.lockDigest, readback, workspace, ...(preservedInputsDigest ? { preservedInputsDigest } : {}), ...(hostInstructionsDigest ? { hostInstructionsDigest } : {}), ...(legacyHistoryDigest ? { legacyHistoryDigest } : {}) }), lockDigest: installed.lockDigest, readback };
+    return { state: generations.finishMaintenance(token, owner, state.revision, { lockDigest: installed.lockDigest, readback, workspace, ...(preservedInputsDigest ? { preservedInputsDigest } : {}), ...(hostInstructionsDigest ? { hostInstructionsDigest } : {}), ...(legacyHistoryDigest ? { legacyHistoryDigest } : {}) }, startupReader), lockDigest: installed.lockDigest, readback };
   } finally { generations.close(); }
 }

@@ -493,7 +493,7 @@ test("inactive installation verifies identity and preserves a failed-generation 
       assert.deepEqual(readFileSync(join(updatePreparation.backup,"backup.json")),backupReceiptBefore);
       rmSync(newPolicy);
       const updateResult=await runtimeOperationCommand("update",["--request-file",updateRequestPath,
-        "--operation-directory",updateOperation,"--project-plan",updatePlanPath]);
+        "--operation-directory",updateOperation,"--project-plan",updatePlanPath]) as Awaited<ReturnType<typeof completePreparedRuntimeOperation>>;
       assert.equal(updateResult.state.maintenance,null);
       assert.equal(updateResult.state.directory,updatePreparation.candidate);
       assert.deepEqual(readFileSync(preparedPath),preparedBytes);

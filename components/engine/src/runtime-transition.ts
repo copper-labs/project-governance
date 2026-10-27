@@ -45,8 +45,9 @@ export function prepareRuntimeTransition(registry: string, workspace: string, ca
 }
 
 export function completeRuntimeTransition(registry: string, workspace: string, candidate: string,
-  backupDirectory: string, inputs: BackupInput[], token: string, owner: string, history?: LegacyHistoryRequirement) {
+  backupDirectory: string, inputs: BackupInput[], token: string, owner: string, history?: LegacyHistoryRequirement,
+  finalize:typeof finalizeRuntimeActivation=finalizeRuntimeActivation) {
   if (history) requireLegacyHistory(registry,workspace,token,owner,history);
   const prepared = prepareRuntimeTransition(registry, workspace, candidate, backupDirectory, inputs, token, owner);
-  return { ...finalizeRuntimeActivation(registry, workspace, token, owner, undefined, undefined, history), backupDigest: prepared.backupDigest };
+  return { ...finalize(registry, workspace, token, owner, undefined, undefined, history), backupDigest: prepared.backupDigest };
 }

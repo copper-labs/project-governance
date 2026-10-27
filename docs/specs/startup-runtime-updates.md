@@ -102,6 +102,45 @@ runtime access; replacement requires exclusive access. Native startup reservatio
 participating tasks. Missing lifecycle evidence does not prove another task has finished. Do not
 kill processes, delete their locks, or age out active ownership to make an upgrade possible.
 
+### Explicit update from the owning live chat
+
+Compiled 4.4.1 adds `update --handoff-startup` to the explicit request/operation/plan route.
+It preserves a previously staged candidate and operation token. The caller must be the recorded
+native parent, with the same process identity, task binding and generation. Other readers must drain.
+The existing maintenance owner exchanges only that parent's reader for a completion requirement
+in one transaction. An older finalizer cannot complete that requirement. This does not mark a
+session ended or make an integration-changing release eligible for automatic startup adoption.
+
+Completion verifies the installed lock and launcher, restores the parent's successor reservation,
+and updates the startup binding. Task and registry completion replay after interruption. A real
+SessionEnd during the operation is respected, including an older handler that already retired the
+binding into history; completion must not resurrect that closed task. A per-operation SQLite mutex
+prevents update/cancellation overlap and releases automatically when its process exits. It carries
+no grant or task authority. The existing single-updater-per-worktree requirement still applies.
+
+Before activation, the same request with `--cancel-handoff` restores the original reservation and
+ends this operation. It also handles interruption after saved intent but before consumption. Once
+activation or other required mutation begins, cancellation refuses; resume completion or use the
+existing verified recovery route. New hooks retain the binding during a handoff. Older native close
+events remain reconcilable through their exact retained owner history.
+
+Taking a reservation always requires the live owning parent. Completing or cancelling a recorded
+handoff may instead use the existing positive local host-absence proof. A different live PID,
+reused PID, foreign machine or delegated worker cannot use that route. Recovery before backup may
+replay an already-consumed reservation, but cannot consume a new one for an absent parent. Completion
+leaves an open task's restored reader available to the existing absent-owner recovery; it never
+fabricates SessionEnd. A closed task's reader is retired during completion. A native close event that
+times out behind existing task-store serialization still needs that normal absent-owner recovery.
+Recovery that already retired the original owner before consumption remains cancellable through its
+exact released-reservation history. A shared native host that stays alive still blocks absence proof;
+that case requires the original owning chat to complete or cancel.
+
+To bootstrap this repair from an older installed runtime, the owning chat runs the verified unpacked
+release's compiled CLI with the original request, project plan and operation directory plus
+`--handoff-startup`. The selected older payload is never edited. The candidate named by the original
+request remains the candidate; using a newer updater does not silently replace it. Changing the
+target release requires a separate deliberate operation after completion or cancellation.
+
 Refresh the assessment if unrelated edits or a commit appeared while discovery ran. Reuse verified
 artifacts. Recheck the actual mutation snapshot immediately before activation and commit. Changes
 inside the transaction or to its authority footprint require recovery or deferral, not silent reuse

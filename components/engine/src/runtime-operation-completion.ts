@@ -12,6 +12,7 @@ import { stageRuntimeOperation } from "./runtime-stage-operation.ts";
 import { completeRuntimeTransition } from "./runtime-transition.ts";
 import type { RuntimePreparation } from "./runtime-operation-preparation.ts";
 import { contextDoctor, type ContextReadiness } from "./context-doctor.ts";
+import { installationHandoffFinalizer } from "./runtime-installation-handoff.ts";
 
 /** A passive diagnostic cannot turn completed activation into failed installation authority. */
 export function runtimeContextReadinessSnapshot(workspace: string,
@@ -33,6 +34,7 @@ export async function completePreparedRuntimeOperation(operationDirectory: strin
   const saved=JSON.parse(narrativeFile(directory,join(directory,"operation.json")));
   const prepared=JSON.parse(narrativeFile(directory,join(directory,"prepared.json")));
   const request=saved.request as RuntimePreparation;
+  const finalize=installationHandoffFinalizer(directory,request);
   if(saved.requestDigest!==digest(request)||prepared.requestDigest!==saved.requestDigest||
       prepared.state!=="prepared"||prepared.workspace!==request.workspace||prepared.registry!==request.registry||
       saved.owner!==`installation:${directory}`||prepared.maintenance?.owner!==saved.owner||
@@ -50,9 +52,9 @@ export async function completePreparedRuntimeOperation(operationDirectory: strin
   if(request.mode==="init")installProjectDefaults(request.workspace,request.registry,prepared.backup,saved.token,saved.owner);
   const activated=request.mode==="repair" ? await forwardRepairRuntime(request.registry,request.workspace,prepared.candidate,
     prepared.backup,request.inputs,saved.token,saved.owner,request.history) : request.hostPlan ? completeHostInstructionTransition(request.registry,request.workspace,prepared.candidate,
-    prepared.backup,request.inputs,saved.token,saved.owner,request.hostPlan,COMPILED_HOST_BLOCK,request.history,request.startupReceipts)
+    prepared.backup,request.inputs,saved.token,saved.owner,request.hostPlan,COMPILED_HOST_BLOCK,request.history,request.startupReceipts,finalize)
     : completeRuntimeTransition(request.registry,request.workspace,prepared.candidate,
-      prepared.backup,request.inputs,saved.token,saved.owner,request.history);
+      prepared.backup,request.inputs,saved.token,saved.owner,request.history,finalize);
   const completedPath=join(directory,"completed.json");
   if(existsSync(completedPath)) {
     const retained=JSON.parse(narrativeFile(directory,completedPath));

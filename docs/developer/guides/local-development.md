@@ -39,6 +39,12 @@ permissions, user restrictions and project custody controls remain necessary.
 Absent configuration retains operator review. Invalid configuration refuses. Publication or package
 installation alone never opts a project in. See the [owning contract](../../specs/engine-workflow-and-device-contract.md#configured-local-development-binding-44).
 
+If the deliberate upgrade blocks on this chat's own runtime reader, the 4.4.1 installer supports
+an [owning-parent handoff](../../specs/startup-runtime-updates.md#explicit-update-from-the-owning-live-chat).
+Use the original update request and operation with `--handoff-startup`; other running work must drain.
+An older runtime can use the verified unpacked release's compiled updater without replacing its
+staged candidate or restarting Codex. Follow that release's packaged install guidance.
+
 ## Run and iterate
 
 From the worktree root, use its repository-local runtime:

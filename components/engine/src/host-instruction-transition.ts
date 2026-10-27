@@ -28,7 +28,8 @@ export function requireHostInstructionCompletion(registry: string, plan: ReturnT
 /** Resume a backed host update with generation activation and one final admission boundary. */
 export function completeHostInstructionTransition(registry: string, workspace: string, candidate: string,
   backupDirectory: string, inputs: BackupInput[], token: string, owner: string,
-  plan: ReturnType<typeof planHostInstructions>, block: string, history?: LegacyHistoryRequirement, startupReceipts?: string) {
+  plan: ReturnType<typeof planHostInstructions>, block: string, history?: LegacyHistoryRequirement, startupReceipts?: string,
+  finalize:typeof finalizeRuntimeActivation=finalizeRuntimeActivation) {
   if (history) requireLegacyHistory(registry,workspace,token,owner,history);
   if (realpathSync(workspace) !== plan.workspace) throw new Error("Host instruction workspace differs from transition");
   const required = requireHostInstructionCompletion(registry, plan, block, backupDirectory, token, owner, startupReceipts);
@@ -40,6 +41,6 @@ export function completeHostInstructionTransition(registry: string, workspace: s
   const verified = verifyHostInstructionBackup(plan, block, backupDirectory);
   if(required.startup && !backedStartupHookTransition(workspace,backupDirectory,startupReceipts)?.complete)throw new Error("Native hook completion readback required");
   if (!verified.complete) throw new Error("Host instruction completion readback required");
-  return { ...finalizeRuntimeActivation(registry, workspace, token, owner, undefined, required.hostInstructionsDigest, history),
+  return { ...finalize(registry, workspace, token, owner, undefined, required.hostInstructionsDigest, history),
     backupDigest: prepared.backupDigest, hostInstructionsDigest: required.hostInstructionsDigest };
 }

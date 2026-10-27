@@ -14,13 +14,15 @@ import { legacyMigrationInvocation } from "./legacy-migration-launch.ts";
 import { readCurrentMigrationPlan } from "./runtime-migration-plan.ts";
 import { MAX_BACKUP_INPUTS } from "./runtime-backup.ts";
 import { assertSharedStartupHookSource } from "./startup-hook-source.ts";
+import { installationHandoffPath,installationHandoff,prepareInstallationHandoff,cancelInstallationHandoff,withInstallationHandoffOwner } from "./runtime-installation-handoff.ts";
 
 /** Explicit local transition command; no package publication or implicit remote artifact selection. */
 export async function runtimeOperationCommand(command: "init" | "update" | "repair", args: string[],
-  installedScope?: {workspace:string;registry:string}) {
+  installedScope?: {workspace:string;registry:string}, handoffOwned=false):Promise<unknown> {
   const {values}=parseArgs({args,strict:true,allowPositionals:false,options:{
     "request-file":{type:"string"},"operation-directory":{type:"string"},"project-plan":{type:"string"},
     "request-digest":{type:"string"},
+    "handoff-startup":{type:"boolean"},"cancel-handoff":{type:"boolean"},
   }});
   if(!values["request-file"]||!values["operation-directory"]||!values["project-plan"])
     throw new Error("Installation request, operation directory and project plan required");
@@ -61,6 +63,11 @@ export async function runtimeOperationCommand(command: "init" | "update" | "repa
   if(command==="update" && !request.startupReceipts)assertPortableStartupCutover(workspace,request.registry);
   const savedPath=join(directory,"operation.json");
   const saved=existsSync(savedPath)?JSON.parse(narrativeFile(directory,savedPath)):null;
+  const handoff=Boolean(values["handoff-startup"] || values["cancel-handoff"] || existsSync(installationHandoffPath(directory)));
+  if(handoff && (command!=="update" || !request.startupReceipts))throw new Error("Installation handoff requires an explicit managed update");
+  if(handoff && !handoffOwned)return withInstallationHandoffOwner(directory,()=>runtimeOperationCommand(command,args,installedScope,true));
+  if(existsSync(installationHandoffPath(directory)))installationHandoff(directory,request,process.env,undefined,true);
+  if(values["cancel-handoff"])return cancelInstallationHandoff(directory,request);
   if(command === "init") {
     if(request.expectedRevision!==0 || request.history)throw new Error("Init requires a fresh installation");
     for(const name of ["config/governance/runtime.lock.yaml",".governance/runtime/bin/project-governance"]) {
@@ -76,6 +83,7 @@ export async function runtimeOperationCommand(command: "init" | "update" | "repa
   }
   const legacy=existsSync(join(workspace,"config/governance/runtime.lock.yaml")) &&
     parse(narrativeFile(workspace,"config/governance/runtime.lock.yaml"))?.schema_version===1;
+  if(handoff && (legacy || saved?.legacyLockRequired))throw new Error("Installation handoff requires a compiled installation; legacy migration retains its existing owner");
   if((legacy||saved?.legacyLockRequired) && !process.env.GOVERNANCE_LEGACY_LOCK_FD) {
     const cli=fileURLToPath(new URL(import.meta.url.endsWith(".ts")?"./cli.ts":"./cli.js",import.meta.url));
     const invocation=legacyMigrationInvocation(workspace,cli,[command,"--request-file",resolve(values["request-file"]),
@@ -100,7 +108,8 @@ export async function runtimeOperationCommand(command: "init" | "update" | "repa
         if(!entry)mkdirSync(path,{mode:0o700});
       }
     }
-    await prepareRuntimeOperation(request,directory,()=>{readCurrentMigrationPlan(values["project-plan"]!,plan.planDigest);});
+    await prepareRuntimeOperation(request,directory,()=>{readCurrentMigrationPlan(values["project-plan"]!,plan.planDigest);},
+      handoff?()=>prepareInstallationHandoff(directory,request):undefined);
   }
   return completePreparedRuntimeOperation(directory);
 }
