@@ -34,8 +34,8 @@ export async function verifyInstallationHandoff(packageRoot,archive,oldArchive=a
   artifact:{url:pathToFileURL(path).href,integrity:'sha512-'+createHash('sha512').update(readFileSync(path)).digest('base64')},
   source_commit:'a'.repeat(40),node:meta.engines.node,configuration_schema:1});
  const results=[];
- for(const scenario of ['successor','retained-candidate','absent-cancel','absent-complete','absent-retired-cancel']) {
-  const retainedOldCandidate=scenario==='retained-candidate',absent=scenario.startsWith('absent-'),retired=scenario==='absent-retired-cancel',cancel=scenario==='absent-cancel'||retired;
+ for(const scenario of ['successor','retained-candidate','absent-cancel','absent-complete','absent-retired-cancel','historical-lock','historical-lock-cancel']) {
+  const retainedOldCandidate=scenario==='retained-candidate',absent=scenario.startsWith('absent-'),retired=scenario==='absent-retired-cancel',cancel=scenario==='absent-cancel'||retired||scenario==='historical-lock-cancel';
   const area=join(root,scenario),workspace=join(area,'repo');mkdirSync(workspace,{recursive:true});
   execFileSync('git',['init','-q'],{cwd:workspace});
   const registry=join(area,'registry.sqlite'),receipts=join(area,'startup.sqlite');
@@ -52,7 +52,7 @@ export async function verifyInstallationHandoff(packageRoot,archive,oldArchive=a
   const generations=new RuntimeGenerations(registry),tasks=new StartupTasks(receipts);
   const lockPath=join(workspace,'config/governance/runtime.lock.yaml');
   const event={session_id:env.CODEX_THREAD_ID,hook_event_name:'SessionStart',source:'startup'};
-  const native=tasks.event('codex',event,workspace,fileDigest(lockPath),env);assert.ok(native.taskId);
+  const native=tasks.event('codex',event,workspace,scenario.startsWith('historical-lock')?'sha256:'+'b'.repeat(64):fileDigest(lockPath),env);assert.ok(native.taskId);
   let boundHost=host;
   if(absent) {
    // Seed a synthetic parent with a real exited local PID; recovery still uses the real process inventory.
@@ -70,7 +70,7 @@ export async function verifyInstallationHandoff(packageRoot,archive,oldArchive=a
   run(process.execPath,[cli,...args],2); // The actual packaged explicit update refuses its live parent without handoff.
   const originalOperation=readFileSync(join(operation,'operation.json'));
   const stagedReceipt=readFileSync(join(operation,'staging/request.json'));
-  if(absent) {
+  if(absent || scenario==='historical-lock-cancel') {
    const {prepareRuntimeOperation}=await module('runtime-operation-preparation');
    const {prepareInstallationHandoff}=await module('runtime-installation-handoff');
    const request=JSON.parse(readFileSync(nextRequestPath,'utf8'));
@@ -89,7 +89,7 @@ export async function verifyInstallationHandoff(packageRoot,archive,oldArchive=a
      prepared.maintenance.token,prepared.maintenance.owner,request.hostPlan,COMPILED_HOST_BLOCK,undefined,receipts,
      ()=>{throw new Error('fixture interruption after activation');}),/fixture interruption/);
    }
-   env.CODEX_THREAD_ID='new-recovery-parent';
+   if(absent)env.CODEX_THREAD_ID='new-recovery-parent';
   }
   const completed=run(process.execPath,[cli,...args,cancel?'--cancel-handoff':'--handoff-startup']);
   assert.equal(generations.state().maintenance,null);

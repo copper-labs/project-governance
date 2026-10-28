@@ -123,3 +123,32 @@ found no actionable issue. A shared native host that remains alive still blocks 
 the original chat can complete or cancel. These fixtures establish neither ordinary development
 acceptance nor device/provider proof. Normal commit/push hooks and stable publication/readback
 remain operational steps, recorded externally against the final commit and archive.
+
+## Historical discovery digest during explicit installation
+
+4.4.1 publication completed. Its explicit handoff incorrectly requires a task's discovery digest to
+match the current file even when the native owner holds a verified current generation after recovery.
+Correct only this explicit route: validate the current lock against the recorded installed generation
+when discovery is historical, retain current lock bytes for operation replay/cancellation, and leave
+automatic assessment freshness unchanged. No database schema, host ownership or publication policy
+changes. Do not refresh a stored digest by hand or reinterpret an old zero-write installation request.
+
+- [x] Reproduce the historical-digest refusal and implement current-generation verification.
+- [x] Check stale discovery, mismatched lock/payload, replay/cancel and current parent ownership.
+- [x] Build/typecheck, qualify the exact archive's affected update cases and reconcile Opus review.
+- [ ] Publish/read back 4.4.2 through normal hooks; record adoption separately.
+
+Reuse the unchanged 4.4.1 integrated/archive proof with explicit source/asset correspondence. Run
+owning source cases and all installed handoff scenarios at this checkpoint, including historical
+discovery completion and cancellation. This is a small correction inside the already qualified
+handoff boundary, not another full release matrix. SQLite's
+[isolation contract](https://www.sqlite.org/isolation.html) (updated 2022-04-18; reviewed 2026-10-27)
+reinforces retaining the existing final transaction's ownership recheck; it does not prove this code.
+
+The correction passed 24 initial focused cases, 10 adjacent owner cases, then 25 review-focused
+cases after adding the pre-backup replay lock check. Build/typecheck and all seven installed
+handoff scenarios passed. Opus 5.5 high-effort review and recheck closed the material findings.
+Cancellation deliberately consumes discovery with its own result and verified pre-handoff lock;
+completion records the activated lock. Neither reuses a historical available candidate. Final low
+wording/test refinements leave runtime bytes unchanged. Normal hooks/publication and readback are
+recorded externally against the final commit; no adopter mutation belongs to this source batch.

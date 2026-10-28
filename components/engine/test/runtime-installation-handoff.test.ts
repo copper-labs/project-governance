@@ -1,17 +1,21 @@
+import {removeRuntimeFixture} from "./fixtures/remove-runtime-fixture.ts";
 import {test} from "node:test";
 import assert from "node:assert/strict";
-import {mkdtempSync,realpathSync,mkdirSync,writeFileSync,rmSync,symlinkSync} from "node:fs";
+import {mkdtempSync,realpathSync,mkdirSync,writeFileSync,readFileSync,existsSync,chmodSync,symlinkSync} from "node:fs";
 import {join} from "node:path";
 import {tmpdir,hostname} from "node:os";
 import {recoverStartupOwner} from "../src/startup-owner-recovery.ts";
-import {randomUUID} from "node:crypto";
+import {createHash,randomUUID} from "node:crypto";
 import {DatabaseSync} from "node:sqlite";
-import {spawnSync} from "node:child_process";
+import {execFileSync,spawnSync} from "node:child_process";
 import {requireAbsentStartupHost} from "../src/startup-host-owner.ts";
 import {RuntimeGenerations} from "../src/runtime-generations.ts";
 import {StartupTasks} from "../src/startup-tasks.ts";
 import {digest,fileDigest,durableJson} from "../src/core.ts";
-import {prepareInstallationHandoff,installationHandoff,cancelInstallationHandoff,withInstallationHandoffOwner} from "../src/runtime-installation-handoff.ts";
+import {prepareInstallationHandoff,installationHandoff,cancelInstallationHandoff,withInstallationHandoffOwner,installationHandoffPath} from "../src/runtime-installation-handoff.ts";
+import {stageRuntimeArchive} from "../src/runtime-staging.ts";
+import {startupStatus} from "../src/startup-status.ts";
+import type {CompiledRuntimeLock} from "../src/runtime-lock.ts";
 import type {RuntimePreparation} from "../src/runtime-operation-preparation.ts";
 
 function fixture() {
@@ -31,7 +35,7 @@ function fixture() {
  durableJson(join(operation,"operation.json"),{request:savedRequest,requestDigest:digest(savedRequest),token,owner,legacyLockRequired:false});
  generations.beginMaintenance(owner,3,token);
  return {root,registry,receipts,operation,lockPath,generations,tasks,environment,reader,host,binding,token,owner,request,task:event.taskId,
-  close(){tasks.close();generations.close();rmSync(root,{recursive:true,force:true});},
+  close(){tasks.close();generations.close();removeRuntimeFixture(root);},
   successor(){const db=new DatabaseSync(registry);db.prepare("UPDATE current SET revision=4,previous=directory,directory=?,written=0 WHERE id=1").run(join(root,"new"));db.close();}};
 }
 
@@ -140,7 +144,7 @@ test("SessionEnd between saved intent and reader consumption cancels without orp
 test("process loss releases only the updater mutex and retains the original maintenance operation",async()=>{
  const f=fixture();try {
   const module=new URL("../src/runtime-installation-handoff.ts",import.meta.url).href;
-  const child=spawnSync(process.execPath,["--input-type=module","-e",`import {withInstallationHandoffOwner} from ${JSON.stringify(module)};
+  const child=spawnSync(process.execPath,["--input-type=module","-e",`import {withInstallationHandoffOwner,installationHandoffPath} from ${JSON.stringify(module)};
    await withInstallationHandoffOwner(${JSON.stringify(f.operation)},async()=>process.exit(37));`],{encoding:"utf8"});
   assert.equal(child.status,37,child.stderr);
   await withInstallationHandoffOwner(f.operation,async()=>{
@@ -198,5 +202,77 @@ test("process loss releases only the updater mutex and retains the original main
   cancelInstallationHandoff(f.operation,f.request,{CODEX_THREAD_ID:"recovery-parent"},()=>null);
   assert.equal(f.tasks.owner(f.task),null);assert.equal(f.generations.state().maintenance,null);
   assert.deepEqual(f.generations.state().readers.map(row=>row.token),[other.token]);
+ }finally{f.close();}
+});
+
+function verifiedCurrentRuntime(f:ReturnType<typeof fixture>) {
+ const source=join(f.root,"package"),archive=join(f.root,"current.tgz");
+ mkdirSync(join(source,"dist/engine/src"),{recursive:true});mkdirSync(join(source,"dist/engine/assets"),{recursive:true});
+ writeFileSync(join(source,"package.json"),JSON.stringify({name:"@organta/project-governance",version:"3.0.0",type:"module",
+  engines:{node:">=24.16.0 <25"},bin:{"project-governance":"dist/engine/src/cli.js"}}));
+ writeFileSync(join(source,"dist/engine/src/cli.js"),'console.log("project-governance 3.0.0");');
+ writeFileSync(join(source,"dist/engine/assets/runtime-dependencies.lock.json"),JSON.stringify({lockfileVersion:3,name:"@organta/project-governance",version:"3.0.0",packages:{"":{}}}));
+ execFileSync("tar",["-czf",archive,"-C",f.root,"package"]);
+ const lock:CompiledRuntimeLock={schema_version:2,package:"@organta/project-governance",version:"3.0.0",
+  artifact:{url:"file:///current.tgz",integrity:"sha512-"+createHash("sha512").update(readFileSync(archive)).digest("base64")},
+  source_commit:"a".repeat(40),node:">=24.16.0 <25",configuration_schema:1};
+ const staged=stageRuntimeArchive(archive,lock,join(f.root,"stages"));
+ const db=new DatabaseSync(f.registry);db.prepare("UPDATE current SET directory=? WHERE id=1").run(staged.directory);db.close();
+ f.reader.directory=staged.directory;f.binding.reader.directory=staged.directory;
+ const tasks=new DatabaseSync(f.receipts);tasks.prepare("UPDATE owners SET binding=? WHERE task_id=?").run(JSON.stringify(f.binding),f.task);tasks.close();
+ writeFileSync(f.lockPath,JSON.stringify(lock));
+ return {lock,directory:staged.directory};
+}
+
+test("explicit handoff verifies the current generation when the task retains an older discovery digest",()=>{
+ const f=fixture();try {
+  verifiedCurrentRuntime(f);
+  const historical=startupStatus(f.receipts,f.task,f.request).lockDigest,current=fileDigest(f.lockPath);
+  assert.notEqual(historical,current);
+  const event=f.tasks.event("codex",{session_id:f.environment.CODEX_THREAD_ID,hook_event_name:"UserPromptSubmit"},f.root,current,f.environment);
+  assert.ok("refreshRequired" in event && event.refreshRequired);
+  const intent=prepareInstallationHandoff(f.operation,f.request,f.environment,()=>f.host);
+  assert.equal(intent.lockDigest,current);assert.equal(startupStatus(f.receipts,f.task,f.request).lockDigest,historical);
+  cancelInstallationHandoff(f.operation,f.request,f.environment,()=>f.host);
+  assert.equal(f.generations.state().readers[0]?.token,f.reader.token);
+  const cancelled=startupStatus(f.receipts,f.task,f.request);
+  assert.equal(cancelled.lockDigest,current);assert.equal(cancelled.result.status,"installation-cancelled");
+  assert.equal(cancelled.result.lockDigest,current);assert.equal(cancelled.discovery,"complete");
+  const next=f.tasks.event("codex",{session_id:f.environment.CODEX_THREAD_ID,hook_event_name:"UserPromptSubmit"},f.root,current,f.environment);
+  assert.ok("refreshRequired" in next && !next.refreshRequired);assert.equal(next.discover,false);
+  cancelInstallationHandoff(f.operation,f.request,f.environment,()=>f.host);
+ }finally{f.close();}
+});
+
+for(const changed of ["lock","payload"])test(`historical discovery digest cannot authorize a changed current ${changed}`,()=>{
+ const f=fixture();try {
+  const current=verifiedCurrentRuntime(f),before=startupStatus(f.receipts,f.task,f.request);
+  if(changed==="lock")writeFileSync(f.lockPath,JSON.stringify({...current.lock,source_commit:"b".repeat(40)}));
+  else {
+   const file=join(current.directory,"node_modules/@organta/project-governance/dist/engine/src/cli.js");
+   chmodSync(file,0o600);writeFileSync(file,'console.log("changed");');
+  }
+  assert.throws(()=>prepareInstallationHandoff(f.operation,f.request,f.environment,()=>f.host),changed==="lock"?/Installation lock differs/:/payload differs/);
+  assert.equal(existsSync(installationHandoffPath(f.operation)),false);
+  assert.equal(startupStatus(f.receipts,f.task,f.request).lockDigest,before.lockDigest);
+  assert.deepEqual(f.tasks.owner(f.task),before.owner);
+  assert.equal(f.generations.state().readers[0]?.token,f.reader.token);
+  assert.equal(f.generations.state().maintenance?.token,f.token);
+ }finally{f.close();}
+});
+
+test("saved pre-consumption handoff intent refuses changed lock bytes before consuming its reader",()=>{
+ const f=fixture();try {
+  const other=f.generations.acquire("other",f.token);
+  assert.throws(()=>prepareInstallationHandoff(f.operation,f.request,f.environment,()=>f.host),/sole recorded parent/);
+  const original=readFileSync(f.lockPath),owner=f.tasks.owner(f.task);
+  f.generations.release(other.token,other.owner);writeFileSync(f.lockPath,"changed lock after intent\n");
+  assert.throws(()=>prepareInstallationHandoff(f.operation,f.request,f.environment,()=>f.host),/Installation lock changed before reader handoff/);
+  assert.equal(f.generations.state().readers[0]?.token,f.reader.token);
+  assert.equal(existsSync(installationHandoffPath(f.operation)),true);
+  assert.equal(f.generations.state().maintenance?.token,f.token);assert.deepEqual(f.tasks.owner(f.task),owner);
+  writeFileSync(f.lockPath,original);prepareInstallationHandoff(f.operation,f.request,f.environment,()=>f.host);
+  assert.equal(f.generations.state().readers.length,0);
+  cancelInstallationHandoff(f.operation,f.request,f.environment,()=>f.host);
  }finally{f.close();}
 });

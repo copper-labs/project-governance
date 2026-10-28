@@ -83,8 +83,21 @@ For an explicit compiled update blocked only by this chat's startup reader, 4.4.
 The caller must still be the recorded native parent; other readers must drain. The operation
 temporarily consumes only that parent reservation and restores it on the verified successor.
 To use the repair from an older runtime, invoke the verified unpacked 4.4.1 compiled CLI with the
-original request, plan and operation directory. This preserves the staged candidate; it does not
+original request, plan and operation directory, provided that plan still matches the updater.
+This preserves the staged candidate; it does not
 edit the old installed payload or replace the requested target version.
+
+If a newer updater computes different managed host guidance, a fresh plan cannot be paired with an
+unchanged request that declared different host writes. Preserve the original evidence. Before any
+handoff, backup or activation, the owning coordinator may end its exact unused maintenance hold
+through `runtime-maintenance --action end` after checking that token has no completion requirements.
+A later attempt uses a separately declared request and operation; never rewrite the retained request.
+
+4.4.2 also permits a historical discovery digest when the current lock and recorded generation
+verify together. It leaves automatic discovery freshness unchanged and edits no startup receipt to
+force admission. Completion records the activated lock; cancellation records the verified pre-handoff
+lock. Each records its own result, consuming old discovery without reusing its candidate. Wrong current lock, changed
+payload or a different reader still refuses. Pre-backup replay also rechecks the saved lock bytes.
 
 Repeat that invocation to resume after interruption. Before activation, replace `--handoff-startup`
 with `--cancel-handoff` to restore the original reservation and end the attempt. Cancellation refuses

@@ -124,6 +124,18 @@ activation or other required mutation begins, cancellation refuses; resume compl
 existing verified recovery route. New hooks retain the binding during a handoff. Older native close
 events remain reconcilable through their exact retained owner history.
 
+A task's discovery lock digest can precede its current owner binding after an earlier recovery.
+Explicit installation does not reuse that discovery candidate or silently refresh its authority.
+If the historical digest differs, handoff verifies the current lock against the recorded generation's
+archive and installed payload, then the existing maintenance transaction verifies the exact current
+reader/generation before consumption. Bind the handoff to the current lock bytes for cancellation.
+Do not rewrite the discovery row to pass admission. Normal explicit completion records the
+activated lock; cancellation records the verified pre-handoff lock. Each consumes discovery with its
+own result; cancellation
+therefore clears refreshRequired but does not retain or authorize the old discovery candidate.
+Automatic assessment and its separate available-candidate requirement remain unchanged. Replay before
+backup rechecks the intent's lock bytes before consuming the reader.
+
 Taking a reservation always requires the live owning parent. Completing or cancelling a recorded
 handoff may instead use the existing positive local host-absence proof. A different live PID,
 reused PID, foreign machine or delegated worker cannot use that route. Recovery before backup may
