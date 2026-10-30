@@ -517,7 +517,7 @@ on the exact release archive, plus applicable integrated release proof. Never co
 closure as ordinary accepted development or device acceptance.
 
 - [x] Reconcile all individually qualified repairs against the stable base.
-- [ ] Complete focused source and exact installed release proof.
+- [x] Complete focused source and exact installed release proof.
 - [x] Complete independent review and reconcile material findings.
 - [ ] Commit and push through normal narrative/hooks; publish stable and verify readback.
 
@@ -556,3 +556,28 @@ all affected native/platform owners on the exact installed archive and obtain th
 independent follow-up. Reuse unaffected broad/source and archive proof with explicit byte bindings.
 The normal owned-emulator path's collapsed diagnostic reason remains a separate low-priority
 proposal; custody still refuses safely, and no new diagnostic schema is introduced in this batch.
+
+
+### Combined release qualification closeout
+
+The stable-base integration is qualified. The original broad engine run retained 1,448 passing
+cases and 25 declared skips; its one injected-inventory fixture failure is closed by the corrected
+focused and installed cases. Focused source rechecks preserve valid supervisor/recovery cases and
+close the two demonstrated native/simulator defects. The initial named-pipe test's incorrect CLI
+exit expectation is corrected against the existing redacted invocation contract and passes.
+Continuity passes 82 cases. The script batch retains 141 passing cases and five declared skips;
+its whitespace fixture failure is closed by the corrected ten-case native-dispatch owner suite.
+These overlapping results are not added into a fabricated aggregate pass count.
+
+The final protected archive passes all 257 workflow/reader/platform/public owner cases without
+skips, including the explicit observed route, complete failed reconciliation and successor fences.
+The normal exact-package verifier passes staging, host API, workflow binding, parser, prompt,
+worktree upgrade, greenfield, review/delivery/lint and offline decision-consumer owners. The archive
+matches rebuilt committed compiled code and shipped assets; JEV runtime owners retain stable-base
+bytes. Independent Opus 5.5 high review and focused follow-up have no remaining blockers.
+
+Normal narrative/hooks, final source-bound release metadata, push, stable publication and immutable
+asset/tag/latest readback complete the release operation. Retain exact originals and local proof
+externally. The separately selected local recovery artifact can be handed to its original owner
+without consumer adoption or publication. Actual owner execution and accepted application outcomes
+remain separate from this controlled qualification. No installation changes on publication.
