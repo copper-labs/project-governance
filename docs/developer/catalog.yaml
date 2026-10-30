@@ -7,11 +7,18 @@ capabilities:
       - distinguish isolated checks from shared-resource workflows
       - deliberately adopt task-based binding without duplicate consent
       - retain current task checks and honest per-run evidence
-    symbols: [project-governance workflow-bind, workflowAuthorization, bindConfiguredWorkflow]
+    symbols: [project-governance workflow-bind, project-governance workflow-release-resources, workflowAuthorization, bindConfiguredWorkflow]
     reference: docs/specs/engine-workflow-and-device-contract.md
     guides:
       - docs/developer/guides/local-development.md
     sources:
+      - components/engine/src/workflow-resource-release.ts
+      - components/engine/src/workflow-local-host-observation.ts
+      - components/engine/src/android-app-session.ts
+      - components/engine/src/android-app-session-cleanup.ts
+      - components/engine/src/android-owned-app-session.ts
+      - components/engine/src/ios-observation-cleanup.ts
+      - components/engine/src/simulator-build-cleanup.ts
       - components/engine/src/workflow-authorization.ts
       - components/engine/scripts/workflow-host-binding.mjs
       - components/engine/src/cli.ts

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {mkdtempSync,mkdirSync,readFileSync,writeFileSync,realpathSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
-import {pathToFileURL} from 'node:url';
+import {pathToFileURL,fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
 import {execFileSync,spawnSync} from 'node:child_process';
 
@@ -113,4 +113,4 @@ export async function verifyInstallationHandoff(packageRoot,archive,oldArchive=a
  const result={status:'passed',evidenceDirectory:root,cases:results,scope:'packaged explicit update and synthetic native lifecycle; not ordinary accepted development'};
  writeFileSync(join(root,'handoff-proof.json'),JSON.stringify(result,null,2));return result;
 }
-if(process.argv[1]===new URL(import.meta.url).pathname)console.log(JSON.stringify(await verifyInstallationHandoff(resolve(process.argv[2]),resolve(process.argv[3]),resolve(process.argv[4]??process.argv[3]),resolve(process.argv[5]??process.argv[4]??process.argv[3]))));
+if(process.argv[1]===fileURLToPath(import.meta.url))console.log(JSON.stringify(await verifyInstallationHandoff(resolve(process.argv[2]),resolve(process.argv[3]),resolve(process.argv[4]??process.argv[3]),resolve(process.argv[5]??process.argv[4]??process.argv[3]))));

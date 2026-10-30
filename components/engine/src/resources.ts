@@ -116,6 +116,20 @@ export class ResourceRegistry {
     });
   }
 
+  /** Recovery reads the original acquisition, never reacquires or infers a generation from current rows. */
+  originalLeases(operation: string, owner: string): Lease[] {
+    const row = this.#db.prepare("SELECT owner,resources,leases FROM requests WHERE operation=?").get(operation);
+    if (!row || row.owner !== owner) throw new Error("Original resource acquisition owner differs");
+    const leases = JSON.parse(String(row.leases)) as Lease[];
+    if (!Array.isArray(leases) || !leases.length || leases.length > 64 || leases.some(lease =>
+        !lease || Object.keys(lease).sort().join(",") !== "generation,operation,owner,resource" ||
+        lease.owner !== owner || lease.operation !== operation || typeof lease.resource !== "string" || !lease.resource ||
+        !Number.isSafeInteger(lease.generation) || lease.generation < 1) ||
+        canonical(leases.map(lease => lease.resource)) !== row.resources)
+      throw new Error("Original resource acquisition is invalid");
+    return leases;
+  }
+
   assertHeld(lease: Lease): void {
     const row = this.#db.prepare("SELECT * FROM resources WHERE resource=?").get(lease.resource) as unknown as HeldRow | undefined;
     if (!row || row.state !== "held" || row.owner !== lease.owner || row.operation !== lease.operation || row.generation !== lease.generation) {

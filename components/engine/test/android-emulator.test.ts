@@ -3,14 +3,11 @@ import assert from "node:assert/strict";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { androidEmulatorAdapter, observeAndroidCapacity, observeAndroidEmulatorCleanup } from "../src/android-emulator.ts";
-import { Store } from "../../harness/src/store/store.ts";
-import { proposeAction, authorizeAction } from "../../harness/src/ops/actions.ts";
-import { defaultPolicy } from "../../harness/src/ops/authority.ts";
-import { WorkflowStore } from "../src/workflow-store.ts";
-import { ResourceRegistry } from "../src/resources.ts";
-import { parseRecipe, recipeDigest } from "../src/workflow-types.ts";
-import { executeWorkflow } from "../src/workflow-executor.ts";
+import { api,moduleUrl } from "./fixtures/workflow-owner-release.ts";
+const {Store,proposeAction,authorizeAction,defaultPolicy,WorkflowStore,ResourceRegistry}=api;
+const {androidEmulatorAdapter,observeAndroidCapacity,observeAndroidEmulatorCleanup}=await import(moduleUrl("android-emulator"));
+const {parseRecipe,recipeDigest}=await import(moduleUrl("workflow-types"));
+const {executeWorkflow}=await import(moduleUrl("workflow-executor"));
 const config = { serial: "emulator-5564", adb: realpathSync(process.execPath), lockPath: "/fixture/locks/device", capacity: { beforeStage: "install", minimumAvailableBytes: 2048 } };
 const inventory = "List of devices attached\nemulator-5564\tdevice\n";
 const df = (available: string) => `Filesystem 1024-blocks Used Available Capacity Mounted on\n/dev/data 10 1 ${available} 10% /data\n`;
@@ -62,7 +59,7 @@ test("workflow capacity refusal skips install and dependent work while declared 
     const result = await executeWorkflow(store, run.id, { commandsDirectory: join(root, "commands"), registry,
       observeCleanup: async () => existsSync(join(workspace, "cleaned")) ? "fixture cleanup observed" : null });
     assert.equal(result.state, "failed"); assert.equal(existsSync(join(workspace, "installed")), false); assert.equal(existsSync(join(workspace, "tested")), false);
-    const stages = store.stages(run.id); assert.deepEqual(stages.map(stage => stage.state), ["failed", "blocked", "succeeded"]);
+    const stages = store.stages(run.id); assert.deepEqual(stages.map((stage:any) => stage.state), ["failed", "blocked", "succeeded"]);
     assert.equal(JSON.parse(readFileSync(stages[0]!.result!.log, "utf8")).state, "insufficient");
     assert.equal(registry.inspect()[0]!.state, "released");
   } finally { registry.close(); store.close(); core.close(); rmSync(root, { recursive: true, force: true }); }

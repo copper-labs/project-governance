@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpath
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { pathToFileURL } from 'node:url';
+import { pathToFileURL, fileURLToPath } from 'node:url';
 
 const hash = bytes => `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
 const identity = value => hash(JSON.stringify(value));
@@ -269,7 +269,7 @@ export async function verifyReviewQuality(packageRoot, archive, options = {}) {
   const live = options.live === true;
   if (live) assert.ok(process.env.JEV_TOKEN?.trim(), '--live requires caller-owned JEV_TOKEN in the environment');
   const output = options.output ? resolve(options.output) : realpathSync(mkdtempSync(join(tmpdir(), 'governance-review-quality-')));
-  const checkout = resolve(new URL('../../..', import.meta.url).pathname);
+  const checkout = fileURLToPath(new URL('../../..', import.meta.url));
   assert.ok(relative(checkout, output).startsWith('..'), 'Proof evidence must stay outside the source checkout');
   mkdirSync(output, { recursive: true, mode: 0o700 });
   const write = (path, value) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, JSON.stringify(value, null, 2) + '\n', { flag: 'wx', mode: 0o600 }); return { path, digest: fileHash(path) }; };

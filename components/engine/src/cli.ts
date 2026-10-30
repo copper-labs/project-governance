@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { workflowResourceReleaseCommand } from "./workflow-resource-release.ts";
 import { evaluationCommand } from "./evaluation-command.ts";
 import { RELEASE_VERSION } from "./release-version.ts";
 import { durableJson } from "./core.ts";
@@ -191,6 +192,7 @@ Project setup and context:
 Operations:
   evaluate --request-file <local JSON>
   telemetry | context-evaluate | resource-status | resource-maintenance
+  workflow-release-resources  Record exact local owner cleanup before workflow reconciliation
   workflow-bind --request <json> --receipt <json>
   workflow-wait | workflow-diagnose | workflow-recover-observation | workflow-resume-cleanup
   command-resume-cleanup | command-recover | command-reconcile
@@ -378,6 +380,9 @@ Use the owning command contract for structured request fields.
     }
     if (command === "resource-status") {
       console.log(JSON.stringify(resourceStatusCommand(args.slice(1)))); return 0;
+    }
+    if (command === "workflow-release-resources") {
+      console.log(JSON.stringify(await workflowResourceReleaseCommand(args.slice(1)))); return 0;
     }
     if (command === "resource-maintenance") {
       console.log(JSON.stringify(resourceMaintenance(args.slice(1))));

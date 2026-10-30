@@ -1,3 +1,5 @@
+import { ownedAndroidAppSessionCleanup } from "./android-owned-app-session.ts";
+import { observeAndroidAppSession } from "./android-app-session.ts";
 import { existsSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { digest, durableJson } from "./core.ts";
@@ -25,7 +27,8 @@ export async function resumeStoppedWorkflowCleanup(directory: string, database: 
       observeCleanup:async(observed,leases)=>{
         const resources=leases.map(lease=>lease.resource);
         const adapter = observed.binding.recipe.androidEmulator;
-        const observation = adapter ? await observeAndroidEmulatorCleanup(resources, adapter, observed.binding.recipe.workspace)
+        const appSession=observed.binding.recipe.androidAppSession;
+        const observation = appSession ? appSession.ownership==="owned-emulator" ? await ownedAndroidAppSessionCleanup(directory,observed,store.stages(observed.id),undefined,undefined,true).then(x=>x.observation,()=>null) : await observeAndroidAppSession(resources,appSession,observed.binding.recipe.workspace) : adapter ? await observeAndroidEmulatorCleanup(resources, adapter, observed.binding.recipe.workspace)
           : await observeSimulatorCleanup(resources) ?? await observePhysicalCleanup(resources);
         if(!observation)return null;
         const receipt={runId,bindingDigest:digest(observed.binding),leases,observation};

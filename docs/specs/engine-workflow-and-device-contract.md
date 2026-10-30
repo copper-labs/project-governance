@@ -5,7 +5,7 @@ type: spec
 status: draft
 owner: project-governance
 created: 2026-09-20
-updated: 2026-10-07
+updated: 2026-10-30
 summary: Approved workflow execution with explicit resource ownership, RN iOS simulator then physical-device proof, and bounded recovery.
 ---
 
@@ -318,6 +318,125 @@ further observation takeover. Device release still requires independent readback
 retains ownership. The command does not resume ordinary workflow work.
 
 
+### Initial owner release for local producer and storage claims
+
+The trusted local resource owner can use `workflow-release-resources` before cleanup reconciliation.
+It is a write admitted by the normal managed launcher, not a status command or a new grant:
+
+```sh
+project-governance workflow-release-resources --database ORIGINAL_LEDGER --run ORIGINAL_RUN \
+  --revision CURRENT_REVISION --worker-directory ORIGINAL_WORKER --registry RESOURCE_REGISTRY \
+  --authority ORIGINAL_BINDING_AUTHORITY --kind local-host \
+  --evidence ORIGINAL_CLOSURE_REPORT --evidence-digest sha256:ORIGINAL_FILE_DIGEST \
+  --receipt RELEASE_RECEIPT
+```
+
+The command runs from the original worktree and requires its original worker request, current
+workflow revision, existing authority and exact acquisition record. The original native requests,
+receipts, local-machine launch/guardian records and retained process membership must match the
+workflow. Commands must have resolved cleanup. Fresh complete process enumeration must establish
+absence of every retained command owner, group, descendant and reported process. Original worker
+absence uses the existing qualified reader identity check; ambiguous native command PID reuse
+remains refused. The current original generation reader must still match before a new release.
+
+The input is the owner's existing execution/closure report, not a model-written release receipt.
+Its selected byte digest must match. `childStarted` is true; `status` is passed, failed or cancelled;
+`processClosure.closed` is true with empty `after.group` and `after.observedTree` arrays;
+`observedProcessIdentities` maps recorded PIDs to original start fingerprints; `ended` is finite
+Unix seconds. At least one identity must match the same original native command whose execution
+window contains both report completion and original file modification time. Every additional
+identity is also checked absent. The native-launched report writer should capture its own PID/start
+fingerprint at entry and merge it into the final report after child cleanup, separately from child
+stop/kill targets. That original writer supplies a stable native identity when short-lived or
+detached children are not retained in native membership. It is not permission to add identities or
+change timestamps in an old report. A reported `legacyLockReleased: false` refuses. Failed assertions,
+budget overruns and source failures remain failures; they do not prevent genuine completed cleanup.
+Read the unchanged original report; copying or editing it is not a way to pass freshness checks.
+
+`--kind local-host` is the bound owner's explicit selection for local producer/storage obligations.
+Opaque names alone do not prove that scope. It cannot replace device, network, remote, emulator or
+continuing-session custody readback. Known reserved claims and emulator recipes refuse; custom
+external resources still need their owning adapter. This retains the existing trusted same-account
+host boundary, not authentication of arbitrary local code or human/API approval.
+
+The runtime constructs the existing `WorkflowCleanupReceipt` and publishes it durably without
+replacing any existing file. It then rechecks evidence and uses the canonical workflow store's short
+snapshot transaction around the existing registry release. Slow file/process observation happens
+outside that writer lock. All original lease owners/generations are checked atomically by the
+registry; it never acquires, transfers or steals a claim. Interrupted release reuses the original
+receipt. A matching historical release is read back without touching later owners or rewriting facts.
+No second registry, schema migration, force option, process signaling, stage dispatch or acceptance
+record is added.
+
+Successful release exits 0 for that administrative operation and leaves workflow/stage outcomes
+unchanged. Run the separate existing `workflow-reconcile-cleanup` with the same original receipt,
+current revision, resource registry and original worker directory. A reconciled failed/cancelled
+workflow still exits 1. Cleanup is not ordinary accepted development or API approval.
+
+### Original observation-only mixed iOS owner release
+
+The same `workflow-release-resources` entry has an explicitly selected `--kind ios-observation`
+adapter. Its scope is exactly one original `ios-device` claim, the matching `ios-app` claim and
+one owner-declared local-storage claim. It accepts no additional network, emulator, remote,
+continuing-session or other reserved claims. All operations must be local. The local claim is
+selected with `--local-resource`; `--lock-directory` names the existing original host custody
+directory through a canonical path with an existing canonical parent. The original trusted owner
+asserts that mapping; neither opaque names nor the model establish it. The mapping is bound into
+the immutable original release receipt. This remains the existing trusted same-account host boundary.
+
+Use the original hash-selected observation report. It must identify the bound `deviceUdid` and
+record `appOrSDKLaunch: false` and `ownedFileLockHeld: false`. Its `observedAt` and original file
+modification time must fall within the same original native command's execution window. Original
+native request, trusted command outcome/cleanup, machine, process owners and retained descendants
+are verified by the shared release evidence owner; source edits and expired test clocks are not
+rewritten or renewed. The report is never copied, adapted or backdated into a producer-report shape.
+
+That report is not fresh device/SDK cleanup. The administrative adapter obtains fresh cleanup using
+the existing qualified physical observer on the exact original device/app pair. It requires current
+hardware/device identity, the single matching installed app container and app-process absence. It
+also requires current absence of the original local lock directory and all retained host processes.
+It only reads lock state and device-info JSON; it never steals/deletes a lock, launches/stops/installs
+an app, runs an SDK lifecycle operation, answers a dialog or resumes a workflow stage. Recorded
+`sdkLifecycle` is `unclaimed`: no-launch and app-process absence do not establish SDK shutdown.
+
+All original authority, revision, acquisition generations and installed-generation reader checks
+remain. The command collects its fresh observation outside the workflow writer transaction, publishes
+the existing create-only release receipt, rechecks host/lock/evidence/generation state, and refuses
+if more than five seconds elapsed since completed device readback. The existing short snapshot
+fence and atomic registry release retire the complete original claim set. An interrupted retry
+retains the journal, obtains fresh closure again, and requires the same original proof, mapping and
+device/app identity. A completed historical replay does not disturb later owners. Reconciliation
+remains separate and preserves original outcomes. No native API approval or acceptance is created.
+
+The relevant primary-source comparison reuses existing owners. Apple's
+[device command-line documentation](https://developer.apple.com/documentation/xcode/interacting-with-devices-using-the-command-line)
+(HTTP Last-Modified 2026-09-24; reviewed 2026-10-30) recommends versioned JSON output for automation.
+Our physical observer already follows that approach; this adapter composes its readback with the
+original host/lock owner instead of changing the device parser. Kubernetes'
+[finalizer contract](https://kubernetes.io/docs/concepts/overview/working-with-objects/finalizers/)
+(updated 2025-04-27; reviewed 2026-10-30) retains owner-specific cleanup obligations until established.
+The overlap here is exact owner/evidence retirement, not a new controller or proof of performance.
+
+### Terminal workflow reader finalization
+
+After original resource cleanup is recorded, `workflow-reconcile-cleanup` with the original
+`--worker-directory` also retires its exact detached runtime reader. An already-terminal replay
+requires the current revision, original hash-bound cleanup receipt, resolved stages and matching
+outcome. It does not release later resource leases or turn failed assertions into success.
+
+Complete process enumeration must prove the original worker absent. The macOS finalizer may also
+recognize PID reuse when the saved and freshly observed start fingerprints are calendar-valid and
+different, and a fresh C-locale UTC start is strictly later than the unchanged original owner
+acknowledgement's filesystem timestamp. A different display string alone is insufficient: legacy
+fingerprints have no timezone. Equal, missing, malformed, unreadable or temporally ambiguous
+identities refuse. Other platforms retain numeric-PID absence until separately qualified.
+
+The existing trusted local evidence boundary applies to the original request and acknowledgement;
+recovery rechecks their bytes and acknowledgement timestamp before retiring the reader. It never
+rewrites that evidence, signals/adopts the replacement process, changes outcomes, dispatches work
+or relaxes receipt/resource/generation ownership checks. Stopped-worker observation and cleanup
+continuation retain their separate conservative PID-absence requirements. No force flag is added.
+
 ### Recovery through the managed launcher
 
 The managed runtime admits `command-resume-cleanup`, `command-recover` and `command-reconcile`
@@ -551,3 +670,196 @@ identity, guards, and trusted host ownership remain the authority boundary.
 The compiled archive ships both operator scripts under `dist/engine/assets/host/`.
 Use those entries with the selected installed package. The workspace modes require
 the corresponding host API; they refuse an older runtime before requesting approval.
+
+For this observation adapter only, a fast original command may have no retained membership sample.
+The exact original native supervisor receipt must itself confirm cleanup with a resolved outcome;
+unknown execution/cleanup or owner-loss inference cannot substitute. The release proof records
+`membershipHistory: not-recorded` and the original native receipt as closure authority. It does not
+invent historical descendant observations. Fresh owner/guardian/child/group absence remains required,
+and a membership file appearing during collection refuses release. Existing producer-report and
+local-host membership requirements remain unchanged.
+
+### Original failed compiler-only simulator release
+
+`workflow-release-resources --kind ios-simulator-build` composes the existing qualified simulator
+observer with exactly one original local producer claim. Add `--local-resource`, the original
+`--lock-directory` and `--simulator-lock-directory` mappings to the normal original run, revision,
+authority, worker, registry, report/digest and receipt arguments. This explicit trusted-owner
+selection declares a compiler-only failure; empty telemetry alone cannot grant that classification.
+It accepts no physical device, app, network, emulator or additional claims, and no SDK rebuild.
+
+The original unchanged closeout must record failed nonzero execution, `nativeSdkRebuilt: false`,
+empty `appClosure`, confirmed conflict-free process closure with original observed identities,
+released legacy locks and a `finished` time/file modification within the original native command
+window. Original native outcomes/owner evidence, retained membership and process identity overlap
+are required; all reported processes must now be absent. Nonempty app closure is outside this
+compiler-only contract. Do not rewrite a report or treat an empty list as independent SDK proof.
+
+The adapter only observes the exact simulator's current Shutdown state through the existing
+qualified JSON device-list observer and current absence of both owner-mapped host lock directories.
+It never shuts down or controls a simulator, launches/stops apps, or executes SDK work. Physical
+device and SDK lifecycle remain explicitly unclaimed. Both original generations are released
+together through the same journal/atomic registry path; original failed outcomes/clocks remain.
+The same snapshot, freshness, mismatch and interrupted replay guards apply.
+
+An already released historical run must not be reacquired or assigned a new cleanup receipt to
+retroactively qualify an unsupported release. Preserve its actual release journal and failed
+outcome; subsequent owners retain their own generations. This adapter qualifies the supported
+public route for still-held matching compiler-only runs, not a retrospective acceptance claim.
+
+### Explicit borrowed Android app session
+
+`androidAppSession` is an opt-in recipe descriptor for a borrowed physical device or an
+already-running emulator. It does not replace `androidEmulator` or own emulator shutdown.
+The two descriptors are mutually exclusive. The original project policy still owns permission.
+
+```json
+{
+  "androidAppSession": {
+    "ownership": "borrowed",
+    "serial": "emulator-5556",
+    "adb": "/opt/android/platform-tools/adb",
+    "userId": 0,
+    "localLocks": [{"resource": "local-producer", "path": "/var/tmp/owned-producer.lock"}]
+  }
+}
+```
+
+The exact original resource set must consist of `android:<serial>`, one or more `app:<package>`
+claims and every explicitly mapped local claim. Packages derive from those claims. Do not rename
+resources or create aliases. ADB must be a canonical external executable outside the workspace;
+local lock parents must exist at canonical paths. Unsupported/mixed identities, duplicate mappings,
+missing descriptors and unmapped local claims refuse before new acquisition. Existing stored
+workflows are not migrated or reinterpreted.
+
+Normal finish and stopped-worker cleanup continuation read exact selected ADB inventory, explicit
+foreground Android user, package/user UID mapping and complete wide numeric process-name output.
+Parse the numeric PID and UID columns, then retain the entire final NAME column. Kernel and other
+process names may contain spaces. Missing names, invalid numeric fields and duplicate PIDs still
+refuse; a name containing spaces never exempts its UID or selected package/service match.
+Successful remote completion is mandatory. Any selected UID process, same-user exact package
+process or colon-suffixed service prevents release, including custom process names, shared UIDs
+and SDK sandbox processes. Any same-user isolated UID whose package ownership is unavailable
+retains custody, even when it may belong to another app. When such rows are present, the adapter
+uses Android's read-only `cmd activity get-isolated-pids <full-package-uid>` for each distinct selected
+package UID. Only an explicit successful `[]` proves absence for that UID; unsupported, malformed,
+empty, nonempty or failed responses retain custody. Repeat this observation after the user/package
+identity recheck. This establishes package ownership, not SDK lifecycle acknowledgement or the
+absence of every indirect cross-package service dependency. The existing process-inventory digest
+also binds those bounded ownership responses; no new receipt/store schema is introduced.
+The adapter rechecks user/package identity after enumeration
+and observes actual absence of every original local lock. Shared UIDs can conservatively retain
+claims for another active app. Unsupported output, missing package identity, stderr, transport
+failure, timeout or truncation is unknown. `device` connectivity alone does not prove boot readiness.
+Raw full package/process inventories are not persisted in receipts.
+
+For a resolved stopped original worker, `workflow-release-resources --kind android-app-session`
+uses the ordinary base flags (database, run, current revision, worker-directory, registry, authority,
+evidence, evidence-digest and receipt). Select one **original native command `result.json`** and its
+actual digest as evidence; a project-authored closure report is insufficient. Device/user/lock
+mappings come only from the original recipe, not new CLI declarations. Original native confirmed
+cleanup, host/process absence, exact whole-set leases and generation readers remain mandatory.
+The existing create-only journal, snapshot transaction, freshness, interruption re-observation and
+historical replay machinery applies without a new store or schema. Normal reconciliation preserves
+the original failed/cancelled/unknown semantics and never reruns completed work.
+
+This adapter never force-stops an app, controls an emulator, installs software or calls an SDK.
+It releases genuinely closed resource custody without inventing SDK close acknowledgement or
+accepted test/API results. A borrowed device/emulator remains running. The owned-emulator adapter
+still requires emulator absence, closed owned ports and absent original lock. Offline injected
+fixture proof establishes the runtime contract; actual device qualification belongs to its owner.
+
+### Preserve qualified native recovery in resource evidence
+
+An original raw native receipt can remain `unknown`/cleanup `unknown` after qualified recovery.
+Resource-owner evidence uses the same read-only recovered view as workflow settlement only when
+the stage already records the exact raw `receiptDigest` and `recoveryDigest`. Original native request,
+launch, machine, membership, process absence and expected-exit-code bindings still apply. Recovery
+bytes join the immutable evidence snapshot and are checked again before release. A known native
+exit remains failed or cancelled as originally derived; lost execution is never promoted. Raw
+receipt bytes, native result clocks and failed results remain unchanged. This is cleanup custody,
+not successful development, SDK/API acceptance or permission to replay completed commands.
+
+### Explicit owned-emulator app sessions
+
+A fresh app session may declare `ownership: owned-emulator` while retaining its original
+`android:<serial>`, `app:<package>` and every mapped local claim. Add
+`emulator: {bootStage: "device", lockPath: "/var/tmp/owned-vm.lock"}` to the existing descriptor.
+The serial must be an exact supported even emulator console port. The boot stage must be an
+ordinary declared stage. Do not combine this descriptor with `androidEmulator`, rename claims,
+retrofit older bindings or relabel an existing borrowed VM. The project retains boot/shutdown
+authority; Governance adds only observation and attribution.
+
+The original project producer writes `android-emulator-owner.json`, create-only, in the boot
+stage's existing `PROJECT_GOVERNANCE_WORKFLOW_ARTIFACT_DIR`. The version1 record contains:
+
+- `runId`, `stageId`, `ownership: owned-emulator`, exact `serial`, `userId` and `lockPath`.
+- `initial: {targetAbsent: true, portsClosed: [consolePort, adbPort], lockAcquired: true, observedAt}`.
+  These are facts observed by the original admitted producer before starting its own VM. Failed,
+  ambiguous or borrowed-target observations cannot be recorded as confirmed absence/ownership.
+- `emulator: {pid, fingerprint}` for the VM process, recorded among the original command's retained
+  native descendants. A supervisor or wrapper PID, missing membership or mismatched fingerprint
+  is insufficient.
+- `bootedAt` (host VM launch time) and final `observedAt`, within that original native command.
+  The report's actual mtime must also be within the original command window. No guest readiness,
+  SDK-close acknowledgement or successful app outcome is inferred from those timestamps.
+
+All original native commands must have qualified resolved outcomes and actual owner/group closure.
+A normal worker can briefly observe a native supervisor after it wrote the terminal receipt. Only
+that normal path waits up to the existing five-second settlement budget for the exact original
+identities; PID reuse, missing/mutated evidence or unproved execution still refuses. Public late
+owner release does not wait around a live original workflow worker.
+
+Reuse the owned-target observer for successful ADB inventory with exact target absence, closed
+console/ADB ports and absent original ownership lock. Compose every original local-lock and native
+closure fact, then release the whole original lease set atomically. App absence follows the closed
+owned VM, rather than querying an unavailable guest. Keep SDK lifecycle acknowledgement unclaimed.
+The original failure/cancellation/unknown state, raw receipts, clocks, generation readers, create-only
+journals, interruption re-observation and historical replay fences remain unchanged. The existing
+`workflow-release-resources --kind android-app-session` selects only the bound original lifetime.
+
+Offline fixtures prove normal finish, continuation, whole-set public release and harmless successor
+reuse without executing an emulator/device. Actual Android qualification and normal deliberate
+adoption belong to the existing project owner. This contract does not automatically upgrade pins.
+
+
+## Explicit observed local-host recovery
+
+A separately approved recovery may use `workflow-release-resources --kind local-host-observed
+--request-file <path> --receipt <path>` for an original failed local-only operation whose closure
+report lacks a historical native process overlap. The ordinary `local-host` rule still requires
+that overlap. Never rewrite an original report or replace its missing history with invented data.
+
+The bounded version1 request supplies `runId`, current `revision`, original `owner`, `authority`,
+canonical `workspace`, `database`, `workerDirectory`, `registry`, exact `bindingDigest`, complete
+original `leases`, and original `generation` reader (or null only when originally absent).
+`report`, `approval` and `mappingEvidence` are canonical ordinary-file references `{path, digest}`.
+The approval is an existing explicit authority decision, not an inferred human-confirmation event.
+This remains the trusted local account boundary; file references do not authenticate a human.
+
+The request declares `localOnly: true`, `historicalMutexMappingConfirmed: true`, and `guards` entries
+`{directory, resources}` covering each original claim exactly once. Multiple logical reservations
+may share one real mutex when the original owner's hash-bound mapping establishes that relationship.
+Opaque names, absent imaginary locks, unknown mappings and unconfirmed declarations do not justify
+recovery. Actual mutex roots must come from retained launch evidence or equivalent original facts.
+
+The runtime validates original worker/native identity, same host, resolved failed effects, original
+closure flags and report times, unchanged files, exact whole-set held leases and original runtime
+reader. It observes full process/group absence, including all report identities and the original
+worker PID; present or reused identities refuse. It observes canonical actual guard absence and
+stable parent identity itself. A caller's JSON assertion of absence never substitutes for those
+checks. Device, app-session, network or remote custody cannot use this route.
+
+Retain a distinct create-only `workflow-local-host-observed-cleanup` receipt binding request,
+approval and mapping digests, original report and native evidence, `historicalProcessJoin: missing`,
+actual guard mappings and current absence. Recheck files, complete process inventory, guards,
+original generation and the existing workflow/resource snapshots immediately before whole-set
+release. The owner keeps that local lane idle through this short observe-to-commit seam. This
+coordinates cooperating owners; it adds no sandbox against an unrelated process ignoring mutexes.
+
+An interrupted journal is reused only with the same original scope and fresh observations. A
+completed release replay never affects successor claims. Existing `workflow-reconcile-cleanup`
+retains the original failed result and clocks and retires only its original reader. No workflow
+dispatch, device action, successful test, acceptance, runtime adoption or automatic upgrade follows.
+Qualification uses synthetic negative, interruption, public-route and successor fixtures; actual
+recovery requires the original owner's admitted public invocation and readback.

@@ -66,25 +66,30 @@ export async function observeAndroidCapacity(raw: AndroidEmulatorAdapter, worksp
   } catch { return { ...base, state: "unknown" as const, availableBytes: null, reason: "Exact emulator capacity could not be established; install was not started." }; }
 }
 
-/** Target absence, closed console/ADB/claimed ports and adapter lock absence are all required. */
-export async function observeAndroidEmulatorCleanup(resources: readonly string[], raw: AndroidEmulatorAdapter, workspace: string, probes?: {
-  devices: () => Promise<string>; portClosed: (port: number) => Promise<boolean>; lockAbsent: (path: string) => Promise<boolean>;
-}) {
-  if (typeof workspace !== "string" || !isAbsolute(workspace)) throw new Error("Android observer requires an absolute workspace");
+export interface AndroidEmulatorCleanupProbes {
+  devices:()=>Promise<string>; portClosed:(port:number)=>Promise<boolean>; lockAbsent:(path:string)=>Promise<boolean>;
+}
+
+/** Shared target facts only. The caller validates its original claim shape; no resource aliases are constructed. */
+export async function observeAndroidEmulatorTargetCleanup(raw:AndroidEmulatorAdapter,workspace:string,claimedPorts:readonly number[]=[],probes?:AndroidEmulatorCleanupProbes) {
+  if(typeof workspace!=="string"||!isAbsolute(workspace))throw Error("Android observer requires an absolute workspace");
   try {
-    const config = androidEmulatorAdapter(raw, workspace), expected = `android-emulator:${config.serial}`;
-    if (!resources.includes(expected) || new Set(resources).size !== resources.length || resources.some(resource => resource !== expected && !/^tcp:127\.0\.0\.1:\d+$/u.test(resource))) return null;
-    const inventory = devices(probes ? await probes.devices() : await adb(config, ["devices"]));
-    if (inventory.some(item => item.serial === config.serial)) return null;
-    const port = Number(config.serial.slice("emulator-".length)), ports = [...new Set([port, port + 1, ...resources.filter(item => item !== expected).map(item => Number(item.split(":").at(-1)))])];
-    for (const value of ports) if (!await (probes?.portClosed ?? observeClosedPort)(value)) return null;
-    const absent = probes ? await probes.lockAbsent(config.lockPath) : (() => {
-      const parent = dirname(config.lockPath);
-      if (!lstatSync(parent).isDirectory() || realpathSync(parent) !== parent) return false;
-      return !readdirSync(parent).includes(basename(config.lockPath));
-    })();
-    if (!absent) return null;
-    return { kind: "android-emulator-cleanup-observation", version: 1, serial: config.serial, targetAbsent: true, portsClosed: ports,
-      lockPath: config.lockPath, lockAbsent: true, inventoryDigest: digest(inventory), observedAt: new Date().toISOString() };
-  } catch { return null; }
+    const config=androidEmulatorAdapter(raw,workspace);
+    const inventory=devices(probes?await probes.devices():await adb(config,["devices"]));
+    if(inventory.some(item=>item.serial===config.serial))return null;
+    const port=Number(config.serial.slice("emulator-".length)),ports=[...new Set([port,port+1,...claimedPorts])];
+    for(const value of ports)if(!await(probes?.portClosed??observeClosedPort)(value))return null;
+    const absent=probes?await probes.lockAbsent(config.lockPath):(()=>{const parent=dirname(config.lockPath);if(!lstatSync(parent).isDirectory()||realpathSync(parent)!==parent)return false;return!readdirSync(parent).includes(basename(config.lockPath));})();
+    if(!absent)return null;
+    return{kind:"android-emulator-cleanup-observation",version:1,serial:config.serial,targetAbsent:true,portsClosed:ports,lockPath:config.lockPath,lockAbsent:true,inventoryDigest:digest(inventory),observedAt:new Date().toISOString()};
+  }catch{return null;}
+}
+
+/** The existing owned-emulator claim contract still requires target, ports and ownership lock closure. */
+export async function observeAndroidEmulatorCleanup(resources:readonly string[],raw:AndroidEmulatorAdapter,workspace:string,probes?:AndroidEmulatorCleanupProbes) {
+  if(typeof workspace!=="string"||!isAbsolute(workspace))throw Error("Android observer requires an absolute workspace");
+  try{const config=androidEmulatorAdapter(raw,workspace),expected=`android-emulator:${config.serial}`;
+    if(!resources.includes(expected)||new Set(resources).size!==resources.length||resources.some(resource=>resource!==expected&&!/^tcp:127\.0\.0\.1:\d+$/u.test(resource)))return null;
+    return await observeAndroidEmulatorTargetCleanup(config,workspace,resources.filter(x=>x!==expected).map(x=>Number(x.split(":").at(-1))),probes);
+  }catch{return null;}
 }

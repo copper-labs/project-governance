@@ -1,3 +1,4 @@
+import { assertAndroidAppSession } from "./android-app-session.ts";
 import { realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { parse } from "yaml";
@@ -41,6 +42,7 @@ export function workflowAuthorization(workspace: string): WorkflowAuthorization 
 
 /** Existing task authority still decides scope; this checks only declared extra capabilities. */
 export function assertWorkflowAuthorization(policy: WorkflowAuthorization, recipe: Recipe): void {
+  assertAndroidAppSession(recipe);
   if (policy.mode !== "task") throw new Error("Task workflow authorization is not configured");
   if (recipe.resources.some(resource => !policy.resources.includes(resource))) throw new Error("Workflow resource is outside the configured task policy");
   for (const operation of Object.values(recipe.operations)) {

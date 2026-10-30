@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { pathToFileURL, fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline';
 import { continuationCandidate, continuationInputs, verifyContinuationInstallation, assessUpgradeTaskFacts } from './verify-continuity-upgrade.mjs';
 import { FACTS_MARKER } from './verify-conversational-facts.mjs';
@@ -236,7 +236,7 @@ test('the continuation candidate changes only scratch identity, preserves bundle
 
 test('synthetic native dispatch distinguishes a configured timeout from normal completion', { timeout: 15000 }, async () => {
   const temporary = mkdtempSync(join(tmpdir(), 'continuity-dispatch-test-'));
-  const child = spawn(process.execPath, [new URL('./fixtures/continuity-native-host.mjs', import.meta.url).pathname,
+  const child = spawn(process.execPath, [fileURLToPath(new URL('./fixtures/continuity-native-host.mjs', import.meta.url)),
     temporary, pathToFileURL(resolve('components/engine/src/startup-host-owner.ts')).href], { stdio: ['pipe', 'pipe', 'pipe'] });
   const lines = createInterface({ input: child.stdout })[Symbol.asyncIterator]();
   const exited = new Promise(resolve => child.once('exit', (code, signal) => resolve({ code, signal })));

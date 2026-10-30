@@ -1,3 +1,5 @@
+import { ownedAndroidAppSessionCleanup } from "./android-owned-app-session.ts";
+import { observeAndroidAppSession } from "./android-app-session.ts";
 import { observeAndroidEmulatorCleanup } from "./android-emulator.ts";
 import { credentialEnvironment } from "./credential-environment.ts";
 import { spawn } from "node:child_process";
@@ -107,7 +109,8 @@ async function worker(directory: string, expectedDigest: string): Promise<void> 
       // Unknown resource types remain held; supported device claims require host readback.
       observeCleanup: async (observedRun, leases) => {
         const resources = leases.map(lease => lease.resource);
-        const observation = observedRun.binding.recipe.androidEmulator
+        const appSession=observedRun.binding.recipe.androidAppSession;
+        const observation = appSession ? appSession.ownership==="owned-emulator" ? await ownedAndroidAppSessionCleanup(directory,observedRun,store.stages(observedRun.id),undefined,undefined,true).then(x=>x.observation,()=>null) : await observeAndroidAppSession(resources,appSession,observedRun.binding.recipe.workspace) : observedRun.binding.recipe.androidEmulator
           ? await observeAndroidEmulatorCleanup(resources, observedRun.binding.recipe.androidEmulator, observedRun.binding.recipe.workspace)
           : await observeSimulatorCleanup(resources) ?? await observePhysicalCleanup(resources);
         if (!observation) return null;

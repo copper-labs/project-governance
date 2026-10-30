@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-10-27
-updated: 2026-10-27
+updated: 2026-10-30
 summary: Uses existing checks and deliberate task-based workflow binding while retaining ownership and exact evidence.
 ---
 
@@ -71,6 +71,16 @@ Correct that cause. Do not clear an uncertain receipt, release a live resource, 
 or silently use another runner. Task-based binding preserves the executor's per-stage task checks,
 process tracking, deadlines and cleanup rules.
 
+## Finish original local resource cleanup
+
+For resolved local producer/storage work, the original owner can now use
+`workflow-release-resources` with its current workflow revision, original worker directory and
+existing closure report. The runtime constructs and preserves the release receipt; it does not
+execute more work or change the failed result. See the exact
+[owner release contract](../../specs/engine-workflow-and-device-contract.md#initial-owner-release-for-local-producer-and-storage-claims).
+Then use the original receipt with `workflow-reconcile-cleanup`. Failed/cancelled workflow outcomes
+still exit 1. Device, remote and retained-session obligations keep their qualified adapters.
+
 ## Withdraw and assess
 
 Changing to `mode: operator` stops new policy bindings. It does not revoke already authorized work.
@@ -79,3 +89,31 @@ Withdraw the task or cancel the existing workflow through its current owner and 
 Policy-based receipts record `task-policy`, a policy digest and binding time rather than a human
 approval. Test success, physical-device proof and accepted development remain separate claims.
 Fewer dialogs alone do not prove lower total cost or better outcomes.
+
+For an original observation-only iOS workflow with mixed device/app/local-storage claims, the
+[owner-release adapter](../../specs/engine-workflow-and-device-contract.md#original-observation-only-mixed-ios-owner-release)
+uses `workflow-release-resources --kind ios-observation` with the original observation report and
+owner-declared storage/lock mapping. It obtains fresh qualified device-info and host closure without
+launching an app or claiming SDK shutdown. Keep ordinary device/SDK execution and human API
+approval with their existing owners.
+
+Borrowed Android app workflows use the explicit
+[app-session descriptor](../../specs/engine-workflow-and-device-contract.md#explicit-borrowed-android-app-session),
+keeping original `android:<serial>`, `app:<package>` and mapped local claim identities. They observe
+app/service and local-lock absence while retaining the running borrowed emulator/device. Late
+owner release uses `--kind android-app-session` with an original native receipt; it does not require
+or infer SDK-close acknowledgement. Owned-emulator shutdown custody remains separate and unchanged.
+
+For fresh Android work that owns emulator boot and shutdown, use the explicit
+[owned app-session contract](../../specs/engine-workflow-and-device-contract.md#explicit-owned-emulator-app-sessions).
+Its original producer supplies the boot ownership record through the existing stage artifact
+directory. The runtime observes complete owned VM and original local closure and releases the
+whole original claim set. Existing borrowed sessions and older bindings keep their original
+lifetime. A normal deliberate owner adoption can cover both Android routes in one update.
+
+
+If the original local-only failed report has no historical native identity overlap, keep it intact.
+The separately approved [observed local recovery](../../specs/engine-workflow-and-device-contract.md#explicit-observed-local-host-recovery)
+uses an exact request, explicit decision and original real-mutex mapping. The runtime obtains fresh
+host and mutex absence; ordinary local-host checks and original failure remain unchanged. It does
+not run more work or automatically recover a project.

@@ -437,6 +437,15 @@ export class WorkflowStore {
     });
   }
 
+  /** Fence the final registry commit against changed recovery state without doing slow observation under this lock. */
+  withResourceReleaseSnapshot<T>(id: string, expected: string, release: () => T): T {
+    return this.#atomic(() => {
+      if (digest({run:this.read(id),stages:this.stages(id),cleanupWorker:this.cleanupWorker(id)})!==expected)
+        throw new Error("Workflow changed before resource release");
+      return release();
+    });
+  }
+
   cleanupWorker(id: string): { pid: number; fingerprint: string } | null {
     const row = this.#db.prepare("SELECT data FROM engine_event WHERE run_id=? AND kind='cleanup-continuation-reserved' ORDER BY sequence DESC LIMIT 1").get(id);
     if (!row) return null;

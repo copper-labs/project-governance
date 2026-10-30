@@ -1,10 +1,10 @@
-import { workflowOperation } from "./workflow-operation.ts";
+import { validateOriginalWorkflowCommand } from "./workflow-operation.ts";
 import { existsSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { commandProcesses } from "./command-owner-recovery.ts";
 import { digest, durableJson } from "./core.ts";
 import { narrativeFile } from "./narrative-inputs.ts";
-import { observeCommand, validateCommandRequest, type CommandRequest } from "./process-owner.ts";
+import { observeCommand, type CommandRequest } from "./process-owner.ts";
 import { settleWorkflowCommandCleanup } from "./workflow-command-cleanup.ts";
 import { WorkflowStore } from "./workflow-store.ts";
 import { validateInputs, type StageResult } from "./workflow-types.ts";
@@ -40,12 +40,7 @@ export async function recoverStoppedWorkflow(directory: string, database: string
       if (!existsSync(join(commandDirectory, "request.json"))) { unresolved.push(stage.id); continue; }
       if (realpathSync(commandDirectory) !== commandDirectory) throw new Error("Command recovery directory uses an alias");
       const command = JSON.parse(narrativeFile(commandDirectory, "request.json")) as CommandRequest;
-      if (command.version !== 1 || command.id !== `${runId}:${stage.id}` ||
-          digest(command.operation) !== digest(workflowOperation(run.binding.recipe, runId, spec, request.commandsDirectory)) ||
-          !Number.isInteger(command.deadlineMs) || command.deadlineMs < 1 || command.deadlineMs > spec.deadlineMs ||
-          Object.keys(command).some(key => !["version", "id", "operation", "deadlineMs", "outputLimit", "ownerDigest", "executionIdentity"].includes(key)))
-        throw new Error("Original command differs from workflow stage");
-      validateCommandRequest(command);
+      validateOriginalWorkflowCommand(command,run.binding.recipe,runId,spec,request.commandsDirectory);
       const requestDigest = digest(command), observed = observeCommand(commandDirectory, requestDigest);
       if (!observed.receipt) { unresolved.push(stage.id); continue; }
       if (observed.receipt.runtimeVersion !== command.executionIdentity?.runtimeVersion ||

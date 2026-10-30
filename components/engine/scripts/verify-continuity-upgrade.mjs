@@ -3,7 +3,7 @@ import { spawn, execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { appendFileSync, cpSync, existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { pathToFileURL, fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline';
 import { readDeliveredFacts } from './verify-conversational-facts.mjs';
 import { digest } from '../src/core.ts';
@@ -115,7 +115,7 @@ export function continuationCandidate(packageRoot, temporary, environment = proc
 
 async function nativeHost({ packageRoot, workspace, environment, log }) {
   const ownerModule = pathToFileURL(join(packageRoot, 'dist/engine/src/startup-host-owner.js')).href;
-  const child = spawn(process.execPath, [new URL('./fixtures/continuity-native-host.mjs', import.meta.url).pathname,
+  const child = spawn(process.execPath, [fileURLToPath(new URL('./fixtures/continuity-native-host.mjs', import.meta.url)),
     workspace, ownerModule], { cwd: workspace, env: environment, stdio: ['pipe', 'pipe', 'pipe'] });
   const lines = createInterface({ input: child.stdout })[Symbol.asyncIterator]();
   let stderr = '', lastDispatch;

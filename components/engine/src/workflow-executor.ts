@@ -1,3 +1,4 @@
+import { assertAndroidAppSession } from "./android-app-session.ts";
 import { observeAndroidCapacity } from "./android-emulator.ts";
 import { workflowOperation } from "./workflow-operation.ts";
 import { settleWorkflowCommandCleanup } from "./workflow-command-cleanup.ts";
@@ -43,6 +44,7 @@ export async function executeWorkflow(store: WorkflowStore, id: string, options:
   let leases: Lease[] = retained, unresolved = false, failed = continuation ? store.stages(id).some(stage => stage.state !== "pending" && stage.state !== "succeeded") : false;
   mkdirSync(options.commandsDirectory, { recursive: true, mode: 0o700 });
   try {
+    if (!continuation) assertAndroidAppSession(recipe);
     if (!continuation && recipe.resources.length) leases = options.registry.acquire(recipe.resources, owner, run.id);
   } catch (error) {
     for (const stage of recipe.stages) store.stage(id, owner, stage.id, "blocked");
