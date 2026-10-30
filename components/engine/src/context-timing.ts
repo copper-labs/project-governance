@@ -32,7 +32,7 @@ export class ContextTiming {
       else if (reason === "deadline") this.#limitReason = "provider-deadline";
     }
   }
-  snapshot(providerCallMs = 0, indexMs = 0) {
+  snapshot(providerCallMs: number | null = 0, indexMs: number | null = 0) {
     const end = this.now(), selectionStart = this.#selectionStart ?? end, selectionEnd = this.#selectionEnd ?? end;
     return { version: 1, preparationMs: Math.max(0, selectionStart - this.started),
       sourceCaptureMs: this.sourceCaptureMs, indexMs, selectionMs: Math.max(0, selectionEnd - selectionStart), providerCallMs,

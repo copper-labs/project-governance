@@ -1,3 +1,4 @@
+import { contextRouteCommand } from "../src/context-route-command.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -98,6 +99,10 @@ test("a native primary prompt with an external explicit bind delivers local fall
     assert.ok(!JSON.stringify(entry).includes(event.prompt)); assert.equal(fileDigest(defaultDbPath(f.main)), before);
     assert.equal(existsSync(join(contextStateRoot(f.linked), "prompt-entries")), false);
     assert.throws(() => readPromptEntry(f.linked, id), /unavailable in/);
+    const followup = await contextRouteCommand(["--retrieval", "semantic", "--task", "Inspect local rules"], f.main,
+      resolve("src/project_governance_runtime/assets/skills"), undefined, { session: "host-session" });
+    assert.equal(followup.selection.retrieval.reason, "native-workspace-alignment-required");
+    assert.equal(followup.selection.retrieval.providerAttempted, false); assert.equal(calls, 0);
     const transcript = join(f.base, "native-usage.jsonl");
     writeFileSync(transcript, JSON.stringify({ type: "token_usage_record", payload: { thread_id: event.session_id,
       root_turn_id: event.turn_id, response_id: "synthetic-response", usage: { input_tokens: 17, output_tokens: 3 } } }) + "\n");

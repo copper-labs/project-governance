@@ -270,7 +270,8 @@ export class DecisionRuntime {
     const signal = signals.length ? AbortSignal.any(signals) : undefined;
     const metadata = metadataQuestionGroup(ask.consumerId, ask.questions);
     const passage = passageQuestionGroup(ask.consumerId, ask.questions);
-    const limits = ask.budgetPartition === "context-selection" && (metadata || passage)
+    const workflow = ask.budgetFamily === true && ask.consumerId === "DL04" && ask.questions.length === 1 && ask.questions[0]?.definitionId === "workflow.match/1";
+    const limits = ask.budgetPartition === "context-selection" && (metadata || passage || workflow)
       ? this.settings.contextBudget : this.settings.budget;
     const resolved = this.eligibility(ask.consumerId, metadata ? "context.metadata-relevance/1" : undefined);
     const consumer = resolved.consumer;
@@ -334,7 +335,7 @@ export class DecisionRuntime {
         return effect !== "advise" || (resolved.effect !== "advise" && !(entry === "workflow-observe" && resolved.effect === "choose-read"));
       })) return fallback("entry-effect-incompatible");
     if (ask.budgetFamily && !ask.budgetPartition || ask.budgetPartition && (ask.budgetPartition !== "context-selection" ||
-      !(metadata || passage) || !/^[a-f0-9]{64}$/u.test(ask.budgetInvocationId ?? "")) ||
+      !(metadata || passage || workflow) || !/^[a-f0-9]{64}$/u.test(ask.budgetInvocationId ?? "")) ||
       ask.budgetInvocationId && !ask.budgetPartition) return fallback("budget-partition-incompatible");
     if (ask.deadlineAt !== undefined && !Number.isFinite(ask.deadlineAt)) return fallback("invalid-deadline");
     if (this.#client.adapter.id !== this.settings.provider) return fallback("provider-client-mismatch");

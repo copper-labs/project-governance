@@ -9,6 +9,12 @@ updated: 2026-10-04
 summary: Reuses session-bound continuity intent and bounded discovery for ordinary context and check delivery.
 ---
 
+> Current 4.5 entry and optional-selection behavior is owned by
+> [demand-driven context](engine-demand-driven-context.md). Its no-retrieval native entry and
+> explicit local/semantic requests supersede automatic optional retrieval described below.
+> Historical proofs below do not establish current accepted-outcome savings.
+
+
 # Task context through ordinary entry points
 
 Status: accepted corrective design; implementation and qualification tracked in the

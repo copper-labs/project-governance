@@ -9,6 +9,12 @@ updated: 2026-10-06
 summary: Refines conversational context, selection quality, outcome linkage and reliable entry through existing runtime owners.
 ---
 
+> Current 4.5 entry and optional-selection behavior is owned by
+> [demand-driven context](engine-demand-driven-context.md). Its no-retrieval native entry and
+> explicit local/semantic requests supersede automatic optional retrieval described below.
+> Historical proofs below do not establish current accepted-outcome savings.
+
+
 # 4.1 context quality and ordinary-work evidence
 
 ## Problem and intended behavior

@@ -11,7 +11,7 @@ export interface HistoryCandidate {
   sourceHints: string[];
 }
 export interface HistorySelection {
-  state: "ready" | "unavailable"; candidates: HistoryCandidate[]; inspected: number; omissions: string[];
+  state: "ready" | "unavailable" | "not-requested"; candidates: HistoryCandidate[]; inspected: number; omissions: string[];
 }
 
 /** Optional local lookup reads the existing repository store, never a second graph or task owner. */

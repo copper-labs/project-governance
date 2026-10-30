@@ -175,3 +175,7 @@ declare another executor part of the current release.
 
 The approved [minimum useful governance plan](exec-plans/active/2026-10-27-minimum-useful-governance.md)
 owns the 4.4 local-workflow simplification and its release checkpoint.
+
+The [demand-driven context specification](specs/engine-demand-driven-context.md) and
+[delivery plan](exec-plans/active/2026-10-30-demand-driven-context.md) own the 4.5 separation of
+required prompt guidance, explicit local retrieval, paid semantic selection and coverage telemetry.

@@ -465,3 +465,18 @@ test("missing malformed and unlinked route phases are not inferred from declared
     assert.equal(report.efficiencyComparison.medianSavingsFraction, null);
   } finally { f.close(); }
 });
+
+test("skipped native indexing stays a separate workload with unknown elapsed indexing time", () => {
+  const f=fixture();
+  try {
+    const selected=f.conditions.find(item=>item.id==="candidate")!;
+    const route={kind:"route",...f.write("skipped-route.json",{version:1,receiptId:"skipped",inputDigest:hash,workspace:f.root,
+      runtimeVersion:selected.runtime.version,archiveDigest:selected.runtime.archiveDigest,
+      projection:{cache:"skipped",extractedCount:null,reusedCount:null,pendingCount:null},timing:{version:1,indexMs:null,totalMs:10}})};
+    const episode=f.episode("skipped","candidate",{entryKind:"context-delivery",evidence:[route]});
+    const report=readReleaseEvaluation(f.root,f.manifest([episode]));
+    assert.equal(report.contextTiming.indexWorkloads.skipped,1);
+    assert.equal(Object.values(report.contextTiming.indexWorkloads).reduce((sum,n)=>sum+n,0),report.contextTiming.measurements);
+    assert.equal(report.contextTiming.phases.indexMs!.medianMs,null);
+  } finally {f.close();}
+});

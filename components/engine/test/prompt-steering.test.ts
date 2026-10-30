@@ -84,7 +84,9 @@ test("returning to earlier A after B observes current intent and facts without r
   assert.notEqual(latest.entryId, anchor.entryId); assert.equal(latest.familyId, anchor.entryId); assert.equal(latest.promptDigest, anchor.promptDigest);
   const packet = JSON.parse(readFileSync(join(f.state, "prompt-packets", `${latest.entryId}.json`), "utf8"));
   assert.equal(packet.taskFacts.checkpoint.checkpointId, current.checkpointId); assert.notEqual(current.checkpointId, initial.checkpointId);
-  assert.match((recurring as any).hookSpecificOutput.additionalContext, /Current exact recurrence source/);
+  assert.doesNotMatch((recurring as any).hookSpecificOutput.additionalContext, /Current exact recurrence source/);
+  const retrieved = await contextRouteCommand(["--entry", String(latest.entryId), "--expansion", "1", "--task", f.event.prompt], f.root, f.assetRoot, undefined, { session: f.event.session_id });
+  assert.match(JSON.stringify(retrieved.optional), /Current exact recurrence source/);
   assert.deepEqual(await f.submit(), recurring); assert.deepEqual(readFileSync(join(f.state, "prompt-packets", `${anchor.entryId}.json`)), original);
 });
 
@@ -130,80 +132,72 @@ for (const [label, shift] of [["same-millisecond", 0], ["backwards-clock", -1000
   assert.deepEqual(await f.submit({ prompt }), prepared); assert.equal(f.entries().length, 2);
 });
 
-test("completed same-turn steering reassesses exact purpose/source within the original two continuation slots", async t => {
+test("semantic requests after steering share the original family while native entry remains free", async t => {
   const f = fixture(t, true), wires = transport(t);
-  await f.submit(); const anchor = f.entries()[0]!, before = wires.length;
-  assert.ok(before > 0, "The original fixture must execute intercepted metadata transport");
-  const prompt = "Give me an update, then fix cleanup in src/reconnect.ts.";
-  writeFileSync(join(f.root, "src/reconnect.ts"), "/** Reconnect now retains its revised settlement identity. */\nexport const reconnect = 'Revised exact source';\n");
-  const changed = await f.submit({ prompt }), child = entryFor(f, prompt);
-  assert.equal(child.familyId, anchor.entryId); assert.equal(child.contextFamily.step, 1); assert.equal(child.contextFamily.status, "reserved");
-  assert.ok(wires.length > before, "Changed exact purpose/source cannot reuse old metadata judgments");
-  const packet = JSON.parse(readFileSync(join(f.state, "prompt-packets", `${child.entryId}.json`), "utf8"));
-  assert.ok(packet.route.metadata.coverage.invalidatedBatches > 0); assert.equal(packet.route.metadata.coverage.replayedBatches, 0);
-  assert.equal(packet.route.execution.entryId, child.entryId); assert.equal(packet.route.execution.familyId, anchor.entryId);
-  assert.equal(packet.route.expansion.entry, child.entryId); assert.equal(packet.route.expansion.familyId, anchor.entryId);
-  const childCalls = wires.length; assert.deepEqual(await f.submit({ prompt }), changed); assert.equal(wires.length, childCalls);
-  await assert.rejects(contextRouteCommand(["--entry", child.entryId, "--expansion", "2", "--task", prompt], f.root, f.assetRoot, undefined, { session: "other-chat" }), /current observed entry/);
-  assert.throws(() => readPreparedPrompt(f.root, anchor.entryId, f.assetRoot, f.event.session_id), /supersedes/);
-  const nextPrompt = "Now inspect reconnect settlement in src/reconnect.ts.";
-  await f.submit({ prompt: nextPrompt }); const next = entryFor(f, nextPrompt);
-  assert.equal(next.contextFamily.step, 2); assert.equal(next.contextFamily.status, "reserved");
-  const used = wires.length, exhausted = await f.submit({ prompt: "Now finish reconnect cleanup from src/reconnect.ts." });
-  assert.equal(wires.length, used); assert.match((exhausted as any).hookSpecificOutput.additionalContext, /Current local context only: context-family/);
+  await f.submit(); const anchor = f.entries()[0]!;
+  const retrieve = (entry: any, purpose: string) => contextRouteCommand(["--entry", entry.entryId, "--task", purpose, "--retrieval", "semantic"], f.root, f.assetRoot, undefined, { session: f.event.session_id });
+  assert.equal(wires.length, 0);
+  const first = await retrieve(anchor, f.event.prompt); assert.equal(first.expansion?.step, 0);
+  assert.ok(wires.length > 0);
+  for (const step of [1, 2]) {
+    const prompt = `Inspect reconnect settlement ${step}.`, before: number = wires.length;
+    writeFileSync(join(f.root, "src/reconnect.ts"), `/** Reconnect settlement ${step}. */\nexport const reconnect=${step};\n`);
+    const changed = await f.submit({ prompt }), child = entryFor(f, prompt);
+    assert.equal(wires.length, before); assert.equal(child.familyId, anchor.entryId);
+    const selected = await retrieve(child, prompt); assert.equal(selected.expansion?.step, step);
+    assert.ok(wires.length > before);
+    const spent: number = wires.length; await retrieve(child, prompt); assert.equal(wires.length, spent);
+    assert.deepEqual(await f.submit({ prompt }), changed);
+  }
+  const used = wires.length, prompt = "Finish reconnect cleanup.";
+  await f.submit({ prompt }); const final = await retrieve(entryFor(f, prompt), prompt);
+  assert.equal(wires.length, used); assert.equal(final.selection.retrieval.effective, "local");
   assert.equal(readDecisionBudget(f.state, contextFamilyScope(f.root, anchor.entryId))?.calls, used);
   const db = new DatabaseSync(join(f.state, DECISION_BUDGET_FILE), { readOnly: true });
-  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM context_family").get()!.n, 1); assert.equal(db.prepare("PRAGMA user_version").get()!.user_version, 2); db.close();
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM context_family").get()!.n, 1); db.close();
 });
 
 test("in-flight same-turn steering is local, and late original completion cannot displace current input", async t => {
-  const f = fixture(t, true); let started!: () => void, release!: () => void;
-  const observed = new Promise<void>(resolve => { started = resolve; }), gate = new Promise<void>(resolve => { release = resolve; });
-  const wires = transport(t, async (_wire, call) => { if (call === 1) { started(); await gate; } });
-  const original = f.submit(); await observed;
+  const f = fixture(t, true); const wires = transport(t);
+  const original = f.submit();
   const prompt = "Pause implementation and give me current progress.";
   const changed = await f.submit({ prompt }), child = entryFor(f, prompt);
-  assert.equal(wires.length, 1); assert.equal(child.accountingAnchor.ready, false); assert.equal(child.accountingAnchor.entryDigest, null);
+  assert.equal(wires.length, 0); assert.equal(child.accountingAnchor.ready, false); assert.equal(child.accountingAnchor.entryDigest, null);
   assert.equal(child.selectionReason, "original-preparation-unavailable-or-incomplete");
-  assert.deepEqual(await f.submit({ prompt }), changed); assert.equal(wires.length, 1);
-  release(); const late = await original;
+  assert.deepEqual(await f.submit({ prompt }), changed); assert.equal(wires.length, 0);
+  const late = await original;
   assert.match((late as any).hookSpecificOutput.additionalContext, /superseded while preparing/);
   assert.doesNotMatch((late as any).hookSpecificOutput.additionalContext, /Keep cleanup ownership until settlement/);
   assert.equal(latestSessionPrompt(f.root, f.event.session_id).entry?.entryId, child.entryId);
-  const expansion = await contextRouteCommand(["--entry", child.entryId, "--expansion", "1", "--task", prompt], f.root, f.assetRoot, undefined, { session: f.event.session_id });
-  assert.equal(expansion.expansion?.status, "local-only"); assert.equal(wires.length, 1);
+  const expansion = await contextRouteCommand(["--entry", child.entryId, "--task", prompt, "--retrieval", "semantic"], f.root, f.assetRoot, undefined, { session: f.event.session_id });
+  assert.equal(expansion.expansion?.status, "local-only"); assert.equal(expansion.selection.retrieval.reason, "entry-anchor-unready"); assert.equal(wires.length, 0);
   assert.equal(promptAccountingFamily(f.root, child).ready, false, "A completed parent cannot upgrade the frozen unqualified claim");
 });
 
 test("duplicate changed input while its preparation is in flight stays local without overwriting its eventual packet", async t => {
-  const f = fixture(t, true); let started!: () => void, release!: () => void;
-  const observed = new Promise<void>(resolve => { started = resolve; }), gate = new Promise<void>(resolve => { release = resolve; });
-  const wires = transport(t, async (_wire, call) => { if (call === 2) { started(); await gate; } });
+  const f = fixture(t, true); const wires = transport(t);
   await f.submit(); const anchor = f.entries()[0]!, original = readFileSync(join(f.state, "prompt-packets", `${anchor.entryId}.json`));
-  const prompt = "Inspect current reconnect settlement after steering.", current = f.submit({ prompt }); await observed;
-  const duplicate = await f.submit({ prompt }); assert.equal(wires.length, 2);
+  const prompt = "Inspect current reconnect settlement after steering.", current = f.submit({ prompt });
+  const duplicate = await f.submit({ prompt }); assert.equal(wires.length, 0);
   const text = (duplicate as any).hookSpecificOutput.additionalContext;
   assert.match(text, /Required current guidance: authorization/); assert.match(text, /Current task facts/);
   assert.match(text, /has no verified packet reference yet/); assert.doesNotMatch(text, /Native entry reference \(for --entry\)/);
   const entryId = latestSessionPrompt(f.root, f.event.session_id).entryId!;
-  assert.equal(existsSync(join(f.state, "prompt-packets", `${entryId}.json`)), false);
-  assert.equal(existsSync(join(f.state, "prompt-entries", `${entryId}.json`)), false);
-  release(); const prepared = await current; assert.equal(entryFor(f, prompt).familyId, anchor.entryId);
-  assert.deepEqual(await f.submit({ prompt }), prepared); assert.equal(wires.length, 2);
+  assert.equal(entryId, entryFor(f, prompt).entryId, "The original may finish while the duplicate renders; the duplicate cannot own its packet");
+  const prepared = await current; assert.equal(entryFor(f, prompt).familyId, anchor.entryId);
+  assert.deepEqual(await f.submit({ prompt }), prepared); assert.equal(wires.length, 0);
   assert.deepEqual(readFileSync(join(f.state, "prompt-packets", `${anchor.entryId}.json`)), original);
 });
 
 test("late original preparation cannot relabel superseded mandatory guidance as current after steering", async t => {
-  const f = fixture(t, true); let started!: () => void, release!: () => void;
-  const observed = new Promise<void>(resolve => { started = resolve; }), gate = new Promise<void>(resolve => { release = resolve; });
-  const wires = transport(t, async (_wire, call) => { if (call === 1) { started(); await gate; } });
-  const original = f.submit(); await observed;
+  const f = fixture(t, true); const wires = transport(t);
+  const original = f.submit();
   const currentGuidance = "Current mandatory guidance: preserve the new settlement authority.\n";
   writeFileSync(join(f.root, "AGENTS.md"), currentGuidance);
   const changed = await f.submit({ prompt: "Pause and explain the current settlement authority." });
   assert.match((changed as any).hookSpecificOutput.additionalContext, /Current mandatory guidance: preserve the new settlement authority/);
-  release(); const text = (await original as any).hookSpecificOutput.additionalContext;
-  assert.equal(wires.length, 1); assert.match(text, /superseded while preparing/);
+  const text = (await original as any).hookSpecificOutput.additionalContext;
+  assert.equal(wires.length, 0); assert.match(text, /superseded while preparing/);
   assert.doesNotMatch(text, /Required current guidance:/); assert.doesNotMatch(text, /Required current guidance: authorization/);
   assert.doesNotMatch(text, /Quoted optional evidence|Native entry reference \(for --entry\)/);
   const old = entryFor(f, f.event.prompt); assert.equal(old.status, "superseded"); assert.equal(old.taskFacts.delivered, false);
@@ -218,7 +212,7 @@ test("missing original packet cannot manufacture fresh paid entry authority, eve
   assert.equal(child.accountingAnchor.ready, false); assert.equal(child.familyId, anchor.entryId);
   assert.match((changed as any).hookSpecificOutput.additionalContext, /original-preparation-unavailable-or-incomplete/);
   writeFileSync(path, original);
-  const result = await contextRouteCommand(["--entry", child.entryId, "--expansion", "1", "--task", prompt], f.root, f.assetRoot, undefined, { session: f.event.session_id });
+  const result = await contextRouteCommand(["--entry", child.entryId, "--task", prompt, "--retrieval", "semantic"], f.root, f.assetRoot, undefined, { session: f.event.session_id });
   assert.equal(result.expansion?.status, "local-only"); assert.equal(wires.length, calls);
 });
 
@@ -251,8 +245,7 @@ test("an invalid original turn claim gives current local guidance without creati
     assert.equal(f.entries().length, 1);
   }
   writeFileSync(path, original);
-  const db = new DatabaseSync(join(f.state, DECISION_BUDGET_FILE), { readOnly: true });
-  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM context_family").get()!.n, 1); db.close();
+  assert.equal(existsSync(join(f.state, DECISION_BUDGET_FILE)), false);
 });
 
 test("turn-level native usage stays unallocated across steered entries and preserves earlier immutable receipts", async t => {

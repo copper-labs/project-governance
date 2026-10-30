@@ -80,7 +80,7 @@ function contextTimings(episodes: EvaluationEpisode[]) {
   return { measurements: units.size, episodesWithoutCapturedRoute: episodes.filter(episode => !episode.contextTimings.length).length,
     duplicates, conflicts, generationMatched: rows.filter(row => row.generation === "matched").length,
     generationUnqualified: units.size - rows.filter(row => row.generation === "matched").length,
-    indexWorkloads: Object.fromEntries(["extraction-only", "reuse-only", "mixed", "empty-or-unobserved", "unknown"].map(workload =>
+    indexWorkloads: Object.fromEntries(["extraction-only", "reuse-only", "mixed", "empty-or-unobserved", "skipped", "unknown"].map(workload =>
       [workload, rows.filter(row => row.capture.index.workload === workload).length])),
     phases: Object.fromEntries(CONTEXT_TIME_METRICS.map(metric => {
       const observed = rows.flatMap(row => row.capture.phases[metric] === null ? [] : [row.capture.phases[metric]!]);

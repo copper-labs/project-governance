@@ -4,6 +4,12 @@ import type { RoutedContextPacket } from "./context-route-command.ts";
 
 /** Delivery readiness is separate from whether semantic selection answered the inventory. */
 export function contextSelectionStatus(packet: RoutedContextPacket) {
+  const retrieval = packet.selection?.retrieval;
+  if (retrieval && retrieval.requested !== "semantic") return {
+    delivery: packet.ready ? "ready" : "blocked", mode: retrieval.requested, coverage: "not-requested", applied: false,
+    reason: retrieval.reason, answeredCount: null, permittedCount: null,
+    summary: retrieval.requested === "none" ? `Required guidance is ${packet.ready ? "ready" : "blocked"}; optional retrieval was not requested.`
+      : "Local retrieval was requested; no provider selection was requested." };
   const metadataReason = packet.metadata?.reason ?? packet.metadata?.coverage.reason;
   const inactiveMetadata = ["metadata-question-disabled", "metadata-scope-disabled"].includes(metadataReason ?? "");
   const coverage = inactiveMetadata ? undefined : packet.metadata?.coverage, decision = packet.optional?.decision;
@@ -46,7 +52,7 @@ export function presentContextRoute(packet: RoutedContextPacket & { reuse?: unkn
       method: packet.relevanceAdvice.method, coverage: packet.relevanceAdvice.coverage } : null,
     workflowAdvice: packet.workflowAdvice,
     metadata: metadata ? { reason: metadata.reason, coverage: metadata.coverage } : null,
-    selection: { binding: selection.binding, reason: selection.reason, candidateCount: selection.candidateCount,
+    selection: { retrieval: selection.retrieval, binding: selection.binding, reason: selection.reason, candidateCount: selection.candidateCount,
       inventoryUnavailable: selection.inventoryUnavailable, optionalDelivery: selection.optionalDelivery,
       optionalClippedPaths: selection.optionalClippedPaths, optionalOmissionReasons: selection.optionalOmissionReasons },
     procedureReferences: packet.procedureReferences, procedureReferenceCount: packet.procedureReferenceCount,

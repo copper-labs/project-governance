@@ -248,7 +248,7 @@ function contextTiming(record: Record<string, unknown>, reference: EvaluationRef
   const extractedCount = integer(projection.extractedCount), reusedCount = integer(projection.reusedCount);
   return { id: `context-route:${String(record.receiptId)}`, reference,
     index: { cache: typeof projection.cache === "string" && /^[a-z][a-z0-9-]{0,127}$/u.test(projection.cache) ? projection.cache : null, extractedCount, reusedCount, pendingCount: integer(projection.pendingCount),
-      workload: extractedCount === null || reusedCount === null ? "unknown" : extractedCount && reusedCount ? "mixed" : extractedCount ? "extraction-only" : reusedCount ? "reuse-only" : "empty-or-unobserved" },
+      workload: projection.cache === "skipped" ? "skipped" : extractedCount === null || reusedCount === null ? "unknown" : extractedCount && reusedCount ? "mixed" : extractedCount ? "extraction-only" : reusedCount ? "reuse-only" : "empty-or-unobserved" },
     phases: { preparationMs: measuredNumber(timing.preparationMs), sourceCaptureMs: measuredNumber(timing.sourceCaptureMs), indexMs: measuredNumber(timing.indexMs),
       selectionMs: measuredNumber(timing.selectionMs), metadataDecisionWorkMs: measuredNumber(timing.providerCallMs), deliveryMs: measuredNumber(timing.deliveryMs), totalMs: measuredNumber(timing.totalMs),
       indexIdentityMs: measuredNumber(indexTiming.identityMs), indexFreshnessMs: measuredNumber(indexTiming.freshnessMs), indexCacheMs: measuredNumber(indexTiming.cacheMs),

@@ -8,7 +8,7 @@ Read shared skill discovery with `skill-read --path catalog.yaml`. Read a refere
 with `skill-read --path <path-relative-to-skills-root>`, for example `test-execution/SKILL.md`.
 The JSON response contains exact content and its digest, with a 64 KiB per-file limit. Use
 `context-route --entry <id>` to reuse the current prompt's packet. After binding a task, use
-`context-route --task <current request>` to refresh its guidance; catalog browsing does not replace
+`context-route --task <current request> --retrieval none` to refresh its guidance; catalog browsing does not replace
 that routing. A bare command cannot identify the current host turn.
 These commands read the selected package without recreating the wheel's physical skill directory.
 
@@ -132,10 +132,9 @@ revision, requirement, acceptance, sourcePaths}` or `GOVERNANCE_DECISION_CONTEXT
 Guarded admission still requires its explicitly authorized decision object; an ambient binding grants
 no delegation or model-routing authority. Replay retains the job's original task, including no task.
 
-The normal submit path prepares required instructions and bounded optional context before native stdin.
-JEV only sees approved sources; explicitly supplied provider sources retain deterministic delivery when
-sharing or credentials are absent. Missing binding is recorded as unavailable and cannot count as a
-successful JEV exposure. Provider completion records native status separately from optional quality advice.
+The normal submit path prepares required instructions and bounded local context before native stdin.
+It does not request JEV selection. Explicitly supplied provider sources retain deterministic delivery.
+Missing binding is recorded as unavailable and cannot count as successful task coverage. Provider completion records native status separately from optional quality advice.
 The trusted host sets `dataDestination: local-only` when the assignment forbids cloud processing.
 Current native adapters then refuse before context selection or provider launch; RC4 has no qualified
 local generation backend. Omission retains the existing authorized cloud path, or the host may state
@@ -197,3 +196,26 @@ It resumes cleanup only and refuses while the original command worker is alive. 
 `command-reconcile --directory <original-command-directory> --digest <request-digest>` binds the existing cleanup
 evidence. These are write operations. A lost command outcome stays unknown in its original receipt;
 workflow verification fails even when cleanup is confirmed. Read stage evidence before interpreting a failed run.
+
+
+## Demand-driven repository context (4.5)
+
+Native entry supplies required guidance and task facts without optional indexing or provider calls.
+A repository attachment does not establish that the current request needs repository evidence.
+
+- `context-route --task <request>` defaults to local retrieval. With no native task binding, supply
+  `--revision <revision>` as well. Zero relevant optional results are valid; inspect explicit originals
+  when needed rather than treating a partial index as proof of absence.
+- `context-route --entry <id>` replays the original required packet without new selection.
+- `context-route --entry <id> --expansion 1 --task <request>` requests local evidence for that entry.
+  Add `--retrieval semantic` only when useful: existing provider enablement, sharing permissions,
+  source identity and bounded accounting still apply. It is not a new approval step.
+- `--retrieval none` refreshes required guidance without optional work. Do not combine it with
+  optional paths, links, discovery, or explicit expansion inputs.
+- Provider job context defaults to local. It does not silently ask a second model to prepare input.
+- `telemetry context status --since <ISO timestamp>` reports inspected-entry coverage and known
+  usage subtotals. Missing host consumption, acceptance and later reads remain unknown. Record
+  explicit outcome evidence using the existing `telemetry context outcome` owner; do not infer it.
+
+Release-evaluation comparisons still require matched conditions and original hash-bound manifests.
+Skipped indexing is distinguished from a warm reuse or empty index. No dollar savings are implied.

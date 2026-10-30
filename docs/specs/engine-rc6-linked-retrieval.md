@@ -9,6 +9,12 @@ updated: 2026-10-04
 summary: Automatic prompt entry, a rebuildable SQLite repository index, source-backed relationships, bounded JEV selection with expansion and real-task qualification.
 ---
 
+> Current 4.5 entry and optional-selection behavior is owned by
+> [demand-driven context](engine-demand-driven-context.md). Its no-retrieval native entry and
+> explicit local/semantic requests supersede automatic optional retrieval described below.
+> Historical proofs below do not establish current accepted-outcome savings.
+
+
 # RC6 prompt entry and maintained repository context
 
 The [RC7 reliability amendment](engine-rc7-prompt-reliability.md) supersedes this contract's

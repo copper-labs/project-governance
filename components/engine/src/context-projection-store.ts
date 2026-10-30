@@ -1,3 +1,4 @@
+import { contextSearchTerms } from "./context-terms.ts";
 /** Disposable per-worktree projection. SQLite owns snapshots and writer exclusion; tasks never enter here. */
 import { DatabaseSync } from "node:sqlite";
 import { lstatSync, mkdirSync, realpathSync, statSync, readdirSync, unlinkSync, existsSync } from "node:fs";
@@ -144,7 +145,7 @@ export class ProjectionStore {
   }
   search(generation: string, purpose: string): string[] {
     if (!this.fts) return [];
-    const terms = [...new Set(purpose.match(/[\p{L}\p{N}_]{3,}/gu) ?? [])].slice(0, 24);
+    const terms = [...contextSearchTerms(purpose)].slice(0, 24);
     if (!terms.length) return [];
     const query = terms.map(term => '"' + term.replaceAll('"', '""') + '"').join(" OR ");
     try { return this.database.prepare("SELECT path FROM descriptors WHERE descriptors MATCH ? AND generation=? ORDER BY rank LIMIT 64").all(query, generation).map(row => String(row["path"])); }

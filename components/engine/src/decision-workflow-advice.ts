@@ -66,7 +66,7 @@ export function resolveWorkflowCandidates(raw: unknown, root: string, subject: V
 
 /** RC1 workflow advice: match intent to eligible registered recipes, or return unknown. */
 export async function workflowAdvice(runtime: DecisionRuntime, supplied: { candidates: WorkflowCandidate[]; rejected: Array<{ id: string; reason: string }> } | null,
-  scope: BudgetScope | null, options: { task: string; eventId: string; policyDigest: string; environment: string; revision: string; subjectDigest: string; sourcePaths: string[] }): Promise<WorkflowAdvice> {
+  scope: BudgetScope | null, options: { task: string; eventId: string; policyDigest: string; environment: string; revision: string; subjectDigest: string; sourcePaths: string[]; familyId?: string }): Promise<WorkflowAdvice> {
   const eligibility = runtime.eligibility("DL04");
   const candidates = supplied?.candidates ?? [], rejected = supplied?.rejected ?? [];
   const limits: string[] = [];
@@ -90,7 +90,7 @@ export async function workflowAdvice(runtime: DecisionRuntime, supplied: { candi
   const questions: QuestionInstance[] = [{ name: "match", definitionId: "workflow.match/1", consumerId: "DL04",
     evidenceIds: [taskId, ...candidates.map(candidate => `workflow:${candidate.id}`)],
     candidates: candidates.map(candidate => ({ id: candidate.id, description: candidate.description })) }];
-  const outcome = await runtime.ask({ consumerId: "DL04", eventId: `${options.eventId}:DL04`, scope,
+  const outcome = await runtime.ask({ ...(options.familyId ? { budgetPartition: "context-selection" as const, budgetInvocationId: options.familyId, budgetFamily: true } : {}), consumerId: "DL04", eventId: `${options.eventId}:DL04`, scope,
     subject: { digest: options.subjectDigest, revision: options.revision, environment: options.environment },
     evidence, coverage: base.coverage, questions, sourcePaths: options.sourcePaths,
     eligibilityDigest: digest(candidates.map(candidate => ({ id: candidate.id, recipeDigest: candidate.recipeDigest }))),

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { appendFileSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, realpathSync, rmSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -41,7 +41,7 @@ export async function verifyGreenfield(packageRoot, archive, { live = false } = 
     return invoke('/bin/sh', ['-c', handler.command], JSON.stringify(value), 0, handler.timeout * 1000, name);
   };
   const write = (path, content) => { mkdirSync(join(workspace, path, '..'), { recursive: true }); writeFileSync(join(workspace, path), content); };
-  const status = () => readFileSync(calls, 'utf8').trim().split('\n').filter(Boolean).length;
+  const status = () => !existsSync(calls) ? 0 : readFileSync(calls, 'utf8').trim().split('\n').filter(Boolean).length;
   try {
     const installed = await initializeGreenfield(packageRoot, archive, { temporary, workspace, registry, cli, environment, preload, calls, invoke, write, live });
     ({ launcher, hooks } = installed);
@@ -52,27 +52,24 @@ export async function verifyGreenfield(packageRoot, archive, { live = false } = 
     const submit = value => invokeHook('UserPromptSubmit', value);
     const submitted = submit(event), text = submitted.hookSpecificOutput.additionalContext;
     assert.match(text, /Retain operator authorization/);
-    assert.match(text, /preserve the audit log during onboarding/i);
+    assert.doesNotMatch(text, /preserve the audit log during onboarding/i);
+    if (!live) assert.equal(status(), 0, "Native entry must not dispatch paid retrieval");
     const entry = text.match(/Native entry reference \(for --entry\): ([a-f0-9]{64})\./u)?.[1]; assert.ok(entry, text);
     environment.HARNESS_SESSION = event.session_id;
     const bound = invoke(launcher, ['harness', 'task', 'create', '--outcome', event.prompt, '--scope', workspace]);
     assert.ok(bound.task.taskId);
     assert.equal(bound.contextEntry.status, 'linked');
-    const before = live ? null : status(), compact = invoke(launcher, ['context-route', '--entry', entry]);
-    assert.equal(compact.presentation, 'selected-context');
-    assert.equal(compact.reuse.status, 'validated-entry-replay');
-    assert.equal(compact.ready, true);
-    // Replay retains the original pre-binding packet; linking must not rewrite its history.
-    assert.equal(compact.selection.binding.taskId, null);
-    assert.equal(compact.metadata.coverage.applied, true, 'Live success cannot be satisfied by safe fallback');
+    const native = invoke(launcher, ['context-route', '--entry', entry, '--json']);
+    assert.equal(native.reuse.status, 'validated-entry-replay'); assert.equal(native.optional, null);
+    assert.equal(native.selection.binding.taskId, null); assert.equal(native.projection.cache, 'skipped');
+    const args = ['context-route', '--entry', entry, '--retrieval', 'semantic', '--task', event.prompt];
+    const compact = invoke(launcher, args);
+    assert.equal(compact.presentation, 'selected-context'); assert.equal(compact.ready, true);
+    assert.equal(compact.metadata.coverage.applied, true, 'Explicit semantic success cannot be satisfied by safe fallback');
     assert.equal(compact.metadata.coverage.answeredCount, compact.metadata.coverage.permittedCount);
-    assert.ok(compact.optional.entries.some(item => item.id === 'projects/example/brief.md'), JSON.stringify({
-      selected: compact.optional.entries.map(item => item.id), metadata: compact.metadata,
-      optional: { reason: compact.optional.reason, omitted: compact.optional.omitted, omissions: compact.optional.omissionReasons }, selection: compact.selection }));
-    assert.match(compact.optional.entries.find(item => item.id === 'projects/example/brief.md').excerpt,
-      /preserve the audit log during onboarding/i);
+    assert.match(compact.optional.entries.find(item => item.id === 'projects/example/brief.md').excerpt, /preserve the audit log during onboarding/i);
     assert.equal(compact.projection, undefined); assert.equal(compact.metadata.catalog, undefined);
-    const full = invoke(launcher, ['context-route', '--entry', entry, '--json']);
+    const before = live ? null : status(), full = invoke(launcher, [...args, '--json']);
     assert.ok(full.projection); assert.ok(full.metadata.catalog);
     assert.ok(full.metadata.catalog.excluded.some(item => item.path === largeEvidence && item.reason === 'automatic-path-excluded'));
     assert.ok(!full.optional.entries.some(item => item.id === largeEvidence));
@@ -82,7 +79,7 @@ export async function verifyGreenfield(packageRoot, archive, { live = false } = 
     assert.match(compact.entries.find(item => item.path === 'docs/core.md').content, /Retain operator authorization/);
     assert.ok(compact.optional.entries.every(item => /^sha256:[a-f0-9]{64}$/u.test(item.sourceDigest)));
     assert.equal(invoke(launcher, ['doctor', '--capability', 'decisions']).operational.state, 'succeeded');
-    if (!live) assert.equal(status(), before, 'Binding and packet replay cannot pay for repeated inference');
+    if (!live) assert.equal(status(), before, 'Exact explicit replay cannot repeat inference');
     const ordinary = submit({ ...event, turn_id: 'bound-task' });
     const boundEntry = ordinary.hookSpecificOutput.additionalContext.match(/Native entry reference \(for --entry\): ([a-f0-9]{64})\./u)?.[1];
     assert.ok(boundEntry);
@@ -135,18 +132,21 @@ function verifyOfflineRecovery({ environment, profile, saveProfile, status, subm
   delete environment.JEV_TOKEN; profile.continuity.decisions.config_revision = 'missing-token'; saveProfile();
   const previous = status(), missing = submit({ ...event, turn_id: 'missing-token' });
   assert.match(missing.hookSpecificOutput.additionalContext, /Retain operator authorization/);
-  assert.match(missing.hookSpecificOutput.additionalContext, /Reason: missing-token/);
+  assert.match(missing.hookSpecificOutput.additionalContext, /optional retrieval was not requested/);
+  const retrieve = () => invoke(launcher, ['context-route', '--task', event.prompt, '--retrieval', 'semantic', '--json']);
+  assert.equal(retrieve().selection.retrieval.reason, 'missing-token');
   assert.equal(status(), previous);
   environment.JEV_TOKEN = 'greenfield-fixture-credential'; environment.GREENFIELD_HTTP_STATUS = '402';
   profile.continuity.decisions.config_revision = 'billing-denied'; saveProfile();
   const denied = submit({ ...event, turn_id: 'billing-denied' });
-  assert.match(denied.hookSpecificOutput.additionalContext, /billing-unavailable/);
-  assert.match(denied.hookSpecificOutput.additionalContext, /credit/);
+  assert.equal(status(), previous);
+  const failure = retrieve(); assert.equal(failure.metadata.reason, 'billing-unavailable');
+  assert.equal(failure.selection.retrieval.effective, 'local');
   assert.ok(!JSON.stringify(denied).includes('private-provider-response-marker'));
   const health = invoke(launcher, ['doctor', '--capability', 'decisions'], undefined, 1);
   assert.equal(health.operational.state, 'failed'); assert.equal(health.operational.httpStatus, 402);
   delete environment.GREENFIELD_HTTP_STATUS; profile.continuity.decisions.config_revision = 'funded-recovery'; saveProfile();
-  submit({ ...event, turn_id: 'funded-recovery' });
+  submit({ ...event, turn_id: 'funded-recovery' }); retrieve();
   assert.equal(invoke(launcher, ['doctor', '--capability', 'decisions']).operational.state, 'succeeded');
 }
 

@@ -5,8 +5,6 @@ import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { contextRouteCommand } from "../src/context-route-command.ts";
-import { automaticContextCandidates } from "../src/context-candidates.ts";
-import type { ValidationSubject } from "../src/change-subject.ts";
 import { contextStateRoot } from "../src/context-command.ts";
 import { digest } from "../src/core.ts";
 import type { DecisionProvider } from "../src/decisions.ts";
@@ -14,19 +12,20 @@ import type { DecisionProvider } from "../src/decisions.ts";
 test("routed command captures staged policy, delivers mandatory content and writes source-free evidence", async () => {
   const root = mkdtempSync(join(tmpdir(), "context-route-")), previous = process.env.XDG_STATE_HOME;
   const assets = resolve("src/project_governance_runtime/assets/skills");
+  const originalToken = process.env.JEV_TOKEN; process.env.JEV_TOKEN = "fixture-only";
   process.env.XDG_STATE_HOME = join(root, "state");
   const git = (...args: string[]) => execFileSync("git", args, { cwd: root, stdio: "pipe" });
   try {
     git("init"); git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-m", "fixture");
     mkdirSync(join(root, "config/governance"), { recursive: true });
-    const profile = { profile_id: "fixture", context_router: { routes: [{ id: "fix", match: { prompt_terms: ["fix"] },
+    const profile = { continuity: { decisions: { mode: "auto", allowed_data_classes: ["source"], allowed_source_paths: ["**"], consumers: { DL03: { mode: "auto" } } } }, profile_id: "fixture", context_router: { routes: [{ id: "fix", match: { prompt_terms: ["fix"] },
       primary_context: ["rules.md"], skills: ["test-execution"] }] } };
     writeFileSync(join(root, "config/governance/profile.yaml"), JSON.stringify(profile));
     writeFileSync(join(root, "config/governance/facts.lock.yaml"), JSON.stringify({ profile_id: "fixture", facts: {} }));
     writeFileSync(join(root, "rules.md"), "private mandatory policy content");
     git("add", "config", "rules.md");
     writeFileSync(join(root, "rules.md"), "unstaged replacement");
-    const result = await contextRouteCommand(["--task", "fix", "--revision", "1", "--staged"], root, assets);
+    const result = await contextRouteCommand(["--retrieval", "semantic", "--decision-task", "fixture-task", "--task", "fix", "--revision", "1", "--staged"], root, assets);
     assert.equal(result.ready, true);
     assert.equal(result.entries[0]?.content, "private mandatory policy content");
     assert.deepEqual(result.skills?.entries.map(skill => skill.id), ["test-execution"]);
@@ -42,24 +41,24 @@ test("routed command captures staged policy, delivers mandatory content and writ
         method: "baseline", reason: "fixture", model: null, questionVersion: "1", confidence: null, latencyMs: 1,
         usage: { inputTokens: 4, outputTokens: 1 } };
     } };
-    const assisted = await contextRouteCommand(["--task", "fix", "--revision", "2", "--optional-path", "optional.ts", "--optional-path", "rules.md"], root, assets, provider);
+    const assisted = await contextRouteCommand(["--retrieval", "semantic", "--decision-task", "fixture-task", "--task", "fix", "--revision", "2", "--optional-path", "optional.ts", "--optional-path", "rules.md"], root, assets, provider);
     assert.equal(calls, 1);
     assert.equal(assisted.entries[0]?.content, "unstaged replacement");
     assert.equal(assisted.optional?.entries[0]?.excerpt, "private optional source");
     assert.equal(assisted.selection.automatic.priorityPreview.find(item => item.path === "optional.ts")?.disposition,
       "explicit-optional", "explicit delivery overrides automatic sharing rejection in the preview");
-    const declared = await contextRouteCommand(["--task", "fix", "--revision", "2"], root, assets,
+    const declared = await contextRouteCommand(["--retrieval", "semantic", "--decision-task", "fixture-task", "--task", "fix", "--revision", "2"], root, assets,
       provider, {}, { version: 1, workspace: root, taskId: "fixture-task", revision: "2", requirement: "fix",
         acceptance: [], sourcePaths: ["optional.ts"] });
     assert.equal(declared.selection.automatic.priorityPreview.find(item => item.path === "optional.ts")?.disposition,
       "task-declared", "task scope admission overrides automatic sharing rejection in the preview");
     assert.equal(assisted.optional?.measurement.tokenSavings, null);
-    const fallback = await contextRouteCommand(["--task", "fix", "--revision", "2", "--optional-path", "optional.ts"], root, assets,
+    const fallback = await contextRouteCommand(["--retrieval", "semantic", "--decision-task", "fixture-task", "--task", "fix", "--revision", "2", "--optional-path", "optional.ts"], root, assets,
       { async decide() { throw new Error("unavailable"); } });
     assert.equal(fallback.ready, true);
     assert.equal(fallback.optional?.reason, "provider-unavailable");
     writeFileSync(join(root, "single.ts"), "x".repeat(3000));
-    const single = await contextRouteCommand(["--task", "fix", "--revision", "single-line",
+    const single = await contextRouteCommand(["--retrieval", "semantic", "--decision-task", "fixture-task", "--task", "fix", "--revision", "single-line",
       "--optional-path", "single.ts"], root, assets, { async decide(request) {
       const order = request.candidates.map(candidate => candidate.id);
       return { version: 1, kind: request.kind, inputDigest: digest(request), delivered: order,
@@ -67,17 +66,17 @@ test("routed command captures staged policy, delivers mandatory content and writ
         confidence: null, latencyMs: 1, usage: { inputTokens: null, outputTokens: null } };
     } });
     assert.ok(!single.optional?.entries.some(entry => entry.id === "single.ts"));
-    assert.ok(single.optional?.entries.some(entry => entry.id === "optional.ts"), "safe local candidates remain available without sharing approval");
+    assert.ok(!single.optional?.entries.some(entry => entry.id === "optional.ts"), "Unmatched files do not backfill local context");
     assert.equal(single.optional?.omissionReasons["single.ts"], "excerpt-unrepresentable");
-    assert.equal(single.selection.reason, "fixture");
-    assert.equal(single.selection.optionalDelivery, "delivered");
+    assert.equal(single.selection.reason, "no-assessable-candidates");
+    assert.equal(single.selection.optionalDelivery, "none");
     assert.equal(single.selection.optionalOmissionReasons["single.ts"], "excerpt-unrepresentable");
     const singleReceipt = JSON.parse(readFileSync(join(contextStateRoot(root), "routes",
       `${single.receiptId}.json`), "utf8"));
     assert.equal(singleReceipt.optional.omissionReasons["single.ts"], "excerpt-unrepresentable");
     writeFileSync(join(root, "long.ts"), Array.from({ length: 120 }, (_, index) =>
       `Line ${index}: source for the fix and its verification.\n`).join(""));
-    const clipped = await contextRouteCommand(["--task", "fix", "--revision", "clipped",
+    const clipped = await contextRouteCommand(["--retrieval", "semantic", "--decision-task", "fixture-task", "--task", "fix", "--revision", "clipped",
       "--optional-path", "long.ts"], root, assets, { async decide(request) {
       return { version: 1, kind: request.kind, inputDigest: digest(request),
         delivered: request.candidates.map(candidate => candidate.id), suggested: null,
@@ -97,7 +96,7 @@ test("routed command captures staged policy, delivers mandatory content and writ
         provider: "jev", mode: "auto", allowed_questions: ["rank_optional_context"], allowed_data_classes: ["source"], allowed_source_paths: ["optional.ts"],
       } } };
       writeFileSync(join(root, "config/governance/profile.yaml"), JSON.stringify(noTokenProfile));
-      const noToken = await contextRouteCommand(["--task", "fix", "--revision", "no-token", "--optional-path", "optional.ts"], root, assets);
+      const noToken = await contextRouteCommand(["--retrieval", "semantic", "--decision-task", "fixture-task", "--task", "fix", "--revision", "no-token", "--optional-path", "optional.ts"], root, assets);
       assert.equal(noToken.ready, true);
       assert.equal(noToken.optional?.reason, "missing-token");
       assert.equal(noToken.entries[0]?.content, "unstaged replacement");
@@ -109,7 +108,7 @@ test("routed command captures staged policy, delivers mandatory content and writ
       writeFileSync(join(root, "config/governance/profile.yaml"), JSON.stringify({ ...noTokenProfile,
         context_router: { ...profile.context_router, routes: [{ ...profile.context_router.routes[0],
           token_budget: { expansion_context_tokens: 1 } }] } }));
-      const cramped = await contextRouteCommand(["--task", "fix", "--revision", "cramped",
+      const cramped = await contextRouteCommand(["--retrieval", "semantic", "--decision-task", "fixture-task", "--task", "fix", "--revision", "cramped",
         "--optional-path", "optional.ts"], root, assets);
       assert.equal(cramped.optional?.reason, "missing-token");
       assert.deepEqual(cramped.optional?.entries, []);
@@ -117,8 +116,8 @@ test("routed command captures staged policy, delivers mandatory content and writ
       assert.equal(cramped.selection.optionalDelivery, "none");
       writeFileSync(join(root, "config/governance/profile.yaml"), JSON.stringify(noTokenProfile));
       process.env.JEV_TOKEN = "fixture-only";
-      const legacyUnbound = await contextRouteCommand(["--task", "fix", "--revision", "legacy", "--optional-path", "optional.ts"], root, assets);
-      assert.equal(legacyUnbound.optional?.reason, "scope-unavailable");
+      const legacyUnbound = await contextRouteCommand(["--retrieval", "semantic", "--task", "fix", "--revision", "legacy", "--optional-path", "optional.ts"], root, assets);
+      assert.equal(legacyUnbound.selection.retrieval.reason, "semantic-scope-unavailable");
       assert.equal(networkCalls, 0);
       globalThis.fetch = async (_url, init) => {
         networkCalls++;
@@ -128,7 +127,7 @@ test("routed command captures staged policy, delivers mandatory content and writ
           return [name, { type: "choice", choice, confidence: 0.9, probabilities: Object.fromEntries(keys.map(key => [key, key === choice ? 1 : 0])) }];
         })), usage: { input_tokens: 10, output_tokens: 2 } });
       };
-      const legacyArgs = ["--task", "fix", "--revision", "legacy", "--decision-task", "legacy-task", "--optional-path", "optional.ts"];
+      const legacyArgs = ["--retrieval", "semantic", "--task", "fix", "--revision", "legacy", "--decision-task", "legacy-task", "--optional-path", "optional.ts"];
       const legacy = await contextRouteCommand(legacyArgs, root, assets);
       assert.equal(legacy.optional?.decision?.questionVersion, "legacy.context-rank/1");
       assert.equal(legacy.optional?.decision?.method, "provider");
@@ -143,10 +142,10 @@ test("routed command captures staged policy, delivers mandatory content and writ
         networkCalls++;
         return Response.json({ model: "jev-1.13.0", answers: { q1: { type: "noul", noul: 0.9 } }, usage: { input_tokens: 10, output_tokens: 2 } });
       };
-      const unbound = await contextRouteCommand(["--task", "fix", "--revision", "expanded", "--optional-path", "optional.ts"], root, assets);
-      assert.equal(unbound.relevanceAdvice?.reason, "scope-unavailable");
+      const unbound = await contextRouteCommand(["--retrieval", "semantic", "--task", "fix", "--revision", "expanded", "--optional-path", "optional.ts"], root, assets);
+      assert.equal(unbound.selection.retrieval.reason, "semantic-scope-unavailable");
       assert.equal(networkCalls, 0);
-      const expanded = await contextRouteCommand(["--task", "fix", "--decision-task", "fixture-task", "--revision", "expanded", "--optional-path", "optional.ts"], root, assets);
+      const expanded = await contextRouteCommand(["--retrieval", "semantic", "--decision-task", "fixture-task", "--task", "fix", "--revision", "expanded", "--optional-path", "optional.ts"], root, assets);
       assert.equal(expanded.relevanceAdvice?.delivered, true);
       assert.equal(expanded.optional?.decision?.questionVersion, "context.relevance/1");
       assert.equal(expanded.entries[0]?.content, "unstaged replacement");
@@ -157,10 +156,10 @@ test("routed command captures staged policy, delivers mandatory content and writ
       writeFileSync(join(root, "config/governance/profile.yaml"), JSON.stringify(profile));
     }
     const controller = new AbortController(); controller.abort(); const callsBefore = calls;
-    const cancelled = await contextRouteCommand(["--task", "fix", "--revision", "2", "--optional-path", "optional.ts"], root, assets, provider, { signal: controller.signal });
+    const cancelled = await contextRouteCommand(["--retrieval", "semantic", "--decision-task", "fixture-task", "--task", "fix", "--revision", "2", "--optional-path", "optional.ts"], root, assets, provider, { signal: controller.signal });
     assert.equal(calls, callsBefore); assert.equal(cancelled.optional?.reason, "cancelled");
     assert.equal(cancelled.ready, true); assert.equal(cancelled.entries[0]?.content, "unstaged replacement");
-    await assert.rejects(() => contextRouteCommand(["--task", "fix", "--revision", "2", "--optional-path", "optional.ts"], root, assets, {
+    await assert.rejects(() => contextRouteCommand(["--retrieval", "semantic", "--decision-task", "fixture-task", "--task", "fix", "--revision", "2", "--optional-path", "optional.ts"], root, assets, {
       async decide(request) { writeFileSync(join(root, "optional.ts"), "changed during advice"); return provider.decide(request); },
     }), /sources changed/);
     writeFileSync(join(root, ".gitignore"), ".governance/\nstate/\n");
@@ -169,27 +168,28 @@ test("routed command captures staged policy, delivers mandatory content and writ
     writeFileSync(localPath, "local project guidance");
     profile.context_router.routes[0]!.skills = ["local"];
     writeFileSync(join(root, "config/governance/profile.yaml"), JSON.stringify(profile));
-    const local = await contextRouteCommand(["--task", "fix", "--revision", "local"], root, assets);
+    const local = await contextRouteCommand(["--retrieval", "semantic", "--decision-task", "fixture-task", "--task", "fix", "--revision", "local"], root, assets);
     assert.equal(local.ready, true);
     assert.equal(local.skills?.entries[0]?.content, "local project guidance");
     git("add", "config/governance/profile.yaml");
-    const stagedLocal = await contextRouteCommand(["--task", "fix", "--revision", "local", "--staged"], root, assets);
+    const stagedLocal = await contextRouteCommand(["--retrieval", "semantic", "--decision-task", "fixture-task", "--task", "fix", "--revision", "local", "--staged"], root, assets);
     assert.equal(stagedLocal.ready, false);
     assert.ok(stagedLocal.blockers.includes("skill-unavailable:local"));
-    await assert.rejects(() => contextRouteCommand(["--task", "fix", "--revision", "local", "--optional-path", "optional.ts"], root, assets, {
+    await assert.rejects(() => contextRouteCommand(["--retrieval", "semantic", "--decision-task", "fixture-task", "--task", "fix", "--revision", "local", "--optional-path", "optional.ts"], root, assets, {
       async decide(request) { writeFileSync(localPath, "changed local guidance"); return provider.decide(request); },
     }), /sources changed/);
     profile.context_router.routes[0]!.skills = ["missing-skill"];
     writeFileSync(join(root, "config/governance/profile.yaml"), JSON.stringify(profile));
     const priorCalls = calls;
-    const blocked = await contextRouteCommand(["--task", "fix", "--revision", "2", "--optional-path", "optional.ts"], root, assets, provider);
+    const blocked = await contextRouteCommand(["--retrieval", "semantic", "--decision-task", "fixture-task", "--task", "fix", "--revision", "2", "--optional-path", "optional.ts"], root, assets, provider);
     assert.equal(calls, priorCalls);
     assert.equal(blocked.ready, false);
     assert.ok(blocked.blockers.includes("skill-unavailable:missing-skill"));
     writeFileSync(join(root, "config/governance/facts.lock.yaml"), JSON.stringify({ profile_id: "wrong" }));
-    await assert.rejects(() => contextRouteCommand(["--task", "fix", "--revision", "3"], root, assets), /identity mismatch/);
-    await assert.rejects(() => contextRouteCommand(["--task", "fix", "--revision", "3", "--staged", "--base-ref", "HEAD"], root, assets), /Staged/);
+    await assert.rejects(() => contextRouteCommand(["--retrieval", "semantic", "--decision-task", "fixture-task", "--task", "fix", "--revision", "3"], root, assets), /identity mismatch/);
+    await assert.rejects(() => contextRouteCommand(["--retrieval", "semantic", "--decision-task", "fixture-task", "--task", "fix", "--revision", "3", "--staged", "--base-ref", "HEAD"], root, assets), /Staged/);
   } finally {
+    if (originalToken === undefined) delete process.env.JEV_TOKEN; else process.env.JEV_TOKEN = originalToken;
     if (previous === undefined) delete process.env.XDG_STATE_HOME; else process.env.XDG_STATE_HOME = previous;
     rmSync(root, { recursive: true, force: true });
   }
@@ -223,7 +223,7 @@ test("expanded context advice gets a new event when approved source policy chang
       return Response.json({ model: "jev-1.13.0", answers: { q1: { type: "noul", noul: 0.9 } },
         usage: { input_tokens: 10, output_tokens: 2 } });
     };
-    const args = ["--task", "fix", "--revision", "same-revision", "--decision-task", "fixture-task",
+    const args = ["--retrieval", "semantic", "--task", "fix", "--revision", "same-revision", "--decision-task", "fixture-task",
       "--optional-path", "docs/one.md"];
     const first = await contextRouteCommand(args, root, assets);
     assert.equal(first.relevanceAdvice?.delivered, true);
@@ -302,10 +302,8 @@ test("an explicit optional path does not turn off bounded delivery for other lar
     resolve("src/project_governance_runtime/assets/skills"), provider);
     assert.equal(packet.ready, true);
     assert.equal(packet.entries[0]?.content, "Required rules survive optional selection.");
-    assert.equal(packet.optional?.decision?.method, "jev");
-    assert.equal(observedLengths.length, 2);
-    assert.ok(observedLengths.every(length => length > 12000),
-      "classifier receives the original capture and chooses its own bounded excerpts");
+    assert.equal(packet.optional?.decision?.method, "baseline");
+    assert.equal(observedLengths.length, 0, "Local retrieval never invokes an injected provider");
     assert.deepEqual(new Set(packet.optional?.entries.map(entry => entry.id)),
       new Set(["docs/important.md", "docs/related.md"]));
     assert.ok(packet.optional?.entries.every(entry =>
@@ -314,8 +312,21 @@ test("an explicit optional path does not turn off bounded delivery for other lar
       "--changed-path", "docs", "--optional-path", "docs/important.md",
       "--optional-excerpt-bytes", "1024"], root,
     resolve("src/project_governance_runtime/assets/skills"), provider);
-    assert.equal(narrower.optional?.decision?.method, "jev");
+    assert.equal(narrower.optional?.decision?.method, "baseline");
     assert.ok(narrower.optional?.entries.every(entry => Buffer.byteLength(entry.excerpt) <= 1024));
+    // Paid-path qualification keeps whole-original input coverage separate from bounded delivery.
+    const profilePath = join(root, "config/governance/profile.yaml"), profile = JSON.parse(readFileSync(profilePath, "utf8"));
+    profile.continuity.decisions = { mode: "auto", allowed_data_classes: ["source"], allowed_source_paths: ["docs/**"], consumers: { DL03: { mode: "auto" } } };
+    writeFileSync(profilePath, JSON.stringify(profile));
+    const beforeToken = process.env.JEV_TOKEN; process.env.JEV_TOKEN = "fixture-only";
+    try {
+      const selected = await contextRouteCommand(["--task", "review design", "--revision", "1", "--decision-task", "capture-fixture", "--retrieval", "semantic",
+        "--changed-path", "docs", "--optional-path", "docs/important.md"], root, resolve("src/project_governance_runtime/assets/skills"), provider);
+      assert.equal(selected.optional?.decision?.method, "jev");
+      assert.ok(observedLengths.length > 0 && observedLengths.every(length => length > 12000));
+      assert.ok(selected.optional?.entries.every(entry => Buffer.byteLength(entry.excerpt) <= 2048));
+    } finally { if (beforeToken === undefined) delete process.env.JEV_TOKEN; else process.env.JEV_TOKEN = beforeToken; }
+
   } finally {
     if (previous === undefined) delete process.env.XDG_STATE_HOME; else process.env.XDG_STATE_HOME = previous;
     rmSync(root, { recursive: true, force: true });
@@ -352,21 +363,16 @@ test("broad task scope admits a matching late path before the candidate cap", as
       "--revision", "1", "--changed-path", "docs", "--changed-path", "docs/a29.md"], root,
     resolve("src/project_governance_runtime/assets/skills"));
     assert.equal(packet.ready, true);
-    assert.ok(packet.selection.automatic.inventoryCount > 4);
     assert.ok(packet.selection.automatic.seeds.includes(target));
-    assert.ok(packet.selection.automatic.seeds.includes("docs/a0.md"),
-      "changed source retains a candidate slot ahead of unchanged path matches");
+    assert.ok(!packet.selection.automatic.seeds.includes("docs/a0.md"), "Incidental changes do not earn a candidate slot");
     assert.equal(packet.selection.automatic.priorityPreview[0]?.path, "docs/a29.md");
     assert.equal(packet.selection.automatic.priorityPreview[0]?.exact, true);
-    assert.equal(packet.selection.automatic.priorityPreview[1]?.path, target, "current indexed meaning precedes an incidental changed file");
-    assert.equal(packet.selection.automatic.priorityPreview.find(item => item.path === "docs/a0.md")?.changed, true);
-    assert.equal(packet.selection.automatic.priorityPreview[0]?.disposition, "seeded");
-    assert.equal(packet.selection.automatic.priorityPreview.find(item => item.path === "docs/binary.md")?.disposition,
-      "source-unavailable-or-not-bounded-text");
-    assert.ok(packet.selection.automatic.priorityPreview.length > 64);
-    assert.ok(packet.selection.automatic.priorityPreview.length <= 128);
+    assert.equal(packet.selection.automatic.priorityPreview[1]?.path, target);
+    assert.ok(!packet.optional?.entries.some(item => item.id === "docs/binary.md"));
     const routeReceipt = JSON.parse(readFileSync(join(contextStateRoot(root), "routes", `${packet.receiptId}.json`), "utf8"));
     assert.equal(routeReceipt.selection.automatic.priorityPreview.length, packet.selection.automatic.priorityPreview.length);
+    assert.ok(packet.selection.automatic.priorityPreview.length <= 64);
+    assert.ok(packet.selection.automatic.excluded.length <= 128);
     const episode = readdirSync(join(contextStateRoot(root), "episodes"))
       .map(name => JSON.parse(readFileSync(join(contextStateRoot(root), "episodes", name), "utf8")))
       .find(item => item.native?.receiptId === packet.receiptId);
@@ -416,7 +422,7 @@ test("explicit optional source above a full automatic set still reaches JEV", as
         probabilities: Object.fromEntries(keys.map(key => [key, key === "other/explicit.md" ? 1 : 0])),
       } }, usage: { input_tokens: 20, output_tokens: 2 } });
     };
-    const packet = await contextRouteCommand(["--task", "Find explicit task evidence", "--revision", "1",
+    const packet = await contextRouteCommand(["--retrieval", "semantic", "--task", "Find auto and explicit task evidence", "--revision", "1",
       "--decision-task", "fixture", "--changed-path", "docs", "--optional-path", "other/explicit.md"], root,
     resolve("src/project_governance_runtime/assets/skills"));
     assert.equal(packet.ready, true);
@@ -443,7 +449,7 @@ test("explicit optional source above a full automatic set still reaches JEV", as
         probabilities: Object.fromEntries(keys.map(key => [key, key === keys[0] ? 1 : 0])),
       } }, usage: { input_tokens: 20, output_tokens: 2 } });
     };
-    const scoped = await contextRouteCommand(["--task", "Find explicit task evidence", "--revision", "2",
+    const scoped = await contextRouteCommand(["--retrieval", "semantic", "--task", "Find auto and explicit task evidence", "--revision", "2",
       "--decision-task", "fixture", "--changed-path", "docs", "--optional-path", "other/explicit.md"], root,
     resolve("src/project_governance_runtime/assets/skills"));
     assert.equal(scoped.optional?.decision?.method, "provider");
@@ -459,71 +465,4 @@ test("explicit optional source above a full automatic set still reaches JEV", as
     if (previousToken === undefined) delete process.env.JEV_TOKEN; else process.env.JEV_TOKEN = previousToken;
     rmSync(root, { recursive: true, force: true });
   }
-});
-
-test("a narrow candidate cap retains changed files beside stronger filename matches", () => {
-  const paths = ["docs/login-timeout-guide.md", "docs/login-timeout-history.md",
-    "docs/login-timeout-migration.md", "docs/changed.md", "docs/late.md"];
-  const subject = { source: () => ({ file_type: "regular" }) } as unknown as ValidationSubject;
-  const priority = { purpose: "Fix login timeout", exact: [] as string[], changed: ["docs/changed.md"] };
-  const result = automaticContextCandidates(subject, paths, new Set(), ["docs/**"], 2, priority);
-  assert.equal(result.seeds.length, 2);
-  assert.equal(result.seeds[0], "docs/changed.md");
-  assert.ok(result.seeds[1]?.includes("login-timeout"));
-  const exact = automaticContextCandidates(subject, paths, new Set(), ["docs/**"], 2,
-    { ...priority, exact: ["docs/late.md"] });
-  assert.deepEqual(exact.seeds, ["docs/late.md", "docs/changed.md"]);
-  const saturated = automaticContextCandidates(subject,
-    ["docs/changed-1.md", "docs/changed-2.md", "docs/changed-3.md", "docs/login-timeout-guide.md"],
-    new Set(), ["docs/**"], 2, { ...priority,
-      changed: ["docs/changed-1.md", "docs/changed-2.md", "docs/changed-3.md"] });
-  assert.deepEqual(saturated.seeds, ["docs/changed-1.md", "docs/changed-2.md"]);
-  assert.ok(!saturated.seeds.includes("docs/login-timeout-guide.md"));
-  assert.ok(saturated.omittedCount > 0);
-  assert.equal(saturated.priorityPreview.find(item => item.path === "docs/changed-3.md")?.disposition,
-    "not-inspected-seed-cap");
-});
-
-test("priority preview shows related discoveries outside the initial task scope", () => {
-  const paths = ["src/feature/a.ts", "package.json", "README.md", "test/feature.test.ts"];
-  const subject = { root: "/fixture", paths: () => paths,
-    source: (path: string) => ({ file_type: "regular", identity: path }),
-    read: (path: string) => Buffer.from(path === "package.json" ? '{"name":"fixture"}' : "source") } as unknown as ValidationSubject;
-  const priority = { purpose: "Investigate feature", exact: [] as string[], changed: [] as string[] };
-  const result = automaticContextCandidates(subject, ["src/feature/a.ts"], new Set(), ["**"], 8, priority);
-  assert.ok(result.paths.includes("README.md"));
-  assert.equal(result.priorityPreview.find(item => item.path === "README.md")?.disposition, "discovered");
-  const saturated = automaticContextCandidates(subject, ["src/feature/a.ts"], new Set(), ["**"], 1, priority);
-  assert.equal(saturated.discovery, null, "A full source allocation must not scan for results it cannot deliver");
-});
-
-test("priority preview reserves room for seeds after many excluded paths", () => {
-  const paths = [...Array.from({ length: 70 }, (_, index) => `src/a${index}.ts`),
-    ...Array.from({ length: 40 }, (_, index) => `docs/b${index}.md`)];
-  const subject = { root: "/fixture", paths: () => paths,
-    source: (path: string) => ({ file_type: "regular", identity: path }),
-    read: () => Buffer.from("source") } as unknown as ValidationSubject;
-  const result = automaticContextCandidates(subject, paths, new Set(), ["docs/**"], 32,
-    { purpose: "review", exact: [], changed: [] });
-  assert.equal(result.seeds.length, 32);
-  assert.ok(result.seeds.every(path => result.priorityPreview.some(item =>
-    item.path === path && item.disposition === "seeded")));
-  assert.ok(result.priorityPreview.length > 64);
-  assert.ok(result.priorityPreview.length <= 128);
-});
-
-test("priority preview retains every discovery after excluded leaders and 32 seeds", () => {
-  const excluded = Array.from({ length: 16 }, (_, index) => `src/changed-${index}.ts`);
-  const seeds = Array.from({ length: 32 }, (_, index) => `docs/seed-${index}.ts`);
-  const related = Array.from({ length: 20 }, (_, index) => `docs/related-${index}.md`);
-  const subject = { root: "/fixture", paths: () => [...excluded, ...seeds, ...related],
-    source: (path: string) => ({ file_type: "regular", identity: path }),
-    read: () => Buffer.from("source") } as unknown as ValidationSubject;
-  const result = automaticContextCandidates(subject, [...excluded, ...seeds], new Set(), ["docs/**"], 64,
-    { purpose: "review", exact: [], changed: excluded });
-  assert.equal(result.seeds.length, 32);
-  assert.equal(result.discovery?.paths.length, 20);
-  assert.ok(result.discovery?.paths.every(path => result.priorityPreview.some(item =>
-    item.path === path && item.disposition === "discovered")));
-  assert.ok(result.priorityPreview.length >= 68);
 });

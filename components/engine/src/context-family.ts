@@ -2,7 +2,7 @@
 import { join } from "node:path";
 import { digest, durableJson, object } from "./core.ts";
 import { contextStateRoot } from "./context-command.ts";
-import { currentTaskRefresh, latestSessionPrompt, promptEntryTaskBinding, readPromptEntry, promptAccountingFamily } from "./context-observations.ts";
+import { currentTaskRefresh, latestSessionPrompt, promptEntryTaskBinding, readPromptEntry, promptAccountingFamily, readPromptTurnReservation } from "./context-observations.ts";
 import { sessionId, workContext } from "../../harness/src/store/location.ts";
 import { resolveTaskContext, taskBindingReceipt } from "./decision-task-binding.ts";
 import { DatabaseSync } from "node:sqlite";
@@ -12,7 +12,7 @@ import { narrativeFile } from "./narrative-inputs.ts";
 import type { MetadataCursor } from "./context-metadata.ts";
 import { ContextRouteError } from "./context-route-errors.ts";
 
-export function expansionIdentity(workspace: string, entryId: string, caller?: string) {
+export function expansionIdentity(workspace: string, entryId: string, caller?: string, semantic = true) {
   if (process.env.HARNESS_AGENT_ANCESTRY || process.env.GOVERNANCE_PARENT_TASK || process.env.GOVERNANCE_PARENT_LOCK_DIGEST)
     throw new ContextRouteError("delegated-worker", "A delegated worker cannot spend the parent prompt's context allowance");
   const session = sessionId(caller), entry = readPromptEntry(workspace, entryId);
@@ -25,7 +25,15 @@ export function expansionIdentity(workspace: string, entryId: string, caller?: s
   const frozen = object(entry.scope);
   if (frozen.workspace !== entry.workspace || typeof frozen.taskId !== "string" || typeof frozen.taskRevision !== "string") throw new Error("Context entry accounting scope is unavailable");
   const accounting = promptAccountingFamily(workspace, entry);
+  // Local reads need no spending identity. Legacy entries without a verified marker cannot mint one.
+  let identity;
+  if (semantic) {
+    const original = readPromptTurnReservation(workspace, String(entry.provider), session, String(entry.turn)).marker;
+    identity = { id: accounting.familyId, workspace, locator: String(entry.worktreeLocator), session, turn: String(entry.turn), started: Date.parse(String(original.submittedAt)) };
+  }
   return { session, familyId: accounting.familyId, anchorReady: accounting.ready,
+    current: latestSessionPrompt(workspace, session).entryId === entryId,
+    identity,
     scope: current.context ? { workspace, taskId: current.context.taskId, taskRevision: current.context.revision } : frozen as unknown as BudgetScope,
     transitionId: refresh?.id ?? null,
     revision: current.context ? `task:${current.context.taskId}@${current.context.revision}` : frozen.taskRevision as string };
@@ -73,4 +81,18 @@ export function finishContextSelection(workspace: string, entry: string, step: n
   if (Buffer.byteLength(JSON.stringify(value)) > 8 * 1024 * 1024) return false;
   try { durableJson(cursorPath(state, entry, step), value); return finishContextRequest(state, entry, step, request, digest(value)); }
   catch { return false; }
+}
+
+/** Local retrieval never spends a semantic continuation; exact repeats keep their original step. */
+export function nextSemanticStep(workspace: string, family: string, request: string): number {
+  let db: DatabaseSync | undefined;
+  try {
+    db = new DatabaseSync(join(contextStateRoot(workspace), DECISION_BUDGET_FILE), { readOnly: true });
+    db.exec("PRAGMA busy_timeout=100");
+    const rows = db.prepare("SELECT step,identity,cursor_digest FROM context_request WHERE family=? ORDER BY step").all(family);
+    const repeated = rows.find(row => row.identity === request);
+    if (repeated) return Number(repeated.step);
+    const last = rows.at(-1);
+    return last ? last.cursor_digest ? Number(last.step) + 1 : Number(last.step) : 0;
+  } catch { return 0; } finally { db?.close(); }
 }

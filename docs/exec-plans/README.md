@@ -21,6 +21,9 @@ shows existing project-owned checks; it does not require a check after every edi
 
 ## Active
 
+- [Demand-driven context delivery](active/2026-10-30-demand-driven-context.md)
+  owns explicit optional retrieval, bounded semantic spending, effectiveness telemetry and stable 4.5 qualification.
+
 - [Minimum useful governance](active/2026-10-27-minimum-useful-governance.md)
   owns deliberate task-based local workflow binding, proportionate development guidance,
   independent review and stable 4.4 qualification. Adopter activation remains separate.

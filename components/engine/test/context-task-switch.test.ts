@@ -11,6 +11,7 @@ import { PROJECT_DEFAULTS } from "../src/runtime-project-defaults.ts";
 import { readDecisionBudget, contextFamilyScope, DECISION_BUDGET_FILE } from "../src/decision-budget.ts";
 import { Store } from "../../harness/src/store/store.ts";
 import { defaultDbPath } from "../../harness/src/store/location.ts";
+import { ValidationSubject } from "../src/change-subject.ts";
 import { DatabaseSync } from "node:sqlite";
 import { CONTEXT_OPERATION_MS } from "../src/context-timing.ts";
 
@@ -36,16 +37,16 @@ function fixture(t: TestContext, paid: boolean) {
   return { root, run, state: contextStateRoot(root), event: { hook_event_name: "UserPromptSubmit", session_id: "owner-session", turn_id: "turn-one", cwd: root, prompt: "Fix the second implementation" } };
 }
 
-test("a rebind during native selection cannot attach another task's facts to the original scope", async t => {
+test("a rebind during native required preparation cannot attach another task's facts to the original scope", async t => {
   const f = fixture(t, true), first = f.run("task", "create", "--outcome", "Original owned task", "--scope", f.root);
   let second: any;
-  t.mock.method(globalThis, "fetch", async (_url: unknown, init: RequestInit) => {
+  const read = ValidationSubject.prototype.read;
+  t.mock.method(ValidationSubject.prototype, "read", function(this: ValidationSubject, ...args: Parameters<typeof read>) {
     second ??= f.run("task", "create", "--outcome", "New unrelated task", "--scope", f.root);
-    const wire = JSON.parse(String(init.body));
-    return Response.json({ model: "jev-1.13.0", answers: Object.fromEntries(Object.keys(wire.questions).map(name => [name, { type: "noul", noul: 0.9 }])) });
+    return read.apply(this, args);
   });
   const output = await promptContext("codex", f.event, f.root, { environment: {}, assetRoot: assets });
-  assert.ok(second, "The binding must actually change during provider selection");
+  assert.ok(second, "The binding must actually change during required preparation");
   const text = (output as any).hookSpecificOutput.additionalContext;
   const marker = "Current task facts (read-only snapshot; declarations are not proof):\n";
   const facts = JSON.parse(text.slice(text.indexOf(marker) + marker.length).split("\n")[0]);
@@ -64,6 +65,8 @@ test("task switch refreshes on the normal route, preserves paid budget and canno
   });
   const first = f.run("task", "create", "--outcome", "Work on first", "--scope", f.root);
   await promptContext("codex", f.event, f.root, { environment: {}, assetRoot: assets });
+  assert.equal(calls, 0);
+  await contextRouteCommand(["--task", "First implementation", "--retrieval", "semantic"], f.root, assets);
   assert.equal(calls, 1);
   const entryPath = join(f.state, "prompt-entries", readdirSync(join(f.state, "prompt-entries"))[0]!);
   const original = readFileSync(entryPath, "utf8"), entry = JSON.parse(original);
@@ -72,7 +75,7 @@ test("task switch refreshes on the normal route, preserves paid budget and canno
   const replayedHook = await promptContext("codex", f.event, f.root, { environment: {}, assetRoot: assets });
   assert.match(JSON.stringify(replayedHook), /context-route --task/);
   assert.doesNotMatch(JSON.stringify(replayedHook), /new operator turn/);
-  const args = ["--task", f.event.prompt, "--optional-path", "second.ts"];
+  const args = ["--task", f.event.prompt, "--optional-path", "second.ts", "--retrieval", "semantic"];
   const packet = await contextRouteCommand(args, f.root, assets);
   assert.equal(packet.selection.binding.taskId, second.task.taskId);
   assert.equal(packet.expansion?.entry, entry.entryId); assert.ok(packet.expansion?.transitionId);
@@ -83,15 +86,15 @@ test("task switch refreshes on the normal route, preserves paid budget and canno
   assert.equal(repeated.timing.providerCallMs, 0, "Historical calls are not current retrieval latency");
   assert.equal(readDecisionBudget(f.state, contextFamilyScope(f.root, entry.entryId))?.calls, 2);
   f.run("task", "create", "--outcome", "Work on third", "--scope", f.root);
-  const exhausted = await contextRouteCommand(["--task", "A new request for third"], f.root, assets);
+  const exhausted = await contextRouteCommand(["--task", "A new request for third", "--retrieval", "semantic"], f.root, assets);
   assert.equal(exhausted.ready, true); assert.equal(exhausted.metadata?.reason, "budget-exhausted"); assert.equal(calls, 2);
   assert.equal(f.run("resume", "--task", first.task.taskId).contextEntry.status, "refresh-required");
-  const returned = await contextRouteCommand(["--task", "Back to the first task"], f.root, assets);
+  const returned = await contextRouteCommand(["--task", "Back to the first task", "--retrieval", "semantic"], f.root, assets);
   assert.equal(returned.expansion?.entry, entry.entryId); assert.equal(returned.ready, true);
   assert.equal(calls, 2, "Returning to the original task must not open new spending");
   const accounting = new DatabaseSync(join(f.state, DECISION_BUDGET_FILE));
   accounting.prepare("UPDATE context_family SET expires=0 WHERE id=?").run(entry.entryId); accounting.close();
-  const expired = await contextRouteCommand(["--task", "Refresh after expiry"], f.root, assets);
+  const expired = await contextRouteCommand(["--task", "Refresh after expiry", "--retrieval", "semantic"], f.root, assets);
   assert.equal(expired.expansion?.entry, entry.entryId); assert.equal(expired.ready, true);
   assert.equal(calls, 2, "Expiry cannot be mistaken for a newly observed turn");
   assert.equal(readFileSync(entryPath, "utf8"), original);
@@ -104,14 +107,14 @@ test("slow preparation retains selection time; expired operations return local c
     return Response.json({ model: "jev-1.13.0", answers: Object.fromEntries(Object.keys(wire.questions).map(name => [name, { type: "noul", noul: 0.9 }])) });
   });
   f.run("task", "create", "--outcome", "Work on first", "--scope", f.root);
-  const slow = await contextRouteCommand(["--task", "First implementation"], f.root, assets, undefined,
+  const slow = await contextRouteCommand(["--task", "First implementation", "--retrieval", "semantic"], f.root, assets, undefined,
     { operationStartedAt: performance.now() - 5500 });
   assert.equal(slow.metadata?.reason, "answered"); assert.equal(calls, 1);
   assert.ok(slow.timing.preparationMs >= 5500); assert.equal(slow.timing.limitReason, null);
-  const late = await contextRouteCommand(["--task", "Second implementation"], f.root, assets, undefined,
+  const late = await contextRouteCommand(["--task", "Second implementation", "--retrieval", "semantic"], f.root, assets, undefined,
     { operationStartedAt: performance.now() - CONTEXT_OPERATION_MS - 1000 });
-  assert.equal(late.ready, true); assert.equal(late.metadata?.reason, "cancelled"); assert.equal(calls, 1);
-  assert.equal(late.timing.limitReason, "operation-deadline"); assert.equal(late.timing.providerCallMs, 0);
+  assert.equal(late.ready, true); assert.equal(late.metadata, null); assert.equal(late.selection.retrieval.reason, "operation-deadline"); assert.equal(calls, 1);
+  assert.equal(late.timing.limitReason, "operation-deadline"); assert.equal(late.timing.providerCallMs, null);
 });
 
 test("task revision refreshes normally, while a closed task cannot use an old entry", async t => {
@@ -130,15 +133,15 @@ test("task revision refreshes normally, while a closed task cannot use an old en
 test("a task switch during provider selection refuses delivery to the outdated binding", async t => {
   const f = fixture(t, true); let calls = 0;
   t.mock.method(globalThis, "fetch", async (_url: unknown, init: RequestInit) => {
-    if (++calls === 2) f.run("task", "create", "--outcome", "Changed during selection", "--scope", f.root);
+    if (++calls === 1) f.run("task", "create", "--outcome", "Changed during selection", "--scope", f.root);
     const wire = JSON.parse(String(init.body));
     return Response.json({ model: "jev-1.13.0", answers: Object.fromEntries(Object.keys(wire.questions).map(name => [name, { type: "noul", noul: 0.9 }])) });
   });
   f.run("task", "create", "--outcome", "First task", "--scope", f.root);
   await promptContext("codex", f.event, f.root, { environment: {}, assetRoot: assets });
   const second = f.run("task", "create", "--outcome", "Second task", "--scope", f.root);
-  await assert.rejects(contextRouteCommand(["--task", "Refresh second task"], f.root, assets), /task changed while preparing/);
-  assert.equal(readDecisionBudget(f.state, contextFamilyScope(f.root, second.contextEntry.entryId))?.calls, 2);
+  await assert.rejects(contextRouteCommand(["--task", "Refresh second task", "--retrieval", "semantic"], f.root, assets), /task changed while preparing/);
+  assert.equal(readDecisionBudget(f.state, contextFamilyScope(f.root, second.contextEntry.entryId))?.calls, 1);
 });
 
 test("task switch without credentials keeps original reads available and rejects another session", async t => {
@@ -152,4 +155,20 @@ test("task switch without credentials keeps original reads available and rejects
   assert.equal(existsSync(join(f.state, DECISION_BUDGET_FILE)), false);
   await assert.rejects(contextRouteCommand(["--entry", second.contextEntry.entryId, "--expansion", "1", "--task", "foreign"],
     f.root, assets, undefined, { session: "other-session" }), /current observed entry/);
+});
+
+test("a task rebind during steered native preparation refuses stale delivery", async t => {
+  const f = fixture(t, true), first = f.run("task", "create", "--outcome", "Original owned task", "--scope", f.root);
+  await promptContext("codex", f.event, f.root, { environment: {}, assetRoot: assets });
+  let second: any;
+  const read = ValidationSubject.prototype.read;
+  t.mock.method(ValidationSubject.prototype, "read", function(this: ValidationSubject, ...args: Parameters<typeof read>) {
+    second ??= f.run("task", "create", "--outcome", "New unrelated task", "--scope", f.root);
+    return read.apply(this, args);
+  });
+  const result: any = await promptContext("codex", { ...f.event, prompt: "New steering input" }, f.root, { environment: {}, assetRoot: assets });
+  assert.match(result.hookSpecificOutput.additionalContext, /task changed while preparing/);
+  const entries = readdirSync(join(f.state, "prompt-entries")).map(name => JSON.parse(readFileSync(join(f.state,"prompt-entries",name),"utf8")));
+  assert.ok(entries.some(entry => entry.status === "failed" && entry.reason === "entry-task-changed"));
+  assert.ok(second); assert.notEqual(first.task.taskId, second.task.taskId);
 });

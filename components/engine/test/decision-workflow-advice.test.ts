@@ -1,3 +1,6 @@
+import { promptContext } from "../src/prompt-context.ts";
+import { contextStateRoot } from "../src/context-command.ts";
+import { contextFamilyScope, readDecisionBudget } from "../src/decision-budget.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
@@ -42,6 +45,7 @@ test("context-route workflow advice uses captured recipes/catalog and never exec
   globalThis.fetch = async (_url, init) => {
     calls++;
     const payload = JSON.parse(String(init?.body));
+    if (!payload.questions.match) return Response.json({ model: "jev-1.13.0", answers: Object.fromEntries(Object.keys(payload.questions).map(id => [id, { type: "noul", noul: 0.01 }])) });
     assert.deepEqual(Object.keys(payload.questions.match.criteria).sort(), ["inspect", "unknown"]);
     assert.equal(payload.questions.match.criteria.inspect.trust, "untrusted");
     assert.ok(payload.questions.match.instructions.evidence.every((item: { trust: string }) => item.trust === "untrusted"));
@@ -49,7 +53,7 @@ test("context-route workflow advice uses captured recipes/catalog and never exec
       type: "choice", choice: "inspect", confidence: 0.8, probabilities: { inspect: 0.9, unknown: 0.1 },
     } } });
   };
-  const result = await contextRouteCommand(["--task", "fix", "--revision", "1", "--decision-task", "fixture", "--staged",
+  const result = await contextRouteCommand(["--retrieval", "semantic", "--task", "fix", "--revision", "1", "--decision-task", "fixture", "--staged",
     "--workflow-candidates", "config/governance/candidates.json"], root, resolve("src/project_governance_runtime/assets/skills"));
   assert.equal(result.ready, true);
   assert.equal(result.workflowAdvice?.recommended?.recipeId, "inspect-recipe");
@@ -57,4 +61,16 @@ test("context-route workflow advice uses captured recipes/catalog and never exec
   assert.equal(result.entries[0]?.content, "Mandatory rules remain");
   assert.equal(calls, 1);
   assert.equal(existsSync(join(root, "ran")), false);
+  await assert.rejects(contextRouteCommand(["--task","fix","--revision","1","--decision-task","fixture","--workflow-candidates","config/governance/candidates.json"], root, resolve("src/project_governance_runtime/assets/skills")), /requires explicit/);
+  write("config/governance/operations.json", { version: 1, operations: { inspect: { argv: [process.execPath,"-e","require('node:fs').writeFileSync('ran','unexpected')"], cwd: root, effect: "local" } } });
+  write("config/governance/profile.yaml", { profile_id:"fixture", continuity:{decisions:{mode:"auto",allowed_data_classes:["source","metadata"],allowed_source_paths:["config/**"],allowed_metadata_paths:["config/**"],consumers:{DL03:{mode:"auto",questions:["context.metadata-relevance/1"]},DL04:{mode:"auto"}}}},context_router:{default_route:"local",routes:[{id:"local",primary_context:["rules.md"]}]}});
+  const assets=resolve("src/project_governance_runtime/assets/skills"),before=calls;
+  await promptContext("codex",{hook_event_name:"UserPromptSubmit",session_id:"workflow-family",turn_id:"one",cwd:root,prompt:"fix"},root,{environment:{},assetRoot:assets});
+  assert.equal(calls,before);
+  const native=await contextRouteCommand(["--task","fix","--retrieval","semantic","--workflow-candidates","config/governance/candidates.json"],root,assets,undefined,{session:"workflow-family"});
+  assert.equal(native.workflowAdvice?.recommended?.recipeId,"inspect-recipe",JSON.stringify({retrieval:native.selection.retrieval,workflow:native.workflowAdvice}));
+  assert.equal(native.selection.retrieval.providerAttempted,true);
+  assert.equal(readDecisionBudget(contextStateRoot(root),contextFamilyScope(root,native.expansion!.familyId))?.calls,calls-before);
+  assert.equal(existsSync(join(root,"ran")),false);
+
 });

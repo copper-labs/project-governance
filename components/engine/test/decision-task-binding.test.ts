@@ -112,8 +112,8 @@ test("root and revoked scopes preserve requirements and local retrieval without 
     assert.equal(root.ready, true);
     assert.equal(root.routingPaths.mode, "bound-task-empty-scope");
     assert.ok(root.entries.some(item => item.path === "docs-rules.md"));
-    assert.ok(root.selection.candidateCount > 0);
-    assert.ok(root.optional?.entries.some(item => item.id === "docs/new.md"));
+    assert.equal(root.selection.retrieval.requested, "local");
+    assert.ok(!root.optional?.entries.some(item => item.id === "docs/new.md"), "Unrelated drafts are not local matches");
     const task = f.bind(["docs"]), store = new Store(defaultDbPath(f.root));
     try {
       store.reviseTask(task.taskId, [], { expectedVersion: task.version, revoke: [0], authorityRef: "operator-qualified" });
@@ -121,7 +121,7 @@ test("root and revoked scopes preserve requirements and local retrieval without 
     } finally { store.close(); }
     revoked = await contextRouteCommand(["--task", "Repair source and its plan"], f.root, assets);
     assert.equal(revoked.routingPaths.mode, "bound-task-empty-scope");
-    assert.ok(revoked.selection.candidateCount > 0); assert.equal(calls, 0);
+    assert.equal(revoked.selection.retrieval.requested, "local"); assert.equal(calls, 0);
     } finally { globalThis.fetch = previousFetch; }
     process.env.HARNESS_SESSION = "unbound";
     await assert.rejects(() => contextRouteCommand(["--task", "Repair source and its plan"], f.root, assets), /session-unbound.*create or resume/);
@@ -215,7 +215,7 @@ test("ordinary bound files retain bounded baseline delivery without classifier s
     globalThis.fetch = async () => { calls++; throw new Error("no sharing allowed"); };
     const packet = await contextRouteCommand(["--task", "Repair source and its plan"], f.root, assets);
     assert.equal(packet.ready, true); assert.equal(calls, 0);
-    assert.equal(packet.optional?.reason, "source-scope-disabled");
+    assert.equal(packet.optional?.reason, "local-requested");
     assert.equal(packet.optional?.entries[0]?.id, "src/feature.ts");
     assert.equal(packet.optional?.entries[0]?.sourceRange?.complete, false);
     assert.ok(packet.selection.automatic.excluded.some(item => item.path === "docs/binary.md"));
@@ -251,6 +251,7 @@ writeFileSync('state/hook.json',JSON.stringify(prepared.decisionOptions));
 test("task-bound routing discovers new drafts, preserves mixed owners and records real delivery and fallback", async () => {
   const f = fixture();
   try {
+    process.env.JEV_TOKEN = "fixture-only";
     const task = f.bind();
     f.write("docs/new.md", "A NEW DRAFT about the workflow");
     f.write("docs/secret.json", "DO NOT TRANSMIT");
@@ -268,7 +269,7 @@ test("task-bound routing discovers new drafts, preserves mixed owners and record
         method: "jev", reason: "fixture", model: "fixture", questionVersion: "1", confidence: 1, latencyMs: 1,
         usage: { inputTokens: 10, outputTokens: 1 } };
     } };
-    const packet = await contextRouteCommand(["--task", "Repair source and its plan"], f.root, assets, provider);
+    const packet = await contextRouteCommand(["--retrieval", "semantic", "--task", "Repair source and its new workflow plan"], f.root, assets, provider);
     assert.equal(calls, 1); assert.equal(packet.ready, true);
     assert.equal(packet.selection.binding.taskId, task.taskId);
     assert.equal(packet.routingPaths.mode, "bound-task");
@@ -276,7 +277,8 @@ test("task-bound routing discovers new drafts, preserves mixed owners and record
     assert.equal(packet.optional?.decision?.method, "jev");
     assert.ok(packet.selection.automatic.excluded.some(item => item.path === "docs/secret.json"));
     assert.ok(packet.selection.automatic.excluded.some(item => item.path === "docs/binary.md"));
-    const fallback = await contextRouteCommand(["--task", "Repair source and its plan"], f.root, assets);
+    delete process.env.JEV_TOKEN;
+    const fallback = await contextRouteCommand(["--retrieval", "semantic", "--task", "Repair source and its new workflow plan"], f.root, assets);
     assert.equal(fallback.ready, true); assert.equal(fallback.optional?.reason, "missing-token");
     assert.ok(fallback.optional?.entries.some(item => item.id === "docs/new.md"));
     assert.deepEqual(fallback.entries, packet.entries);
@@ -288,9 +290,10 @@ test("task-bound routing discovers new drafts, preserves mixed owners and record
     const manifest = join(f.root, "state/outcome.json");
     writeFileSync(manifest, JSON.stringify({ version: 2, episodes: [{ id: episode.id, scope: episode.scope, decisions: [], caller: { path, digest: fileDigest(path) } }] }));
     assert.equal(decisionOutcomeReport(contextStateRoot(f.root), manifest).counts.joined, 1);
-    const staged = await contextRouteCommand(["--task", "Repair source and its plan", "--staged"], f.root, assets);
+    const staged = await contextRouteCommand(["--retrieval", "semantic", "--task", "Repair source and its new workflow plan", "--staged"], f.root, assets);
     assert.ok(!staged.optional?.entries.some(item => item.id === "docs/new.md"));
-    await assert.rejects(() => contextRouteCommand(["--task", "Repair source and its plan"], f.root, assets, { async decide(request) {
+    process.env.JEV_TOKEN = "fixture-only";
+    await assert.rejects(() => contextRouteCommand(["--retrieval", "semantic", "--task", "Repair source and its new workflow plan"], f.root, assets, { async decide(request) {
       f.write("docs/new.md", "changed after capture"); return provider.decide(request);
     } }), /sources changed/);
   } finally { f.cleanup(); }
@@ -299,14 +302,15 @@ test("task-bound routing discovers new drafts, preserves mixed owners and record
 test("unsafe candidates never become provider evidence and absent required owners prevent calls", async () => {
   const f = fixture();
   try {
+    process.env.JEV_TOKEN = "fixture-only";
     f.bind(["docs"]);
     symlinkSync(join(f.root, "src/feature.ts"), join(f.root, "docs/link.md"));
     let calls = 0;
     const provider: DecisionProvider = { async decide() { calls++; throw new Error("fixture fallback"); } };
-    const packet = await contextRouteCommand(["--task", "Repair source and its plan"], f.root, assets, provider);
+    const packet = await contextRouteCommand(["--retrieval", "semantic", "--task", "Repair source and its new workflow plan"], f.root, assets, provider);
     assert.equal(calls, 1); assert.ok(!packet.optional?.entries.some(item => item.id === "docs/link.md"));
     rmSync(join(f.root, "docs-rules.md"));
-    const blocked = await contextRouteCommand(["--task", "Repair source and its plan"], f.root, assets, provider);
+    const blocked = await contextRouteCommand(["--retrieval", "semantic", "--task", "Repair source and its new workflow plan"], f.root, assets, provider);
     assert.equal(blocked.ready, false); assert.equal(calls, 1);
     assert.equal(blocked.selection.reason, "required-context-unavailable");
   } finally { f.cleanup(); }

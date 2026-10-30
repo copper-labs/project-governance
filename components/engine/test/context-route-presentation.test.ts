@@ -57,7 +57,7 @@ test("ordinary presentation exposes provider failure while required guidance rem
     writeFileSync(join(root, "config/governance/facts.lock.yaml"), JSON.stringify({ profile_id: "fixture", facts: {} }));
     writeFileSync(join(root, "rules.md"), "Required local guidance");
     writeFileSync(join(root, "optional.ts"), "Optional source context");
-    const routed = await contextRouteCommand(["--task", "fix", "--revision", "1", "--optional-path", "optional.ts"], root,
+    const routed = await contextRouteCommand(["--retrieval", "semantic", "--decision-task", "fixture-task", "--task", "fix", "--revision", "1", "--optional-path", "optional.ts"], root,
       resolve("src/project_governance_runtime/assets/skills"), { async decide() { throw new Error("unavailable"); } });
     const shown = presentContextRoute(routed);
     assert.equal(shown.ready, true); assert.equal(shown.selectionStatus.mode, "local");

@@ -9,6 +9,12 @@ updated: 2026-10-03
 summary: Make context reach the correct worktree, expose semantic coverage gaps, reduce repeated selection, and select project procedures before ordinary development work.
 ---
 
+> Current 4.5 entry and optional-selection behavior is owned by
+> [demand-driven context](engine-demand-driven-context.md). Its no-retrieval native entry and
+> explicit local/semantic requests supersede automatic optional retrieval described below.
+> Historical proofs below do not establish current accepted-outcome savings.
+
+
 # RC10 reliable context and procedure selection
 
 This is the approved next release after RC9.1. The operator authorized implementation after the

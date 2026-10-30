@@ -10,6 +10,7 @@ import { object, text, digest } from "./core.ts";
 import { routeContext } from "./context-routing.ts";
 import { materializeRoutedContext } from "./routed-context.ts";
 import { loadSkillCatalog, type CatalogSkill } from "./skill-catalog.ts";
+import { contextWorkspaceIdentity } from "./context-workspace-identity.ts";
 import { contextStateRoot } from "./context-command.ts";
 import { buildContextPacket } from "./context-packet.ts";
 import { JevDecisionAdapter, type DecisionProvider, type DecisionOptions, type Candidate } from "./decisions.ts";
@@ -31,8 +32,8 @@ import { capturedSourceSpans } from "./context-source-facts.ts";
 import { matchesPackPath } from "./planning.ts";
 import type { BudgetScope } from "./decision-budget.ts";
 import { openContextFamily, type ContextFamilyIdentity } from "./decision-budget.ts";
-import { maintainContextProjection } from "./context-projection.ts";
-import { expansionIdentity, beginContextSelection, finishContextSelection, nextContextExpansion } from "./context-family.ts";
+import { skippedContextProjection, maintainContextProjection } from "./context-projection.ts";
+import { expansionIdentity, beginContextSelection, finishContextSelection, nextContextExpansion, nextSemanticStep } from "./context-family.ts";
 import { ContextTiming, CONTEXT_DELIVERY_RESERVE_MS } from "./context-timing.ts";
 import { CONTEXT_PATH_LIMIT, CONTEXT_PROMPT_LIMIT } from "./context-limits.ts";
 import { currentTaskRefresh, latestSessionPrompt } from "./context-observations.ts";
@@ -46,6 +47,7 @@ import { contextExcerptBudget } from "./checkers/context-router.ts";
 import { sessionId } from "../../harness/src/store/location.ts";
 import { declaredDocuments } from "./checkers/document-links.ts";
 import { SOURCE_CAPTURE_MAX_BYTES, SOURCE_CAPTURE_BATCH_MAX_BYTES } from "./source-capture-limits.ts";
+import { lexicalContextOrder } from "./context-ranking.ts";
 import { writeContextRecord } from "./context-records.ts";
 
 export interface ContextRouteOptions extends DecisionOptions {
@@ -96,7 +98,16 @@ function routedDecisionProvider(input: { supplied: DecisionProvider | undefined;
   decisionScope: BudgetScope | null; configDigests: Record<string, string>; task: string; revision: string;
   onAdvice: (advice: ContextAdvice) => void; deadlineAt: number }): DecisionProvider {
   const { supplied, options, settings, metadata, profile, root, scope, decisionScope, configDigests, task, revision, onAdvice } = input;
-  if (supplied) return supplied;
+  // Injected adapters are still downstream of the caller's disclosure policy.
+  if (supplied && !options.family) return {
+    async decide(request) {
+      const runtime = new DecisionRuntime(settings, contextStateRoot(root), options);
+      if (runtime.eligibility("DL03").providerUse !== "eligible" ||
+          request.candidates.some(candidate => !matchesPackPath(candidate.id, settings.legacy.allowedSourcePaths ?? [])))
+        throw new Error("Supplied context adapter is outside the approved source policy");
+      return supplied.decide(request);
+    },
+  };
   if ((options.promptEntry || settings.questionIds.DL03.includes("context.metadata-relevance/1")) && metadata) return {
     async decide(request) {
       const available = new Set(request.candidates.map(item => item.id));
@@ -181,7 +192,7 @@ export async function contextRouteCommand(args: string[], root: string,
 async function capturedContextRoute(args: string[], root: string, assetRoot: string,
   suppliedProvider: DecisionProvider | undefined, options: ContextRouteOptions, timing: ContextTiming, taskContext?: DecisionTaskContext) {
   const { values } = parseArgs({ args, strict: true, allowPositionals: false, options: {
-    task: { type: "string" }, revision: { type: "string" }, staged: { type: "boolean" },
+    retrieval: { type: "string" }, task: { type: "string" }, revision: { type: "string" }, staged: { type: "boolean" },
     "decision-task": { type: "string" },
     "decision-context": { type: "string" },
     "workflow-candidates": { type: "string" },
@@ -193,27 +204,41 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
   } });
   if (!values.task && !options.family && !taskContext)
     throw new ContextRouteError("entry-turn-unobserved", "A shell command cannot identify the current host turn. Use context-route --entry <id> from this prompt's packet for validated reuse, or --task <current request> for refresh.");
-  let automaticRefresh = false;
+  const requestedRetrieval = values.retrieval ?? (options.promptEntry ? "none" : "local");
+  if (!["none", "local", "semantic"].includes(requestedRetrieval))
+    throw new ContextRouteError("invalid-retrieval-mode", "Use --retrieval none|local|semantic.");
+  if (requestedRetrieval === "none" && ["optional-path", "discover-path", "links", "optional-excerpt-bytes", "workflow-candidates", "expansion"].some(key => values[key as keyof typeof values] !== undefined))
+    throw new ContextRouteError("conflicting-retrieval-inputs", "Optional inputs require local or semantic retrieval.");
+  if (values["workflow-candidates"] && requestedRetrieval !== "semantic")
+    throw new ContextRouteError("workflow-advice-not-requested", "Workflow advice requires explicit --retrieval semantic.");
+  const nativePrompt = options.promptEntry === true;
+  const activeSession = sessionId(options.session);
+  if (requestedRetrieval === "semantic" && (values.staged || values["decision-task"] || values["decision-context"] || taskContext) && activeSession && latestSessionPrompt(root, activeSession).entry)
+    throw new ContextRouteError("native-semantic-scope-required", "Use --task with the current native entry for semantic retrieval; explicit decision scopes cannot bypass its allowance.");
+  let automaticRefresh = false, entryAnchorUnready = false;
   // A deliberate bind can refresh the same turn through the ordinary command, without retry diagnosis.
   if (!values.entry && !options.family && !values.staged && !values["decision-task"] && !values["decision-context"] && !taskContext) {
     const session = sessionId(options.session);
     if (session) {
       const latest = latestSessionPrompt(root, session).entry;
       const current = taskBindingReceipt(resolveTaskContext(root, { session }));
-      if (latest && currentTaskRefresh(root, latest, current)) {
-        automaticRefresh = true;
+      if (latest && (currentTaskRefresh(root, latest, current) || requestedRetrieval === "semantic")) {
+        automaticRefresh = Boolean(currentTaskRefresh(root, latest, current));
         values.entry = String(latest.entryId);
-        values.expansion = String(nextContextExpansion(root, values.entry));
+        if (requestedRetrieval !== "semantic") values.expansion = String(nextContextExpansion(root, values.entry));
       }
     }
   }
   if (values.entry || values.expansion) {
-    if (!values.entry || !["1", "2"].includes(values.expansion ?? "") || options.family || values.staged || values["decision-task"] || values["decision-context"] || taskContext)
-      throw new Error("Use context-route --entry <entry-id> --expansion 1|2 with the current purpose and optional paths or links");
-    const selected = expansionIdentity(root, values.entry, options.session);
+    if (!values.entry || (values.expansion !== undefined && !["1", "2"].includes(values.expansion)) || options.family || values.staged || values["decision-task"] || values["decision-context"] || taskContext)
+      throw new Error("Use context-route --entry <entry-id> --task <purpose>, then --expansion 1|2 for semantic continuation");
+    const selected = expansionIdentity(root, values.entry, options.session, requestedRetrieval === "semantic");
+    if (requestedRetrieval === "semantic" && !selected.current)
+      throw new ContextRouteError("entry-superseded", "Semantic retrieval requires the current native entry.");
+    entryAnchorUnready = !selected.anchorReady;
     options = { ...options, session: selected.session, promptEntry: true, workspaceCatalog: true,
       localOnly: options.localOnly || !selected.anchorReady,
-      family: { id: selected.familyId, entryId: values.entry, step: Number(values.expansion), scope: selected.scope, revision: selected.revision, transitionId: selected.transitionId, automaticRefresh } };
+      family: { id: selected.familyId, entryId: values.entry, step: Number(values.expansion ?? 0), scope: selected.scope, revision: selected.revision, ...(selected.identity ? { identity: selected.identity } : {}), transitionId: selected.transitionId, automaticRefresh } };
   }
   const binding = resolveTaskContext(root, { ...(taskContext ? { context: taskContext } : {}),
     ...(values["decision-context"] ? { path: values["decision-context"] } : {}),
@@ -298,58 +323,71 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
   const mandatoryPaths = new Set([...route.primary, ...route.active, ...route.expansion]);
   const decisionScope = resolveDecisionScope(root, { ...(values["decision-task"] === undefined ? {} : { taskId: values["decision-task"] }), revision }, binding.context ?? undefined)
     ?? (options.provisionalScope ? resolveDecisionScope(root, {}, { workspace: options.provisionalScope.workspace, taskId: options.provisionalScope.taskId, revision: options.provisionalScope.taskRevision }) : null);
-  const allCandidatePaths = options.workspaceCatalog || settings.questionIds.DL03.includes("context.metadata-relevance/1") || !pathScopes.length
+  const retrieve = requestedRetrieval !== "none";
+  const aligned = requestedRetrieval !== "semantic" || contextWorkspaceIdentity(root, options.session, { deadlineAt: timing.deadline }).paidSelectionAllowed;
+  let providerPermitted = requestedRetrieval === "semantic" && aligned && !options.localOnly && !!(options.family?.scope ?? decisionScope);
+  const allCandidatePaths = !retrieve ? [] : options.workspaceCatalog || settings.questionIds.DL03.includes("context.metadata-relevance/1") || !pathScopes.length
     ? subject.paths() : inventory.relevant;
   const candidateInventory = allCandidatePaths;
   const requestedOriginals = [...(values["optional-path"] ?? []), ...(values.links ?? [])].map(safeSubjectPath);
-  const catalog = contextMetadataCatalog(candidateInventory, task, [...priorityPaths, ...requestedOriginals], changedPriorities, mandatoryPaths, options.historyHints, declaredDocuments(subject));
-  const projection = maintainContextProjection(subject, catalog.candidates.map(item => item.path), contextStateRoot(root),
+  const catalog: ReturnType<typeof contextMetadataCatalog> = retrieve
+    ? contextMetadataCatalog(candidateInventory, task, [...priorityPaths, ...requestedOriginals], changedPriorities, mandatoryPaths, options.historyHints, declaredDocuments(subject))
+    : { version: "metadata-index-2", inventoryCount: 0, eligibleCount: 0, excludedCount: 0, excluded: [], requiredCount: 0, omittedCount: 0, candidates: [] };
+  const projection = !retrieve ? skippedContextProjection() : maintainContextProjection(subject, catalog.candidates.map(item => item.path), contextStateRoot(root),
     { purpose: task, exact: [...priorityPaths, ...(values.links ?? []).map(safeSubjectPath)], deadlineAt: timing.deadline - CONTEXT_DELIVERY_RESERVE_MS });
   const priorities = new Map(projection.priority.map((path, index) => [path, index]));
   catalog.candidates.sort((a, b) => Number(b.pinned) - Number(a.pinned) ||
     (priorities.get(a.path) ?? Infinity) - (priorities.get(b.path) ?? Infinity) || b.matches - a.matches || a.path.localeCompare(b.path));
-  const familyRequest = digest({ purpose: task, revision: options.family?.revision ?? revision, configDigests,
-    source: scope.subject_digest, originals: requestedOriginals });
-  if (options.family?.automaticRefresh) options.family.step = nextContextExpansion(root, options.family.id, familyRequest);
+  const familyRequest = digest({ retrieval: requestedRetrieval, purpose: task, revision: options.family?.revision ?? revision, configDigests,
+    source: scope.subject_digest, originals: requestedOriginals, workflow: values["workflow-candidates"] ?? null, continuation: values.expansion ?? null });
+  if (options.family && providerPermitted) options.family.step = values.expansion === undefined ? nextSemanticStep(root, options.family.id, familyRequest) : Number(values.expansion);
   if (performance.now() >= timing.deadline) options = { ...options, signal: AbortSignal.abort("context-operation-deadline") };
   const metadataRuntime = new DecisionRuntime(settings, contextStateRoot(root), options);
   const inactiveSelection = !!options.family &&
     (!settings.questionIds.DL03.includes("context.metadata-relevance/1") || !settings.legacy.allowedDataClasses.includes("metadata") ||
       !(settings.allowedMetadataPaths ?? []).length || metadataRuntime.eligibility("DL03", "context.metadata-relevance/1").providerUse !== "eligible");
-  if (options.family?.identity && !options.family.nativeSteering && !options.localOnly && !inactiveSelection &&
-      !["opened", "existing"].includes(openContextFamily(contextStateRoot(root), options.family.identity))) options = { ...options, localOnly: true };
-  const admission = options.family && !options.localOnly && !inactiveSelection ? beginContextSelection(root, options.family.id, options.family.step, familyRequest) : null;
+  let familyReason: string | null = null;
+  if (options.family && providerPermitted && options.family.step > 2) familyReason = "family-exhausted";
+  if (!familyReason && options.family?.identity && providerPermitted && !inactiveSelection) {
+    const opened = openContextFamily(contextStateRoot(root), options.family.identity);
+    if (!["opened", "existing"].includes(opened)) familyReason = `family-${opened}`;
+  }
+  if (familyReason) options = { ...options, localOnly: true };
+  const admission = options.family && providerPermitted && !options.localOnly && !inactiveSelection ? beginContextSelection(root, options.family.id, options.family.step, familyRequest) : null;
   if (admission && !admission.paid && !admission.replay) options = { ...options, localOnly: true };
+  providerPermitted = providerPermitted && !options.localOnly && !inactiveSelection;
   let failureCursor: Parameters<typeof finishContextSelection>[4] = { version: 1, generation: projection.generation, batches: [] };
   let deferredInvocation: { scope: BudgetScope; id: string } | null = null;
   try {
   const selectionDeadline = timing.beginSelection();
-  const passageEnabled = settings.questionIds.DL03.includes("context.metadata-relevance/1") &&
+  const passageEnabled = providerPermitted && settings.questionIds.DL03.includes("context.metadata-relevance/1") &&
     ["context.passage-evidence/1", "context.passage-role/1"].every(id => settings.questionIds.DL03.includes(id));
   const passageEligible = passageEnabled &&
     metadataRuntime.eligibility("DL03", "context.metadata-relevance/1").providerUse === "eligible" &&
     metadataRuntime.eligibility("DL03").providerUse === "eligible" &&
     catalog.candidates.some(item => matchesPackPath(item.path, settings.legacy.allowedSourcePaths ?? []));
   const metadataDeadline = selectionDeadline;
-  const metadata = packet.ready && !options.localOnly ? await selectContextMetadata(subject, catalog, task,
+  const metadata = packet.ready && providerPermitted ? await selectContextMetadata(subject, catalog, task,
     metadataRuntime, options.family?.scope ?? decisionScope, scope.subject_digest ?? digest(configDigests),
     options.family?.id ?? options.retrievalEvent ?? randomUUID(), options.signal, metadataDeadline, projection,
     options.family ? { id: options.family.id, revision: options.family.revision,
       ...(admission?.previous ? { previous: admission.previous } : {}), replayOnly: admission?.replay ?? false,
-      expand: options.family.step > 0 && !options.family.automaticRefresh && !options.family.nativeSteering } : undefined,
+      expand: options.family.step > 0 && !admission?.replay } : undefined,
     { deferBudgetClose: passageEligible, reservePassageBudget: passageEligible }) : null;
   if (passageEligible && metadata && !options.family && decisionScope) deferredInvocation = { scope: decisionScope, id: metadata.invocationId };
   failureCursor = metadata?.cursor ?? failureCursor;
-  const procedurePaths = route.procedureSources.filter(path => !mandatoryPaths.has(path)), procedureSet = new Set(procedurePaths);
-  const sourceInventory = candidateInventory.filter(path => !procedureSet.has(path));
+  const localMatches = new Set([...route.procedureSources, ...projection.priority, ...catalog.candidates.filter(item => item.exact || item.matches > 0).map(item => item.path)]);
+  const supported = new Set([...localMatches, ...(metadata?.positivePaths ?? [])]);
+  const procedurePaths = retrieve ? route.procedureSources.filter(path => !mandatoryPaths.has(path) && supported.has(path)) : [], procedureSet = new Set(procedurePaths);
+  const sourceInventory = candidateInventory.filter(path => !procedureSet.has(path) && supported.has(path));
   const automatic = automaticContextCandidates(subject, sourceInventory, mandatoryPaths,
     ["**"], settings.legacy.maxCandidates,
     { purpose: task, exact: priorityPaths, changed: changedPriorities,
-      ordered: (metadata?.order ?? catalog.candidates.map(item => item.path)).filter(path => !procedureSet.has(path)) });
+      ordered: (metadata?.order ?? catalog.candidates.map(item => item.path)).filter(path => !procedureSet.has(path) && supported.has(path)) });
   automatic.excluded.push(...catalog.excluded.slice(0, Math.max(0, 64 - automatic.excluded.length)));
   automatic.excludedCount += catalog.excludedCount;
   automatic.omittedCount += allCandidatePaths.length - candidateInventory.length;
-  const declaredFiles = binding.context?.sourcePaths.filter(path => { try { return subject.source(path)?.file_type === "regular"; } catch { return false; } }) ?? [];
+  const declaredFiles = !retrieve ? [] : binding.context?.sourcePaths.filter(path => { try { return subject.source(path)?.file_type === "regular"; } catch { return false; } }) ?? [];
   const linkSeeds = new Set((values.links ?? []).map(safeSubjectPath));
   const expandedLinks = [...projection.links.flatMap(link => link.resolved ? linkSeeds.has(link.source) ? [link.resolved] : linkSeeds.has(link.resolved) ? [link.source] : [] : []),
     ...projection.catalogLinks.filter(link => linkSeeds.has(link.source)).map(link => link.resolved)];
@@ -396,7 +434,12 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
       ? { ...item, disposition: excludedReasons.get(item.path) ?? "candidate-not-materialized" } : item;
   });
   let relevanceAdvice: ContextAdvice | null = null;
-  const provider = routedDecisionProvider({ supplied: suppliedProvider, options, settings, metadata, profile, root, scope,
+  const localProvider: DecisionProvider = { async decide(request) { return {
+    version: 3, kind: request.kind, inputDigest: digest(request), delivered: lexicalContextOrder(request), suggested: null,
+    method: "baseline", reason: requestedRetrieval === "local" ? "local-requested" : "semantic-local-fallback",
+    providerCalled: false, model: null, questionVersion: "local-context-1", confidence: null, latencyMs: 0,
+    usage: { inputTokens: null, outputTokens: null } }; } };
+  const provider = !providerPermitted ? localProvider : routedDecisionProvider({ supplied: suppliedProvider, options, settings, metadata, profile, root, scope,
     decisionScope, configDigests, task, revision, deadlineAt: timing.deadline - CONTEXT_DELIVERY_RESERVE_MS,
     onAdvice: advice => { relevanceAdvice = advice; } });
   // Invalid mandatory context prevents any optional provider call or source transmission.
@@ -412,15 +455,15 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
     optionalExcerptBytes,
   }, provider, options.localOnly ? { signal: AbortSignal.abort() } : options) : null;
   let workflowRecommendation = null;
-  if (packet.ready && !options.promptEntry && !options.localOnly) {
+  if (packet.ready && providerPermitted && !nativePrompt && values["workflow-candidates"]) {
     const manifestPath = values["workflow-candidates"] === undefined ? null : safeSubjectPath(values["workflow-candidates"]);
     const supplied = manifestPath ? resolveWorkflowCandidates(load(manifestPath), root, subject) : null;
     const workflowPaths = [...new Set([...(manifestPath ? [manifestPath] : []), ...(supplied?.sourcePaths ?? [])])];
     for (const path of workflowPaths) if (subject.source(path)?.file_type === "regular") {
       configDigests[path] = digest(readCaptured(path, 1024 * 1024).toString("base64"));
     }
-    workflowRecommendation = await workflowAdvice(new DecisionRuntime(settings, contextStateRoot(root), options), supplied, decisionScope, {
-      task, eventId: digest({ task, revision, supplied, source: scope.subject_digest }), policyDigest: digest(configDigests),
+    workflowRecommendation = await workflowAdvice(new DecisionRuntime(settings, contextStateRoot(root), options), supplied, options.family?.scope ?? decisionScope, {
+      ...(options.family ? { familyId: options.family.id } : {}), task, eventId: digest({ task, revision, supplied, source: scope.subject_digest }), policyDigest: digest(configDigests),
       environment: scope.mode, revision, subjectDigest: scope.subject_digest ?? digest(configDigests), sourcePaths: workflowPaths,
     });
   }
@@ -436,15 +479,15 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
     } catch { staleSources.push(path); }
   }
   const receiptId = randomUUID();
-  if (options.family && options.family.step > 0) {
+  if (options.family && (options.family.step > 0 || options.family.nativeSteering || requestedRetrieval === "semantic")) {
     const changed = options.family.nativeSteering
       ? digest(taskBindingReceipt(resolveTaskContext(root, options.session === undefined ? {} : { session: options.session }))) !== digest(nativeBinding)
-      : (() => { const final = expansionIdentity(root, options.family.entryId ?? options.family.id, options.session);
+      : (() => { const final = expansionIdentity(root, options.family.entryId ?? options.family.id, options.session, requestedRetrieval === "semantic");
         return digest(final.scope) !== digest(options.family!.scope) || final.revision !== options.family!.revision; })();
     if (changed)
       throw new ContextRouteError("entry-task-changed", "The task changed while preparing context; refresh against the current binding.");
   }
-  const identity = { revision, taskDigest: digest(task), configDigests, routingPaths, route: route.selected?.id ?? null,
+  const identity = { retrievalMode: requestedRetrieval, revision, taskDigest: digest(task), configDigests, routingPaths, route: route.selected?.id ?? null,
     contextBudget: route.budget, contextBudgetAuthority: route.budgetAuthority,
     source: { mode: scope.mode, base: scope.base_ref, changes: scope.subject_digest },
     context: packet.entries.map(({ content, ...entry }) => entry),
@@ -457,11 +500,16 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
       : !admittedPaths.has(path) ? "source-unavailable-or-capture-limit"
       : !matchesPackPath(path, settings.legacy.allowedSourcePaths ?? []) || !settings.legacy.allowedDataClasses.includes("source") ? "source-scope-disabled"
       : passageAdvice?.omitted.find(item => item.path === path)?.reason ?? passageAdvice?.reason ?? "procedure-selection-unavailable" }));
-  const selection = { binding: taskBindingReceipt(binding), candidateCount: candidates.length, inventoryUnavailable: inventory.unavailable,
+  const retrieval = { requested: requestedRetrieval, effective: requestedRetrieval === "none" ? "none" : metadata?.delivered || passageAdvice?.decisions.some(decision => decision.delivered) || optional?.decision?.method === "provider" ? "semantic" : "local",
+    providerAttempted: [...(metadata?.decisions ?? []), ...(passageAdvice?.decisions ?? []), ...[(relevanceAdvice as ContextAdvice | null)?.decision], ...(workflowRecommendation?.decision ? [workflowRecommendation.decision] : [])].some(decision => decision?.providerCalled === true) || optional?.decision?.providerCalled === true,
+    trigger: nativePrompt ? "native-prompt" : "explicit-request",
+    reason: requestedRetrieval === "none" ? "retrieval-not-requested" : requestedRetrieval === "local" ? "local-requested"
+      : !aligned ? performance.now() >= timing.deadline ? "operation-deadline" : "native-workspace-alignment-required" : !(options.family?.scope ?? decisionScope) ? "semantic-scope-unavailable" : !providerPermitted ? familyReason ?? admission?.status ?? (entryAnchorUnready ? "entry-anchor-unready" : null) ?? (inactiveSelection ? metadataRuntime.eligibility("DL03", "context.metadata-relevance/1").reasons[0] ?? "metadata-policy-disabled" : "semantic-local-only") : metadata?.reason ?? "semantic-requested" };
+  const selection = { retrieval, binding: taskBindingReceipt(binding), candidateCount: candidates.length, inventoryUnavailable: inventory.unavailable,
     capturedSourceFacts: capturedFacts?.coverage ?? null,
     metadataStage: { reason: metadata?.reason ?? "not-attempted", deadlineOffsetMs: metadataDeadline - timing.started,
       passageReserveMs: 0 },
-    reason: !packet.ready ? "required-context-unavailable" : !candidates.length ? automatic.excludedCount ? "no-permitted-candidates" : "no-optional-candidates"
+    reason: !packet.ready ? "required-context-unavailable" : !retrieve ? "retrieval-not-requested" : !candidates.length && !supported.size ? projection.status.complete ? "no-local-match" : "no-local-match-index-incomplete" : !candidates.length ? automatic.excludedCount ? "no-permitted-candidates" : "no-optional-candidates"
       : optionalBudget < 2 ? "optional-budget-empty" : optional?.reason ?? "selection-unavailable",
     optionalDelivery: optional ? optional.entries.length ? "delivered" : "none" : "not-attempted",
     optionalClippedPaths: optional?.entries.filter(entry => entry.sourceRange || entry.sourceRanges).map(entry => entry.id) ?? [],
@@ -489,7 +537,7 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
   const currentEntryId = options.family?.entryId ?? options.family?.id ?? null;
   const expansion = options.family ? { entry: currentEntryId, familyId: options.family.id, step: options.family.step, status: admission?.status ?? "local-only", completed: familyCompleted,
     transitionId: options.family.transitionId ?? null,
-    nextStep: options.family.step < 2 ? options.family.step + 1 : null, sharedAllowance: true, originalReadsAvailable: true } : null;
+    nextStep: requestedRetrieval === "semantic" && options.family.step < 2 ? options.family.step + 1 : null, sharedAllowance: true, originalReadsAvailable: true } : null;
   const ambientSession = options.session ?? sessionId();
   const nativeSession = options.session ?? (binding.source === "session" ? ambientSession : null);
   let promptLink: { status: string; reason: string; entryId: string | null } = options.family
@@ -499,6 +547,7 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
     try {
       const latest = latestSessionPrompt(root, nativeSession);
       promptLink.reason = latest.entry ? "explicit-request-outside-native-packet" : latest.reason;
+      if (latest.entry) promptLink = { status: "observed", reason: "latest-session-observation-not-consumption", entryId: String(latest.entry.entryId) };
     }
     catch (error) {
       promptLink.reason = error instanceof ContextRouteError && /^[a-z][a-z0-9-]{0,79}$/u.test(error.code)
@@ -514,8 +563,8 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
       ...(binding.attemptId ? { attemptId: binding.attemptId } : {}) } } : {}),
   }) : null;
   const receipt = { version: 3, ...runtimeExecutionIdentity(), workspace: root, receiptId, execution, createdAt: new Date().toISOString(), ...identity, selection, expansion,
-    timing: timing.snapshot(metadata?.providerCallMs ?? 0, projection.status.elapsedMs),
-    projection: projectionReceiptPreview(projection, admittedPaths),
+    timing: timing.snapshot(providerPermitted ? metadata?.providerCallMs ?? 0 : null, retrieve ? projection.status.elapsedMs : null),
+    projection: retrieve ? projectionReceiptPreview(projection, admittedPaths) : { ...projectionReceiptPreview(projection, admittedPaths), cache: "skipped", generation: null, extractedCount: null, reusedCount: null, pendingCount: null, elapsedMs: null, timing: null },
     procedureReferences: procedureReferences.slice(0, 64), procedureReferenceCount: procedureReferences.length,
     inputDigest: digest(identity), ready: packet.ready && !staleSources.length, blockers: packet.blockers,
     omissions: packet.omissions, skillOmissions: packet.skills?.omissions ?? [],
@@ -560,7 +609,7 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
     timing: receipt.timing,
     projection: receipt.projection,
     expansion: expansion ? { ...expansion, argv: expansion.nextStep ? ["project-governance", "context-route", "--entry", expansion.entry,
-      "--expansion", String(expansion.nextStep), "--task", task, "--revision", revision] : null } : null,
+      "--expansion", String(expansion.nextStep), "--retrieval", "semantic", "--task", task, "--revision", revision] : null } : null,
     procedureReferences: receipt.procedureReferences, procedureReferenceCount: receipt.procedureReferenceCount,
     optional, metadata: metadataSummary, relevanceAdvice: relevanceAdvice as ContextAdvice | null, workflowAdvice: workflowRecommendation,
     optionalBudget, optionalOmitted: optional?.omitted ?? optionalPaths, discovery, selection };

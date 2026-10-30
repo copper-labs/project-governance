@@ -330,7 +330,7 @@ export async function selectContextMetadata(subject: ValidationSubject, catalog:
     applied, mode: decisions[0]?.mode ?? "off",
     priorityAssessed, generalAssessed, replayedBatches, invalidatedBatches,
     passageReservedBytes: reserveBytes, metadataByteCeiling, passageReservedCalls: reserveCalls, metadataCallCeiling };
-  return { version: 3, catalog, order, reason, assessed: [...assessed], metadataPermittedCount: assessable.length, coverage, preflight, cursor,
+  return { version: 3, catalog, order, positivePaths: [...positive.keys()], reason, assessed: [...assessed], metadataPermittedCount: assessable.length, coverage, preflight, cursor,
     invocationId, budgetFinalized, excluded, decisions, delivered: applied,
     ordering: { rule: "positive-then-uncertain-before-baseline", positiveCount: positive.size,
       uncertainCount: uncertain.size, supportedNegativeCount: negative.size,

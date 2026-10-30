@@ -157,7 +157,7 @@ test("normal prompt expansion validates session, gives explicit originals withou
   for (const path of ["config/governance/profile.yaml", "config/governance/facts.lock.yaml"]) writeFileSync(join(root, path), PROJECT_DEFAULTS[path]!);
   writeFileSync(join(root, "app.ts"), "export const launch='ready';\n");
   const assets = resolve("src/project_governance_runtime/assets/skills"), event = { hook_event_name: "UserPromptSubmit", session_id: "native", turn_id: "first", cwd: root, prompt: "Find the launch" };
-  const first = await promptContext("codex", event, root, { environment: {}, assetRoot: assets }); assert.match((first as any).hookSpecificOutput.additionalContext, /--expansion/);
+  const first = await promptContext("codex", event, root, { environment: {}, assetRoot: assets }); assert.match((first as any).hookSpecificOutput.additionalContext, /--task <current request>/);
   const directory = join(contextStateRoot(root), "prompt-entries"), entry = JSON.parse(readFileSync(join(directory, readdirSync(directory)[0]!), "utf8"));
   const args = ["--entry", entry.entryId, "--expansion", "1", "--task", event.prompt, "--optional-path", "app.ts"];
   await assert.rejects(contextRouteCommand(args, root, assets, undefined, { session: "wrong" }), /current observed entry/);
@@ -188,11 +188,12 @@ test("failed explicit-original delivery retains paid progress and leaves the fin
     { environment: {}, assetRoot: assets }); }
   finally { globalThis.fetch = originalFetch; if (originalToken === undefined) delete process.env.JEV_TOKEN; else process.env.JEV_TOKEN = originalToken; }
   const dir = join(contextStateRoot(root), "prompt-entries"), entry = JSON.parse(readFileSync(join(dir, readdirSync(dir)[0]!), "utf8"));
-  const args = ["--entry", entry.entryId, "--expansion", "1", "--task", "Find launch", "--optional-path", "missing.ts"];
+  await contextRouteCommand(["--retrieval", "semantic", "--entry", entry.entryId, "--task", "Find launch"], root, assets, undefined, options);
+  const args = ["--retrieval", "semantic", "--entry", entry.entryId, "--expansion", "1", "--task", "Find launch", "--optional-path", "missing.ts"];
   await assert.rejects(contextRouteCommand(args, root, assets, undefined, options), (error: unknown) => error instanceof Error && error.cause instanceof Error && error.cause.message === "Optional source unavailable");
   const after = calls;
   await assert.rejects(contextRouteCommand(args, root, assets, undefined, options), (error: unknown) => error instanceof Error && error.cause instanceof Error && error.cause.message === "Optional source unavailable"); assert.equal(calls, after);
-  const final = await contextRouteCommand(["--entry", entry.entryId, "--expansion", "2", "--task", "Find launch", "--optional-path", "app.ts"], root, assets, undefined, options);
+  const final = await contextRouteCommand(["--retrieval", "semantic", "--entry", entry.entryId, "--expansion", "2", "--task", "Find launch", "--optional-path", "app.ts"], root, assets, undefined, options);
   assert.equal(final.expansion?.status, "reserved"); assert.equal(final.expansion?.completed, true);
   assert.match(final.optional!.entries[0]!.excerpt, /ready/);
 });

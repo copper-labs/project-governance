@@ -468,9 +468,13 @@ Use the owning command contract for structured request fields.
         const workspace = workContext(process.cwd()).worktree;
         const operation = args[2] ?? "status";
         const { values } = parseArgs({ args: args.slice(3), strict: true, allowPositionals: false, options: {
-          entry: { type: "string" }, transcript: { type: "string" }, path: { type: "string" }, "source-workspace": { type: "string" }, disposition: { type: "string" }, evidence: { type: "string" },
+          since: { type: "string" }, entry: { type: "string" }, transcript: { type: "string" }, path: { type: "string" }, "source-workspace": { type: "string" }, disposition: { type: "string" }, evidence: { type: "string" },
         } });
-        if (operation === "status" && !Object.keys(values).length) { console.log(JSON.stringify(contextObservationStatus(workspace))); return 0; }
+        if (operation === "status" && Object.keys(values).every(key => key === "since")) {
+          const since = values.since === undefined ? undefined : Date.parse(values.since);
+          if (since !== undefined && !Number.isFinite(since)) throw new Error("Invalid --since timestamp");
+          console.log(JSON.stringify(contextObservationStatus(workspace, since))); return 0;
+        }
         if (!values.entry) throw new Error("Context observation requires --entry ID");
         if (operation === "import" && values.transcript) { console.log(JSON.stringify(importContextUsage(workspace, values.entry, values.transcript))); return 0; }
         if (operation === "expansion" && values.path) { console.log(JSON.stringify(recordContextObservation(workspace, values.entry, { kind: "expansion", path: values.path,

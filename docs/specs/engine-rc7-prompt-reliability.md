@@ -9,6 +9,12 @@ updated: 2026-09-27
 summary: Give semantic selection its own clock and refresh context after explicit task changes without resetting spending or history.
 ---
 
+> Current 4.5 entry and optional-selection behavior is owned by
+> [demand-driven context](engine-demand-driven-context.md). Its no-retrieval native entry and
+> explicit local/semantic requests supersede automatic optional retrieval described below.
+> Historical proofs below do not establish current accepted-outcome savings.
+
+
 # RC7 prompt reliability
 
 This amendment owns the timing and task-transition corrections to the

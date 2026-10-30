@@ -22,7 +22,7 @@ test("installation doctor reports missing state without creating or migrating it
     assert.equal(existsSync(registry), false);
     installHostInstructions(root, COMPILED_HOST_BLOCK);
     assert.equal(runtimeDoctor(root, registry).findings.some(finding => finding.id === "installation.host-instructions-drift"), false);
-    writeFileSync(join(root, "CLAUDE.md"), COMPILED_HOST_BLOCK.replace("Before task-specific", "Before substantial") + "\n");
+    writeFileSync(join(root, "CLAUDE.md"), COMPILED_HOST_BLOCK.replace("Request repository context only when useful", "Always request repository context") + "\n");
     assert.ok(runtimeDoctor(root, registry).findings.some(finding => finding.id === "installation.host-instructions-drift"));
     const generations = new RuntimeGenerations(registry);
     const maintenance = generations.beginMaintenance("interrupted-updater", 0); generations.close();

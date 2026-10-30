@@ -10,7 +10,7 @@ import { ProjectionStore, projectionIdentity, sourceFactId, type ProjectionFile 
 import { documentationConfig, documentationCatalog } from "./checkers/document-catalog.ts";
 import { CONTEXT_SELECTION_MS } from "./context-timing.ts";
 import { SOURCE_CAPTURE_MAX_BYTES, SOURCE_CAPTURE_BATCH_MAX_BYTES } from "./source-capture-limits.ts";
-import { contextTerms } from "./context-terms.ts";
+import { contextTerms, contextSearchTerms } from "./context-terms.ts";
 
 export interface ProjectionOptions { deadlineAt?: number; byteLimit?: number; factByteLimit?: number; rebuild?: boolean; extractor?: string; purpose?: string; exact?: string[] }
 
@@ -163,7 +163,7 @@ export function maintainContextProjection(subject: ValidationSubject, paths: str
   }
   const { links: catalogLinks, coverage: catalogCoverage } = declaredCatalogLinks(subject, byPath, safe);
   const exact = new Set((options.exact ?? []).filter(path => safe.has(path)));
-  const terms = new Set((options.purpose ?? "").toLowerCase().match(/[\p{L}\p{N}_]{3,}/gu) ?? []);
+  const terms = contextSearchTerms(options.purpose ?? "");
   const symbols = [...byPath].filter(([, fact]) => fact.spans.some(span => terms.has(span.name.toLowerCase()))).map(([path]) => path).slice(0, 32);
   const seeds = new Set([...exact, ...symbols, ...search.slice(0, 16)]), related = new Set<string>();
   for (const link of links) if (link.resolved) { if (seeds.has(link.source)) related.add(link.resolved); if (seeds.has(link.resolved)) related.add(link.source); }
@@ -190,4 +190,16 @@ export function maintainContextProjection(subject: ValidationSubject, paths: str
       timing: { identityMs: identified - started, freshnessMs: observed - identified, cacheMs: opened - observed,
         extractionMs: extractedAt - opened, publicationAndLinksMs: performance.now() - extractedAt } } };
   } finally { store?.close(); }
+}
+
+/** Required-only entry must not open storage or replace a warm source index. */
+export function skippedContextProjection(): ReturnType<typeof maintainContextProjection> {
+  return { entries: new Map(), unavailable: [], capturedBytes: 0,
+    documentation: { inspectedCount: 0, overviewCount: 0, gaps: [] }, facts: new Map(), links: [], catalogLinks: [], priority: [],
+    generation: "not-requested", status: { cache: "skipped", published: false, locatorVerified: false, view: "worktree", extractor: SOURCE_EXTRACTOR,
+      inventoryCount: 0, extractedCount: 0, reusedCount: 0, describedCount: 0, pendingCount: 0, complete: false,
+      quality: { descriptorCount: 0, pathOnlyCount: 0, pathOnlyReasons: {}, pathOnlyExamples: [], pathOnlyExamplesTruncated: false,
+        withoutAuthoredOverviewCount: 0, partialSyntaxCount: 0, unavailableExtractionCount: 0, accuracy: "not-established", inventory: "not-requested" },
+      reverseCoverage: "not-requested", catalogCoverage: "not-requested", capturedBytes: 0, elapsedMs: 0, fts: false,
+      timing: { identityMs: 0, freshnessMs: 0, cacheMs: 0, extractionMs: 0, publicationAndLinksMs: 0 } } };
 }

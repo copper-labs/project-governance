@@ -346,3 +346,15 @@ test("Git ident expansion is captured from literal checkout bytes", t => {
   const projection = maintainContextProjection(source, ["a.ts"], f.state);
   assert.equal(projection.facts.get("a.ts")?.bytes, readFileSync(join(f.root, "a.ts")).length);
 });
+
+test("literal identifiers outrank split-word noise and remain exact FTS matches",t=>{
+ const f=fixture(t);
+ for(let i=0;i<70;i++)f.write(`a${i}.ts`,"/** open context family load config */\nexport const noise=1;\n");
+ f.write("z.ts","export function openContextFamily() {}\nexport function load_config() {}\n");
+ for(const purpose of ["openContextFamily","load_config"]){
+  const projection=f.run({purpose});assert.equal(projection.priority[0],"z.ts");
+  const store=new ProjectionStore(f.state,f.root,projectionIdentity(f.root)!);
+  try {if(store.fts)assert.ok(store.search(projection.generation!,purpose).includes("z.ts"));}
+  finally{store.close();}
+ }
+});

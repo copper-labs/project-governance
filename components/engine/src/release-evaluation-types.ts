@@ -43,7 +43,7 @@ export const CONTEXT_TIME_METRICS = ["preparationMs", "sourceCaptureMs", "indexM
 export interface EvaluationContextTiming {
   id: string; reference: EvaluationReference;
   index: { cache: string | null; extractedCount: number | null; reusedCount: number | null; pendingCount: number | null;
-    workload: "extraction-only" | "reuse-only" | "mixed" | "empty-or-unobserved" | "unknown" };
+    workload: "extraction-only" | "reuse-only" | "mixed" | "empty-or-unobserved" | "skipped" | "unknown" };
   phases: Record<typeof CONTEXT_TIME_METRICS[number], number | null>;
 }
 export interface EvaluationEpisode {

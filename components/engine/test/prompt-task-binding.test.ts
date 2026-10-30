@@ -66,7 +66,7 @@ test("normal task create links its provisional prompt without rewriting intent; 
     assert.equal("promptEntry" in provider.delivery && provider.delivery.promptEntry?.entryId, id);
     writeFileSync(join(f.root, "parser.ts"), "export function parse() { return 'changed'; }\n");
     const stale = await promptContext("codex", f.event, f.root, { environment: {}, assetRoot: assets });
-    assert.match((stale as any).hookSpecificOutput.additionalContext, /No selection was repeated/);
+    assert.match((stale as any).hookSpecificOutput.additionalContext, /No selection was repeated|without another selection/);
     assert.equal(readFileSync(path, "utf8"), bytes);
   } finally { f.cleanup(); }
 });
@@ -166,8 +166,8 @@ test("a fresh explicit request does not claim delivery of an existing native pac
     await promptContext("codex", f.event, f.root, { environment: {}, assetRoot: assets });
     const packet = await contextRouteCommand(["--task", f.event.prompt], f.root, assets);
     assert.equal(packet.execution.nativeSession, f.event.session_id);
-    assert.equal(packet.execution.promptLink.status, "unlinked");
-    assert.equal(packet.execution.promptLink.reason, "explicit-request-outside-native-packet");
+    assert.equal(packet.execution.promptLink.status, "observed");
+    assert.equal(packet.execution.promptLink.reason, "latest-session-observation-not-consumption");
     assert.equal(packet.execution.entryId, null);
   } finally { f.cleanup(); }
 });
@@ -344,7 +344,7 @@ test("interrupted preparation returns current local facts without repeating paid
     rmSync(join(root, "prompt-packets", `${id}.json`));
     rmSync(join(root, "prompt-entries", `${id}.json`));
     const output = await promptContext("codex", f.event, f.root, { environment: {}, assetRoot: assets });
-    assert.match((output as any).hookSpecificOutput.additionalContext, /No selection was repeated/);
+    assert.match((output as any).hookSpecificOutput.additionalContext, /No selection was repeated|without another selection/);
     assert.match((output as any).hookSpecificOutput.additionalContext, /Current task facts/);
     assert.doesNotMatch((output as any).hookSpecificOutput.additionalContext, /Native entry reference \(for --entry\)/);
     assert.equal(readdirSync(join(root, "routes")).length, routeCount + 1, "One deterministic local guidance receipt is retained");
@@ -390,7 +390,7 @@ test("lost recording delivers local context without any paid advice", async () =
     for (let i = 0; i < 2; i++) {
       const output = await promptContext("codex", f.event, f.root, { environment: {}, assetRoot: assets });
       assert.match((output as any).hookSpecificOutput.additionalContext, /Keep required rules intact/);
-      assert.match((output as any).hookSpecificOutput.additionalContext, /parser.ts/);
+      assert.doesNotMatch((output as any).hookSpecificOutput.additionalContext, /parser.ts/);
     }
     assert.equal(calls, 0);
   } finally {
@@ -427,8 +427,8 @@ test("concurrent duplicate hooks prepare only once", async () => {
   try {
     const pending = promptContext("codex", f.event, f.root, { environment: {}, assetRoot: assets });
     const duplicate = await promptContext("codex", f.event, f.root, { environment: {}, assetRoot: assets });
-    assert.match((duplicate as any).hookSpecificOutput.additionalContext, /No selection was repeated/);
-    assert.match((await pending as any).hookSpecificOutput.additionalContext, /parser.ts/);
+    assert.match((duplicate as any).hookSpecificOutput.additionalContext, /No selection was repeated|without another selection/);
+    assert.doesNotMatch((await pending as any).hookSpecificOutput.additionalContext, /parser.ts/);
     assert.doesNotMatch((duplicate as any).hookSpecificOutput.additionalContext, /Native entry reference \(for --entry\)/);
     assert.equal(readdirSync(join(contextStateRoot(f.root), "routes")).length, 2, "The duplicate only retains a deterministic local guidance receipt");
     const entries = readdirSync(join(contextStateRoot(f.root), "prompt-entries")); assert.equal(entries.length, 1);

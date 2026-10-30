@@ -1,3 +1,4 @@
+import { contextEffectiveness } from "./context-effectiveness.ts";
 import { closeSync, constants, fstatSync, lstatSync, openSync, readSync, readdirSync, realpathSync, linkSync, unlinkSync, opendirSync } from "node:fs";
 import { join, isAbsolute, basename, dirname } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
@@ -767,7 +768,7 @@ export function recordContextObservation(workspace: string, entryId: string, obs
   return { recorded: true, id };
 }
 
-export function contextObservationStatus(workspace: string) {
+export function contextObservationStatus(workspace: string, since?: number) {
   const root = contextStateRoot(workspace), counts: Record<string, number> = Object.create(null), reasons: Record<string, number> = Object.create(null);
   const usage = { inputTokens: null as number | null, outputTokens: null as number | null, responses: 0 };
   const reads = { local: 0, external: 0, classification: "observed reads, not established retrieval misses" };
@@ -776,10 +777,22 @@ export function contextObservationStatus(workspace: string) {
   const projection = readContextProjection(root, workspace, { kinds: ["entry", "route", "usage", "outcome", "expansion", "failure", "observation"] });
   const labels = { entry: "prompt-entries", route: "routes", usage: "context-observations", outcome: "context-observations",
     expansion: "context-observations", failure: "entry-failures", decision: "decisions", observation: "context-observations" };
-  const receipts = recentReceipts(root, ["prompt-entries", "entry-failures", "prompt-rejections", "context-observations", "routes"],
-    { limit: 1000, maximumBytes: 8 * 1024 * 1024,
-      prioritized: projection.records.map(item => ({ collection: item.kind === "failure" && item.status === "not-delivered" ? "prompt-rejections" : labels[item.kind], name: `${item.id}.json` })),
+  // Reserve entry capacity so busy child streams cannot evict the whole denominator.
+  const entryScan = recentReceipts(root, ["prompt-entries"], { limit: 300, maximumBytes: 4 * 1024 * 1024,
+    ...(since === undefined ? {} : { since }),
+    prioritized: projection.records.filter(item => item.kind === "entry").map(item => ({ collection: "prompt-entries", name: `${item.id}.json` })), predicate: item => item.workspace === realpathSync(workspace) });
+  const childScan = recentReceipts(root, ["entry-failures", "prompt-rejections", "context-observations"],
+    { limit: 700, maximumBytes: 4 * 1024 * 1024, ...(since === undefined ? {} : { since }),
+      prioritized: projection.records.filter(item => item.kind !== "entry" && item.kind !== "route").map(item => ({ collection: item.kind === "failure" && item.status === "not-delivered" ? "prompt-rejections" : labels[item.kind], name: `${item.id}.json` })),
       predicate: item => item.workspace === undefined || item.workspace === realpathSync(workspace) });
+  const routeScan = recentReceipts(root, ["routes"], { limit: 300, maximumBytes: 4 * 1024 * 1024,
+    ...(since === undefined ? {} : { since }),
+    prioritized: projection.records.filter(item => item.kind === "route").map(item => ({ collection: "routes", name: `${item.id}.json` })),
+    predicate: item => item.workspace === undefined || item.workspace === realpathSync(workspace) });
+  const receipts = { records: [...entryScan.records, ...childScan.records, ...routeScan.records].sort((a,b) => b.at-a.at),
+    invalid: entryScan.invalid + childScan.invalid + routeScan.invalid, readBytes: entryScan.readBytes + childScan.readBytes + routeScan.readBytes,
+    truncated: entryScan.truncated || childScan.truncated || routeScan.truncated, scanComplete: entryScan.scanComplete && childScan.scanComplete && routeScan.scanComplete,
+    selection: "separate bounded entry and observation populations; newest within inspected originals" };
   invalid += receipts.invalid; readBytes = receipts.readBytes; truncated = receipts.truncated;
   let latestEntry: Record<string, unknown> | null = null, latestRoute: Record<string, unknown> | null = null;
   for (const { collection, name, value: item } of receipts.records) try {
@@ -798,12 +811,14 @@ export function contextObservationStatus(workspace: string) {
     }
     const reason = item.reason ?? item.code ?? item.selectionReason;
     if (typeof reason === "string") reasons[reason] = (reasons[reason] ?? 0) + 1;
-    if (collection === "context-observations" && kind === "usage") {
-      const values = object(item.usage); usage.responses++;
-      for (const key of ["inputTokens", "outputTokens"] as const) if (numeric(values[key]) !== null) usage[key] = (usage[key] ?? 0) + Number(values[key]);
-    }
   } catch { invalid++; }
-  return { version: 1, counts, reasons, usage, reads, documentation: documentation.result(truncated), truncated, scanComplete: receipts.scanComplete, invalid, readBytes,
+  const effectiveness = contextEffectiveness(receipts.records, truncated || invalid > 0);
+  // The legacy summary covers all inspected usage; effectiveness.nativeUsage is population-linked.
+  usage.responses = effectiveness.observedUsage.responses;
+  usage.inputTokens = effectiveness.observedUsage.fields.inputTokens.known;
+  usage.outputTokens = effectiveness.observedUsage.fields.outputTokens.known;
+  return { version: 1, since: since === undefined ? null : new Date(since).toISOString(),
+    effectiveness, counts, reasons, usage, reads, documentation: documentation.result(truncated), truncated, scanComplete: receipts.scanComplete, invalid, readBytes,
     selection: receipts.selection, projection: { state: projection.state, role: "receipt-read-hints", truncated: projection.truncated,
       evictedRecords: projection.evictedRecords, evictedBytes: projection.evictedBytes, writeCoverage: projection.writeCoverage, limits: projection.limits }, latestEntry, latestRoute,
     confirmedModelUse: null, avoidedTokens: null, benefit: "requires comparable accepted tasks; counters are known subtotals" };

@@ -61,7 +61,8 @@ export function recordContextFailure(root: string, error: unknown, providerCalle
   return known;
 }
 
-export const CONTEXT_ROUTE_HELP = `context-route [--task <purpose> --revision <revision>] [--decision-task <id>]
+export const CONTEXT_ROUTE_HELP = `Optional retrieval: --retrieval none|local|semantic. Explicit requests default to local; semantic requires existing sharing consent and a native entry or task scope.
+context-route [--task <purpose> --revision <revision>] [--decision-task <id>]
   --entry <id> revalidates a native packet without selection; requires its matching host session.
   Use the 64-character native entry reference, never a route receipt UUID or task ID.
   A bare shell command cannot identify the current host turn. --task is prose, not a task ID.

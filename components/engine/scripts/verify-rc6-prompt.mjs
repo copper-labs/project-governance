@@ -7,6 +7,11 @@ import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { continuationCandidate, continuationInputs, continuityUpgradeJourney } from './verify-continuity-upgrade.mjs';
 
+function usesRequestedContext(packageRoot) {
+  const [major, minor] = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')).version.split('.').map(Number);
+  return major > 4 || major === 4 && minor >= 5;
+}
+
 /** Parse only the selected payload's declared presentation; never treat a route UUID as an entry. */
 function promptEntryReference(text, presentation) {
   return (presentation === 'published-4.0.0'
@@ -94,7 +99,7 @@ async function verifyOwnerRollover({ packageRoot, temporary, workspace, environm
   const departed = seedPriorHost('departed-host', exitedHost.pid);
   assert.equal(readers().length, beforeReaders + 1);
   const resumedPrompt = invokeNativePrompt(departed.receipts, departed.prompt);
-  assert.match(resumedPrompt.hookSpecificOutput.additionalContext, /app.ts/);
+  assert.match(resumedPrompt.hookSpecificOutput.additionalContext, usesRequestedContext(packageRoot) ? /Required current guidance/ : /app.ts/);
   assert.deepEqual(invokeNativePrompt(departed.receipts,
     { ...departed.prompt, hook_event_name: 'SessionStart', source: 'resume' }), {});
   assert.equal(readers().length, beforeReaders + 1, 'The old startup reader stays held after rollover');
@@ -105,7 +110,7 @@ async function verifyOwnerRollover({ packageRoot, temporary, workspace, environm
   const beforeOwner = beforeTasks.owner(present.taskId); beforeTasks.close();
   assert.deepEqual(beforeOwner, { host: present.host, reader: { registry, ...present.reader } });
   const liveContinuation = invokeNativePrompt(present.receipts, present.prompt);
-  assert.match(liveContinuation.hookSpecificOutput.additionalContext, /app.ts/);
+  assert.match(liveContinuation.hookSpecificOutput.additionalContext, usesRequestedContext(packageRoot) ? /Required current guidance/ : /app.ts/);
   const afterTasks = new StartupTasks(present.receipts);
   assert.deepEqual(afterTasks.owner(present.taskId), beforeOwner, 'A live prior owner must remain unchanged');
   afterTasks.close();
@@ -167,7 +172,7 @@ async function verifyLinkedNativeHooks({ packageRoot, sibling, siblingRegistry, 
   assert.equal(existsSync(siblingReceipts), true);
   const prompt = invoke('UserPromptSubmit', { ...event, hook_event_name: 'UserPromptSubmit',
     turn_id: 'linked-turn', prompt: 'Fix app.ts in this worktree.' });
-  assert.match(prompt.hookSpecificOutput.additionalContext, /app.ts/);
+  assert.match(prompt.hookSpecificOutput.additionalContext, usesRequestedContext(packageRoot) ? /Required current guidance/ : /app.ts/);
   invoke('SessionEnd', { ...event, hook_event_name: 'SessionEnd' });
   assert.deepEqual(startupReceiptFingerprint(temporary), primaryBefore, 'The sibling must not write primary startup receipts');
 }
@@ -295,19 +300,19 @@ async function verifyWorktreeCutover({ packageRoot, archive, temporary, workspac
 
 /** Qualify the installed launcher and stdin protocol in an unborn disposable repository. */
 /** Check task transitions through the installed launcher without disturbing later lifecycle proof. */
-function verifyTaskSwitch({ invoke, launcher, workspace, environment, session, calls }) {
+function verifyTaskSwitch({ invoke, launcher, workspace, environment, session, calls, demand }) {
   environment.HARNESS_SESSION = session;
   const first = invoke(launcher, ['harness', 'task', 'create', '--outcome', 'First app task', '--scope', workspace]);
   assert.equal(first.contextEntry.status, 'linked');
   const second = invoke(launcher, ['harness', 'task', 'create', '--outcome', 'Repair app launch', '--scope', workspace]);
   assert.equal(second.contextEntry.status, 'refresh-required');
-  const refreshed = invoke(launcher, ['context-route', '--task', 'Repair app launch']);
+  const refreshed = invoke(launcher, ['context-route', '--task', 'Repair app launch', ...(demand ? ['--retrieval', 'semantic'] : [])]);
   assert.equal(refreshed.selection.binding.taskId, second.task.taskId);
   assert.equal(refreshed.expansion.entry, first.contextEntry.entryId);
   assert.ok(refreshed.expansion.transitionId);
   assert.equal(refreshed.timing.operationBudgetMs, 45000);
   assert.equal(refreshed.metadata.reason, 'answered');
-  assert.equal(readFileSync(calls, 'utf8').trim().split('\n').length, 2);
+  assert.equal(readFileSync(calls, 'utf8').trim().split('\n').length, demand ? 1 : 2);
   delete environment.HARNESS_SESSION;
 }
 
@@ -334,7 +339,7 @@ function verifyNativeEnvelope({ invoke, hooks, workspace, launcher, event }) {
 }
 
 /** Exercise procedure/source delivery and exact reuse through the shipped native hook. */
-function verifyRc10Delivery({ invoke, hooks, workspace, launcher, environment, temporary, event, presentation }) {
+function verifyRc10Delivery({ invoke, hooks, workspace, launcher, environment, temporary, event, presentation, demand }) {
   const profile = join(workspace, 'config/governance/profile.yaml'), before = readFileSync(profile), app = readFileSync(join(workspace, 'app.ts'));
   const guide = join(workspace, 'recovery.md'), assertion = join(workspace, 'app.test.ts'), calls = join(temporary, 'delivery-calls.jsonl'), preload = join(temporary, 'delivery-fixture.mjs');
   const oldSession = environment.HARNESS_SESSION, oldOptions = environment.NODE_OPTIONS, oldToken = environment.JEV_TOKEN;
@@ -362,12 +367,14 @@ function verifyRc10Delivery({ invoke, hooks, workspace, launcher, environment, t
       }))});};`);
     environment.JEV_TOKEN = 'fixture'; environment.NODE_OPTIONS = `--import ${pathToFileURL(preload).href}`; environment.HARNESS_SESSION = turn.session_id;
     const command = hooks.hooks.UserPromptSubmit[0].hooks[0].command, output = invoke('/bin/sh', ['-c', command], JSON.stringify(turn));
-    const text = output.hookSpecificOutput.additionalContext;
+    const nativeText = output.hookSpecificOutput.additionalContext;
+    const entry = promptEntryReference(nativeText, presentation); assert.ok(entry);
+    if (demand) { assert.equal(existsSync(calls), false); assert.doesNotMatch(nativeText, /Never delete the saved original run/); }
+    const selected = demand ? invoke(launcher, ['context-route', '--entry', entry, '--task', turn.prompt, '--retrieval', 'semantic', '--json']) : null;
+    const text = demand ? JSON.stringify(selected.optional.entries) : nativeText;
     assert.match(text, /Never delete the saved original run/); assert.match(text, /record.closed/); assert.match(text, /assert.equal/);
-    assert.ok(text.includes(JSON.stringify(readFileSync(join(workspace, 'app.ts'), 'utf8'))),
-      'The native profile allowance must deliver this complete source unit, which exceeds the default 3 KB slot');
-    assert.ok(Buffer.byteLength(text) > 8000, 'The normal hook must honor the declared envelope instead of a second 8 KB optional cap');
-    const entry = promptEntryReference(text, presentation); assert.ok(entry);
+    assert.ok(text.includes(JSON.stringify(readFileSync(join(workspace, 'app.ts'), 'utf8'))), 'The declared retrieval envelope preserves this complete source unit');
+    assert.ok(Buffer.byteLength(text) > 8000, 'The requested context honors the declared envelope');
     const count = () => readFileSync(calls, 'utf8').trim().split('\n').length, dispatched = count();
     assert.ok(dispatched >= 2);
     assert.deepEqual(invoke('/bin/sh', ['-c', command], JSON.stringify(turn)), output);
@@ -375,10 +382,16 @@ function verifyRc10Delivery({ invoke, hooks, workspace, launcher, environment, t
     assert.equal(count(), dispatched, 'A normal repeat and explicit replay cannot pay for another selection');
     writeFileSync(guide, readFileSync(guide, 'utf8') + '\nChanged current source.\n');
     const stale = spawnSync(launcher, ['context-route', '--entry', entry], { cwd: workspace, env: environment, encoding: 'utf8', timeout: 5000 });
-    assert.notEqual(stale.status, 0); assert.equal(JSON.parse(stale.stderr).code, 'entry-source-stale'); assert.equal(count(), dispatched);
+    if (demand) assert.equal(stale.status, 0, 'Optional edits cannot stale required-only native context');
+    else { assert.notEqual(stale.status, 0); assert.equal(JSON.parse(stale.stderr).code, 'entry-source-stale'); }
+    assert.equal(count(), dispatched);
     environment.JEV_TOKEN = '';
     const fallback = invoke('/bin/sh', ['-c', command], JSON.stringify({ ...turn, turn_id: 'delivery-fallback' }));
-    assert.match(fallback.hookSpecificOutput.additionalContext, /recovery.md/); assert.equal(count(), dispatched);
+    if (demand) {
+      const local = invoke(launcher, ['context-route', '--task', turn.prompt, '--retrieval', 'semantic', '--json']);
+      assert.equal(local.selection.retrieval.effective, 'local'); assert.ok(local.optional.entries.some(item => item.id === 'recovery.md'));
+    } else assert.match(fallback.hookSpecificOutput.additionalContext, /recovery.md/);
+    assert.equal(count(), dispatched);
   } finally {
     invoke('/bin/sh', ['-c', hooks.hooks.SessionEnd[0].hooks[0].command], JSON.stringify({ ...turn, hook_event_name: 'SessionEnd' }));
     writeFileSync(profile, before); writeFileSync(join(workspace, 'app.ts'), app); rmSync(guide, { force: true }); rmSync(assertion, { force: true });
@@ -435,13 +448,13 @@ export async function verifyRc6Prompt(packageRoot, archive, options = {}) {
     const event = { session_id: 'installed-host', turn_id: 'turn-one', hook_event_name: 'UserPromptSubmit', cwd: workspace, prompt: 'Fix the app launch.' };
     const output = invoke('/bin/sh', ['-c', handler.command], JSON.stringify(event));
     assert.equal(output.hookSpecificOutput.hookEventName, 'UserPromptSubmit');
-    assert.match(output.hookSpecificOutput.additionalContext, /app.ts/);
+    assert.match(output.hookSpecificOutput.additionalContext, usesRequestedContext(packageRoot) ? /Required current guidance/ : /app.ts/);
     const launcher = join(workspace, '.governance/runtime/bin/project-governance');
     verifyStopUsage({ temporary, event, invoke, hooks, launcher });
     const help = spawnSync(launcher, ['--help'], { cwd: workspace, env: environment, encoding: 'utf8', timeout: 5000 });
     assert.equal(help.status, 0, help.stderr);
     assert.match(help.stdout, /context-route/);
-    assert.equal(invoke(launcher, ['context-index', 'status']).status, 'present');
+    assert.equal(invoke(launcher, ['context-index', 'status']).status, usesRequestedContext(packageRoot) ? 'absent' : 'present');
     const wrongReceipts = join(temporary, 'wrong-startup.sqlite');
     const refusedStore = spawnSync(launcher, ['startup', 'observe', '--provider', 'codex', '--event-stdin', '--receipts', wrongReceipts],
       { cwd: workspace, env: environment, input: JSON.stringify(event), encoding: 'utf8', timeout: 5000 });
@@ -453,7 +466,7 @@ export async function verifyRc6Prompt(packageRoot, archive, options = {}) {
     assert.equal(doctor.documentation.status, 'configured');
     assert.deepEqual(doctor.documentation.activeLanguages, ['python', 'kotlin']);
     assert.ok(doctor.documentation.advisoryLanguages.includes('typescript'));
-    assert.equal(doctor.observations.documentation.status, 'observed-subset');
+    assert.equal(doctor.observations.documentation.status, usesRequestedContext(packageRoot) ? 'not-observed' : 'observed-subset');
     const status = invoke(launcher, ['telemetry', 'context', 'status']);
     assert.equal(status.counts['prompt-entries:prepared'], 1);
     assert.equal(status.avoidedTokens, null);
@@ -468,15 +481,16 @@ export async function verifyRc6Prompt(packageRoot, archive, options = {}) {
         consumers: { DL03: { mode: 'auto', questions: ['context.metadata-relevance/1'] } } } } }));
     environment.JEV_TOKEN = 'fixture'; environment.NODE_OPTIONS = `--import ${pathToFileURL(preload).href}`;
     const active = invoke('/bin/sh', ['-c', handler.command], JSON.stringify({ ...event, turn_id: 'turn-two', prompt: '- Repair app.ts' }));
-    assert.match(active.hookSpecificOutput.additionalContext, /app.ts/);
-    assert.equal(readFileSync(calls, 'utf8').trim().split('\n').length, 1);
-    verifyTaskSwitch({ invoke, launcher, workspace, environment, session: event.session_id, calls });
-    verifyRc10Delivery({ invoke, hooks, workspace, launcher, environment, temporary, event, presentation });
+    assert.match(active.hookSpecificOutput.additionalContext, usesRequestedContext(packageRoot) ? /optional retrieval was not requested/ : /app.ts/);
+    if (usesRequestedContext(packageRoot)) assert.equal(existsSync(calls), false);
+    else assert.equal(readFileSync(calls, 'utf8').trim().split('\n').length, 1);
+    verifyTaskSwitch({ invoke, launcher, workspace, environment, session: event.session_id, calls, demand: usesRequestedContext(packageRoot) });
+    verifyRc10Delivery({ invoke, hooks, workspace, launcher, environment, temporary, event, presentation, demand: usesRequestedContext(packageRoot) });
     const observed = invoke(launcher, ['telemetry', 'context', 'status']).documentation;
-    assert.equal(observed.status, 'observed-subset');
+    assert.equal(observed.status, usesRequestedContext(packageRoot) ? 'not-observed' : 'observed-subset');
     const appGap = observed.candidates.find(item => item.path === 'app.ts');
-    assert.ok(appGap, 'The changed app source remains in the documentation gap sample');
-    assert.match(appGap.sourceDigest, /^sha256:[a-f0-9]{64}$/u);
+    if (usesRequestedContext(packageRoot)) assert.equal(appGap, undefined, 'Required-only native entry does not claim optional documentation inspection');
+    else { assert.ok(appGap); assert.match(appGap.sourceDigest, /^sha256:[a-f0-9]{64}$/u); }
     delete environment.NODE_OPTIONS; environment.JEV_TOKEN = '';
     const { RuntimeGenerations, registry, readers, beforeReaders } = await verifyPromptReaderRecovery({
       packageRoot, temporary, workspace, environment });

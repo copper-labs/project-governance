@@ -64,17 +64,20 @@ test("edited source gives an exact same-turn recovery, preserving paid budget, o
   const id = f.entryId(), state = contextStateRoot(f.root), scope = contextFamilyScope(f.root, id);
   const entryPath = join(state, "prompt-entries", `${id}.json`), packetPath = join(state, "prompt-packets", `${id}.json`);
   const originalEntry = readFileSync(entryPath), originalPacket = readFileSync(packetPath);
+  await contextRouteCommand(["--entry", id, "--task", f.event.prompt, "--retrieval", "semantic"], f.root, assets, undefined, { session: "native" });
   const budget = readDecisionBudget(state, scope)!;
   assert.ok(calls > 0 && budget.calls > 0);
   const before = calls;
   writeFileSync(join(f.root, "parser.ts"), "export const parser='changed';\n");
+  assert.equal((await contextRouteCommand(["--entry", id], f.root, assets, undefined, { session: "native" })).ready, true, "Optional edits cannot stale a required-only native packet");
+  writeFileSync(join(f.root, "rules.md"), "Revised required cleanup instruction.\n");
   let failure: ContextRouteError | undefined;
   await assert.rejects(contextRouteCommand(["--entry", id], f.root, assets, undefined, { session: "native" }), (error: unknown) => {
     assert.ok(error instanceof ContextRouteError); failure = error;
     assert.equal(error.code, "entry-source-stale");
     assert.equal(error.diagnostic?.causeCode, "source-changed");
-    assert.equal(error.diagnostic?.sourceKind, "optional");
-    assert.equal(error.diagnostic?.sourcePathDigest, digest("parser.ts"));
+    assert.equal(error.diagnostic?.sourceKind, "required");
+    assert.equal(error.diagnostic?.sourcePathDigest, digest("rules.md"));
     const receipt = JSON.parse(readFileSync(error.receiptPath!, "utf8"));
     assert.equal(receipt.providerCalled, false); assert.equal(receipt.providerUsage, "not-called");
     assert.ok(!JSON.stringify(receipt).includes("parser.ts") && !JSON.stringify(receipt).includes("export const"));
@@ -86,7 +89,7 @@ test("edited source gives an exact same-turn recovery, preserving paid budget, o
   assert.deepEqual(recovery.requires, ["task"]);
   await assert.rejects(contextRouteCommand(recovery.arguments, f.root, assets, undefined, { session: "native" }));
   assert.equal(calls, before); assert.deepEqual(readDecisionBudget(state, scope), budget, "Incomplete instructions cannot occupy a paid expansion slot");
-  const args = [...recovery.arguments, "--task", f.event.prompt];
+  const args = [...recovery.arguments, "--task", f.event.prompt, "--retrieval", "semantic"];
   await assert.rejects(contextRouteCommand(args, f.root, assets, undefined, { session: "different-chat" }), /current observed entry/);
   assert.equal(calls, before);
   const refreshed = await contextRouteCommand(args, f.root, assets, undefined, { session: "native" });
@@ -98,7 +101,7 @@ test("edited source gives an exact same-turn recovery, preserving paid budget, o
   const duplicate = await contextRouteCommand(args, f.root, assets, undefined, { session: "native" });
   assert.equal(duplicate.expansion?.status, "duplicate"); assert.equal(calls, after);
   assert.equal(presentContextRoute(refreshed).nativeEntryReference!.reuses, "original-packet");
-  const final = await contextRouteCommand(["--entry", id, "--expansion", "2", "--task", "Inspect changed parser cleanup"], f.root, assets, undefined, { session: "native" });
+  const final = await contextRouteCommand(["--entry", id, "--expansion", "2", "--task", "Inspect changed parser cleanup", "--retrieval", "semantic"], f.root, assets, undefined, { session: "native" });
   assert.equal(final.expansion?.completed, true);
   const closedBudget = readDecisionBudget(state, scope), closedCalls = calls;
   writeFileSync(join(f.root, "parser.ts"), "export const parser='changed again';\n");
@@ -122,6 +125,7 @@ test("retained receipt corruption gets no source-refresh advice, and delegated r
   await promptContext("codex", f.event, f.root, { environment: {}, assetRoot: assets });
   const id = f.entryId(), packet = JSON.parse(readFileSync(join(contextStateRoot(f.root), "prompt-packets", `${id}.json`), "utf8"));
   writeFileSync(join(f.root, "parser.ts"), "export const parser='changed';\n");
+  writeFileSync(join(f.root, "rules.md"), "Changed required rule.\n");
   process.env.HARNESS_AGENT_ANCESTRY = "delegated-fixture";
   await assert.rejects(contextRouteCommand(["--entry", id], f.root, assets, undefined, { session: "native" }), (error: unknown) => {
     assert.ok(error instanceof ContextRouteError); assert.equal(error.code, "entry-source-stale");

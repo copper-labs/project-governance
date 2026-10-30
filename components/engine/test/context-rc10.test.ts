@@ -72,7 +72,7 @@ test("native packet reuse isolates two chats and sibling worktrees, with no fres
   await promptContext("codex", { ...event, session_id: "chat-b", turn_id: "b1" }, root, { environment: {}, assetRoot: assets });
   assert.equal((await contextRouteCommand(["--entry", entry.entryId], root, assets, provider, { session: "chat-a" })).reuse?.turn, "a1");
   writeFileSync(join(root, "parser.ts"), "export function parse() { return 'changed'; }\n");
-  await assert.rejects(contextRouteCommand(["--entry", entry.entryId], root, assets, provider, { session: "chat-a" }), refusal("entry-source-stale"));
+  assert.equal((await contextRouteCommand(["--entry", entry.entryId], root, assets, provider, { session: "chat-a" })).ready, true, "Optional source is not part of a required-only replay");
   await promptContext("codex", { ...event, turn_id: "a2" }, root, { environment: {}, assetRoot: assets });
   await assert.rejects(contextRouteCommand(["--entry", entry.entryId], root, assets, provider, { session: "chat-a" }), refusal("entry-superseded"));
   const current = entries().find(value => value.turn === "a2");
@@ -466,7 +466,7 @@ test("many procedure declarations share the capture window with ranked source ra
   writeFileSync(join(root, "config/governance/profile.yaml"), JSON.stringify({ context_router: { default_route: "project", default_context: ["rules.md"], procedure_sources: procedures, routes: [{ id: "project" }] },
     continuity: { decisions: { mode: "off", max_candidates: 64 } } }));
   git("add", "."); git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "fixture");
-  const packet = await contextRouteCommand(["--task", "Find source retaining the original result", "--revision", "1",
+  const packet = await contextRouteCommand(["--task", "Find procedure and source retaining the original result", "--revision", "1",
     ...explicit.flatMap(path => ["--optional-path", path])], root, resolve("src/project_governance_runtime/assets/skills"), {
       async decide(request) { return { version: 1, kind: request.kind, inputDigest: digest(request), delivered: request.candidates.map(item => item.id), suggested: null,
         method: "baseline", reason: "off", model: null, questionVersion: "baseline-1", confidence: null, latencyMs: 0, usage: { inputTokens: null, outputTokens: null } }; },
@@ -479,7 +479,7 @@ test("many procedure declarations share the capture window with ranked source ra
   assert.ok(packet.procedureReferences.some(item => item.status !== "delivered-complete-selected-sections"));
 });
 
-test("normal prompt entry delivers an approved procedure even when its file metadata score is low", async t => {
+test("explicit semantic retrieval delivers a locally matched procedure after free native entry", async t => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "rc10-native-procedure-"))), state = process.env.XDG_STATE_HOME, token = process.env.JEV_TOKEN, original = globalThis.fetch;
   process.env.XDG_STATE_HOME = join(root, "state"); process.env.JEV_TOKEN = "fixture";
   t.after(() => { globalThis.fetch = original; if (state === undefined) delete process.env.XDG_STATE_HOME; else process.env.XDG_STATE_HOME = state; if (token === undefined) delete process.env.JEV_TOKEN; else process.env.JEV_TOKEN = token; rmSync(root, { recursive: true, force: true }); });
@@ -497,14 +497,17 @@ test("normal prompt entry delivers an approved procedure even when its file meta
   };
   const assets = resolve("src/project_governance_runtime/assets/skills"), event = { hook_event_name: "UserPromptSubmit", session_id: "s", turn_id: "1", cwd: root, prompt: "Recover pending work safely" };
   const prepared = await promptContext("codex", event, root, { environment: {}, assetRoot: assets }), text = (prepared as any).hookSpecificOutput.additionalContext;
-  assert.match(text, /Preserve process ownership/); assert.match(text, /Keep the saved queue/); assert.match(text, /Drain pending work before replacing the owned worker/);
-  assert.equal(calls, 2); assert.deepEqual(await promptContext("codex", event, root, { environment: {}, assetRoot: assets }), prepared); assert.equal(calls, 2);
+  assert.match(text, /Preserve process ownership/); assert.doesNotMatch(text, /Keep the saved queue/); assert.equal(calls, 0);
+  assert.deepEqual(await promptContext("codex", event, root, { environment: {}, assetRoot: assets }), prepared);
+  const selected = await contextRouteCommand(["--retrieval", "semantic", "--task", "Inspect operations warm restart"], root, assets, undefined, { session: "s" });
+  assert.match(JSON.stringify(selected.optional), /Keep the saved queue/);
+  assert.match(JSON.stringify(selected.optional), /Drain pending work before replacing the owned worker/); assert.equal(calls, 2);
   delete process.env.JEV_TOKEN;
-  const fallback = await promptContext("codex", { ...event, turn_id: "2" }, root, { environment: {}, assetRoot: assets });
-  const local = (fallback as any).hookSpecificOutput.additionalContext;
-  assert.match(local, /Preserve process ownership/); assert.match(local, /docs\/operations.md/); assert.equal(calls, 2);
-  assert.match(local, /delivered-unconfirmed-sections/, "ordinary local evidence is not a positive procedure selection");
-  assert.doesNotMatch(local, /delivered-complete-selected-sections/);
+  await promptContext("codex", { ...event, turn_id: "2" }, root, { environment: {}, assetRoot: assets });
+  const fallback = await contextRouteCommand(["--retrieval", "semantic", "--task", "Inspect operations warm restart"], root, assets, undefined, { session: "s" });
+  assert.equal(calls, 2); assert.equal(fallback.selection.retrieval.effective, "local");
+  assert.match(JSON.stringify(fallback.procedureReferences), /delivered-unconfirmed-sections/);
+  assert.doesNotMatch(JSON.stringify(fallback.procedureReferences), /delivered-complete-selected-sections/);
 });
 
 test("several relevant guide sections cannot crowd out implementation and assertion evidence", async () => {

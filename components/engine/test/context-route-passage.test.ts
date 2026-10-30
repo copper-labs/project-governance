@@ -38,7 +38,7 @@ test("normal routing applies opted-in passage advice and links its source-free r
     return Response.json({ model: "jev-1.13.0", answers: Object.fromEntries(Object.keys(wire.questions)
       .map(name => [name, { type: "noul", noul: 0.95 }])) });
   };
-  const result = await contextRouteCommand(["--task", "Find proof that the selected simulator launches", "--revision", "1",
+  const result = await contextRouteCommand(["--retrieval", "semantic", "--task", "Find proof that the selected simulator launches", "--revision", "1",
     "--decision-task", "fixture-task"], root, resolve("src/project_governance_runtime/assets/skills"));
   assert.equal(result.ready, true); assert.equal(groups.length, 2);
   assert.ok(groups[0]?.every(name => name.startsWith("file-")));
@@ -56,7 +56,7 @@ test("normal routing applies opted-in passage advice and links its source-free r
   metadataOnly.continuity.decisions.allowed_data_classes = ["metadata"];
   writeFileSync(profilePath, JSON.stringify(metadataOnly));
   groups.length = 0;
-  const fallback = await contextRouteCommand(["--task", "Find proof that the selected simulator launches", "--revision", "1",
+  const fallback = await contextRouteCommand(["--retrieval", "semantic", "--task", "Find proof that the selected simulator launches", "--revision", "1",
     "--decision-task", "fixture-task"], root, resolve("src/project_governance_runtime/assets/skills"));
   assert.equal(groups.length, 1);
   assert.equal(fallback.selection.metadataStage.passageReserveMs, 0);

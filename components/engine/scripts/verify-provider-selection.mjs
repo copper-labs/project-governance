@@ -46,6 +46,7 @@ export async function verifyProviderSelection({ packageRoot, repo, temporary, ru
   authorizeProviderAssignment({ store: storePath, taskId: task.taskId, path, request });
   writeFileSync(requestPath, JSON.stringify({ ...request, admission: path }));
   const submitArgs = ['provider-submit', '--request', requestPath, '--directory', directory];
+  const selectionCalls = readFileSync(callsPath, "utf8");
   const submitted = run(submitArgs);
   const waited = run(['provider-wait', '--directory', directory, '--digest', submitted.requestDigest, '--milliseconds', '30000']);
   assert.equal(waited.receipt.state, 'succeeded');
@@ -53,7 +54,8 @@ export async function verifyProviderSelection({ packageRoot, repo, temporary, ru
   assert.ok(captured.includes('REQUIRED_CONTEXT_MARKER')); assert.ok(captured.includes('source.ts')); assert.ok(!captured.includes(source));
   const retained = JSON.parse(readFileSync(join(directory, 'request.json'), 'utf8'));
   assert.equal(retained.decisionBinding.context.status, 'prepared-for-native-input');
-  assert.ok(retained.decisionBinding.context.decisionReceipt);
+  assert.equal(retained.decisionBinding.context.decisionReceipt, null);
+  assert.equal(readFileSync(callsPath, "utf8"), selectionCalls, "Provider-job context is local by default");
   const before = readFileSync(callsPath, 'utf8');
   assert.equal(run(submitArgs).submitted, false); assert.equal(readFileSync(callsPath, 'utf8'), before);
   const readback = run(['provider-doctor', '--request', requestPath, '--directory', directory]);
@@ -64,7 +66,7 @@ export async function verifyProviderSelection({ packageRoot, repo, temporary, ru
   writeFileSync(requestPath, JSON.stringify({ ...fallback, admission: fallbackPath }));
   const next = run(['provider-submit', '--request', requestPath, '--directory', fallbackDirectory]);
   assert.equal(run(['provider-wait', '--directory', fallbackDirectory, '--digest', next.requestDigest, '--milliseconds', '30000']).receipt.state, 'succeeded');
-  assert.equal(JSON.parse(readFileSync(join(fallbackDirectory, 'request.json'), 'utf8')).decisionBinding.context.reason, 'missing-token');
+  assert.equal(JSON.parse(readFileSync(join(fallbackDirectory, 'request.json'), 'utf8')).decisionBinding.context.reason, 'local-requested');
   assert.equal(readFileSync(callsPath, 'utf8'), before);
   writeFileSync(requestPath, JSON.stringify({ ...request, id: 'local-only', dataDestination: 'local-only' }));
   const localPreview = run(['provider-doctor', '--request', requestPath, '--directory', join(trusted, 'local-only')], 1);

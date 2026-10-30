@@ -9,13 +9,14 @@ import { digest } from "../src/core.ts";
 
 test("a selected original above 1 MiB yields bounded evidence and retains whole-source freshness", async () => {
   const root = mkdtempSync(join(tmpdir(), "large-original-")), state = mkdtempSync(join(tmpdir(), "large-original-state-"));
+  const token = process.env.JEV_TOKEN; process.env.JEV_TOKEN = "fixture-only";
   const previous = process.env.XDG_STATE_HOME; process.env.XDG_STATE_HOME = state;
   const assets = resolve("src/project_governance_runtime/assets/skills");
   try {
     const git = (...args: string[]) => execFileSync("git", args, { cwd: root, stdio: "pipe" });
     git("init", "-q"); git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-m", "fixture");
     mkdirSync(join(root, "config/governance"), { recursive: true });
-    writeFileSync(join(root, "config/governance/profile.yaml"), JSON.stringify({ context_router: { default_route: "default", routes: [{ id: "default", primary_context: ["rules.md"] }] } }));
+    writeFileSync(join(root, "config/governance/profile.yaml"), JSON.stringify({ continuity: { decisions: { mode: "auto", allowed_data_classes: ["source"], allowed_source_paths: ["launch.ts"], consumers: { DL03: { mode: "auto" } } } }, context_router: { default_route: "default", routes: [{ id: "default", primary_context: ["rules.md"] }] } }));
     writeFileSync(join(root, "config/governance/facts.lock.yaml"), JSON.stringify({ facts: {} }));
     writeFileSync(join(root, "rules.md"), "Preserve required policy.\n");
     const source = "/*" + " ".repeat(1_100_000) + "*/\nexport function recoverLaunch() { return 'running'; }\n";
@@ -29,7 +30,7 @@ test("a selected original above 1 MiB yields bounded evidence and retains whole-
         suggested: null, method: "baseline" as const, reason: "fixture", model: null, questionVersion: "1", confidence: null,
         latencyMs: 0, usage: { inputTokens: null, outputTokens: null } };
     } };
-    const args = ["--task", "recover launch running", "--revision", "large", "--optional-path", "launch.ts"];
+    const args = ["--retrieval", "semantic", "--decision-task", "fixture-task", "--task", "recover launch running", "--revision", "large", "--optional-path", "launch.ts"];
     const packet = await contextRouteCommand(args, root, assets, provider);
     assert.equal(packet.ready, true); assert.equal(calls, 1);
     assert.equal(packet.entries[0]?.content, "Preserve required policy.\n");
@@ -40,6 +41,7 @@ test("a selected original above 1 MiB yields bounded evidence and retains whole-
     await assert.rejects(contextRouteCommand(args, root, assets, provider), error => (error as any).code === "stale-source");
     assert.equal(calls, 2);
   } finally {
+    if (token === undefined) delete process.env.JEV_TOKEN; else process.env.JEV_TOKEN = token;
     if (previous === undefined) delete process.env.XDG_STATE_HOME; else process.env.XDG_STATE_HOME = previous;
     rmSync(root, { recursive: true, force: true }); rmSync(state, { recursive: true, force: true });
   }

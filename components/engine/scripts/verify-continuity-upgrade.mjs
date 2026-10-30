@@ -244,6 +244,12 @@ export async function continuityUpgradeJourney({ packageRoot, temporary, workspa
     const observed = JSON.parse(readFileSync(join(stateRoot(item.root), 'prompt-entries', `${id}.json`), 'utf8'));
     assert.equal(observed.binding.taskId, item.task.taskId); assert.equal(observed.binding.attemptId, item.attempt.attemptId);
     assert.equal(packet.execution.nativeSession, session); assert.equal(packet.reuse.status, 'validated-entry-replay');
+    if (packet.selection.retrieval?.requested === 'none') {
+      assert.equal(packet.timing.indexMs, null);
+      const local = await command(item, ['context-route', '--task', 'Inspect local task implementation']);
+      assert.equal(local.selection.retrieval.requested, 'local');
+      assert.equal(local.selection.retrieval.providerAttempted, false);
+    }
     const index = await command(item, ['context-index', 'status']);
     assert.equal(index.status, 'present'); assert.equal(index.recordedWorkspace, item.root);
     item.indexLocator = index.recordedLocator;

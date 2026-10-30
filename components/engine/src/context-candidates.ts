@@ -40,6 +40,8 @@ export function automaticContextCandidates(subject: ValidationSubject, relevant:
   priority?: { purpose: string; exact: string[]; changed: string[]; ordered?: string[] }) {
   if (!Number.isSafeInteger(maximum) || maximum < 1 || maximum > 64) throw new Error("Invalid candidate limit");
   const excluded: Array<{ path: string; reason: string }> = [];
+  if (!relevant.length) return { paths: [], seeds: [], discovery: null, discoveryUnavailable: false, excluded, excludedCount: 0,
+    priorityPreview: [] as Array<{ path: string; exact: boolean; changed: boolean; taskTermMatches: number; disposition: string }>, inventoryCount: 0, omittedCount: 0 };
   const declared = declaredDocuments(subject);
   const dispositions = new Map<string, string>();
   let excludedCount = 0;

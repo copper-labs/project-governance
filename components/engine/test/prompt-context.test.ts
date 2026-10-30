@@ -68,7 +68,7 @@ test("mature task facts cannot displace an already-selected decisive original", 
   assert.equal(readFacts(oversized.text).task.status, facts.task!.status);
 });
 
-test("raw prompt delivers source before a task exists, then a follow-up reuses the exact host binding", async () => {
+test("raw prompt delivers required guidance before a task exists, then a follow-up reuses the exact host binding", async () => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "prompt-context-"))), old = process.env.XDG_STATE_HOME;
   process.env.XDG_STATE_HOME = join(root, "state");
   const assets = resolve("src/project_governance_runtime/assets/skills");
@@ -79,7 +79,7 @@ test("raw prompt delivers source before a task exists, then a follow-up reuses t
     writeFileSync(join(root, "parser.ts"), "export function parse() { return 'parsed'; }\n");
     const event = { hook_event_name: "UserPromptSubmit", session_id: "host-session", turn_id: "turn-1", cwd: root, prompt: "- Fix the parser unique-private-prompt\n- preserve tests" };
     const first = await promptContext("codex", event, root, { environment: {}, assetRoot: assets });
-    assert.match((first as any).hookSpecificOutput.additionalContext, /parser.ts/);
+    assert.doesNotMatch((first as any).hookSpecificOutput.additionalContext, /parser.ts/);
     assert.doesNotMatch((first as any).hookSpecificOutput.additionalContext, /JEV index coverage/);
     const folder = join(contextStateRoot(root), "prompt-entries");
     const saved = JSON.parse(readFileSync(join(folder, readdirSync(folder)[0]!), "utf8"));
@@ -97,7 +97,7 @@ test("raw prompt delivers source before a task exists, then a follow-up reuses t
     process.env.JEV_TOKEN = "fixture";
     try {
       const legacy = await promptContext("codex", { ...event, turn_id: "legacy-profile" }, root, { environment: {}, assetRoot: assets });
-      assert.match((legacy as any).hookSpecificOutput.additionalContext, /parser.ts/); assert.equal(legacyCalls, 0);
+      assert.doesNotMatch((legacy as any).hookSpecificOutput.additionalContext, /parser.ts/); assert.equal(legacyCalls, 0);
     } finally { globalThis.fetch = originalFetch; if (originalToken === undefined) delete process.env.JEV_TOKEN; else process.env.JEV_TOKEN = originalToken; }
     const store = new Store(defaultDbPath(root));
     const where = workContext(root);
@@ -106,22 +106,22 @@ test("raw prompt delivers source before a task exists, then a follow-up reuses t
     const workspace = store.workspace(where.locator, root);
     store.bind(task.taskId, "host-session", workspace, root); store.close();
     const next = await promptContext("codex", { ...event, turn_id: "turn-2", prompt: "Continue" }, root, { environment: {}, assetRoot: assets });
-    assert.match((next as any).hookSpecificOutput.additionalContext, /Historical background only/);
-    assert.match((next as any).hookSpecificOutput.additionalContext, new RegExp(prior.taskId));
+    assert.doesNotMatch((next as any).hookSpecificOutput.additionalContext, /Historical background only/);
+    assert.doesNotMatch((next as any).hookSpecificOutput.additionalContext, new RegExp(prior.taskId));
     const second = readdirSync(folder).map(name => JSON.parse(readFileSync(join(folder, name), "utf8"))).find(item => item.turn === "turn-2");
     assert.equal(second.binding.taskId, task.taskId); assert.equal(second.scopeKind, "bound-task");
     const priorContext = process.env.GOVERNANCE_DECISION_CONTEXT;
     process.env.GOVERNANCE_DECISION_CONTEXT = join(root, "stale-context.json");
     try {
       const resumed = await promptContext("codex", { ...event, turn_id: "turn-3", prompt: "Continue" }, root, { environment: {}, assetRoot: assets });
-      assert.match((resumed as any).hookSpecificOutput.additionalContext, /parser.ts/);
+      assert.doesNotMatch((resumed as any).hookSpecificOutput.additionalContext, /parser.ts/);
     } finally { if (priorContext === undefined) delete process.env.GOVERNANCE_DECISION_CONTEXT; else process.env.GOVERNANCE_DECISION_CONTEXT = priorContext; }
     assert.deepEqual(await promptContext("codex", { ...event, cwd: tmpdir() }, root, { environment: {} }), {});
     assert.deepEqual(await promptContext("codex", event, root, { environment: { GOVERNANCE_PARENT_TASK: "parent" } }), {});
     assert.deepEqual(await promptContext("codex", { ...event, turn_id: undefined }, root, { environment: {} }), {});
     assert.deepEqual(await promptContext("other", event, root, { environment: {} }), {});
     mkdirSync(join(root, "subdirectory"));
-    assert.match((await promptContext("codex", { ...event, turn_id: "subdirectory", cwd: join(root, "subdirectory") }, root, { environment: {}, assetRoot: assets }) as any).hookSpecificOutput.additionalContext, /parser.ts/);
+    assert.doesNotMatch((await promptContext("codex", { ...event, turn_id: "subdirectory", cwd: join(root, "subdirectory") }, root, { environment: {}, assetRoot: assets }) as any).hookSpecificOutput.additionalContext, /parser.ts/);
   } finally {
     if (old === undefined) delete process.env.XDG_STATE_HOME; else process.env.XDG_STATE_HOME = old;
     rmSync(root, { recursive: true, force: true });

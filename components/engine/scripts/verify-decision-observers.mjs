@@ -19,7 +19,7 @@ export async function verifyDecisionObservers({ packageRoot, repo, temporary, ru
     version: 1, id: 'inspect', workspace: repo, inputs: [], resources: [], stages: [{ id: 'inspect', operation: 'inspect', deadlineMs: 1000 }], deadlineMs: 2000, policyRevision: '1', claims: ['inspection'] } }] });
   git('add', 'config', 'rules.md', 'a.md', 'b.md');
   git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'Capture observer configuration');
-  const routed = run(['context-route', '--task', 'fix', '--revision', 'observer-1', '--decision-task', 'observer', '--optional-path', 'a.md', '--optional-path', 'b.md', '--workflow-candidates', 'config/governance/candidates.json']);
+  const routed = run(['context-route', '--retrieval', 'semantic', '--task', 'fix', '--revision', 'observer-1', '--decision-task', 'observer', '--optional-path', 'a.md', '--optional-path', 'b.md', '--workflow-candidates', 'config/governance/candidates.json']);
   assert.equal(routed.ready, true); assert.equal(routed.entries[0].content, 'Mandatory instructions remain');
   assert.equal(routed.presentation, 'selected-context'); assert.equal(routed.metadata?.catalog, undefined);
   assert.equal(routed.relevanceAdvice.delivered, true); assert.equal(routed.workflowAdvice.recommended.id, 'inspect');
@@ -83,7 +83,7 @@ export async function verifyDecisionObservers({ packageRoot, repo, temporary, ru
     assert.deepEqual(store.read(initial.id), before); assert.deepEqual(store.stages(initial.id), stages);
     const previousCalls = readFileSync(callsPath, 'utf8');
     delete environment.JEV_TOKEN;
-    const routeArgs = ['context-route', '--task', 'fix', '--revision', 'observer-1', '--decision-task', 'observer', '--optional-path', 'a.md', '--optional-path', 'b.md', '--workflow-candidates', 'config/governance/candidates.json'];
+    const routeArgs = ['context-route', '--retrieval', 'semantic', '--task', 'fix', '--revision', 'observer-1', '--decision-task', 'observer', '--optional-path', 'a.md', '--optional-path', 'b.md', '--workflow-candidates', 'config/governance/candidates.json'];
     const missingContext = run(routeArgs);
     assert.equal(missingContext.relevanceAdvice.delivered, false); assert.equal(missingContext.workflowAdvice.delivered, false);
     const missingProvider = run(['provider-status', ...providerArgs]);
