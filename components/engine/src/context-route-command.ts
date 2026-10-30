@@ -256,9 +256,8 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
   const settings = profileDecisionSettings(profile);
   const inventory = contextCandidateInventory(subject, pathScopes, scope.records.map(record => record.path));
   const paths = inventory.routingPaths;
-  // An unborn repository reports every installed and authored file as added. That is an
-  // inventory, not an operator pin: otherwise bootstrap instructions consume the first task.
-  const priorityPaths = scope.unborn ? requestedPaths ? pathScopes : binding.context?.sourcePaths ?? [] : pathScopes;
+  // Incidental Git changes are ranking signals. Only explicit routing/task paths are exact pins.
+  const priorityPaths = requestedPaths ? pathScopes : binding.context?.sourcePaths ?? [];
   const changedPriorities = scope.unborn ? [] : scope.records.map(record => record.path);
   const routingPaths={mode:requestedPaths?"explicit":emptyScope?"bound-task-empty-scope":binding.context?"bound-task":"captured-changes",paths};
   if (profile.context_router === undefined) throw new ContextRouteError("router-missing",
@@ -336,7 +335,8 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
     metadataRuntime, options.family?.scope ?? decisionScope, scope.subject_digest ?? digest(configDigests),
     options.family?.id ?? options.retrievalEvent ?? randomUUID(), options.signal, metadataDeadline, projection,
     options.family ? { id: options.family.id, revision: options.family.revision,
-      ...(admission?.previous ? { previous: admission.previous } : {}), replayOnly: admission?.replay ?? false } : undefined,
+      ...(admission?.previous ? { previous: admission.previous } : {}), replayOnly: admission?.replay ?? false,
+      expand: options.family.step > 0 && !options.family.automaticRefresh && !options.family.nativeSteering } : undefined,
     { deferBudgetClose: passageEligible, reservePassageBudget: passageEligible }) : null;
   if (passageEligible && metadata && !options.family && decisionScope) deferredInvocation = { scope: decisionScope, id: metadata.invocationId };
   failureCursor = metadata?.cursor ?? failureCursor;
@@ -480,7 +480,7 @@ async function capturedContextRoute(args: string[], root: string, assetRoot: str
       receiptIds: passageAdvice.decisions.map(item => item.receiptId).filter(Boolean) } : null,
     optionalOmissionReasons: optional?.omissionReasons ?? {},
     optionalJudgmentLimitations: optional?.judgmentLimitations ?? {},
-    automatic: { ...automatic, prefilter: "delivery after complete-inventory JEV assessment or explicit partial/fallback; source capture remains bounded" } };
+    automatic: { ...automatic, prefilter: "local ranked shortlist before bounded JEV advice; complete local inventory remains searchable" } };
   // Full decisions already have individual receipts. A normal command returns bounded previews,
   // never the entire index it was meant to keep out of the coding model's context.
   const metadataSummary = metadataReceiptPreview(metadata);

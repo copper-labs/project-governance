@@ -36,10 +36,11 @@ source candidate uses one 45-second operation, including preparation, admission,
 delivery. The managed prompt hook allows 55 seconds so host setup and fallback can complete;
 the additional host time does not extend provider selection or create a per-call timer.
 
-Omitted budgets for isolated context metadata/passage scopes resolve to 512 calls and 10 MiB of
-cumulative request bytes. Ordinary task consumers retain their 16-call/128-KiB defaults. Explicit
-project budgets remain authoritative; upgrading does not silently replace a smaller declaration.
-The settings owner permits a deliberate allowance up to 1,024 calls and 16 MiB. Per-request
+The [2026-10-29 bounded selection amendment](engine-4-1-context-quality.md#bounded-selection-amendment--2026-10-29)
+supersedes the original 512-call/10-MiB context defaults: isolated metadata/passage scopes now share
+at most eight calls and 128 KiB of cumulative request bytes. Tighter explicit project budgets
+remain authoritative; larger old declarations do not enlarge automatic context selection.
+Ordinary task consumers retain their existing defaults and explicit allowances. Per-request
 payload limits, sharing permissions, provider rate/concurrency, family lifetime, duplicate reuse
 and already-spent accounting remain separate existing boundaries. The budget store's 512 MiB file
 capacity is separate from provider-input allowances; retained history does not spend the current
@@ -53,9 +54,9 @@ packet follows subsequent edits. Revalidate captured sources before packet repla
 stale or unverified information cannot silently become current. An explicit refresh or the next
 fresh context request observes the changed worktree. Partial extraction stays visible.
 
-Cached descriptions avoid repeated local extraction. New prompts ordinarily require a new JEV
-relevance assessment; exact valid entry/family replay avoids duplicate provider work. Increasing
-this allowance does not establish cold-only spending, full coverage or measured savings. Published
+Cached descriptions avoid repeated local extraction. Changed semantic inputs require a new JEV
+relevance assessment; exact valid entry/family and standalone refresh reuse avoid duplicate provider
+work. A bounded window does not establish full coverage or measured accepted-work savings. Published
 older runtimes and adopter pins retain their previous behavior until deliberate release/adoption.
 
 ## Current owners and gaps

@@ -38,14 +38,14 @@ test("closed scopes preserve duplicate identities but cannot admit new events", 
   assert.equal(reserveDecisionCall(root, unusedScope, "late", 10, limits).state, "unavailable");
 });
 
-test("the default allowance funds more than eight MiB without renewing or losing byte accounting", t => {
+test("the default context ceiling retains cumulative byte accounting and duplicate reservations", t => {
   const { root, scope } = fixture(t), limits = profileDecisionSettings({}).contextBudget;
-  for (let index = 0; index < 160; index++)
-    assert.equal(reserveDecisionCall(root, scope, `batch-${index}`, 65536, limits).state, "reserved");
-  assert.deepEqual(readDecisionBudget(root, scope), { calls: 160, bytes: 10 * 1024 * 1024, reservations: 160 });
+  for (let index = 0; index < 8; index++)
+    assert.equal(reserveDecisionCall(root, scope, `batch-${index}`, 16384, limits).state, "reserved");
+  assert.deepEqual(readDecisionBudget(root, scope), { calls: 8, bytes: 128 * 1024, reservations: 8 });
   assert.equal(reserveDecisionCall(root, scope, "overflow", 1, limits).state, "exhausted");
-  assert.equal(reserveDecisionCall(root, scope, "batch-128", 65536, limits).state, "duplicate");
-  assert.equal(readDecisionBudget(root, scope)?.bytes, 10 * 1024 * 1024);
+  assert.equal(reserveDecisionCall(root, scope, "batch-4", 16384, limits).state, "duplicate");
+  assert.equal(readDecisionBudget(root, scope)?.bytes, 128 * 1024);
 });
 
 test("corrupt, incompatible and busy stores fail closed", t => {

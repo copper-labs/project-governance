@@ -46,7 +46,9 @@ installed pins, native conversations and normal hooks.
   status can be reported without permission to resume or accept work.
 - Use one versioned `plan-reference` task item, with exact path, batch and normalized definition digest.
   Parsed bookkeeping and explicitly marked commentary changes do not invalidate it; changed definitions do. Forks do not inherit an active batch.
-- Preserve whole permitted metadata availability and current generous allowances. No small per-call cap.
+- Preserve the full local inventory. The approved 2026-10-29 amendment bounds paid selection to a
+  64-candidate local window and eight-call/128-KiB shared context allowance; it supersedes generous
+  automatic whole-inventory traversal.
 - Supply status facts independently of JEV availability. Preserve full current intent and mixed requests.
 - Code owns progress bookkeeping, receipt joins and lint. The coding model remains fixed.
 - Changed input during one active native turn gets exact entry identity and shares the original
@@ -1076,3 +1078,33 @@ generic tool hiding, whole-transcript export, computer use or exhaustive device 
 
 Podcast reconciliation remains pending the intended harness transcript; unrelated medical transcripts
 contribute no design requirements and do not block this approved core planning work.
+
+## Bounded selection correction — 2026-10-29
+
+Operator approval covers the specification's bounded selection amendment. This is one coherent
+context-selection batch, separate from historical F0–F5 proof and other preview work. Retain the
+existing model, disclosure, entry/task, required-context and accounting owners.
+
+- Reproducer: synthetic 12,000-file inventory plus a late local index hit. Before the correction,
+  the focused regression submitted all 12,000 candidates (failed as expected).
+- Implementation: cap the paid candidate window; rank using the existing index/literal facts and
+  explicit paths; remove incidental-change pins; bound the shared context allowance; reuse exact
+  standalone input identities; advance discovery only through explicit continuation.
+- Checkpoint: run metadata/family/concurrency/settings regressions, then affected context entry,
+  packet, passage and projection integration tests and the root no-emit typecheck. Add a clean
+  installed-archive smoke test for this selection/settings boundary after source proof passes.
+- Review: freeze this owned diff for the already authorized Opus 5.5 high-effort read-only review.
+  Reconcile substantive findings with focused regression proof. Keep controlled fixture results
+  separate from passive adoption or accepted-development comparisons.
+- Release evaluation: qualify this correction individually against stable history before choosing
+  a release lane. Do not sweep unrelated preview changes into a patch or change adopter pins.
+- Status: source implementation and qualification complete. The initial 1,204-case engine
+  checkpoint had one obsolete allowance assertion and one provider-fixture teardown race; both
+  owners passed the 55-case affected recheck. Continuity passed 82 cases; scripts passed 142 with
+  five explicit skips. Final metadata/family/concurrency rechecks passed 26 cases. Opus 5.5 high
+  closed material findings; its low follow-ups received focused deterministic checks.
+- Final archive selection proof passed 13 installed cases plus native prompt and greenfield
+  journeys. Reuse the normal full verifier's originals for byte-identical owners, with an explicit
+  archive diff binding metadata execution/map and its dependent declarations to the final recheck.
+  Typecheck/build and source/archive correspondence pass. Ordinary acceptance and savings remain
+  unknown. Normal hooks and publication/readback are recorded against the final commit externally.

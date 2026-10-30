@@ -47,6 +47,8 @@ export interface DecisionAsk {
   budgetPartition?: "context-selection";
   budgetInvocationId?: string;
   budgetFamily?: boolean;
+  /** Read an exact retained decision after normal eligibility checks, without paid admission. */
+  replayOnly?: boolean;
   /** Monotonic deadline shared by all batches in one retrieval. */
   deadlineAt?: number;
   signal?: AbortSignal;
@@ -349,6 +351,7 @@ export class DecisionRuntime {
     if (retained && sameConfiguredDecisionProvider(retained.provider, base.provider) && retained.requestIdentity === identity && retained.payloadDigest === payloadDigestValue && ["reserved", "duplicate"].includes(retained.budget.state))
       return { ...retained, requestId, reason: Object.keys(retained.answers).length ? "repeated-observation" : `repeated-${retained.reason}`,
         receiptId: key, latencyMs: performance.now() - started };
+    if (ask.replayOnly) return { ...base, reason: "exact-replay-unavailable", latencyMs: performance.now() - started };
     // The reservation identity is the consumer-group event key, so one event cannot be spent twice.
     let admittedReservation: BudgetReservation | undefined;
     // Context selection has one operation deadline, including calls without an explicit caller cutoff.

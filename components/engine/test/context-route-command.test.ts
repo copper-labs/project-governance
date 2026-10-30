@@ -358,8 +358,8 @@ test("broad task scope admits a matching late path before the candidate cap", as
       "changed source retains a candidate slot ahead of unchanged path matches");
     assert.equal(packet.selection.automatic.priorityPreview[0]?.path, "docs/a29.md");
     assert.equal(packet.selection.automatic.priorityPreview[0]?.exact, true);
-    assert.equal(packet.selection.automatic.priorityPreview[1]?.path, "docs/a0.md");
-    assert.equal(packet.selection.automatic.priorityPreview[1]?.changed, true);
+    assert.equal(packet.selection.automatic.priorityPreview[1]?.path, target, "current indexed meaning precedes an incidental changed file");
+    assert.equal(packet.selection.automatic.priorityPreview.find(item => item.path === "docs/a0.md")?.changed, true);
     assert.equal(packet.selection.automatic.priorityPreview[0]?.disposition, "seeded");
     assert.equal(packet.selection.automatic.priorityPreview.find(item => item.path === "docs/binary.md")?.disposition,
       "source-unavailable-or-not-bounded-text");

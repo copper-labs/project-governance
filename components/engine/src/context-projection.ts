@@ -10,6 +10,7 @@ import { ProjectionStore, projectionIdentity, sourceFactId, type ProjectionFile 
 import { documentationConfig, documentationCatalog } from "./checkers/document-catalog.ts";
 import { CONTEXT_SELECTION_MS } from "./context-timing.ts";
 import { SOURCE_CAPTURE_MAX_BYTES, SOURCE_CAPTURE_BATCH_MAX_BYTES } from "./source-capture-limits.ts";
+import { contextTerms } from "./context-terms.ts";
 
 export interface ProjectionOptions { deadlineAt?: number; byteLimit?: number; factByteLimit?: number; rebuild?: boolean; extractor?: string; purpose?: string; exact?: string[] }
 
@@ -145,6 +146,16 @@ export function maintainContextProjection(subject: ValidationSubject, paths: str
     cache = published ? "published" : "index-publication-raced";
     if (published) search = store.search(generation, options.purpose ?? "");
   } catch (error) { cache = /full/i.test(String(error)) ? "index-capacity" : "index-publication-unavailable"; }
+  // Current in-memory facts keep retrieval useful when the persistent FTS index is unavailable.
+  const query = contextTerms(options.purpose ?? "");
+  const literalHits: Array<{ path: string; matches: number }> = [];
+  for (const [path, item] of entries) {
+    if (performance.now() >= deadlineAt) break;
+    const matches = [...contextTerms(item.text)].filter(term => query.has(term)).length;
+    if (matches) literalHits.push({ path, matches });
+  }
+  const literal = literalHits.sort((a, b) => b.matches - a.matches || a.path.localeCompare(b.path)).slice(0, 64).map(item => item.path);
+  search = [...new Set([...search, ...literal])].slice(0, 64);
   const safe = new Set(inventory), links: ResolvedSourceLink[] = [];
   for (const [path, fact] of byPath) for (const link of fact.links) {
     const resolution = resolveSourceLink(path, link, safe), target = resolution.resolved && byPath.get(resolution.resolved);

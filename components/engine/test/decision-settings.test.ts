@@ -34,12 +34,12 @@ test("unsupported effects and conflicting legacy/new declarations fail closed", 
   ]) assert.throws(() => profileDecisionSettings({ continuity: { decisions } }));
 });
 
-test("large context budgets default to ten MiB and preserve explicit project allowances", () => {
+test("context budgets bound legacy allowances while preserving smaller project limits", () => {
   const read = (budget?: unknown) => profileDecisionSettings({ continuity: { decisions: budget === undefined ? {} : { budget } } }).contextBudget;
-  assert.deepEqual(read(), { maxCalls: 512, maxRequestBytes: 10 * 1024 * 1024 });
-  assert.deepEqual(read({ max_calls: 256, max_request_bytes: 4194304 }), { maxCalls: 256, maxRequestBytes: 4194304 });
-  assert.deepEqual(read({ max_calls: 1024, max_request_bytes: 16 * 1024 * 1024 }), { maxCalls: 1024, maxRequestBytes: 16 * 1024 * 1024 });
-  assert.equal(read({ max_calls: 600 }).maxRequestBytes, 10 * 1024 * 1024);
+  assert.deepEqual(read(), { maxCalls: 8, maxRequestBytes: 128 * 1024 });
+  assert.deepEqual(read({ max_calls: 256, max_request_bytes: 4194304 }), { maxCalls: 8, maxRequestBytes: 128 * 1024 });
+  assert.deepEqual(read({ max_calls: 1024, max_request_bytes: 16 * 1024 * 1024 }), { maxCalls: 8, maxRequestBytes: 128 * 1024 });
+  assert.equal(read({ max_calls: 600 }).maxRequestBytes, 128 * 1024);
   assert.deepEqual(profileDecisionSettings({}).budget, { maxCalls: 16, maxRequestBytes: 128 * 1024 });
   for (const budget of [{ max_calls: 1025 }, { max_request_bytes: 16 * 1024 * 1024 + 1 }, { max_request_bytes: 1023 }, { max_calls: 1.5 }])
     assert.throws(() => read(budget), /Invalid decision budget bounds/);

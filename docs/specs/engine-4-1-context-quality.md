@@ -26,6 +26,64 @@ from older installations identifies cases to reproduce; it is not evidence of a 
 
 ## Current behavior and proposed change
 
+### Bounded selection amendment — 2026-10-29
+
+The operator approved replacing automatic whole-inventory paid assessment with local retrieval
+followed by bounded semantic advice. This supersedes earlier complete-inventory traversal and
+generous context allowance requirements in RC6/RC10 and the original 4.1 plan. The full safe local
+inventory remains searchable; a small paid window is not a claim of repository-wide coverage.
+
+Use the existing exact paths, literal source facts, symbols, full-text index and verified links to
+rank candidates locally. Explicit task paths lead; incidental changed files are ranking signals,
+not thousands of implicit pins. Assess at most 64 candidates per selection window. If local search
+has few clues, remaining slots use deterministic local fallback order, never a random full sweep.
+Required routed context remains outside optional selection. An explicit continuation may inspect
+the next window, including misleadingly named and previously unassessed files; normal refresh and
+unchanged replay do not advance that window automatically.
+
+Metadata, passage advice and continuations share at most eight calls and 128 KiB of serialized
+request bytes per existing accounting family/invocation. Tighter declared limits apply. Larger old
+profile allowances do not enlarge this automatic context ceiling or change ordinary consumer
+allowances. Admission and duplicate accounting keep their existing transactional owner. Budget
+exhaustion yields usable local context and an explicit unassessed remainder.
+
+Exact standalone refreshes also retain their paid identity across invocation labels when task,
+source/projection, complete supplied batch, purpose, question, model, layout and permissions are
+unchanged. Changed task intent or evidence invalidates incompatible answers. A file digest alone
+does not qualify reuse. Do not add a cross-task answer cache or a second accounting store.
+
+An exact standalone replay does not mint a retry allowance after a paid failure or partial closed
+invocation. Report `exact-input-retained-failure` with its original reason, or `exact-input-closed`,
+rather than a misleading generic store failure. Local context remains usable. A normal new native
+entry uses its existing fresh family, and an available explicit continuation uses that family's
+remaining allowance. This deliberate no-charge fallback preserves immutable outcomes without an
+automatic paid retry loop. Existing continuation admission still allows at most two steps; task
+refresh can consume those same slots. Do not promise unrestricted full-inventory continuation.
+
+Source-sharing consent also gates using content-derived index priority to choose transmitted
+paths. Metadata-only consent permits path-based selection; local content clues may still rank
+the local packet. Deadline-bound local descriptor search as well as extraction. Partial index
+progress changes semantic inputs and may prevent exact replay; practical reuse rates remain unknown.
+
+Report the selection window, its completion and full-inventory unassessed counts separately.
+Keep local extraction/reuse distinct from transmitted descriptions and paid answer reuse. Fewer
+requests are a spending bound, not demonstrated useful context or accepted-work savings.
+
+Qualification uses a large synthetic repository, a late indexed source, explicit expansion, exact
+repeat, changed purpose/evidence/permissions, required context, fallback and shared-budget cases.
+Provider probes and real developer acceptance are separate evidence. The initial constants remain
+subject to labelled useful-evidence and accepted-outcome comparisons.
+
+Research basis: [Anthropic's retrieval/reranking implementation](https://www.anthropic.com/research/contextual-retrieval)
+(published 2024-09-19) retrieves candidates before reranking. The first-party
+[Clairevue JEV experiment](https://signals.clairevue.ai/articles/building-semantic-search)
+(published 2026-10-07) reports lower query usage with a shortlist but missed relevant matches and
+batch-sensitive scores. These support staged selection, explicit expansion and whole-input reuse
+identity; neither establishes our numeric limits or useful-outcome equivalence. Reviewed 2026-10-29;
+no separate update date was shown. Keep model defaults, thresholds and disclosure permissions.
+
+### Original 4.1 behavior
+
 The qualified prompt adapter currently treats a progress question as an ordinary new retrieval
 request. Code verifies the native session/worktree and resolves an existing task binding. The
 complete current prompt is the retrieval request; the bound task's goal and acceptance criteria

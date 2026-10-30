@@ -44,11 +44,11 @@ test("JEV dispatch survives accumulated history and physical capacity failures r
   assert.equal(recovered.reason, "answered"); assert.equal(recovered.budget.calls, 3); assert.equal(calls, 3);
 });
 
-test("larger context defaults stay in isolated scopes and explicit budgets still constrain both", async t => {
+test("bounded context defaults stay isolated from ordinary allowances and respect smaller declarations", async t => {
   const root = mkdtempSync(join(tmpdir(), "decision-scopes-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   for (const [name, declared, ordinaryCalls, contextCalls] of [
-    ["default", undefined, 16, 17], ["explicit", { max_calls: 2, max_request_bytes: 4096 }, 2, 2],
+    ["default", undefined, 16, 8], ["explicit", { max_calls: 2, max_request_bytes: 4096 }, 2, 2],
   ] as const) {
     const settings = profileDecisionSettings({ continuity: { decisions: { mode: "auto",
       ...(declared ? { budget: declared } : {}), allowed_data_classes: ["source", "metadata"],
@@ -70,7 +70,7 @@ test("larger context defaults stay in isolated scopes and explicit budgets still
         assert.equal(outcome.delivered, true);
         assert.deepEqual(outcome.budget.limits, context ? settings.contextBudget : settings.budget);
       }
-      if (!context || declared) assert.equal((await runtime.ask({ ...ask, eventId: `${context}-overflow` })).reason, "budget-exhausted");
+      assert.equal((await runtime.ask({ ...ask, eventId: `${context}-overflow` })).reason, "budget-exhausted");
       assert.equal(readDecisionBudget(root, context ? contextBudgetScope(scope, invocation) : scope)?.calls, expectedCalls);
     }
   }

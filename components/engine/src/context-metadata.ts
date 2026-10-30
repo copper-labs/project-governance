@@ -12,13 +12,13 @@ import { prepareDecisionRequest } from "./decision-request-preparation.ts";
 import { PROVIDER_CONCURRENCY } from "./decision-admission.ts";
 import { DECISION_QUESTIONS } from "./decision-catalog.ts";
 import { maintainContextProjection } from "./context-projection.ts";
-import { MAX_DECISION_BUDGET } from "./decision-settings.ts";
+import { CONTEXT_METADATA_WINDOW } from "./context-limits.ts";
 
 const BATCH_SIZE = METADATA_MAX_QUESTIONS;
 import { contextTerms } from "./context-terms.ts";
 
-export interface MetadataCursor { version: 1; generation: string; batches: Array<{ paths: string[]; signature: string; outcome: DecisionOutcome }> }
-export interface MetadataFamily { id: string; revision: string; previous?: MetadataCursor; replayOnly?: boolean }
+export interface MetadataCursor { version: 1; generation: string; window?: string[]; batches: Array<{ paths: string[]; signature: string; outcome: DecisionOutcome }> }
+export interface MetadataFamily { id: string; revision: string; previous?: MetadataCursor; replayOnly?: boolean; expand?: boolean }
 
 /** Mutate the two remaining queues only after honoring the per-item and shared batch limits. */
 export function packMetadataBatch(priorities: string[], general: string[], items: Map<string, EvidenceItem>,
@@ -49,9 +49,9 @@ function sourceIndexObservation(projection: ReturnType<typeof maintainContextPro
       status: documentation.inspectedCount ? "observed-subset" : "not-observed" }, ...projection.status };
 }
 
-/** Keep the complete eligible inventory. This ordering is fallback advice, never JEV eligibility. */
+/** Keep every local path available, while paid selection uses a bounded window of local results. */
 export function contextMetadataCatalog(paths: string[], purpose: string, exact: string[], changed: string[], required: Set<string>, historyHints: string[] = [], declared?: ReadonlySet<string>) {
-  const query = contextTerms(purpose), exactSet = new Set(exact), changedSet = new Set(changed), pinned = new Set([...exact, ...changed]);
+  const query = contextTerms(purpose), exactSet = new Set(exact), changedSet = new Set(changed), pinned = exactSet;
   const unique = [...new Set(paths)];
   const excluded = unique.filter(path => !required.has(path) && !automaticContextPath(path, declared));
   const safe = unique.filter(path => !required.has(path) && automaticContextPath(path, declared));
@@ -66,7 +66,7 @@ export function contextMetadataCatalog(paths: string[], purpose: string, exact: 
     candidates: ranked };
 }
 
-/** Full permitted inventory stays independent of lexical hits; family replay binds the whole batch. */
+/** Retrieve locally before semantic advice; replay still binds the complete transmitted batch. */
 export async function selectContextMetadata(subject: ValidationSubject, catalog: ReturnType<typeof contextMetadataCatalog>,
   purpose: string, runtime: DecisionRuntime, scope: BudgetScope | null, subjectDigest: string,
   eventId: string, signal?: AbortSignal, deadlineAt = performance.now() + CONTEXT_SELECTION_MS, projection?: ReturnType<typeof maintainContextProjection>, family?: MetadataFamily, evaluation: { concurrency?: number; layout?: "compact-v1" | "shared-v1" | "per-question-v1"; deferBudgetClose?: boolean; reservePassageBudget?: boolean } = {}) {
@@ -81,8 +81,19 @@ export async function selectContextMetadata(subject: ValidationSubject, catalog:
     try { if (subject.source(path)?.file_type !== "regular") throw new Error(); assessable.push(path); }
     catch { excluded.push({ path, reason: "source-unavailable" }); }
   }
-  const invocationId = family?.id ?? digest({ eventId, scope, subjectDigest, catalog: digest(baseline), purpose, configuration: runtime.settings.configDigest }).slice(7);
   projection ??= maintainContextProjection(subject, baseline, runtime.stateRoot, { purpose, deadlineAt });
+  const localPriority = new Map(projection.priority.map((path, index) => [path, index]));
+  const rank = (priority: ReadonlyMap<string, number>) => [...catalog.candidates].sort((a, b) => Number(b.exact) - Number(a.exact) ||
+    (priority.get(a.path) ?? Infinity) - (priority.get(b.path) ?? Infinity) || b.matches - a.matches ||
+    Number(b.changed) - Number(a.changed) || Number(b.historyHint) - Number(a.historyHint) || a.path.localeCompare(b.path));
+  baseline.splice(0, baseline.length, ...rank(localPriority).map(item => item.path));
+  // Selecting a path can itself disclose a content-derived clue. Source consent also gates that signal.
+  const disclosedPriority = new Map([...localPriority].filter(([path]) => runtime.settings.legacy.allowedDataClasses.includes("source") &&
+    matchesPackPath(path, runtime.settings.legacy.allowedSourcePaths ?? [])));
+  const paidOrder = rank(disclosedPriority).map(item => item.path);
+  // Explicit refresh labels are observations, not new paid semantic input identities.
+  const invocationId = family?.id ?? digest({ scope, subjectDigest, catalog: digest(baseline), purpose,
+    projection: projection.generation, layout, configuration: runtime.settings.configDigest }).slice(7);
   const detailAllowed = enabled && runtime.settings.mode !== "off" && runtime.settings.consumers.DL03.mode !== "off" &&
     !runtime.eligibility("DL03").reasons.includes("missing-token") && runtime.settings.legacy.allowedDataClasses.includes("metadata") && runtime.settings.legacy.allowedDataClasses.includes("source");
   const descriptionOmissions: string[] = [], unfittable: string[] = [];
@@ -108,7 +119,7 @@ export async function selectContextMetadata(subject: ValidationSubject, catalog:
     itemByPath.set(path, item);
   }
   const coverageFor = (paths: string[]) => ({ captured: paths.length, omitted: [], unavailable: excluded.slice(0, 64).map(item => item.path), truncated: assessable.length !== paths.length,
-    limits: ["complete-inventory-batched", `maximum-${METADATA_MAX_QUESTIONS}-questions-per-batch`, paths.some(path => itemByPath.get(path)?.text !== path) ? "approved-source-descriptions" : "paths-only"] });
+    limits: ["local-ranked-window-v1", `maximum-${CONTEXT_METADATA_WINDOW}-candidates-per-window`, `maximum-${METADATA_MAX_QUESTIONS}-questions-per-batch`, paths.some(path => itemByPath.get(path)?.text !== path) ? "approved-source-descriptions" : "paths-only"] });
   const signature = (paths: string[]) => digest({ paths, evidence: [purposeItem, ...paths.map(path => itemByPath.get(path))],
     layout, coverage: coverageFor(paths), configuration: runtime.settings.configDigest, revision: family?.revision ?? scope?.taskRevision ?? "unbound", question: definition });
   const cursor: MetadataCursor = { version: 1, generation: projection.generation, batches: [] };
@@ -137,10 +148,13 @@ export async function selectContextMetadata(subject: ValidationSubject, catalog:
       apply(batch.paths, batch.outcome); cursor.batches.push(batch); replayedBatches++;
     } else invalidatedBatches++;
   }
-  const prioritySet = new Set([...catalog.candidates.filter(item => item.pinned || item.matches || item.historyHint).map(item => item.path), ...projection.priority]);
-  const priorities = assessable.filter(path => !visited.has(path) && prioritySet.has(path));
-  const general = assessable.filter(path => !visited.has(path) && !prioritySet.has(path))
-    .map(path => ({ path, hash: digest({ eventId: family?.id ?? eventId, path }) })).sort((a, b) => a.hash.localeCompare(b.hash)).map(item => item.path);
+  const prioritySet = new Set([...catalog.candidates.filter(item => item.pinned || item.matches || item.historyHint).map(item => item.path), ...disclosedPriority.keys()]);
+  const window = family?.replayOnly && family.previous?.window
+    ? family.previous.window.filter(path => permitted.has(path)).slice(0, CONTEXT_METADATA_WINDOW)
+    : paidOrder.filter(path => permitted.has(path) && (!family?.expand || !visited.has(path))).slice(0, CONTEXT_METADATA_WINDOW);
+  cursor.window = window;
+  const priorities = window.filter(path => !visited.has(path) && prioritySet.has(path));
+  const general = window.filter(path => !visited.has(path) && !prioritySet.has(path));
   let priorityAssessed = 0, generalAssessed = 0;
   const reserveCalls = evaluation.reservePassageBudget && runtime.eligibility("DL03", "context.metadata-relevance/1").providerUse === "eligible"
     ? Math.min(2, runtime.settings.contextBudget.maxCalls - 1) : 0;
@@ -149,9 +163,10 @@ export async function selectContextMetadata(subject: ValidationSubject, catalog:
   const metadataCallCeiling = runtime.settings.contextBudget.maxCalls - reserveCalls;
   const spent = scope ? readDecisionBudget(runtime.stateRoot, family
     ? contextFamilyScope(scope.workspace, invocationId) : contextBudgetScope(scope, invocationId)) : null;
-  // Receipt counters are cumulative. The store also includes earlier passage calls in a family.
-  let claimedBytes = Math.max(spent?.bytes ?? 0, ...(family?.previous?.batches ?? []).map(batch => batch.outcome.budget.bytes ?? 0));
-  let claimedCalls = Math.max(spent?.calls ?? 0, ...(family?.previous?.batches ?? []).map(batch => batch.outcome.budget.calls ?? 0));
+  // Families plan against actual cumulative spend. Standalone replay reconstructs the original
+  // split from zero; transactional admission still prohibits new work in a closed invocation.
+  let claimedBytes = family ? Math.max(spent?.bytes ?? 0, ...(family.previous?.batches ?? []).map(batch => batch.outcome.budget.bytes ?? 0)) : 0;
+  let claimedCalls = family ? Math.max(spent?.calls ?? 0, ...(family.previous?.batches ?? []).map(batch => batch.outcome.budget.calls ?? 0)) : 0;
   let reason = enabled ? assessable.length ? "not-attempted" : "metadata-scope-disabled" : "metadata-question-disabled";
   const controller = new AbortController(), cancel = () => controller.abort(signal?.reason);
   if (signal?.aborted) cancel(); else signal?.addEventListener("abort", cancel, { once: true });
@@ -184,11 +199,12 @@ export async function selectContextMetadata(subject: ValidationSubject, catalog:
     }
   }
   const preflight = { remainingInventoryCount: priorities.length + general.length, requestBytes: forecastBytes, requestCalls: forecastCalls,
-    alreadySpentBytes: claimedBytes, alreadySpentCalls: claimedCalls, familyByteLimit: runtime.settings.contextBudget.maxRequestBytes,
+    alreadySpentBytes: spent?.bytes ?? claimedBytes, alreadySpentCalls: spent?.calls ?? claimedCalls,
+    planningBasis: family ? "shared-remaining-allowance" : "standalone-split-reconstruction", familyByteLimit: runtime.settings.contextBudget.maxRequestBytes,
     metadataByteCeiling, metadataCallCeiling, fitsBytes: claimedBytes + forecastBytes <= metadataByteCeiling,
     fitsCalls: claimedCalls + forecastCalls <= metadataCallCeiling, unrepresentableCount: forecastUnrepresentable,
     operationRemainingMs: Math.max(0, deadlineAt - performance.now()), latencyQualification: "not-established",
-    recommendation: claimedBytes + forecastBytes > metadataByteCeiling ? `explicit-byte-allowance-required-within-${MAX_DECISION_BUDGET.maxRequestBytes}-ceiling` : null };
+    recommendation: claimedBytes + forecastBytes > metadataByteCeiling ? "use-local-results-or-expand-within-remaining-allowance" : null };
   const requeue = (paths: string[]) => {
     priorities.unshift(...paths.filter(path => prioritySet.has(path)));
     general.unshift(...paths.filter(path => !prioritySet.has(path)));
@@ -224,7 +240,32 @@ export async function selectContextMetadata(subject: ValidationSubject, catalog:
       if (!batch.length) { reason = "input-budget"; continue; }
       if (controller.signal.aborted || performance.now() >= deadlineAt) { requeue(batch); stop = true; break; }
       if (reserveBytes) {
-        const prepared = prepareDecisionRequest(askFor(batch), runtime.settings, ["DL03"], "budget-planning", runtime.settings.contextBudget);
+        // Reuse costs nothing; it must precede either sizing or claiming paid capacity.
+        const retained = await runtime.ask({ ...askFor(batch), replayOnly: true });
+        if (retained.reason.startsWith("repeated-")) {
+          if (!family) {
+            const original = prepareDecisionRequest(askFor(batch), runtime.settings, ["DL03"], "replay-planning", runtime.settings.contextBudget);
+            if (original.ok) { claimedBytes += original.requestBytes; claimedCalls++; }
+          }
+          completed[nextBatch++] = { paths: batch, signature: signature(batch), outcome: retained };
+          if (!retained.delivered && !["shadow", "repeated-observation", "no-usable-answers"].includes(retained.reason) && retained.failureStage !== "answer-validation") stop = true;
+          continue;
+        }
+        if (stop) { requeue(batch); break; }
+        let prepared = prepareDecisionRequest(askFor(batch), runtime.settings, ["DL03"], "budget-planning", runtime.settings.contextBudget);
+        const remainingBytes = Math.max(0, metadataByteCeiling - claimedBytes);
+        if (prepared.ok && prepared.requestBytes > remainingBytes) {
+          let low = 0, high = batch.length - 1;
+          while (low < high) {
+            const middle = Math.ceil((low + high) / 2);
+            const trial = prepareDecisionRequest(askFor(batch.slice(0, middle)), runtime.settings, ["DL03"], "budget-planning", runtime.settings.contextBudget);
+            if (trial.ok && trial.requestBytes <= remainingBytes) low = middle; else high = middle - 1;
+          }
+          if (low) {
+            requeue(batch.slice(low)); batch = batch.slice(0, low);
+            prepared = prepareDecisionRequest(askFor(batch), runtime.settings, ["DL03"], "budget-planning", runtime.settings.contextBudget);
+          }
+        }
         if (!prepared.ok || claimedBytes + prepared.requestBytes > metadataByteCeiling || claimedCalls + 1 > metadataCallCeiling) {
           requeue(batch); reason = "passage-reserved-budget"; stop = true; break;
         }
@@ -258,9 +299,8 @@ export async function selectContextMetadata(subject: ValidationSubject, catalog:
     }
     const failure = completed.find(batch => batch && !batch.outcome.delivered && !["shadow", "repeated-observation"].includes(batch.outcome.reason));
     reason = signal?.aborted ? "cancelled" : performance.now() >= deadlineAt ? "deadline"
-      : reason === "passage-reserved-budget" ? reason
       : settled.some(item => item.status === "rejected") ? "selection-unavailable"
-      : failure?.outcome.reason ?? completed.at(-1)?.outcome.reason ?? reason;
+      : failure?.outcome.reason ?? (reason === "passage-reserved-budget" ? reason : completed.at(-1)?.outcome.reason ?? reason);
   } finally {
     clearTimeout(cutoff); signal?.removeEventListener("abort", cancel);
     if (!family && scope && !evaluation.deferBudgetClose && decisions.some(item => ["reserved", "duplicate"].includes(item.budget.state)))
@@ -268,6 +308,9 @@ export async function selectContextMetadata(subject: ValidationSubject, catalog:
   }
   if (!priorities.length && !general.length && reason === "not-attempted" && replayedBatches) reason = "exact-batch-replay";
   if (unfittable.length && answered.size < assessable.length && ["answered", "shadow", "repeated-observation"].includes(reason)) reason = "input-budget";
+  const retainedOutcomeReason = !family && reason.startsWith("repeated-") && reason !== "repeated-observation" ? reason : null;
+  if (retainedOutcomeReason) reason = "exact-input-retained-failure";
+  else if (!family && spent && reason === "budget-unavailable") reason = "exact-input-closed";
   const pinned = new Set(catalog.candidates.filter(item => item.pinned).map(item => item.path));
   const relevant = baseline.filter(path => !pinned.has(path) && positive.has(path))
     .sort((a, b) => positive.get(b)! - positive.get(a)! || a.localeCompare(b));
@@ -279,9 +322,12 @@ export async function selectContextMetadata(subject: ValidationSubject, catalog:
   const order = [...baseline.filter(path => pinned.has(path)), ...relevant, ...tentative,
     ...baseline.filter(path => !pinned.has(path) && !positive.has(path) && !uncertain.has(path))];
   const coverage = { eligibleCount: baseline.length, permittedCount: assessable.length, submittedCount: assessed.size, answeredCount: answered.size,
+    selectionScope: "local-ranked-window", windowLimit: CONTEXT_METADATA_WINDOW, windowCandidateCount: window.length,
+    windowComplete: window.length > 0 && window.every(path => answered.has(path)),
+    retainedOutcomeReason,
     unassessedCount: assessable.length - answered.size, notPermittedCount: notPermitted, unavailableCount: excluded.length,
     unfittableCount: unfittable.length, complete: answered.size === assessable.length && assessable.length > 0, inventoryComplete: answered.size === baseline.length, reason, attempted: assessed.size > 0,
-    applied, mode: decisions[0]?.mode ?? "off", traversalStart: parseInt(digest({ eventId }).slice(7, 15), 16),
+    applied, mode: decisions[0]?.mode ?? "off",
     priorityAssessed, generalAssessed, replayedBatches, invalidatedBatches,
     passageReservedBytes: reserveBytes, metadataByteCeiling, passageReservedCalls: reserveCalls, metadataCallCeiling };
   return { version: 3, catalog, order, reason, assessed: [...assessed], metadataPermittedCount: assessable.length, coverage, preflight, cursor,

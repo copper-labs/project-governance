@@ -303,11 +303,12 @@ to JEV state. Each hosted candidate independently passes path/descriptor permiss
 disclosing an unapproved endpoint through a locally approved relationship.
 
 Search exact paths, symbols and descriptor text across the complete local eligible projection.
-Verified relationships are an additional route. These results improve deterministic fallback and
-help select spans; they are not a relevance filter deciding which paths JEV is allowed to assess.
-The independent JEV discovery traversal retains the complete metadata-approved inventory before
-packet, seed, keyword, directory or task-scope relevance caps. Required route applicability and
-hosted permissions keep their existing deterministic owners.
+Verified relationships are an additional route. Under the approved
+[2026-10-29 bounded selection amendment](engine-4-1-context-quality.md#bounded-selection-amendment--2026-10-29),
+these local results select a window of at most 64 candidates for paid assessment. The full local
+inventory remains available to explicit expansion. This supersedes RC6's original independent
+whole-inventory paid traversal. Required route applicability and hosted permissions retain their
+existing deterministic owners.
 
 Use the existing DL03 `context.metadata-relevance/1` question, shared purpose per batch, conservative
 positive-answer interpretation and provider health/budget owner. Ask one relevance question per
@@ -321,12 +322,10 @@ task revision, source metadata/digests, permission/config version, model/questio
 shape. Do not reuse a prior turn's answers merely because files are unchanged.
 
 Budget/deadline exhaustion must expose assessed, unanswered, unvisited, unsupported and
-outside-sharing-scope counts separately. Do not report unvisited files as JEV rejections. Keep the
-stable hash-derived order for the general inventory, but interleave it with exact/descriptor/link
-hits: while the general remainder exists, at most half each batch's slots come from the priority
-stream. Fill unused priority slots from the remainder and deduplicate identities. This changes
-assessment order, not eligibility, and prevents either a random-only scan or lexical hits from
-consuming every slot. Record priority/remainder assessed counts and the complete unvisited remainder.
+outside-sharing-scope counts separately. Do not report unvisited files as JEV rejections. Keep
+deterministic local rank for the general remainder. The existing packer may interleave priority
+and fallback items inside the selected window; it cannot pull extra items from the full inventory.
+Record priority/remainder assessed counts, window completion and the full unassessed remainder.
 The cursor stores its generation and exact completed batch receipts. It reconstructs the complete
 unvisited remainder from the current permitted inventory rather than storing a second path list;
 repeated requests must not silently rescan the same prefix. No low score or empty partial result proves absence of a useful source.

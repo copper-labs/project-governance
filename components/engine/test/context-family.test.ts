@@ -106,7 +106,8 @@ test("unchanged complete batches replay; edits invalidate the whole affected bat
   const firstCalls = calls;
   const replay = await selectContextMetadata(subject, catalog, "mechanism", runtime, scope, digest("subject"), family, undefined, performance.now() + 5000, undefined,
     { id: family, revision: "provisional", previous: first.cursor });
-  assert.equal(calls, firstCalls); assert.equal(replay.coverage.complete, true);
+  assert.equal(calls, firstCalls); assert.equal(replay.coverage.windowComplete, true);
+  assert.equal(replay.coverage.complete, false); assert.equal(replay.coverage.answeredCount, 64);
   const changed = first.cursor.batches[0]!.paths[0]!; contents.set(changed, "export const different=2;\n");
   const edited = await selectContextMetadata(subject, catalog, "mechanism", runtime, scope, digest("new subject"), family, undefined, performance.now() + 5000, undefined,
     { id: family, revision: "provisional", previous: first.cursor });

@@ -24,7 +24,7 @@ export interface DecisionSettings {
   legacy: DecisionConfig;
   consumers: Record<DecisionConsumerId, ConsumerSetting>;
   budget: DecisionBudgetLimits;
-  /** Larger retrieval defaults apply only to isolated context scopes; explicit YAML limits still own both. */
+  /** Context uses a small ceiling even when an older profile declares a larger ordinary allowance. */
   contextBudget: DecisionBudgetLimits;
   migration: { notes: string[] };
   /** Explicit opt-in to new questions is separate from legacy context-ranking permission. */
@@ -36,8 +36,8 @@ export interface DecisionSettings {
 }
 
 export const DEFAULT_DECISION_BUDGET: DecisionBudgetLimits = { maxCalls: 16, maxRequestBytes: 128 * 1024 };
-export const DEFAULT_CONTEXT_BUDGET: DecisionBudgetLimits = { maxCalls: 512, maxRequestBytes: 10 * 1024 * 1024 };
-/** One configuration ceiling also owns the allowance suggested by metadata preflight. */
+export const DEFAULT_CONTEXT_BUDGET: DecisionBudgetLimits = { maxCalls: 8, maxRequestBytes: 128 * 1024 };
+/** Maximum declared ordinary allowance; automatic context retains its smaller ceiling. */
 export const MAX_DECISION_BUDGET: DecisionBudgetLimits = { maxCalls: 1024, maxRequestBytes: 16 * 1024 * 1024 };
 const ORDER: Record<DecisionMode, number> = { off: 0, shadow: 1, auto: 2 };
 const LEGACY_CONTEXT_QUESTION = "rank_optional_context";
@@ -114,7 +114,11 @@ export function profileDecisionSettings(profile: unknown): DecisionSettings {
     if (question !== LEGACY_CONTEXT_QUESTION) notes.push(`Legacy allowed_questions:${question} is baseline-only; it enables no first-RC consumer.`);
   }
   const budget = budgetLimits(settings["budget"]);
-  const contextBudget = budgetLimits(settings["budget"], DEFAULT_CONTEXT_BUDGET);
+  const requestedContextBudget = budgetLimits(settings["budget"], DEFAULT_CONTEXT_BUDGET);
+  const contextBudget = { maxCalls: Math.min(requestedContextBudget.maxCalls, DEFAULT_CONTEXT_BUDGET.maxCalls),
+    maxRequestBytes: Math.min(requestedContextBudget.maxRequestBytes, DEFAULT_CONTEXT_BUDGET.maxRequestBytes) };
+  if (contextBudget.maxCalls !== requestedContextBudget.maxCalls || contextBudget.maxRequestBytes !== requestedContextBudget.maxRequestBytes)
+    notes.push("Automatic context selection is capped at 8 calls and 128 KiB across metadata, passages and continuation; tighter project limits still apply.");
   const mode = legacy.mode;
   const questionIds = Object.fromEntries(DECISION_CONSUMER_IDS.map(id => {
     if (!Object.hasOwn(declared, id)) return [id, id === "DL03" && legacyContext ? ["legacy.context-rank/1"] : []];

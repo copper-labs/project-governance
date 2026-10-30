@@ -55,7 +55,7 @@ test("current mixed request and labelled task background reach metadata question
 test("opt-in passage selection retains calls and bytes in the same retrieval allowance", async t => {
   const root = mkdtempSync(join(tmpdir(), "metadata-passage-reserve-")); t.after(() => rmSync(root, { recursive: true, force: true }));
   const configured = settings({ allowed_data_classes: ["metadata", "source"], allowed_source_paths: ["src/**"],
-    budget: { max_calls: 3, max_request_bytes: 131072 }, consumers: { DL03: { mode: "auto",
+    evidence_bytes: 512, budget: { max_calls: 3, max_request_bytes: 131072 }, consumers: { DL03: { mode: "auto",
       questions: ["context.metadata-relevance/1", "context.passage-evidence/1", "context.passage-role/1"] } } });
   let calls = 0;
   const runtime = new DecisionRuntime(configured, root, { coordinationRoot: root, token: "fixture", fetch: async (_url, init) => {
@@ -77,6 +77,11 @@ test("opt-in passage selection retains calls and bytes in the same retrieval all
   assert.equal(passage.reason, "answered"); assert.equal(calls, 2);
   assert.equal(readDecisionBudget(root, contextBudgetScope(scope, metadata.invocationId))?.calls, 2);
   assert.equal(runtime.closeContextInvocation(scope, metadata.invocationId), true);
+  const repeated = await selectContextMetadata(subject, contextMetadataCatalog(paths, "repair", [], [], new Set()), "repair",
+    runtime, scope, digest("subject"), "new-observation-label", undefined, performance.now() + 5000, undefined, undefined,
+    { deferBudgetClose: true, reservePassageBudget: true });
+  assert.equal(calls, 2, "an exhausted allowance still permits free exact answer reuse");
+  assert.equal(repeated.coverage.answeredCount, metadata.coverage.answeredCount);
 });
 
 test("missing credentials cannot be mislabeled as a passage reservation limit", async t => {
@@ -116,11 +121,11 @@ test("unbound context has a serializable identity and preserves local fallback",
   assert.deepEqual(result.order, ["src/a.ts"]); assert.ok(result.decisions.every(item => !item.providerCalled));
 });
 
-test("shared metadata reaches a late file, preserves pinned paths and reuses paid batches without source bodies", async t => {
+test("metadata ranks its bounded window, preserves explicit pins and reuses paid batches without source bodies", async t => {
   const root = mkdtempSync(join(tmpdir(), "context-metadata-")); t.after(() => rmSync(root, { recursive: true, force: true }));
-  const paths = Array.from({ length: 100 }, (_, i) => `src/${String(i).padStart(3, "0")}.ts`);
+  const paths = Array.from({ length: 64 }, (_, i) => `src/${String(i).padStart(3, "0")}.ts`);
   const catalog = contextMetadataCatalog([...paths, ".env", "secret.key", "node_modules/foo.js"], "where is the mechanism", [paths[0]!], [], new Set());
-  assert.equal(catalog.candidates.length, 100); assert.equal(catalog.excludedCount, 3);
+  assert.equal(catalog.candidates.length, 64); assert.equal(catalog.excludedCount, 3);
   let calls = 0;
   const runtime = new DecisionRuntime(settings(), root, { coordinationRoot: root, token: "fixture", fetch: async (_url, init) => {
     calls++; const wire = JSON.parse(String(init?.body));
@@ -129,13 +134,13 @@ test("shared metadata reaches a late file, preserves pinned paths and reuses pai
     assert.ok(Object.keys(wire.questions).length <= 256);
     assert.equal(JSON.stringify(wire).split("where is the mechanism").length - 1, 1);
     return Response.json({ model: "jev-1.13.0", answers: Object.fromEntries(Object.entries(wire.questions).map(([name, raw]) =>
-      [name, { type: "noul", noul: wireMetadataEvidence(wire, raw).id === "src/099.ts" ? 0.95 : 0.5 }])) });
+      [name, { type: "noul", noul: wireMetadataEvidence(wire, raw).id === "src/063.ts" ? 0.95 : 0.5 }])) });
   } });
   const run = () => selectContextMetadata(subject, catalog, "where is the mechanism", runtime,
     { workspace: root, taskId: "task", taskRevision: "1" }, digest("subject"), "turn1");
   const result = await run();
-  assert.equal(calls, 1); assert.equal(result.assessed.length, 100);
-  assert.deepEqual(result.order.slice(0, 2), ["src/000.ts", "src/099.ts"]);
+  assert.equal(calls, 1); assert.equal(result.assessed.length, 64);
+  assert.deepEqual(result.order.slice(0, 2), ["src/000.ts", "src/063.ts"]);
   assert.equal(result.sourceBodiesTransmitted, false);
   assert.deepEqual((await run()).order, result.order); assert.equal(calls, 1);
 });
@@ -153,10 +158,10 @@ test("prompt budgets cannot consume check-time allowance and historical hints ca
   assert.equal(first.decisions[0]?.budget.partition, "context-selection");
   assert.equal(readDecisionBudget(root, scope), null);
   const second = await selectContextMetadata(subject, catalog, "parser", runtime, scope, digest("subject"), "prompt-2", undefined);
-  assert.equal(second.reason, "answered");
+  assert.equal(second.reason, "repeated-observation");
   assert.equal(decisionBudgetStoreStatus(root).activeScopes?.contextSelection, 0);
   const ordinary = await selectContextMetadata(subject, catalog, "parser", runtime, scope, digest("subject"), "ordinary");
-  assert.equal(ordinary.reason, "answered"); assert.equal(calls, 3);
+  assert.equal(ordinary.reason, "repeated-observation"); assert.equal(calls, 1);
   assert.equal(readDecisionBudget(root, scope), null);
 });
 
@@ -209,7 +214,7 @@ test("answered uncertain file scores reach source inspection without becoming co
   assert.equal(unmodified.ordering.uncertainCount, 0); assert.equal(unmodified.delivered, false);
 });
 
-test("every eligible item beyond the old cutoff reaches JEV, including a misleading name with approved source clues", async t => {
+test("local description search retrieves a misleading name without assessing the whole inventory", async t => {
   const root = mkdtempSync(join(tmpdir(), "context-full-index-")); t.after(() => rmSync(root, { recursive: true, force: true }));
   const paths = [...Array.from({ length: 240 }, (_, i) => `src/item-${String(i).padStart(3, "0")}.ts`), "src/zzz/utility.ts"];
   const purpose = "Find where expired credentials are renewed";
@@ -233,8 +238,9 @@ test("every eligible item beyond the old cutoff reaches JEV, including a mislead
   } });
   const result = await selectContextMetadata(indexedSubject, catalog, purpose, runtime,
     { workspace: root, taskId: "task", taskRevision: "1" }, digest("subject"), "turn");
-  assert.equal(seen.size, paths.length); assert.equal(descriptions, 1);
-  assert.equal(result.coverage.complete, true); assert.equal(result.coverage.unassessedCount, 0);
+  assert.equal(seen.size, 64); assert.equal(descriptions, 1);
+  assert.equal(result.coverage.complete, false); assert.equal(result.coverage.windowComplete, true);
+  assert.equal(result.coverage.unassessedCount, paths.length - 64);
   assert.equal(result.order[0], "src/zzz/utility.ts"); assert.equal(result.sourceIndex.transmittedCount, 1);
 });
 
@@ -280,7 +286,7 @@ test("retrieval closes its scope after each invocation and remains available aft
   assert.equal(calls, 513); assert.equal(decisionBudgetStoreStatus(root).activeScopes?.contextSelection, 0);
 });
 
-test("a bounded index supplies visited metadata windows, rotates across turns and protects ordinary budgets", async t => {
+test("a bounded index preserves exact refreshes without paying to rotate through unrelated files", async t => {
   const root = mkdtempSync(join(tmpdir(), "context-large-")); t.after(() => rmSync(root, { recursive: true, force: true }));
   const paths = Array.from({ length: 1500 }, (_, i) => `src/${String(i).padStart(4, "0")}.ts`);
   const catalog = contextMetadataCatalog(paths, "find behaviour", [], [], new Set());
@@ -296,28 +302,27 @@ test("a bounded index supplies visited metadata windows, rotates across turns an
       seen.add(wireMetadataEvidence(wire, q).id); return [name, { type: "noul", noul: 0.8 }];
     })) });
   } });
-  const starts = new Set<number>(), scope = { workspace: root, taskId: "same-session", taskRevision: "1" };
-  for (let turn = 0; turn < 10; turn++) {
+  const scope = { workspace: root, taskId: "same-session", taskRevision: "1" };
+  for (let turn = 0; turn < 2; turn++) {
     const result = await selectContextMetadata(indexed, catalog, "find behaviour", runtime, scope, digest("source"), `turn-${turn}`);
-    starts.add(result.coverage.traversalStart);
-    assert.equal(result.reason, "budget-exhausted"); assert.equal(result.coverage.complete, false);
+    assert.equal(result.reason, turn === 0 ? "budget-exhausted" : "exact-input-closed"); assert.equal(result.coverage.complete, false);
     assert.ok(result.sourceIndex.inspectedCount <= 63); assert.ok(result.coverage.answeredCount > 0);
   }
-  assert.ok(starts.size > 1); assert.ok(seen.size > 63); assert.ok(inspected <= 15000);
+  assert.ok(seen.size > 0 && seen.size <= 64); assert.ok(inspected <= 3000);
   assert.equal(readDecisionBudget(root, scope), null);
   assert.equal(decisionBudgetStoreStatus(root).activeScopes?.contextSelection, 0);
 });
 
 test("unfittable items do not stop later batches and large wire descriptions fall back to paths", async t => {
   const root = mkdtempSync(join(tmpdir(), "context-fitting-")); t.after(() => rmSync(root, { recursive: true, force: true }));
-  const long = `src/${"long".repeat(20)}.ts`, paths = [...Array.from({ length: 150 }, (_, i) => `src/${i}.ts`), long];
+  const long = `src/${"long".repeat(40)}.ts`, paths = [...Array.from({ length: 63 }, (_, i) => `src/${i}.ts`), long];
   let seen = 0;
   const fetcher: typeof fetch = async (_url, init) => { const wire = JSON.parse(String(init?.body)); seen += Object.keys(wire.questions).length;
     return Response.json({ model: "jev-1.13.0", answers: Object.fromEntries(Object.keys(wire.questions).map(name => [name, { type: "noul", noul: 0.9 }])) }); };
   const result = await selectContextMetadata(subject, contextMetadataCatalog(paths, "find", [], [], new Set()), "find",
-    new DecisionRuntime(settings({ evidence_bytes: 32, budget: { max_calls: 100, max_request_bytes: 1048576 } }), root, { coordinationRoot: root, token: "fixture", fetch: fetcher }),
+    new DecisionRuntime(settings({ evidence_bytes: 128, budget: { max_calls: 100, max_request_bytes: 1048576 } }), root, { coordinationRoot: root, token: "fixture", fetch: fetcher }),
     { workspace: root, taskId: "small-evidence", taskRevision: "1" }, digest("source"), "turn");
-  assert.equal(seen, 150); assert.equal(result.coverage.unfittableCount, 1); assert.equal(result.reason, "input-budget");
+  assert.equal(seen, 63); assert.equal(result.coverage.unfittableCount, 1); assert.equal(result.reason, "input-budget");
   const path = "src/description.md", text = '---\nsummary: ' + 'detail '.repeat(100) + '\n---\n' +
     Array.from({ length: 6 }, () => '# ' + 'heading '.repeat(20)).join('\n') + '\n' +
     Array.from({ length: 12 }, (_, i) => 'export function ' + 'Identifier'.repeat(7) + i + '() {}').join('\n');
@@ -359,5 +364,5 @@ test("metadata can use the caller's remaining allowance beyond one second withou
   assert.ok((first.decisions[0]?.transport?.httpMs ?? 0) > 1000);
   const next = await selectContextMetadata(subject, catalog, "find", runtime, scope, digest("source"), "second",
     undefined, performance.now() + 3000);
-  assert.equal(next.reason, "answered"); assert.equal(calls, 2);
+  assert.equal(next.reason, "repeated-observation"); assert.equal(calls, 1);
 });

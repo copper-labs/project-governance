@@ -14,7 +14,7 @@ import { ProviderPool } from "../src/decision-admission.ts";
 
 function fixture(t: TestContext) {
   const root = mkdtempSync(join(tmpdir(), "context-parallel-")); t.after(() => rmSync(root, { recursive: true, force: true }));
-  const paths = Array.from({ length: 80 }, (_, i) => `src/${String(i).padStart(3, "0")}.ts`);
+  const paths = Array.from({ length: 64 }, (_, i) => `src/${String(i).padStart(3, "0")}.ts`);
   const subject = { root, source: () => ({ file_type: "regular" }),
     projectionSources: (paths: string[]) => ({ view: "worktree", subject: null, sources: new Map(paths.map(path => [path, { key: path, freshness: "fixture" }])) }),
     readBatch: (paths: string[]) => new Map(paths.map(path => [path, "fixture-path-only"])),
@@ -25,11 +25,11 @@ function fixture(t: TestContext) {
   const catalog = contextMetadataCatalog(paths, "repair", [], [], new Set()), scope = { workspace: root, taskId: "task", taskRevision: "1" };
   const response = (wire: any) => Response.json({ model: settings.legacy.model,
     answers: Object.fromEntries(Object.entries(wire.questions).map(([name, value]) => [name,
-      { type: "noul", noul: wireMetadataEvidence(wire, value).id === "src/079.ts" ? 0.99 : 0.8 }])) });
+      { type: "noul", noul: wireMetadataEvidence(wire, value).id === "src/063.ts" ? 0.99 : 0.8 }])) });
   return { root, subject, settings, paths, catalog, scope, response };
 }
 
-test("parallel batches cover the permitted inventory with stable score order independent of completion", async t => {
+test("parallel batches cover the selected window with stable score order independent of completion", async t => {
   const f = fixture(t); let active = 0, peak = 0, count = 0; const seen = new Set<string>();
   const fetcher: typeof fetch = async (_url, init) => {
     active++; peak = Math.max(peak, active); const serial = ++count, wire = JSON.parse(String(init?.body));
@@ -41,7 +41,7 @@ test("parallel batches cover the permitted inventory with stable score order ind
   const parallel = await selectContextMetadata(f.subject, f.catalog, "repair", new DecisionRuntime(f.settings, f.root,
     { coordinationRoot: f.root, token: "fixture", fetch: fetcher }), f.scope, digest("source"), "parallel");
   assert.equal(peak, 4); assert.equal(active, 0); assert.equal(seen.size, f.paths.length); assert.equal(parallel.coverage.complete, true);
-  assert.equal(parallel.order[0], "src/079.ts"); assert.equal(parallel.peakConcurrency, 4);
+  assert.equal(parallel.order[0], "src/063.ts"); assert.equal(parallel.peakConcurrency, 4);
   seen.clear(); count = 0;
   const serial = await selectContextMetadata(f.subject, f.catalog, "repair", new DecisionRuntime(f.settings, f.root,
     { coordinationRoot: f.root, token: "fixture", fetch: fetcher }), f.scope, digest("source"), "serial", undefined, undefined, undefined, undefined, { concurrency: 1 });

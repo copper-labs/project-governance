@@ -383,7 +383,7 @@ test("packet rounds preserve a first complete unit and a second confirmed guard 
   assert.ok(Buffer.byteLength(delivered.excerpt) > 512, "Only additional confirmed source units may spend the remaining packet allowance");
 });
 
-test("the shared byte allowance can assess more than 256 captured units without a second preparation ceiling", async t => {
+test("the context ceiling leaves excess captured units explicitly unassessed", async t => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "rc10-passage-allocation-"))); t.after(() => rmSync(root, { recursive: true, force: true }));
   const candidates = Array.from({ length: 5 }, (_, file) => {
     const excerpt = Array.from({ length: 70 }, (_, unit) => `function finish${unit}() { return ${unit}; }\n\n\n\n\n\n`).join("") +
@@ -404,8 +404,10 @@ test("the shared byte allowance can assess more than 256 captured units without 
   const advice = await selectContextPassages(runtime, candidates, { purpose: "finish", scope: { workspace: root, taskId: "task", taskRevision: "1" },
     subjectDigest: digest("subject"), revision: "1", environment: "explicit", invocationId: "6".repeat(64), policyDigest: settings.configDigest,
     deadlineAt: performance.now() + 5000, excerptBytes: 1024, sourceSpans });
-  assert.equal(advice.assessedUnitCount, 351); assert.equal(advice.eligibleUnitCount, 351);
-  assert.equal(advice.judgments[candidates[4]!.id]?.preferredSpans[0]?.name, "preserve");
+  assert.equal(advice.eligibleUnitCount, 351);
+  assert.ok(advice.assessedUnitCount > 256 && advice.assessedUnitCount < advice.eligibleUnitCount);
+  assert.ok(advice.omitted.some(item => item.reason === "passage-budget"));
+  assert.equal(advice.exclusions[candidates[4]!.id], undefined, "unassessed units cannot exclude their file");
   assert.ok(requestBytes <= settings.contextBudget.maxRequestBytes); assert.ok(advice.packingMs >= 0 && advice.preparationMs >= 0);
 });
 
@@ -528,7 +530,7 @@ test("several relevant guide sections cannot crowd out implementation and assert
   assert.ok(packet.omittedJudgedUnits.some(item => item.path === guide.id)); assert.ok(packet.bytes <= 2300);
 });
 
-test("a large descriptor catalog reaches every permitted file within the default family allowance", { timeout: 45000 }, async t => {
+test("a large descriptor catalog remains locally available while the paid window is bounded", { timeout: 45000 }, async t => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "rc10-large-catalog-"))); t.after(() => rmSync(root, { recursive: true, force: true }));
   const paths = Array.from({ length: 8255 }, (_, index) => `src/module-${String(index % 47).padStart(2, "0")}/long-component-${String(index).padStart(5, "0")}.ts`);
   const subject = { root, source: () => ({ file_type: "regular" }),
@@ -548,8 +550,10 @@ test("a large descriptor catalog reaches every permitted file within the default
   } });
   const selection = await selectContextMetadata(subject, contextMetadataCatalog(paths, "Prevent losing pending work", [], [], new Set()), "Prevent losing pending work",
     runtime, { workspace: root, taskId: "task", taskRevision: "1" }, digest("large"), "large", undefined, performance.now() + 45000);
-  assert.equal(selection.coverage.complete, true, JSON.stringify(selection.coverage)); assert.equal(seen.size, paths.length);
-  assert.equal(selection.order[0], paths.at(-1)); assert.ok(wireBytes <= configured.contextBudget.maxRequestBytes);
-  assert.equal(selection.sourceIndex.descriptorCoverage.descriptorAnsweredCount, paths.length);
+  assert.equal(selection.coverage.complete, false); assert.equal(selection.coverage.windowComplete, true);
+  assert.equal(seen.size, 64); assert.equal(selection.order.length, paths.length);
+  assert.equal(selection.coverage.unassessedCount, paths.length - 64);
+  assert.ok(selection.order.includes(paths.at(-1)!)); assert.ok(wireBytes <= configured.contextBudget.maxRequestBytes);
+  assert.equal(selection.sourceIndex.descriptorCoverage.descriptorAnsweredCount, 64);
   assert.equal(selection.budgetFinalized, true);
 });

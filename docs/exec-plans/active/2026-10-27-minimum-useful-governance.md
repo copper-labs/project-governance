@@ -152,3 +152,23 @@ Cancellation deliberately consumes discovery with its own result and verified pr
 completion records the activated lock. Neither reuses a historical available candidate. Final low
 wording/test refinements leave runtime bytes unchanged. Normal hooks/publication and readback are
 recorded externally against the final commit; no adopter mutation belongs to this source batch.
+
+## Bounded context selection patch — 4.4.3
+
+The operator approved correcting excessive automatic repository classification and publishing a
+stable patch. Base this isolated release on verified stable 4.4.2, with only the bounded selection
+batch described in the [4.1 owning plan](2026-10-05-4-1-context-quality.md#bounded-selection-correction--2026-10-29).
+Keep the separate API-signoff preview outside this release. Existing project configurations and
+installation pins have independent owners; generic release records contain no adopter evidence.
+
+The coherent scope covers local-first candidate selection, a shared context ceiling and exact
+standalone replay, with required context and bounded expansion preserved. Run the declared focused
+and affected integration checkpoint, independent Opus 5.5 high-effort review, clean installed
+selection smoke and normal exact-archive verifier. Commit/push through normal hooks, then generate
+metadata from that commit and publish/read back the immutable stable/latest assets. Record full
+source, archive, proofs and remote identities externally. No automatic adoption is authorized.
+
+Status: source, independent review and applicable installed qualification complete. The owning
+plan records the focused corrections and exact-archive proof reuse. Normal commit/push gates and
+stable publication/readback complete this operational release and are recorded externally; no
+adopter activation is implied.
