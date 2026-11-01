@@ -74,7 +74,7 @@ This repair does not make agents request paid selection or establish its economi
 - [x] Run typecheck and the context candidate, quality, projection and demand-driven owner suites.
 - [x] Complete independent implementation review and reconcile findings.
 - [x] Qualify one stable patch with broad source and exact installed/greenfield archive proof.
-- [ ] Commit through normal hooks; publish and read back the stable patch under operator authority.
+- [x] Commit through normal hooks; publish and read back the stable patch under operator authority.
 
 The initial failing regression is the early checkpoint because it resolves whether directory
 discovery bypasses the approved selection contract. The completed batch checkpoint runs
