@@ -85,8 +85,9 @@ export function automaticContextCandidates(subject: ValidationSubject, relevant:
   }
   let discovery: ReturnType<typeof discoverContext> | null = null;
   let discoveryUnavailable = false;
-  // A full source allocation cannot admit discoveries; avoid scanning the repository for unused results.
-  try { discovery = seeds.length && seeds.length < maximum ? discoverContext(subject, seeds, maximum) : null; }
+  // Route callers supply the admitted ranked set, including resolved local links and positives.
+  // They never need the legacy neighbour lookup; explicit discovery remains separate.
+  try { discovery = !priority?.ordered && seeds.length && seeds.length < maximum ? discoverContext(subject, seeds, maximum) : null; }
   catch { discoveryUnavailable = true; }
   const candidates = [...seeds];
   for (const path of discovery?.paths ?? []) if (!candidates.includes(path) && permitted(path)) {

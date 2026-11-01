@@ -256,7 +256,7 @@ test("task-bound routing discovers new drafts, preserves mixed owners and record
     f.write("docs/new.md", "A NEW DRAFT about the workflow");
     f.write("docs/secret.json", "DO NOT TRANSMIT");
     f.write("other.md", "UNRELATED DIRTY WORK");
-    f.write("docs/binary.md", "a\0b");
+    f.write("docs/workflow-binary.md", "a\0b");
     let calls = 0;
     const provider: DecisionProvider = { async decide(request) {
       calls++;
@@ -276,7 +276,7 @@ test("task-bound routing discovers new drafts, preserves mixed owners and record
     assert.deepEqual(new Set(packet.entries.map(item => item.path)), new Set(["rules.md", "docs-rules.md", "source-rules.md"]));
     assert.equal(packet.optional?.decision?.method, "jev");
     assert.ok(packet.selection.automatic.excluded.some(item => item.path === "docs/secret.json"));
-    assert.ok(packet.selection.automatic.excluded.some(item => item.path === "docs/binary.md"));
+    assert.ok(packet.selection.automatic.excluded.some(item => item.path === "docs/workflow-binary.md"));
     delete process.env.JEV_TOKEN;
     const fallback = await contextRouteCommand(["--retrieval", "semantic", "--task", "Repair source and its new workflow plan"], f.root, assets);
     assert.equal(fallback.ready, true); assert.equal(fallback.optional?.reason, "missing-token");

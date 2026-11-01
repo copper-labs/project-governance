@@ -5,7 +5,7 @@ type: spec
 status: current
 owner: project-governance
 created: 2026-09-22
-updated: 2026-10-04
+updated: 2026-11-01
 summary: Reuses session-bound continuity intent and bounded discovery for ordinary context and check delivery.
 ---
 
@@ -128,7 +128,9 @@ outside that claim until the adopter configures and qualifies its host controls.
    The 128-path preview reserves room for the leading ranked paths, all seeded paths and related
    discoveries; full inventory counts remain available when a large scope exceeds the preview.
    Inspect at most 256 source paths and seed at most 32,
-   bounded further by the configured candidate limit. Reuse metadata discovery for related documents,
+   bounded further by the configured candidate limit. The current demand-driven contract supersedes
+   this legacy automatic-neighbour prefix; see [demand-driven context](engine-demand-driven-context.md).
+   Reuse metadata discovery for related documents,
    manifests and tests. This prefix is a cheap filter, not a semantic guarantee; omitted counts and unavailable inventory
    or discovery remain visible. An inventory failure retains scope references but blocks required-context
    readiness with `context-inventory-unavailable`; directory owners cannot be inferred safely without it.

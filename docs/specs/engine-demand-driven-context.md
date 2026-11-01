@@ -5,7 +5,7 @@ type: spec
 status: approved
 owner: project-governance
 created: 2026-10-30
-updated: 2026-10-30
+updated: 2026-11-01
 summary: Separates required prompt guidance from requested retrieval and makes optional paid selection explicit and measurable.
 ---
 
@@ -79,6 +79,15 @@ matches are scarce. Only positive applied metadata advice may admit a nonlocal c
 negative, failed or shadow advice falls back to actual local matches, not arbitrary catalog filler.
 Local matches are exact/task-declared paths, literal path/descriptor/symbol matches and one-hop links
 from matched seeds. Incidental Git changes and history only rank candidates already supported.
+
+Once the route supplies its complete ranked supported set, automatic directory/package-neighbour
+discovery must not widen it. Declared one-hop links already enter through the local projection.
+Explicit discovery and requested originals retain their separate existing path and disclosure gates.
+This prevents an unrelated neighbour from reappearing after local admission or negative metadata
+advice; it does not let semantic advice suppress a genuine local match or required guidance.
+If extraction is partial, only links actually resolved by the projection are available. Its pending,
+unavailable and extraction coverage remains authoritative; missing links do not become guessed
+directory neighbours or a claim of complete coverage.
 
 Explicit routes retain verified entry linkage where available, and otherwise label any latest-session
 observation as non-authoritative. Neither linkage nor a returned packet establishes model consumption.

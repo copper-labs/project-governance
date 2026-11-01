@@ -31,6 +31,57 @@ function fixture(t: any) {
   return {root,assets,git};
 }
 
+test("ranked retrieval does not reintroduce an unsupported neighbour after selection", async t => {
+  const f = fixture(t), token = process.env.JEV_TOKEN;
+  process.env.JEV_TOKEN = "fixture-only";
+  t.after(() => { if (token === undefined) delete process.env.JEV_TOKEN; else process.env.JEV_TOKEN = token; });
+  mkdirSync(join(f.root, "docs"));
+  writeFileSync(join(f.root, "docs/retry-and-resume.md"), "# Retry and resume\nResume a paused job from its checkpoint.\n");
+  writeFileSync(join(f.root, "docs/colour-palette.md"), "# Colour palette\nUse blue for links.\n");
+  const profilePath = join(f.root, "config/governance/profile.yaml"), profile = JSON.parse(readFileSync(profilePath, "utf8"));
+  profile.continuity.decisions.allowed_data_classes = ["metadata"];
+  profile.continuity.decisions.allowed_metadata_paths = ["docs/**"];
+  profile.continuity.decisions.allowed_source_paths = [];
+  writeFileSync(profilePath, JSON.stringify(profile));
+  let calls = 0;
+  t.mock.method(globalThis, "fetch", async (_url: any, init: any) => {
+    calls++;
+    const wire = JSON.parse(init.body);
+    assert.deepEqual(Object.keys(wire.questions), ["file-0", "file-1"]);
+    return Response.json({ model: "jev-1.13.0", answers: {
+      "file-0": { type: "noul", noul: .01 }, "file-1": { type: "noul", noul: .99 },
+    } });
+  });
+  const semantic = await contextRouteCommand(["--task", "Find the documented process for resuming a paused job after a failure.",
+    "--revision", "1", "--decision-task", "admission-fixture", "--retrieval", "semantic"], f.root, f.assets);
+  assert.equal(calls, 1);
+  assert.deepEqual(semantic.metadata?.positivePaths, ["docs/retry-and-resume.md"]);
+  assert.deepEqual(semantic.optional?.entries.map(item => item.id), ["docs/retry-and-resume.md"]);
+  assert.equal(semantic.selection.automatic.discovery, null);
+  const local = await contextRouteCommand(["--task", "retry", "--revision", "1"], f.root, f.assets);
+  assert.deepEqual(local.optional?.entries.map(item => item.id), ["docs/retry-and-resume.md"]);
+  assert.equal(local.selection.automatic.discovery, null);
+  assert.equal(calls, 1, "Local retrieval does not add a provider request");
+});
+
+test("ranked local retrieval retains declared links and explicit originals", async t => {
+  const f = fixture(t);
+  mkdirSync(join(f.root, "docs"));
+  mkdirSync(join(f.root, "references"));
+  writeFileSync(join(f.root, "docs/retry.md"), "# Retry\nSee [palette](../references/colour-palette.md).\n");
+  writeFileSync(join(f.root, "references/colour-palette.md"), "# Palette\nUse blue.\n");
+  writeFileSync(join(f.root, "docs/unrelated.md"), "# Other\nAn unrelated original.\n");
+  const linked = await contextRouteCommand(["--task", "retry", "--revision", "1"], f.root, f.assets);
+  assert.ok(linked.optional?.entries.some(item => item.id === "references/colour-palette.md"));
+  assert.ok(!linked.optional?.entries.some(item => item.id === "docs/unrelated.md"));
+  const reverse = await contextRouteCommand(["--task", "colour", "--revision", "1"], f.root, f.assets);
+  assert.ok(reverse.optional?.entries.some(item => item.id === "docs/retry.md"));
+  const explicit = await contextRouteCommand(["--task", "retry", "--revision", "1", "--optional-path", "docs/unrelated.md"], f.root, f.assets);
+  assert.ok(explicit.optional?.entries.some(item => item.id === "docs/unrelated.md"));
+  const discovery = await contextRouteCommand(["--task", "retry", "--revision", "1", "--discover-path", "docs/retry.md"], f.root, f.assets);
+  assert.ok(discovery.optional?.entries.some(item => item.id === "docs/unrelated.md"));
+});
+
 test("native entry skips optional indexing and injected providers while preserving required instructions",async t=>{
   const f=fixture(t);let reads=0,calls=0;
   const original=ValidationSubject.prototype.readBatch;

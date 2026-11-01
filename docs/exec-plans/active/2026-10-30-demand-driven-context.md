@@ -5,7 +5,7 @@ type: exec-plan
 status: active
 owner: project-governance
 created: 2026-10-30
-updated: 2026-10-30
+updated: 2026-11-01
 summary: Reviews, implements and releases explicit optional retrieval with honest effectiveness telemetry.
 ---
 
@@ -59,3 +59,25 @@ retained separately from assertion failures and rechecked through the affected c
 Runtime payload changes are compared file-by-file before reusing any prior installed proof. Every
 release claim and exact archive binding is retained in the external release record, not adopter data
 in this project-neutral plan. No live JEV experiment or adopter migration is included.
+
+## Patch batch — preserve candidate admission during discovery
+
+An explicit ranked candidate set can still acquire unrelated directory neighbours through the
+older automatic discovery helper. This can return a file with no local match or declared link even
+after negative metadata advice. Restore the existing admission contract before body delivery;
+keep ordinary local matches, one-hop declared links and explicit discovery/original requests.
+This repair does not make agents request paid selection or establish its economic benefit.
+
+- [x] Reproduce unsupported neighbour delivery against the stable implementation without a provider.
+- [x] Prevent automatic discovery from widening a complete ranked candidate set.
+- [x] Verify local and semantic cases, preserved declared links and explicit original requests.
+- [x] Run typecheck and the context candidate, quality, projection and demand-driven owner suites.
+- [x] Complete independent implementation review and reconcile findings.
+- [x] Qualify one stable patch with broad source and exact installed/greenfield archive proof.
+- [ ] Commit through normal hooks; publish and read back the stable patch under operator authority.
+
+The initial failing regression is the early checkpoint because it resolves whether directory
+discovery bypasses the approved selection contract. The completed batch checkpoint runs
+`npm run typecheck` and the named context suites. Release qualification follows the existing
+[release process](../../governance/release-process.md); evidence remains outside source. Preserve
+provider defaults, disclosure and call/byte limits. No adopter updates belong to this patch.

@@ -286,8 +286,9 @@ test("an explicit optional path does not turn off bounded delivery for other lar
     }));
     writeFileSync(join(root, "config/governance/facts.lock.yaml"), JSON.stringify({ facts: {} }));
     writeFileSync(join(root, "rules.md"), "Required rules survive optional selection.");
+    // Both files have actual local evidence; directory adjacency is not an admission reason.
     for (const name of ["important", "related"]) writeFileSync(join(root, `docs/${name}.md`),
-      Array.from({ length: 320 }, (_, index) => `Line ${index + 1}: relevant design evidence for the task.\n`).join(""));
+      "# Design evidence\n\n" + Array.from({ length: 320 }, (_, index) => `Line ${index + 1}: relevant design evidence for the task.\n`).join(""));
     git("add", ".");
     let observedLengths: number[] = [];
     const provider: DecisionProvider = { async decide(request) {
