@@ -54,7 +54,7 @@ private store mutation is available. Adoption and remote publication are separat
 
 - [x] Both focused synthetic cases fail for the intended adapter reason on the base.
 - [x] Source, owning contract and positive/negative fixtures completed.
-- [ ] Focused source/typecheck and immutable installed proof completed.
+- [x] Focused source/typecheck and immutable installed proof completed.
 - [x] Independent review reconciled.
 - [ ] Exact authorized maintenance readback and original reconciliation recorded externally.
 
@@ -63,6 +63,10 @@ new pair cases exposed an undefined canonical scope value; the corrected iOS/pai
 recheck passed54 with2 installed-only skips. Independent review requested precise
 refusal assertions and incompatible-shape cases; the revised new owner suite
 passes31/31. Both material findings were independently rechecked and closed.
-The final tuple annotation fixes only test type inference. Installed proof and
-actual maintenance remain separate pending checkpoints. This local candidate is
-not a published stable release and does not change any adopter runtime pin.
+The final tuple annotation fixes only test type inference. The exact local archive
+clean-installs through the normal runtime stager and passes147/147 affected installed
+cases with no skips, including generation bindings and public managed invocation.
+Actual maintenance readback remains external and separate from this controlled proof.
+This local candidate is not a published stable release and changes no adopter pin.
+Normal stable integrated qualification, release metadata and publication/readback
+remain separate from this bounded local-maintenance checkpoint.
