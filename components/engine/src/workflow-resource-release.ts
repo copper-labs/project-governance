@@ -23,7 +23,7 @@ function prepareResourceRelease(args: string[], workspace: string, kind: "local-
   const local=kind==="local-host"||kind==="local-host-observed";
   const names=["database","run","revision","worker-directory","registry","authority","kind","evidence","evidence-digest","receipt",...(!local&&kind!=="android-app-session"?["local-resource","lock-directory"]:[]),...(kind==="ios-simulator-build"?["simulator-lock-directory"]:[])];
   const {values}=parseArgs({args,strict:true,allowPositionals:false,options:Object.fromEntries(names.map(key=>[key,{type:"string" as const}]))});
-  if (names.some(key=>!values[key]) || values.kind!==kind || !/^\d+$/u.test(values.revision!) ||
+  if (names.some(key=>!(kind==="ios-observation"&&key==="local-resource")&&!values[key]) || values.kind!==kind || !/^\d+$/u.test(values.revision!) ||
       !Number.isSafeInteger(Number(values.revision))) throw new Error("Complete original workflow, revision, owner adapter and evidence binding required");
   const database=realpathSync(values.database!), directory=realpathSync(values["worker-directory"]!), registryPath=realpathSync(values.registry!);
   if (!statSync(database).isFile() || !statSync(registryPath).isFile()) throw new Error("Existing original stores required");
@@ -50,7 +50,7 @@ function prepareResourceRelease(args: string[], workspace: string, kind: "local-
     if (digest(leases.map(lease=>lease.resource).sort())!==digest([...run.binding.recipe.resources].sort())) throw new Error("Original lease scope differs");
     const receiptPath=resolve(values.receipt!), bindingDigest=digest(run.binding), workerRequestDigest=digest(identity.request);
     const observationKind=kind==="local-host-observed"?"workflow-local-host-observed-cleanup":kind==="android-app-session"?"workflow-android-app-session-cleanup":kind==="local-host"?"workflow-local-host-cleanup":kind==="ios-observation"?"workflow-ios-observation-cleanup":"workflow-ios-simulator-build-cleanup";
-    const scopeDigest=approvedScopeDigest??(kind==="android-app-session"?digest(run.binding.recipe.androidAppSession):kind==="local-host"?null:digest({localResource:values["local-resource"],lockDirectory:values["lock-directory"],...(kind==="ios-simulator-build"?{simulatorLockDirectory:values["simulator-lock-directory"]}:{})}));
+    const scopeDigest=approvedScopeDigest??(kind==="android-app-session"?digest(run.binding.recipe.androidAppSession):kind==="local-host"?null:digest({localResource:values["local-resource"]??null,lockDirectory:values["lock-directory"],...(kind==="ios-simulator-build"?{simulatorLockDirectory:values["simulator-lock-directory"]}:{})}));
     const validate=(receipt: WorkflowCleanupReceipt) => {
       const observation=object(receipt.observation,"resource owner observation");
       if (receipt.runId!==run.id || receipt.bindingDigest!==bindingDigest || digest(receipt.leases)!==digest(leases) ||

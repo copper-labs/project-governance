@@ -21,6 +21,9 @@ shows existing project-owned checks; it does not require a check after every edi
 
 ## Active
 
+- [Never-acquired cleanup](active/2026-11-02-never-acquired-cleanup.md)
+  qualifies two failed-setup cases through existing explicit cleanup adapters and preserves original custody evidence.
+
 - [Demand-driven context delivery](active/2026-10-30-demand-driven-context.md)
   owns explicit optional retrieval, bounded semantic spending, effectiveness telemetry and stable 4.5 qualification.
 

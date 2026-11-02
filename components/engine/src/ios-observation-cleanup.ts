@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { lstatSync, realpathSync, statSync } from "node:fs";
-import { dirname, isAbsolute, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { digest, object } from "./core.ts";
 import { narrativeFile } from "./narrative-inputs.ts";
 import { observePhysicalCleanup } from "./physical-cleanup.ts";
@@ -12,16 +12,18 @@ export type IosObservationProbes = Parameters<typeof observePhysicalCleanup>[1];
 const reserved = /^(?:ios-|android-|workspace-v1:|simulator:|emulator:|device:|tcp:|port:|metro:|service:|remote:)/u;
 
 /** The owner declares the opaque local claim; device and app identity remain reserved and exact. */
-export function iosObservationClaims(recipe: Recipe, local: string) {
+export function iosObservationClaims(recipe: Recipe, local: string | undefined) {
   const resources=recipe.resources;
+  const beforeActor=resources.length===2 && local===undefined;
   const device=resources.find(value=>/^ios-device:(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{8}-[0-9a-fA-F]{16})$/u.test(value));
-  if(recipe.androidEmulator || resources.length!==3 || !local?.trim() || reserved.test(local) || !resources.includes(local) || !device)
+  if(recipe.androidEmulator || recipe.androidAppSession || !device || (!beforeActor &&
+      (resources.length!==3 || !local?.trim() || reserved.test(local) || !resources.includes(local))))
     throw new Error("Exact iOS observation device/app/local-storage claims required");
   const udid=device.slice("ios-device:".length),app=resources.find(value=>value.startsWith(`ios-app:${udid}:`));
   if(!app || !/^[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/u.test(app.slice(`ios-app:${udid}:`.length)) ||
-      new Set(resources).size!==3 || Object.values(recipe.operations).some(operation=>operation.effect!=="local"))
+      new Set(resources).size!==resources.length || Object.values(recipe.operations).some(operation=>operation.effect!=="local"))
     throw new Error("Exact local observation and matching iOS app required");
-  return {device,app,udid,local};
+  return {device,app,udid,local:local??null,beforeActor};
 }
 
 /** Read actual absence only. The adapter never creates, steals, deletes or stale-prunes a project lock. */
@@ -41,9 +43,21 @@ export async function iosObservationEvidence(context:{values:Record<string,strin
   const native=workflowNativeResourceEvidence(directory,run,stages,true),evidence=realpathSync(values.evidence!);
   const raw=narrativeFile(directory,evidence),report=object(JSON.parse(raw)),modified=statSync(evidence).mtimeMs;
   const evidenceDigest="sha256:"+createHash("sha256").update(raw).digest("hex");
-  if(evidenceDigest!==values["evidence-digest"] || report.deviceUdid!==claims.udid || report.appOrSDKLaunch!==false || report.ownedFileLockHeld!==false)
+  if(evidenceDigest!==values["evidence-digest"])throw new Error("Selected owner evidence digest differs");
+  if(claims.beforeActor){
+    const closure=object(report.processClosure),recorded=object(report.observedProcessIdentities);
+    if(run.binding.recipe.stages.length!==1 || !native.originalFailedLaunchesConfirmed || report.status!=="failed" || report.childStarted!==false ||
+       closure.closed!==true || closure.notStarted!==true || report.legacyLockHeld!==false || report.legacyLockReleased!==false ||
+       report.appOrSDKLaunch!==undefined && report.appOrSDKLaunch!==false || report.ownedFileLockHeld!==undefined && report.ownedFileLockHeld!==false ||
+       report.deviceUdid!==undefined && report.deviceUdid!==claims.udid || report.deviceClosure!==undefined || Object.keys(recorded).length>4096)
+      throw new Error("Original failed before-first-device-actor and never-held lock evidence required");
+    if(closure.after!==undefined){const after=object(closure.after);if(!Array.isArray(after.group)||after.group.length||!Array.isArray(after.observedTree)||after.observedTree.length)throw Error("Original actor closure is contradictory");}
+    for(const [pid,fingerprint]of Object.entries(recorded)){if(!/^[1-9]\d*$/u.test(pid))throw Error("Invalid owner process identity");native.identify({pid:Number(pid),fingerprint});}
+    const worker=join(directory,"owner.json"),bytes=narrativeFile(directory,worker);
+    native.identify(JSON.parse(bytes));native.files.set(worker,"sha256:"+createHash("sha256").update(bytes).digest("hex"));
+  }else if(report.deviceUdid!==claims.udid || report.appOrSDKLaunch!==false || report.ownedFileLockHeld!==false)
     throw new Error("Original observation-only device and file-lock closure evidence required");
-  const observed=typeof report.observedAt==="string"?Date.parse(report.observedAt):NaN;
+  const observed=claims.beforeActor?(typeof report.ended==="number"?report.ended*1000:NaN):typeof report.observedAt==="string"?Date.parse(report.observedAt):NaN;
   if(!Number.isFinite(observed) || !native.windows.some(window=>observed>=window.start && observed<=window.end && modified>=window.start && modified<=window.end))
     throw new Error("Observation report is stale or belongs to another original command");
   native.files.set(evidence,evidenceDigest);
@@ -60,7 +74,8 @@ export async function iosObservationEvidence(context:{values:Record<string,strin
   checkHost();
   const {observedAt,...device}=physical;
   const original={commands:native.commands,evidence:{path:evidence,digest:values["evidence-digest"],modifiedAt:modified},
-    stagesDigest:digest(stages),identitiesDigest:digest([...native.identities]),localResource:claims.local,lockDirectory:lock};
+    stagesDigest:digest(stages),identitiesDigest:digest([...native.identities]),localResource:claims.local,lockDirectory:lock,
+    ...(claims.beforeActor?{executionBoundary:"before-first-device-actor",originalChildStarted:false,originalLegacyLockHeld:false,originalLegacyLockReleased:false}:{})};
   const assertions={device,localResource:claims.local,lockDirectory:lock,localLockAbsent:true,sdkLifecycle:"unclaimed"};
   const proof={original,fresh:{observedAt,assertions}};
   return {proof,

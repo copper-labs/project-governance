@@ -5,7 +5,7 @@ type: spec
 status: draft
 owner: project-governance
 created: 2026-09-20
-updated: 2026-10-30
+updated: 2026-11-02
 summary: Approved workflow execution with explicit resource ownership, RN iOS simulator then physical-device proof, and bounded recovery.
 ---
 
@@ -376,13 +376,14 @@ workflow still exits 1. Cleanup is not ordinary accepted development or API appr
 ### Original observation-only mixed iOS owner release
 
 The same `workflow-release-resources` entry has an explicitly selected `--kind ios-observation`
-adapter. Its scope is exactly one original `ios-device` claim, the matching `ios-app` claim and
+adapter. The completed observation route's scope is one original `ios-device` claim, the matching `ios-app` claim and
 one owner-declared local-storage claim. It accepts no additional network, emulator, remote,
 continuing-session or other reserved claims. All operations must be local. The local claim is
 selected with `--local-resource`; `--lock-directory` names the existing original host custody
 directory through a canonical path with an existing canonical parent. The original trusted owner
 asserts that mapping; neither opaque names nor the model establish it. The mapping is bound into
 the immutable original release receipt. This remains the existing trusted same-account host boundary.
+Failed setup can instead qualify the [before-first-actor pair](#failed-setup-before-the-first-ios-actor).
 
 Use the original hash-selected observation report. It must identify the bound `deviceUdid` and
 record `appOrSDKLaunch: false` and `ownedFileLockHeld: false`. Its `observedAt` and original file
@@ -827,8 +828,11 @@ adoption belong to the existing project owner. This contract does not automatica
 
 A separately approved recovery may use `workflow-release-resources --kind local-host-observed
 --request-file <path> --receipt <path>` for an original failed local-only operation whose closure
-report lacks a historical native process overlap. The ordinary `local-host` rule still requires
-that overlap. Never rewrite an original report or replace its missing history with invented data.
+report lacks a historical native process overlap, or whose original report retains both
+`legacyLockHeld: false` and `legacyLockReleased: false` for a never-acquired mutex. The latter case
+requires directly confirmed failed native outcomes, including when historical process overlap is
+present. The ordinary `local-host` rules remain unchanged. Never rewrite an original report or
+replace its missing history with invented data.
 
 The bounded version1 request supplies `runId`, current `revision`, original `owner`, `authority`,
 canonical `workspace`, `database`, `workerDirectory`, `registry`, exact `bindingDigest`, complete
@@ -852,7 +856,9 @@ checks. Device, app-session, network or remote custody cannot use this route.
 
 Retain a distinct create-only `workflow-local-host-observed-cleanup` receipt binding request,
 approval and mapping digests, original report and native evidence, `historicalProcessJoin: missing`,
-actual guard mappings and current absence. Recheck files, complete process inventory, guards,
+actual guard mappings and current absence. A never-acquired recovery records the actual historical
+join state and `legacyMutexEvidence: original-never-acquired-and-fresh-absent`, retaining both
+original false flags. Recheck files, complete process inventory, guards,
 original generation and the existing workflow/resource snapshots immediately before whole-set
 release. The owner keeps that local lane idle through this short observe-to-commit seam. This
 coordinates cooperating owners; it adds no sandbox against an unrelated process ignoring mutexes.
@@ -863,3 +869,26 @@ retains the original failed result and clocks and retires only its original read
 dispatch, device action, successful test, acceptance, runtime adoption or automatic upgrade follows.
 Qualification uses synthetic negative, interruption, public-route and successor fixtures; actual
 recovery requires the original owner's admitted public invocation and readback.
+
+### Failed setup before the first iOS actor
+
+The existing `ios-observation` cleanup adapter also accepts an exact device/app pair without
+`--local-resource`, retaining the required original `--lock-directory`. This is limited to a single
+original stage with a directly confirmed failed native command. Its original time-bound report must
+retain `status: failed`, `childStarted: false`, `processClosure.closed: true`,
+`processClosure.notStarted: true`, and both legacy-lock flags false. Contradictory launch, device,
+lock, process-after or device-closeout evidence refuses. An empty reported process set is valid
+before the actor; original native supervisor/child/group and worker identities remain required and
+are freshly checked for absence. The native wrapper ran; this report does not claim otherwise.
+
+The trusted owner binds the captured original program/control-flow and actual mutex mapping in its
+explicit external maintenance decision. Keep original inputs and reports immutable. The adapter
+does not infer phone state from host absence: it requires the existing fresh qualified physical
+device/app observation, real mutex absence, same-host native identity, exact current original lease
+generations/reader, and the normal short observation-to-commit fence. Failure or ambiguity retains
+the complete pair. It records `executionBoundary: before-first-device-actor` in its create-only
+cleanup proof, without rewriting the old report or claiming SDK lifecycle success.
+
+The established three-claim observation-only route retains its existing report requirements.
+Both routes preserve failed outcomes, original clocks, interruption re-observation, exact journals
+and harmless completed-release replay. Cleanup grants no successor device action or runtime upgrade.

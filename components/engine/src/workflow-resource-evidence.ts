@@ -24,6 +24,7 @@ export function workflowNativeResourceEvidence(directory: string, run: WorkflowR
     if (identities.has(pid) && identities.get(pid) !== fingerprint) throw new Error("Original process identities conflict");
     identities.set(pid,fingerprint);
   };
+  let originalFailedLaunchesConfirmed = true;
   const commands: Array<Record<string,unknown>> = [], windows: Array<{start:number;end:number;ids:Map<number,string>}> = [];
   for (let index=0;index<run.binding.recipe.stages.length;index++) {
     const spec=run.binding.recipe.stages[index]!, stage=stages.find(value=>value.id===spec.id)!;
@@ -45,6 +46,7 @@ export function workflowNativeResourceEvidence(directory: string, run: WorkflowR
         receipt.runtimeVersion!==request.executionIdentity?.runtimeVersion || receipt.archiveDigest!==request.executionIdentity?.archiveDigest ||
         stage.result.cleanup!=="confirmed" || stage.result.exitCode!==receipt.exitCode || stage.result.startedAt!==receipt.startedAt ||
         stage.result.endedAt!==receipt.endedAt || stage.result.log!==receipt.log) throw new Error("Original confirmed native cleanup differs");
+    originalFailedLaunchesConfirmed &&= rawReceipt.cleanup === "confirmed" && rawReceipt.state === "failed" && !qualified?.recovery;
     if(qualified?.recovery){
       if(digest(stage.result.cleanupRecovery??null)!==digest(qualified.recovery)||
          stage.result.state!==receipt.state&&!(receipt.state==="succeeded"&&stage.result.state==="failed"&&stage.result.inputValidity==="stale"))
@@ -83,7 +85,7 @@ export function workflowNativeResourceEvidence(directory: string, run: WorkflowR
     const processes=commandProcesses();
     if (processes.some(process=>identities.has(process.pid) || groups.includes(process.group))) throw new Error("Original command owner or process group still present or PID reused");
   };
-  return {commands,windows,identities,files,identify,assertCurrent};
+  return {commands,windows,identities,files,identify,assertCurrent,originalFailedLaunchesConfirmed: commands.length > 0 && originalFailedLaunchesConfirmed};
 }
 
 /** Local producer reports remain bound to their original execution window and process membership. */
@@ -97,7 +99,7 @@ export function workflowObservedResourceEvidence(directory: string, run: Workflo
 }
 
 function localReportEvidence(directory: string, run: WorkflowRun, stages: WorkflowStage[], evidence: string, expected: string, requireJoin: boolean) {
-  const {commands,windows,identities,files,identify,assertCurrent:nativeCurrent}=workflowNativeResourceEvidence(directory,run,stages);
+  const {commands,windows,identities,files,identify,originalFailedLaunchesConfirmed,assertCurrent:nativeCurrent}=workflowNativeResourceEvidence(directory,run,stages);
   if(!requireJoin){
     const worker=join(directory,"owner.json"),raw=narrativeFile(directory,worker);
     identify(JSON.parse(raw));files.set(worker,"sha256:"+createHash("sha256").update(raw).digest("hex"));
@@ -107,9 +109,12 @@ function localReportEvidence(directory: string, run: WorkflowRun, stages: Workfl
   if (!/^sha256:[a-f0-9]{64}$/u.test(expected) || evidenceDigest!==expected) throw new Error("Selected owner evidence digest differs");
   const report=object(JSON.parse(raw)), closure=object(report.processClosure), after=object(closure.after);
   if(!requireJoin&&report.status!=="failed")throw Error("Observed local recovery requires an original failed report");
+  // Only explicit observed recovery also checks the actual mapped mutex. Never-held is
+  // different from released; keep both original false flags in its immutable report.
+  const neverAcquired = !requireJoin && report.legacyLockHeld===false && report.legacyLockReleased===false && originalFailedLaunchesConfirmed;
   if (report.childStarted!==true || !["passed","failed","cancelled"].includes(String(report.status)) || closure.closed!==true ||
       !Array.isArray(after.group) || after.group.length || !Array.isArray(after.observedTree) || after.observedTree.length ||
-      report.legacyLockReleased!==undefined && report.legacyLockReleased!==true) throw new Error("Owner cleanup remains unresolved");
+      report.legacyLockReleased!==undefined && report.legacyLockReleased!==true && !neverAcquired) throw new Error("Owner cleanup remains unresolved");
   const ended=Number(report.ended)*1000, modified=statSync(evidence).mtimeMs, recorded=object(report.observedProcessIdentities);
   const entries=Object.entries(recorded);
   if (!entries.length || entries.length>4096 || typeof report.ended!=="number" || !Number.isFinite(ended) || !windows.some(window =>
@@ -117,7 +122,7 @@ function localReportEvidence(directory: string, run: WorkflowRun, stages: Workfl
   const joined=windows.some(window=>ended>=window.start && ended<=window.end && modified>=window.start && modified<=window.end &&
     entries.some(([pid,fp])=>window.ids.get(Number(pid))===String(fp).trim()));
   if(requireJoin&&!joined)throw new Error("Owner evidence is stale or belongs to another command");
-  if(!requireJoin&&joined)throw new Error("Original identity join exists; use ordinary local-host cleanup");
+  if(!requireJoin&&joined&&!neverAcquired)throw new Error("Original identity join exists; use ordinary local-host cleanup");
   for (const [pid,fingerprint] of entries) { if (!/^[1-9]\d*$/u.test(pid)) throw new Error("Invalid owner process identity"); identify({pid:Number(pid),fingerprint}); }
   files.set(evidence,evidenceDigest);
   const assertCurrent=()=>{
@@ -126,5 +131,6 @@ function localReportEvidence(directory: string, run: WorkflowRun, stages: Workfl
   };
   assertCurrent();
   return { proof:{commands,evidence:{path:evidence,digest:evidenceDigest,modifiedAt:modified},identitiesDigest:digest([...identities]),stagesDigest:digest(stages),
-    ...(!requireJoin?{historicalProcessJoin:"missing"}:{} )},assertCurrent };
+    ...(!requireJoin?{historicalProcessJoin:joined?"present":"missing"}:{}),
+    ...(neverAcquired?{legacyMutexEvidence:"original-never-acquired-and-fresh-absent",originalLegacyLockHeld:false,originalLegacyLockReleased:false}:{} )},assertCurrent };
 }
