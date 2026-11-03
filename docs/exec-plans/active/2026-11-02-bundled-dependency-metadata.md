@@ -42,8 +42,8 @@ must preserve existing project edits, live owners, permissions and dependency ve
 - [x] Prepared source/base and original failure verified.
 - [x] Focused parser/negative proof and typecheck complete.
 - [x] Independent review reconciled.
-- [ ] Integrated and exact installed-archive release proof complete.
-- [ ] Stable release identity and readback verified.
+- [x] Integrated and exact installed-archive release proof complete.
+- [x] Stable release identity and readback verified.
 
 Adopter paths, errors, installation records and actual check receipts remain external to this
 project-neutral source. Existing cleanup repair qualification remains with its owning plan.
@@ -58,4 +58,11 @@ The integrated engine checkpoint passed1481 with25 installed-only skips. Its nin
 caused by omitting an existing Ruff installation from the selected proof PATH; all34 affected lint
 and plan cases pass with the corrected environment. Harness82/82 and scripts142 pass with5 explicit
 skips. The final dependency checkpoint follows the unchanged integrated proof; no passing cases
-are synthesized or counted as accepted development. Archive and publication gates remain pending.
+are synthesized or counted as accepted development.
+
+Stable4.5.3 is published from`c47898611b8d92f3186a7f9b105a82ebd0418540`.
+The normal archive verifier passes, including clean staging, installed host/workflow journeys and
+real lint backends. The exact archive passes161 installed parser/cleanup cases without skips.
+Published tag, source commit, all three asset digests, runtime metadata, immutable release and
+stable/latest readback match. GitHub's existing4.x tag workflow was skipped; qualification ran
+locally. Adopter activation and notification remain deliberate owner operations, recorded externally.

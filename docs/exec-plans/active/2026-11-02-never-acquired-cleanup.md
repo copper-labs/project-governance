@@ -70,3 +70,9 @@ Actual maintenance readback remains external and separate from this controlled p
 This local candidate is not a published stable release and changes no adopter pin.
 Normal stable integrated qualification, release metadata and publication/readback
 remain separate from this bounded local-maintenance checkpoint.
+
+The already reviewed source repairs subsequently shipped in stable4.5.3 alongside the separately
+qualified npm bundle parser correction. The normal final archive verifier and161 installed affected
+cases pass; tag/source/archive/metadata and immutable stable/latest readback match. The original
+local maintenance archive remains distinct and unpublished. Actual adopter cleanup states and
+deliberate installation pins remain external; this release does not upgrade or release them.
