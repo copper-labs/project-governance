@@ -21,9 +21,6 @@ shows existing project-owned checks; it does not require a check after every edi
 
 ## Active
 
-- [Local build reservation lifecycle](active/2026-11-03-build-reservation-lifecycle.md)
-  closes normal and interrupted local build reservations through one native cleanup owner.
-
 - [Bundled dependency metadata](active/2026-11-02-bundled-dependency-metadata.md)
   qualifies the prepared npm bundle parser correction and its maintained stable patch.
 
@@ -121,6 +118,9 @@ shows existing project-owned checks; it does not require a check after every edi
   Gemini, Claude, and Codex wrappers independently of later implementation-plan improvements.
 
 ## Completed
+
+- [Local build reservation lifecycle](completed/2026-11-03-build-reservation-lifecycle.md)
+  closes normal and interrupted local build reservations through one native cleanup owner.
 
 - [RC10.4 large-evidence and review reliability](completed/2026-10-02-rc10-4-evidence-capture.md)
   published the streamed identity and automatic artifact correction after local, independent and
