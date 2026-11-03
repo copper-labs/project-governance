@@ -6,13 +6,14 @@ import { statSync } from "node:fs";
 import { narrativeFile } from "./narrative-inputs.ts";
 import { recipeDigest, type RunState } from "./workflow-types.ts";
 import { resolveWorkflowRecipe } from "./workflow-catalog.ts";
-import { WorkflowStore } from "./workflow-store.ts";
+import { WorkflowStore, type WorkflowRun, type WorkflowStage } from "./workflow-store.ts";
+import { assertBuildCleanupAdmission } from "./workflow-cleanup-observation.ts";
 import { dispatchWorkflow } from "./workflow-worker.ts";
 import { ResourceRegistry, resourceRegistryPath } from "./resources.ts";
 import { checkRunRoot } from "./check-run.ts";
 
 /** Host authorization already lives in the task ledger; this entry point cannot create an authorized action. */
-export function workflowCommand(command: string, args: string[]) {
+export function workflowCommand(command: string, args: string[]): {run:WorkflowRun;stages?:WorkflowStage[];workerDirectory?:string;cleanupBlocker?:unknown} {
   const submitting = command === "workflow-submit";
   if (!["workflow-submit", "workflow-status", "workflow-cancel", "workflow-reconcile-cleanup"].includes(command)) throw new Error("Unknown workflow command");
   const names = submitting
@@ -42,14 +43,16 @@ export function workflowCommand(command: string, args: string[]) {
         store.cancel(values.run, values.authority);
       }
       const run = store.read(values.run);
-      return { run, stages: store.stages(run.id) };
+      const cleanupBlocker=store.cleanupBlocker(run.id);
+      return { run, stages: store.stages(run.id), ...(cleanupBlocker?{cleanupBlocker}:{}) };
     }
     const version = Number(values["task-version"]);
     if (!values.task || !Number.isSafeInteger(version) || version < 1 || !values.action || !values.recipe || !values.authority || !values["operation-id"]) throw new Error("Complete workflow binding required");
     const recipe = resolveWorkflowRecipe(JSON.parse(narrativeFile(process.cwd(), values.recipe)));
+    assertBuildCleanupAdmission(recipe);
     const run = store.submit({ taskId: values.task, taskVersion: version, actionId: values.action, authorityRef: values.authority,
       recipe, recipeDigest: recipeDigest(recipe), operationId: values["operation-id"] });
-    const workerDirectory = dispatchWorkflow(values.database, run.id, join(checkRunRoot(), "..", "workflows"), resourceRegistryPath());
+    const workerDirectory = dispatchWorkflow(values.database, run.id, join(checkRunRoot(), "..", "workflows"), resourceRegistryPath(),undefined,true);
     return { run, workerDirectory };
   } finally { store.close(); }
 }

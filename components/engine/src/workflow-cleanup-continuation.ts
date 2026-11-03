@@ -1,18 +1,16 @@
-import { ownedAndroidAppSessionCleanup } from "./android-owned-app-session.ts";
-import { observeAndroidAppSession } from "./android-app-session.ts";
+import { observeWorkflowCleanup } from "./workflow-cleanup-observation.ts";
 import { existsSync, realpathSync } from "node:fs";
 import { join } from "node:path";
-import { digest, durableJson } from "./core.ts";
+import { digest } from "./core.ts";
 import { narrativeFile } from "./narrative-inputs.ts";
 import { recoverStoppedWorkflow } from "./workflow-worker-recovery.ts";
 import { executeWorkflow } from "./workflow-executor.ts";
 import { WorkflowStore } from "./workflow-store.ts";
 import { ResourceRegistry } from "./resources.ts";
-import { observePhysicalCleanup } from "./physical-cleanup.ts";
 import { recoverOriginalIosTestCleanup } from "./ios-original-test-cleanup.ts";
-import { observeSimulatorCleanup } from "./simulator-cleanup.ts";
-import { observeAndroidEmulatorCleanup } from "./android-emulator.ts";
 import { releaseRecoveredWorkflowReader } from "./workflow-reader-recovery.ts";
+import { workflowRecoveryIdentity } from "./workflow-reader-recovery.ts";
+import { reconcileReleasedWorkflow, type WorkflowCleanupReceipt } from "./workflow-resource-recovery.ts";
 
 /** Continue only declared, undispatched cleanup under the original resource generations. */
 export async function resumeStoppedWorkflowCleanup(directory: string, database: string, runId: string, revision: number) {
@@ -23,6 +21,19 @@ export async function resumeStoppedWorkflowCleanup(directory: string, database: 
   try {
     const current=store.read(runId);
     if(current.revision!==revision)throw new Error("Worker recovery binding or revision differs");
+    // A crash after registry release must finish bookkeeping, not reacquire or rebuild.
+    const receiptPath=join(directory,"resource-cleanup.json");
+    if(current.binding.recipe.localBuild && existsSync(receiptPath)) {
+      const receipt=JSON.parse(narrativeFile(directory,receiptPath)) as WorkflowCleanupReceipt;
+      if(registry.hasRelease(receipt.leases,digest(receipt))) {
+        const identity=workflowRecoveryIdentity(directory,database,current);
+        identity.assertAbsent();identity.assertUnchanged();
+        const observed=current.state==="running"?await recoverStoppedWorkflow(directory,database,runId,revision):{run:current};
+        const run=reconcileReleasedWorkflow(store,registry,runId,observed.run.revision,receipt);
+        releaseRecoveredWorkflowReader(directory,database,run);
+        return {run,stages:store.stages(runId)};
+      }
+    }
     // This qualified original-only path never dispatches a cleanup stage or rewrites test results.
     const originalPhysical=await recoverOriginalIosTestCleanup(directory,database,store,registry,current);
     if(originalPhysical)return originalPhysical;
@@ -30,17 +41,7 @@ export async function resumeStoppedWorkflowCleanup(directory: string, database: 
     if(recovered.unresolved.length)throw new Error("Original command effects remain unresolved");
     const run=await executeWorkflow(store,runId,{commandsDirectory:join(directory,"commands"),registry,
       cleanupContinuation:{revision:recovered.run.revision,stagesDigest:digest(store.stages(runId))},
-      observeCleanup:async(observed,leases)=>{
-        const resources=leases.map(lease=>lease.resource);
-        const adapter = observed.binding.recipe.androidEmulator;
-        const appSession=observed.binding.recipe.androidAppSession;
-        const observation = appSession ? appSession.ownership==="owned-emulator" ? await ownedAndroidAppSessionCleanup(directory,observed,store.stages(observed.id),undefined,undefined,true).then(x=>x.observation,()=>null) : await observeAndroidAppSession(resources,appSession,observed.binding.recipe.workspace) : adapter ? await observeAndroidEmulatorCleanup(resources, adapter, observed.binding.recipe.workspace)
-          : await observeSimulatorCleanup(resources) ?? await observePhysicalCleanup(resources);
-        if(!observation)return null;
-        const receipt={runId,bindingDigest:digest(observed.binding),leases,observation};
-        durableJson(join(directory,"resource-cleanup.json"),receipt);
-        return digest(receipt);
-      }});
+      observeCleanup:(observed,leases)=>observeWorkflowCleanup(directory,observed,store.stages(observed.id),leases)});
     if(["succeeded","failed","cancelled","blocked"].includes(run.state))releaseRecoveredWorkflowReader(directory,database,run);
     return {run,stages:store.stages(runId)};
   } finally {registry.close();store.close();}

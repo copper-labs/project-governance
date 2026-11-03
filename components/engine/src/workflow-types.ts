@@ -1,3 +1,4 @@
+import { localBuild, type LocalBuild } from "./local-build-cleanup.ts";
 import { androidAppSession, assertAndroidAppSession, type AndroidAppSession } from "./android-app-session.ts";
 import { androidEmulatorAdapter, type AndroidEmulatorAdapter } from "./android-emulator.ts";
 import { credentialNames, nonCredentialEnvironment } from "./credential-environment.ts";
@@ -19,6 +20,7 @@ export interface Recipe {
   version: 1; id: string; workspace: string; inputs: InputFile[]; resources: string[];
   operations: Record<string, CommandOperation>; stages: Stage[]; deadlineMs: number;
   policyRevision: string; claims: string[];
+  localBuild?: LocalBuild;
   androidEmulator?: AndroidEmulatorAdapter;
   androidAppSession?: AndroidAppSession;
 }
@@ -49,7 +51,7 @@ function fields(value: Record<string, unknown>, allowed: string[], label: string
 /** Recipes select host-reviewed operations; input text cannot introduce a new executable. */
 export function parseRecipe(raw: unknown): Recipe {
   const value = object(raw, "recipe");
-  fields(value, ["version", "id", "workspace", "inputs", "resources", "operations", "stages", "deadlineMs", "policyRevision", "claims", "androidEmulator", "androidAppSession"], "recipe");
+  fields(value, ["version", "id", "workspace", "inputs", "resources", "operations", "stages", "deadlineMs", "policyRevision", "claims", "androidEmulator", "androidAppSession", "localBuild"], "recipe");
   if (value["version"] !== 1) throw new Error("unsupported recipe version");
   const workspace = realpathSync(text(value["workspace"], "workspace"));
   const operations: Record<string, CommandOperation> = Object.create(null) as Record<string, CommandOperation>;
@@ -98,7 +100,7 @@ export function parseRecipe(raw: unknown): Recipe {
   if (androidEmulator && (!(value.resources as unknown[] ?? []).includes(`android-emulator:${androidEmulator.serial}`) ||
       (androidEmulator.capacity && !stages.some(stage => stage.id === androidEmulator.capacity!.beforeStage && !stage.cleanup))))
     throw new Error("Android adapter must bind its resource and a normal capacity stage");
-  const recipe:Recipe = { version: 1, id: text(value["id"], "recipe id"), workspace, inputs,
+  const recipe:Recipe = { ...(value.localBuild === undefined ? {} : {localBuild:localBuild(value.localBuild)}), version: 1, id: text(value["id"], "recipe id"), workspace, inputs,
     ...(value.androidAppSession === undefined ? {} : {androidAppSession:androidAppSession(value.androidAppSession,workspace)}),
     ...(androidEmulator ? { androidEmulator } : {}),
     resources: strings(value["resources"] ?? [], "resources", 64), operations, stages,

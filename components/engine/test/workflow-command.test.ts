@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, realpathSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { Store } from "../../harness/src/store/store.ts";
@@ -9,6 +9,7 @@ import { defaultPolicy } from "../../harness/src/ops/authority.ts";
 import { WorkflowStore } from "../src/workflow-store.ts";
 import { parseRecipe, recipeDigest } from "../src/workflow-types.ts";
 import { workflowWaitCommand } from "../src/workflow-wait.ts";
+import { dispatchWorkflow } from "../src/workflow-worker.ts";
 import { workflowCommand, workflowExitCode } from "../src/workflow-command.ts";
 
 test("workflow status observes the ledger and cancellation requires an authority reference", async () => {
@@ -53,4 +54,34 @@ test("workflow shell status distinguishes success, pending, and unsuccessful out
   assert.equal(workflowExitCode("succeeded"), 0);
   for (const state of ["queued", "running", "reconciling"] as const) assert.equal(workflowExitCode(state), 2);
   for (const state of ["failed", "cancelled", "blocked", "unknown"] as const) assert.equal(workflowExitCode(state), 1);
+});
+
+
+test("invalid build admission does not consume the action or operation id",()=>{
+ const dir=realpathSync(mkdtempSync(join(tmpdir(),"workflow-admission-"))),database=join(dir,"ledger.sqlite"),recipePath=join(dir,"recipe.json");
+ const continuity=new Store(database),store=new WorkflowStore(database);
+ try{
+  const task=continuity.createTask("check",[{kind:"scope",provenance:"operator",body:dir}]),policy=defaultPolicy();
+  const request={operation:"check" as const,scope:[dir],targets:[],destination:null,policyRevision:policy.revision};
+  const action=authorizeAction(continuity,proposeAction(continuity,task.taskId,request),request,policy,dir);
+  mkdirSync(join(dir,"config/governance"),{recursive:true});
+  writeFileSync(join(dir,"config/governance/operations.json"),JSON.stringify({version:1,operations:{check:{argv:[process.execPath,"--version"],cwd:".",effect:"read"}}}));
+  const raw={version:1,id:"build",workspace:dir,inputs:[],resources:["build:fixture"],stages:[{id:"check",operation:"check",deadlineMs:2000}],deadlineMs:4000,policyRevision:policy.revision,claims:["fixture"]};
+  writeFileSync(recipePath,JSON.stringify(raw));
+  const args=["--database",database,"--task",task.taskId,"--task-version",String(task.version),"--action",action.actionId,"--recipe",recipePath,"--authority","host:test","--operation-id","build"];
+  assert.throws(()=>workflowCommand("workflow-submit",args),/BUILD_CLEANUP_REQUIRED/);
+  const alias=join(dir,"alias");symlinkSync(dir,alias);
+  writeFileSync(recipePath,JSON.stringify({...raw,localBuild:{posixLockFiles:[join(alias,"new","build.lock")]}}));
+  assert.throws(()=>workflowCommand("workflow-submit",args),/canonical/);
+  // The same action and operation remain available for the corrected recipe.
+  const recipe=parseRecipe({...raw,localBuild:{posixLockFiles:[]},operations:{check:{argv:[process.execPath,"--version"],cwd:".",effect:"read"}}});
+  const binding={taskId:task.taskId,taskVersion:task.version,actionId:action.actionId,authorityRef:"host:test",recipe,recipeDigest:recipeDigest(recipe),operationId:"build"};
+  store.authorizeWorkflow(binding);assert.equal(store.submit(binding).state,"queued");
+  const invalidRecipe={...recipe};delete invalidRecipe.localBuild;
+  const otherAction=authorizeAction(continuity,proposeAction(continuity,task.taskId,request),request,policy,dir);
+  const invalid={...binding,actionId:otherAction.actionId,operationId:"invalid-dispatch",recipe:invalidRecipe,recipeDigest:recipeDigest(invalidRecipe)};
+  store.authorizeWorkflow(invalid);const unstarted=store.submit(invalid);
+  assert.throws(()=>dispatchWorkflow(database,unstarted.id,join(dir,"workers"),join(dir,"resources.sqlite")),/BUILD_CLEANUP_REQUIRED/);
+  assert.equal(store.read(unstarted.id).state,"blocked");
+ }finally{store.close();continuity.close();rmSync(dir,{recursive:true});}
 });

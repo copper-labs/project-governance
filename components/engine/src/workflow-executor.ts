@@ -11,11 +11,13 @@ import { ResourceRegistry, type Lease } from "./resources.ts";
 import { WorkflowStore, type WorkflowRun } from "./workflow-store.ts";
 import { validateInputs, type StageResult } from "./workflow-types.ts";
 
+export interface CleanupObservation { digest: string; assertCurrent(): void; close(): Promise<void> }
+
 export interface ExecutionOptions {
   commandsDirectory: string;
   registry: ResourceRegistry;
   /** Resource-specific readback is required: exited processes alone do not prove device/Metro cleanup. */
-  observeCleanup: (run: WorkflowRun, leases: readonly Lease[]) => Promise<string | null>;
+  observeCleanup: (run: WorkflowRun, leases: readonly Lease[]) => Promise<string | CleanupObservation | null>;
   outputLimit?: number;
   /** Additional persisted admission deadline; never changes the approved recipe identity. */
   absoluteDeadline?: number;
@@ -120,12 +122,22 @@ export async function executeWorkflow(store: WorkflowStore, id: string, options:
     unresolved ||= result.state === "unknown" || result.cleanup === "unknown";
     failed ||= result.state !== "succeeded";
   }
+  const cleanupBlocked=(reason:string)=>{
+    unresolved=true;
+    // Diagnostic storage must not prevent the authoritative unresolved transition.
+    try{store.recordCleanupBlocker(id,owner,reason);}catch{}
+  };
   if (!unresolved && leases.length) {
     try {
       const observation = await options.observeCleanup(store.read(id), leases);
-      if (observation) options.registry.release(leases, observation);
-      else unresolved = true;
-    } catch { unresolved = true; }
+      if (observation) {
+        try {
+          if(typeof observation!=="string")observation.assertCurrent();
+          options.registry.release(leases, typeof observation==="string"?observation:observation.digest);
+        } finally {if(typeof observation!=="string")await observation.close();}
+      }
+      else cleanupBlocked("No cleanup observer supports the reserved resources");
+    } catch(error) {cleanupBlocked(error instanceof Error?error.message:"Resource cleanup observation failed");}
   }
   run = store.read(id);
   return store.transition(id, owner, run.revision,

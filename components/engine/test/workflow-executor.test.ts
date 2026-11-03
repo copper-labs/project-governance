@@ -288,3 +288,13 @@ test("public command recovery releases workflow resources after worker and guard
     f.close();
   }
 });
+
+
+test("cleanup diagnostic failure still records an unresolved run and retains resources",async()=>{
+ const f=fixture(false);
+ try{
+  f.store.recordCleanupBlocker=()=>{throw Error("diagnostic write unavailable");};
+  const result=await executeWorkflow(f.store,f.run.id,{commandsDirectory:join(f.dir,"commands"),registry:f.registry,observeCleanup:async()=>null});
+  assert.equal(result.state,"unknown");assert.equal(f.registry.inspect()[0]!.state,"held");
+ }finally{f.close();}
+});

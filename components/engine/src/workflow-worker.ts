@@ -1,6 +1,4 @@
-import { ownedAndroidAppSessionCleanup } from "./android-owned-app-session.ts";
-import { observeAndroidAppSession } from "./android-app-session.ts";
-import { observeAndroidEmulatorCleanup } from "./android-emulator.ts";
+import { observeWorkflowCleanup, assertBuildCleanupAdmission } from "./workflow-cleanup-observation.ts";
 import { credentialEnvironment } from "./credential-environment.ts";
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
@@ -11,8 +9,6 @@ import { commandEnvironment, processFingerprint, processLiveFingerprint } from "
 import { ResourceRegistry } from "./resources.ts";
 import { executeWorkflow } from "./workflow-executor.ts";
 import { WorkflowStore, type WorkflowRun } from "./workflow-store.ts";
-import { observePhysicalCleanup } from "./physical-cleanup.ts";
-import { observeSimulatorCleanup } from "./simulator-cleanup.ts";
 import { retainRuntimeReader, releaseRuntimeReader, type RuntimeReader } from "./runtime-reader.ts";
 
 const WORKER = fileURLToPath(import.meta.url);
@@ -27,7 +23,7 @@ export interface WorkerObservation {
 }
 
 /** Reserve dispatch once. A lost acknowledgment never authorizes another worker launch. */
-export function dispatchWorkflow(database: string, runId: string, workersDirectory: string, registry: string, execution?: WorkerRequest["execution"]): string {
+export function dispatchWorkflow(database: string, runId: string, workersDirectory: string, registry: string, execution?: WorkerRequest["execution"], capabilityChecked=false): string {
   if (execution && (!Number.isSafeInteger(execution.absoluteDeadline) || execution.absoluteDeadline < 1 || !Number.isSafeInteger(execution.outputLimit) || execution.outputLimit < 1 || execution.outputLimit > 1048576)) throw new Error("Invalid workflow execution bounds");
   const store = new WorkflowStore(database);
   let run: WorkflowRun;
@@ -46,6 +42,14 @@ export function dispatchWorkflow(database: string, runId: string, workersDirecto
   };
   if (existsSync(directory)) return existing();
   if (run.state !== "queued") throw new Error("only a queued workflow can be dispatched");
+  try { assertBuildCleanupAdmission(run.binding.recipe,!capabilityChecked); }
+  catch(error) {
+    const failed=new WorkflowStore(database);
+    try{failed.blockUnstarted(run.id,digest(run.binding),String(error).slice(0,512));}
+    catch{/* Concurrent dispatch may already own the run; preserve the original admission error. */}
+    finally{failed.close();}
+    throw error;
+  }
   // Reject incompatible host state synchronously, before reserving a worker or retaining a runtime reader.
   const resources = new ResourceRegistry(registry); resources.close();
   const environment = { ...commandEnvironment({}), ...credentialEnvironment([...new Set(Object.values(run.binding.recipe.operations).flatMap(op => op.credentialEnv ?? []))]) };
@@ -106,19 +110,7 @@ async function worker(directory: string, expectedDigest: string): Promise<void> 
   try {
     if (digest(store.read(request.runId).binding) !== request.bindingDigest) throw new Error("workflow binding changed");
     await executeWorkflow(store, request.runId, { commandsDirectory: request.commandsDirectory, registry, ...request.execution,
-      // Unknown resource types remain held; supported device claims require host readback.
-      observeCleanup: async (observedRun, leases) => {
-        const resources = leases.map(lease => lease.resource);
-        const appSession=observedRun.binding.recipe.androidAppSession;
-        const observation = appSession ? appSession.ownership==="owned-emulator" ? await ownedAndroidAppSessionCleanup(directory,observedRun,store.stages(observedRun.id),undefined,undefined,true).then(x=>x.observation,()=>null) : await observeAndroidAppSession(resources,appSession,observedRun.binding.recipe.workspace) : observedRun.binding.recipe.androidEmulator
-          ? await observeAndroidEmulatorCleanup(resources, observedRun.binding.recipe.androidEmulator, observedRun.binding.recipe.workspace)
-          : await observeSimulatorCleanup(resources) ?? await observePhysicalCleanup(resources);
-        if (!observation) return null;
-        const receipt = { runId: observedRun.id, bindingDigest: request.bindingDigest, leases, observation };
-        // Preserve actual readback before permitting the registry to release these generations.
-        durableJson(join(directory, "resource-cleanup.json"), receipt);
-        return digest(receipt);
-      } });
+      observeCleanup: (run,leases)=>observeWorkflowCleanup(directory,run,store.stages(run.id),leases) });
     const completed = store.read(request.runId);
     if (["succeeded", "failed", "cancelled", "blocked"].includes(completed.state) &&
         !registry.inspect().some(lease => lease.operation === request.runId && lease.state === "held")) {

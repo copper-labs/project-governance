@@ -21,6 +21,9 @@ shows existing project-owned checks; it does not require a check after every edi
 
 ## Active
 
+- [Local build reservation lifecycle](active/2026-11-03-build-reservation-lifecycle.md)
+  closes normal and interrupted local build reservations through one native cleanup owner.
+
 - [Bundled dependency metadata](active/2026-11-02-bundled-dependency-metadata.md)
   qualifies the prepared npm bundle parser correction and its maintained stable patch.
 

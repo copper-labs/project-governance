@@ -459,6 +459,18 @@ export class WorkflowStore {
     return this.#db.prepare("SELECT id,state,result FROM engine_stage WHERE run_id=? ORDER BY rowid").all(id)
       .map(r => ({ id: String(r["id"]), state: String(r["state"]) as StageState, result: r["result"] === null ? null : JSON.parse(String(r["result"])) as StageResult }));
   }
+  recordCleanupBlocker(id:string,owner:string,reason:string):void {
+    this.#atomic(()=>{
+      const run=this.read(id);
+      if(run.owner!==owner || run.state!=="running")throw Error("Cleanup observation owner differs");
+      this.#event(id,"resource-cleanup-blocked",{reason:reason.slice(0,512)});
+    });
+  }
+  cleanupBlocker(id:string):unknown {
+    if(this.read(id).state!=="unknown")return null;
+    const row=this.#db.prepare("SELECT data FROM engine_event WHERE run_id=? AND kind='resource-cleanup-blocked' AND sequence > COALESCE((SELECT MAX(sequence) FROM engine_event WHERE run_id=? AND kind IN ('claimed','cleanup-continuation-reserved')),0) ORDER BY sequence DESC LIMIT 1").get(id,id);
+    return row?JSON.parse(String(row.data)):null;
+  }
   events(id: string, after = 0): unknown[] {
     return this.#db.prepare("SELECT sequence,at,kind,data FROM engine_event WHERE run_id=? AND sequence>? ORDER BY sequence LIMIT 100").all(id, after)
       .map(r => ({ ...r, data: JSON.parse(String(r["data"])) as unknown }));

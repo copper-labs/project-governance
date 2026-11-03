@@ -957,3 +957,66 @@ original scope; qualification still verifies original runtime reader/evidence an
 ordinary stages. This is a bounded repair execution, not a second installed runtime, compatibility
 copy or an authorization for ordinary development on the new archive. Installed payloads are never
 edited. The ordinary `ios-observation` no-launch route keeps its existing contract unchanged.
+
+
+## Local build reservation lifecycle
+
+A local build must have a supported finish path before it takes a build reservation. Recipes may
+bind `localBuild: {posixLockFiles: ["/absolute/canonical/build.lock"]}`. This is the trusted local
+owner's declaration that every resource is a local build coordination obligation; supported names
+are `local:`, `build:` and `gradle:`. The name alone is not cleanup evidence. No device, emulator,
+app session, network or remote custody can use this declaration. An empty lock list declares
+coordination-only reservations; an actual POSIX record lock must be named by an absolute path whose nearest existing ancestor is canonical
+(the file or parent may not exist yet). Only per-build guards released when the build ends
+are supported; persistent Gradle daemon/cache locks use a different contention protocol and must
+not be supplied. Operations may have read or local effects. Session/workspace claims and mixed
+build/device custody remain outside this adapter. This is neither a lock-directory adapter nor an instruction to delete lock files.
+
+New `build:` and `gradle:` dispatch requires this declaration and an available cleanup capability
+before saving a run, creating a worker or retaining a generation reader. A later host-capability
+failure marks an untouched submitted run blocked. Existing opaque/local manual-recovery
+contracts remain readable and unchanged; callers should select this explicit lifecycle for new
+local builds. POSIX lock observation requires macOS/Linux and `/usr/bin/python3`. Admission also rejects an existing non-regular, aliased or multiply linked lock file. The runtime owns
+the fixed observer program; project data supplies paths, never executable probe code. A bound lock
+mapping cannot be replaced during recovery. If external state later invalidates it, restore that
+original per-build guard before retrying; this route provides no force-release override.
+
+Normal completion and `workflow-resume-cleanup` use one shared resource-observation dispatch.
+Local build cleanup verifies original request/runtime/launch identity, qualified native results,
+recorded process membership and fresh complete process/group absence for every dispatched stage.
+Fast commands without a membership sample require the original native supervisor's confirmed
+closure; later qualified owner recovery retains its distinct provenance. Pending/unresolved
+commands prevent release. Blocked commands that were never dispatched need no manufactured report.
+Project wrappers do not need to duplicate native closure in a second report.
+
+For each existing declared POSIX file, the runtime acquires a nonblocking exclusive record lock,
+checks canonical parent and file identity, and holds the lock through the reservation-release
+transaction. A busy, replaced, symlinked or ambiguous file refuses release. No lock file is created,
+rewritten or deleted. An absent file is recorded as absent and must remain absent at the release
+check. Missing parent directories are observed through the nearest existing canonical ancestor;
+that ancestor and missing path must remain unchanged at release. Ownership generations still fence concurrent/successor reservations. Genuine failures and
+cancellation remain failures/cancellation after their resources are released.
+
+A create-only stable cleanup intent and separate hash-named lock-observation attempts make a crash
+before release retryable even if an unlocked lock file was replaced or removed. Each attempt is
+bound to the same run, recipe, native commands and stages; a fresh observation is held through
+release. Historical observations remain unchanged and do not by themselves authorize release. A crash after release resumes
+terminal bookkeeping from the recorded original release without reacquiring a resource or running
+a build. Repeated recovery preserves successor ownership and original build result bytes. A failed
+observation retains a bounded reason in the workflow's events; `workflow-status` exposes it as
+`cleanupBlocker` while the workflow is unknown. Cleanup availability is independent of expired
+permission to start new work, but it grants no new build, device or signaling authority.
+
+For a historical run without the declaration, the existing trusted owner command accepts
+`workflow-release-resources --kind local-build` with the ordinary original run/owner/revision/
+registry/evidence/receipt arguments plus `--build-cleanup FILE --build-cleanup-digest SHA256`.
+FILE contains exactly the `localBuild` object. The owner must establish the actual historical lock
+mapping from original inputs; a different mapping cannot replace an already-bound declaration.
+Select the first executed original native result as evidence; the shared verifier checks all native stages.
+This explicit recovery never rewrites the old recipe, pin or result. Use existing
+`workflow-reconcile-cleanup` afterward. Replay requires the same declaration and original receipt.
+
+Validation covers normal success/failure, multiple stages, missing duplicate reports, real-lock
+contention, lock replacement/aliasing, unsupported scope, interrupted release, no-replay recovery,
+successor ownership and exact installed execution. This is controlled runtime qualification, not
+product acceptance or measured development savings.

@@ -1,3 +1,5 @@
+import { localBuild, observeLocalBuild } from "./local-build-cleanup.ts";
+import { createHash } from "node:crypto";
 import type { AndroidOwnedSessionProbes } from "./android-owned-app-session.ts";
 import { androidAppSessionEvidence } from "./android-app-session-cleanup.ts";
 import { assertAndroidAppSession, type AndroidAppProbe } from "./android-app-session.ts";
@@ -19,8 +21,8 @@ import { simulatorBuildClaims, simulatorBuildEvidence, type SimulatorBuildProbes
 import type { WorkflowCleanupReceipt } from "./workflow-resource-recovery.ts";
 
 /** Public trusted-local-owner surface; evidence can retire old claims, never authorize new work. */
-function prepareResourceRelease(args: string[], workspace: string, kind: "local-host"|"local-host-observed"|"ios-observation"|"ios-simulator-build"|"android-app-session", approvedScopeDigest?:string) {
-  const local=kind==="local-host"||kind==="local-host-observed";
+function prepareResourceRelease(args: string[], workspace: string, kind: "local-build"|"local-host"|"local-host-observed"|"ios-observation"|"ios-simulator-build"|"android-app-session", approvedScopeDigest?:string) {
+  const local=kind==="local-build"||kind==="local-host"||kind==="local-host-observed";
   const names=["database","run","revision","worker-directory","registry","authority","kind","evidence","evidence-digest","receipt",...(!local&&kind!=="android-app-session"?["local-resource","lock-directory"]:[]),...(kind==="ios-simulator-build"?["simulator-lock-directory"]:[])];
   const {values}=parseArgs({args,strict:true,allowPositionals:false,options:Object.fromEntries(names.map(key=>[key,{type:"string" as const}]))});
   if (names.some(key=>!(kind==="ios-observation"&&key==="local-resource")&&!values[key]) || values.kind!==kind || !/^\d+$/u.test(values.revision!) ||
@@ -49,13 +51,13 @@ function prepareResourceRelease(args: string[], workspace: string, kind: "local-
     const identity=workflowRecoveryIdentity(directory,database,run), leases=registry.originalLeases(run.id,run.owner);
     if (digest(leases.map(lease=>lease.resource).sort())!==digest([...run.binding.recipe.resources].sort())) throw new Error("Original lease scope differs");
     const receiptPath=resolve(values.receipt!), bindingDigest=digest(run.binding), workerRequestDigest=digest(identity.request);
-    const observationKind=kind==="local-host-observed"?"workflow-local-host-observed-cleanup":kind==="android-app-session"?"workflow-android-app-session-cleanup":kind==="local-host"?"workflow-local-host-cleanup":kind==="ios-observation"?"workflow-ios-observation-cleanup":"workflow-ios-simulator-build-cleanup";
-    const scopeDigest=approvedScopeDigest??(kind==="android-app-session"?digest(run.binding.recipe.androidAppSession):kind==="local-host"?null:digest({localResource:values["local-resource"]??null,lockDirectory:values["lock-directory"],...(kind==="ios-simulator-build"?{simulatorLockDirectory:values["simulator-lock-directory"]}:{})}));
+    const observationKind=kind==="local-build"?"workflow-local-build-cleanup":kind==="local-host-observed"?"workflow-local-host-observed-cleanup":kind==="android-app-session"?"workflow-android-app-session-cleanup":kind==="local-host"?"workflow-local-host-cleanup":kind==="ios-observation"?"workflow-ios-observation-cleanup":"workflow-ios-simulator-build-cleanup";
+    const scopeDigest=approvedScopeDigest??(kind==="android-app-session"?digest(run.binding.recipe.androidAppSession):(kind==="local-host"||kind==="local-build")?null:digest({localResource:values["local-resource"]??null,lockDirectory:values["lock-directory"],...(kind==="ios-simulator-build"?{simulatorLockDirectory:values["simulator-lock-directory"]}:{})}));
     const validate=(receipt: WorkflowCleanupReceipt) => {
       const observation=object(receipt.observation,"resource owner observation");
       if (receipt.runId!==run.id || receipt.bindingDigest!==bindingDigest || digest(receipt.leases)!==digest(leases) ||
           observation.kind!==observationKind || observation.version!==1 || observation.authority!==values.authority ||
-          observation.workerRequestDigest!==workerRequestDigest || (kind==="local-host"?object(object(observation.proof).evidence):object(object(object(observation.proof).original).evidence)).digest!==values["evidence-digest"] ||
+          observation.workerRequestDigest!==workerRequestDigest || ((kind==="local-host"||kind==="local-build")?object(object(observation.proof).evidence):object(object(object(observation.proof).original).evidence)).digest!==values["evidence-digest"] ||
           kind!=="local-host" && observation.scopeDigest!==scopeDigest)
         throw new Error("Original release receipt binding differs");
       return observation;
@@ -118,6 +120,30 @@ export function workflowResourceRelease(args: string[],workspace=process.cwd()) 
 /** Explicit platform adapters observe cleanup only; it never dispatches a workflow or app action. */
 export async function workflowResourceReleaseCommand(args:string[],workspace=process.cwd(),probes?:IosObservationProbes|SimulatorBuildProbes|AndroidAppProbe|AndroidOwnedSessionProbes) {
   const {values}=parseArgs({args,strict:false,allowPositionals:true,options:{kind:{type:"string"}}});
+  if(values.kind==="local-build"){
+    const selected=parseArgs({args,strict:false,allowPositionals:true,options:{"build-cleanup":{type:"string"},"build-cleanup-digest":{type:"string"}}}).values;
+    const path=selected["build-cleanup"],expected=selected["build-cleanup-digest"];
+    const boundedDigest=(file:string)=>"sha256:"+createHash("sha256").update(narrativeFile(dirname(file),file)).digest("hex");
+    if(typeof path!=="string"||typeof expected!=="string"||realpathSync(path)!==path||boundedDigest(path)!==expected)throw Error("Exact local build cleanup declaration required");
+    const declaration=localBuild(JSON.parse(narrativeFile(dirname(path),path)));
+    const filtered=args.filter((arg,index)=>!(/^--build-cleanup(?:-digest)?(?:=|$)/u.test(arg)||["--build-cleanup","--build-cleanup-digest"].includes(args[index-1]!)));
+    const context=prepareResourceRelease(filtered,workspace,"local-build",expected);
+    try {
+      if(context.run.binding.recipe.localBuild && digest(context.run.binding.recipe.localBuild)!==digest(declaration))throw Error("Original build cleanup declaration differs");
+      if(context.replay)return context.replay;
+      const first=context.run.binding.recipe.stages.findIndex(spec=>context.stages.find(stage=>stage.id===spec.id)?.result);
+      if(first<0)throw Error("Original native build receipt required");
+      const nativePath=join(context.directory,"commands",`${context.run.id}-${first}`,"result.json");
+      if(realpathSync(context.values.evidence!)!==nativePath || boundedDigest(nativePath)!==context.values["evidence-digest"])throw Error("Original native build receipt required");
+      const observed=await observeLocalBuild(context.directory,context.run,context.stages,declaration);
+      try {
+        return context.finish({...observed.proof,evidence:{path:nativePath,digest:context.values["evidence-digest"]},declaration:{path,digest:expected}},()=>{
+          if(realpathSync(path)!==path || boundedDigest(path)!==expected)throw Error("Build cleanup declaration changed");
+          observed.assertCurrent();
+        });
+      }finally{await observed.close();}
+    }finally{context.close();}
+  }
   if(values.kind==="local-host-observed"){
     const selected=observedLocalRequest(args,workspace),context=prepareResourceRelease(selected.args,workspace,"local-host-observed",selected.requestDigest);
     try{

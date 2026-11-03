@@ -49,7 +49,8 @@ observedProcessIdentities:{[process.pid]:fingerprint},legacyLockReleased:true,en
   const command=join(worker,"commands",submitted.id+"-0");
   let ready=false;
   for(let attempt=0;attempt<200;attempt++){
-    if(store.read(submitted.id).state===(options?.expectedState??"unknown")){
+    if(store.read(submitted.id).state===(options?.expectedState??"unknown") &&
+       !store.stages(submitted.id).some((stage:any)=>["pending","running"].includes(stage.state))){
       const owner=JSON.parse(readFileSync(join(worker,"owner.json"),"utf8")),pids=[owner.pid],groups:number[]=[];
       for(let index=0;index<recipe.stages.length;index++){
         const path=join(worker,"commands",submitted.id+"-"+index);if(!existsSync(join(path,"launch.json")))continue;
