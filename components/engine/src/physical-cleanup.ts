@@ -21,6 +21,32 @@ async function deviceProbe(udid: string, kind: ProbeKind): Promise<unknown> {
   } finally { rmSync(directory, { recursive: true, force: true }); }
 }
 
+/** A stopped test owner can use its captured container only after the target bundle is removed. */
+export async function observeRemovedPhysicalApp(original:{udid:string;bundleId:string;appUrl:string},
+ probes?:Parameters<typeof observePhysicalCleanup>[1]) {
+ if(!probes && process.platform!=="darwin")return null;
+ if(!/^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{8}-[0-9a-fA-F]{16})$/u.test(original.udid) ||
+    !/^[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/u.test(original.bundleId))return null;
+ try {
+  const url=new URL(original.appUrl);
+  if(url.protocol!=="file:" || url.host || url.search || url.hash || !url.pathname.endsWith(".app/"))return null;
+  const probe=probes?.device??deviceProbe,details=object(await probe(original.udid,"details"));
+  if(object(details.hardwareProperties).udid!==original.udid || object(details.deviceProperties).bootState!=="booted" || typeof details.identifier!=="string")return null;
+  const apps=object(await probe(original.udid,"apps")),processes=object(await probe(original.udid,"processes"));
+  if(apps.deviceIdentifier!==details.identifier || processes.deviceIdentifier!==details.identifier || !Array.isArray(apps.apps) || !Array.isArray(processes.runningProcesses))return null;
+  if(apps.apps.some(raw=>{const app=object(raw);if(typeof app.bundleIdentifier!=="string")throw Error("Ambiguous app inventory");return app.bundleIdentifier===original.bundleId;}))return null;
+  for(const raw of processes.runningProcesses) {
+   const row=object(raw);
+   if(typeof row.executable!=="string" || !Number.isSafeInteger(row.processIdentifier))return null;
+   const executable=new URL(row.executable);
+   if(executable.protocol!=="file:" || executable.host || executable.search || executable.hash || executable.pathname.startsWith(url.pathname))return null;
+  }
+  return {kind:"physical-cleanup-observation",version:1,udid:original.udid,deviceIdentifier:details.identifier,
+   bundleId:original.bundleId,appUrl:url.href,appInstalled:false,appProcessAbsent:true,port:null,portClosed:null,
+   observedAt:new Date().toISOString()};
+ }catch{return null;}
+}
+
 /** Missing connectivity or ambiguous app identity cannot release a physical-device claim. */
 export async function observePhysicalCleanup(resources: readonly string[], probes?: {
   device: (udid: string, kind: ProbeKind) => Promise<unknown>;

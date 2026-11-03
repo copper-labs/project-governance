@@ -179,3 +179,5 @@ shows existing project-owned checks; it does not require a check after every edi
 - [Reusable workflow approval and execution diagnostics](active/2026-10-26-workflow-approval-repair.md) owns the bounded 4.3.0 release.
 
 - [Cooperative startup relinquishment](active/2026-11-02-cooperative-startup-relinquishment.md): explicit owning-chat handoff for shared native hosts.
+
+- [Original removed physical tester cleanup](active/2026-11-03-original-physical-cleanup.md): existing continuation, captured container and fresh absence proof.

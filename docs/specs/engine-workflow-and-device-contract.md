@@ -892,3 +892,47 @@ cleanup proof, without rewriting the old report or claiming SDK lifecycle succes
 The established three-claim observation-only route retains its existing report requirements.
 Both routes preserve failed outcomes, original clocks, interruption re-observation, exact journals
 and harmless completed-release replay. Cleanup grants no successor device action or runtime upgrade.
+
+### Original removed-tester cleanup continuation
+
+The existing `workflow-resume-cleanup` owner path also qualifies a completed original physical
+XCTest operation with one retained legacy `ios:<udid>` claim. This covers legacy runs of that exact
+qualified shape, rather than a hard-coded adopter/run ID. This does not alias, rename or acquire
+that claim and does not add a public adapter, recipe field or permission. Its frozen local operation
+must already pin the exact app directory/tree hash, XCTest file/hash, phone and original output
+location. The original native driver must be a captured input. Completed command evidence must
+retain confirmed host cleanup, recorded native process membership and the original failed/successful
+stage result. No missing-membership exemption is added. Selection first checks the complete settled
+one-stage XCTest shape without side effects; nonmatches retain ordinary continuation, including
+pending declared cleanup stages. A relative native driver resolves against its captured operation cwd.
+
+Use original in-command output only: native tester receipt, successful installed-app inventory,
+acknowledged uninstall, absent-app inventory and the file-guard acquisition record. Their file
+modification times must lie inside the original native command window; they identify one bundle,
+original device identity, installed container URL and original guard PID/holder/path. Cross-check
+original frozen command arguments, app metadata and app/XCTest hashes. The app hash uses the native
+path-component order and includes file bytes and symbolic-link targets. Later source changes do not
+invalidate cleanup of already captured effects; changed original artifacts or evidence do.
+
+The continuation only reads fresh details, full app inventory and process inventory for that same
+phone. The bundle must remain uninstalled, the original container must have no running executable,
+all process rows must be unambiguous, and the current device identity must match the original.
+Current reinstallation, device disconnect, unknown process/URL, original host/file guard presence,
+changed owner/generation, another same-phone holder or expired readback retains ownership. It never
+installs/uninstalls/stops/launches an app or creates/prunes a file guard. `sdkLifecycle` is unclaimed.
+
+After fresh closure, use the existing create-only cleanup receipt, short workflow snapshot fence
+and atomic exact-original-lease release. Normal reconciliation preserves stages and original native
+receipt bytes; a failed stage remains a failed workflow, not task/product acceptance. Retire only
+that workflow's original retained runtime reader after terminal reconciliation. An interrupted call
+reuses the original receipt, obtains fresh closure if release is not yet recorded, and replays a
+completed release without touching a successor. Public retries supply the freshly observed current
+workflow revision, as before. The original generation must remain selected and
+its reader held before first release; no pin, global authority or resource registry schema changes.
+
+A reviewed exact-archive repair can be deliberately selected for this existing cleanup command
+against the unchanged original generation. Invoke only its same public cleanup entry with the
+original scope; qualification still verifies original runtime reader/evidence and cannot dispatch
+ordinary stages. This is a bounded repair execution, not a second installed runtime, compatibility
+copy or an authorization for ordinary development on the new archive. Installed payloads are never
+edited. The ordinary `ios-observation` no-launch route keeps its existing contract unchanged.

@@ -9,6 +9,7 @@ import { executeWorkflow } from "./workflow-executor.ts";
 import { WorkflowStore } from "./workflow-store.ts";
 import { ResourceRegistry } from "./resources.ts";
 import { observePhysicalCleanup } from "./physical-cleanup.ts";
+import { recoverOriginalIosTestCleanup } from "./ios-original-test-cleanup.ts";
 import { observeSimulatorCleanup } from "./simulator-cleanup.ts";
 import { observeAndroidEmulatorCleanup } from "./android-emulator.ts";
 import { releaseRecoveredWorkflowReader } from "./workflow-reader-recovery.ts";
@@ -18,10 +19,15 @@ export async function resumeStoppedWorkflowCleanup(directory: string, database: 
   directory=realpathSync(directory);database=realpathSync(database);
   const request=JSON.parse(narrativeFile(directory,"request.json"));
   if(typeof request.registry!=="string" || !existsSync(request.registry))throw new Error("Original workflow resource registry required");
-  const recovered=await recoverStoppedWorkflow(directory,database,runId,revision);
-  if(recovered.unresolved.length)throw new Error("Original command effects remain unresolved");
   const store=new WorkflowStore(database),registry=new ResourceRegistry(request.registry);
   try {
+    const current=store.read(runId);
+    if(current.revision!==revision)throw new Error("Worker recovery binding or revision differs");
+    // This qualified original-only path never dispatches a cleanup stage or rewrites test results.
+    const originalPhysical=await recoverOriginalIosTestCleanup(directory,database,store,registry,current);
+    if(originalPhysical)return originalPhysical;
+    const recovered=await recoverStoppedWorkflow(directory,database,runId,revision);
+    if(recovered.unresolved.length)throw new Error("Original command effects remain unresolved");
     const run=await executeWorkflow(store,runId,{commandsDirectory:join(directory,"commands"),registry,
       cleanupContinuation:{revision:recovered.run.revision,stagesDigest:digest(store.stages(runId))},
       observeCleanup:async(observed,leases)=>{

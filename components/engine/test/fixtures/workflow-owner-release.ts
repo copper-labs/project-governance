@@ -15,7 +15,7 @@ const {commandProcesses}=await import(moduleUrl("command-owner-recovery"));
 const {RuntimeGenerations}=await import(moduleUrl("runtime-generations"));
 
 /** A real benign native command writes its closure report, fails, and leaves custom leases unknown. */
-export async function ownerReleaseFixture(resources:string[]=["fixture-local-producer","fixture-local-storage"], observation:boolean|"simulator"=false, exitCode=1, options?:{recipe?:(dir:string)=>Record<string,unknown>;expectedState?:string;registryPath?:string;producer?:(dir:string)=>string;workerPreload?:string;stages?:Array<{id:string;operation:string;deadlineMs:number;dependsOn?:string[]}>}) {
+export async function ownerReleaseFixture(resources:string[]=["fixture-local-producer","fixture-local-storage"], observation:boolean|"simulator"=false, exitCode=1, options?:{recipe?:(dir:string)=>Record<string,unknown>;argv?:(dir:string,script:string)=>string[];expectedState?:string;registryPath?:string;producer?:(dir:string)=>string;workerPreload?:string;stages?:Array<{id:string;operation:string;deadlineMs:number;dependsOn?:string[];cleanup?:boolean}>}) {
   const dir=realpathSync(mkdtempSync(join(tmpdir(),"workflow-owner-release-"))),database=join(dir,"harness.sqlite");
   const report=join(dir,"closure.json"),script=join(dir,"producer.mjs"),receipt=join(dir,"release.json");
   writeFileSync(script,options?.producer?.(dir)??`import{writeFileSync}from'node:fs';import{execFileSync}from'node:child_process';
@@ -27,7 +27,7 @@ observedProcessIdentities:{[process.pid]:fingerprint},legacyLockReleased:true,en
   const policy=api.defaultPolicy(),request={operation:"check",scope:[dir],targets:[script],destination:null,policyRevision:policy.revision};
   const action=api.authorizeAction(continuity,api.proposeAction(continuity,task.taskId,request),request,policy,dir);
   const recipe=parseRecipe({version:1,id:"owner-release-fixture",workspace:dir,inputs:[{path:"producer.mjs",digest:api.fileDigest(script)}],
-    resources,...options?.recipe?.(dir),operations:{check:{argv:[process.execPath,script,report,JSON.stringify(resources.find(value=>value.startsWith("ios-device:"))?.slice("ios-device:".length)??"fixture")],cwd:".",effect:"local"}},
+    resources,...options?.recipe?.(dir),operations:{check:{argv:options?.argv?.(dir,script)??[process.execPath,script,report,JSON.stringify(resources.find(value=>value.startsWith("ios-device:"))?.slice("ios-device:".length)??"fixture")],cwd:".",effect:"local"}},
     stages:options?.stages??[{id:"native",operation:"check",deadlineMs:5000}],deadlineMs:10000,policyRevision:policy.revision,claims:["controlled fixture"]});
   const store=new api.WorkflowStore(database),binding={taskId:task.taskId,taskVersion:1,actionId:action.actionId,authorityRef:"host:fixture-owner",recipe,
     recipeDigest:api.recipeDigest(recipe),operationId:"fixture-owner:1"};store.authorizeWorkflow(binding);
