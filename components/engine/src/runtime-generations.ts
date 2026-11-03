@@ -119,6 +119,22 @@ export class RuntimeGenerations {
   release(token: string, owner: string) {
     if (this.#db.prepare("DELETE FROM readers WHERE token=? AND owner=?").run(token, owner).changes !== 1) throw new Error("Runtime reader ownership mismatch");
   }
+  /** A cooperating chat releases its reservation, never another command's runtime access. */
+  relinquishStartupReader(reader: InstallationStartupReader, expectedCurrent: {revision:number;directory:string} = reader) {
+    if (!/^startup-task:sha256:[a-f0-9]{64}$/u.test(reader.owner)) throw new Error("Startup reader required");
+    return this.#transaction(() => {
+      const state = this.state();
+      if (state.maintenance) throw new Error("Startup relinquishment cannot cross active maintenance");
+      if (state.revision !== expectedCurrent.revision || state.directory !== expectedCurrent.directory || state.revision < reader.revision ||
+        (state.revision === reader.revision && state.directory !== reader.directory))
+        throw new Error("Startup relinquishment generation changed");
+      const held = state.readers.filter(row => row.owner === reader.owner || row.token === reader.token);
+      if (held.length > 1 || (held[0] && (state.revision !== reader.revision || held[0].token !== reader.token || held[0].owner !== reader.owner || held[0].revision !== reader.revision)))
+        throw new Error("Startup relinquishment reader changed");
+      // An interruption after this ledger commits can replay against the retained exact task binding.
+      if (held[0]) this.#db.prepare("DELETE FROM readers WHERE token=? AND owner=? AND revision=?").run(reader.token, reader.owner, reader.revision);
+    });
+  }
   /** A startup handoff consumes the reader without ending the task's ownership obligation. */
   retireStartupReader(reader: { token: string; owner: string; revision: number; directory: string }): boolean {
     if (!/^startup-task:sha256:[a-f0-9]{64}$/u.test(reader.owner)) throw new Error("Startup reader required");

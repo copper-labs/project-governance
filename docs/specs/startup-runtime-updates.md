@@ -147,6 +147,48 @@ Recovery that already retired the original owner before consumption remains canc
 exact released-reservation history. A shared native host that stays alive still blocks absence proof;
 that case requires the original owning chat to complete or cancel.
 
+### Cooperative relinquishment without ending the native host
+
+Compiled 4.5.4 adds explicit `startup relinquish --binding-digest <current-binding>
+--authority <operator-reason> --receipts <store>`. The native owning chat runs it at an agreed safe
+stopping point. Its task comes from the existing native session environment, never a caller-supplied
+task selector or fabricated lifecycle event. The same native process, exact binding, canonical
+workspace and registry must match. Other live chats sharing that host cannot use their own identity
+to release this reservation. Absent-host recovery retains its separate original rule.
+
+Relinquishment removes only that chat's startup reservation, records the exact binding and receipt
+in existing owner history, and leaves the task open. It neither ends the native session nor proves
+completed work. Other startup, command, workflow and provider readers remain intact. Active
+maintenance refuses relinquishment. The normal updater still requires every reader to drain before
+activation; another prompt or command before that boundary makes it defer normally.
+
+A released owner may resume through the normal pinned launcher. Every managed invocation selects
+and holds the currently installed generation and validates its lock; it never gains permission to
+invoke an old payload directly. A native prompt reacquires a startup reservation and prepares current prompt context. The existing
+internal refresh-required flag is not a native host notification and does not advance discovery.
+The cooperating agent must explicitly read the current startup guide and refresh context on resume.
+The release command's guidance tells the cooperating agent to stop project operations after its
+receipt and use the current installed entry when resumed. This is cooperative task handoff, not an
+idle-badge detector or a new process sandbox. Work outside managed execution remains outside its
+proof, and the operator must not treat the release receipt as evidence that such processes stopped.
+
+The two ledgers retain the same transaction order as startup recovery. A crash after exact reader
+release but before task bookkeeping can finish against the original binding, including after a
+verified forward activation when that original reader is absent. It cannot consume a successor
+reader or cross active maintenance. A completed release replays as evidence only while no owner is bound; a different binding
+requires a new digest. A concurrent older hook may reinsert the identical binding; its owning chat
+can relinquish that exact hold again. History replay selects the latest timestamp with a stable tie-break. A genuine SessionEnd stays closed. Finish any pending update completion or cancellation recovery before relinquishing its restored
+reader. An interrupted relinquishment that left the owner row after activation must be retried
+with the original binding digest from the verified newer archive; ordinary absent-host recovery
+is not that operation, even when older status output suggests it.
+No schema migration, native close event,
+force release, current process signal or automatic upgrade permission is introduced.
+
+The same approved bootstrap seam permits the owning chat to run the verified unpacked newer
+release's `startup relinquish` against its older selected installation. It must use the published
+artifact with verified identity, not edit or copy a command into the pinned payload. Each cooperating
+owner relinquishes independently. Other projects and their runtime reservations remain untouched.
+
 To bootstrap this repair from an older installed runtime, the owning chat runs the verified unpacked
 release's compiled CLI with the original request, project plan and operation directory plus
 `--handoff-startup`. The selected older payload is never edited. The candidate named by the original

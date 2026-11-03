@@ -68,3 +68,26 @@ not `startup install-hooks`. Its explicit request includes `startupReceipts: <ab
 saved project/host migration plans. The verified backup and drained transition own replacement;
 customized or incomplete legacy sets require reconciliation. New hook definitions still need native
 trust review after migration. Do not remove the old launcher or receipt history before qualification.
+
+## Release your own hold for an explicitly coordinated update
+
+When the operator asks this chat to pause project work for a runtime update, inspect its exact
+startup binding with `startup status --task <task-id-provided-by-the-coordinator> --receipts <store>`.
+The verified newer release can provide `startup relinquish
+--binding-digest <bindingDigest> --authority <operator-reason> --receipts <store>` before it is
+installed; use only the operator's verified archive and explicit workspace/registry scope.
+The command derives this chat's identity from its native environment. Do not replace that identity,
+select another chat, fabricate SessionEnd or edit the installed runtime. It releases only this
+chat's startup reservation and leaves the chat open. Other running work keeps its readers.
+
+After a successful receipt, stop project operations and report the receipt. When the operator
+resumes work, use the project's current pinned launcher, read `startup-help`, and refresh context.
+The internal refresh flag is not itself delivered as a native prompt notice.
+A native prompt reacquires your reservation; the updater must defer if work resumes before upgrade.
+This command does not stop unmanaged processes, run the update, approve work or prove task success.
+
+Before relinquishing, finish any pending runtime update/cancellation recovery. If relinquishment
+was interrupted after releasing its reader and the runtime has since changed, retry this same
+command from the verified newer archive with the original digest. Do not use absent-host recovery
+for this live-owner case. The bootstrap form also supplies `--workspace <canonical-worktree>` and
+`--registry <canonical-registry>`; receipts must be that registry's adjacent `startup.sqlite`.

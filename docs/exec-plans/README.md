@@ -177,3 +177,5 @@ shows existing project-owned checks; it does not require a check after every edi
 - [Ordinary task context and selection adoption](active/2026-09-22-task-context-entry.md) — post-RC4 integration repair under the major-adoption programme.
 
 - [Reusable workflow approval and execution diagnostics](active/2026-10-26-workflow-approval-repair.md) owns the bounded 4.3.0 release.
+
+- [Cooperative startup relinquishment](active/2026-11-02-cooperative-startup-relinquishment.md): explicit owning-chat handoff for shared native hosts.

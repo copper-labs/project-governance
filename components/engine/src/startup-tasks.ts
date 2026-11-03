@@ -173,6 +173,27 @@ export class StartupTasks {
    this.#db.exec("COMMIT");return true;
   }catch(error){this.#db.exec("ROLLBACK");throw error;}
  }
+ /** Relinquishment is explicit cooperation, not a native close event or absent-host recovery. */
+ relinquishOwner(taskId:string,expectedBinding:string,release:(binding:NonNullable<ReturnType<StartupTasks["owner"]>>,replay:boolean)=>unknown) {
+  this.#db.exec("BEGIN IMMEDIATE");
+  try {
+   const binding=this.owner(taskId);
+   if(!binding) {
+    const row=this.#db.prepare("SELECT binding FROM owner_history WHERE task_id=? AND json_extract(binding,'$.bindingDigest')=? AND json_type(binding,'$.relinquishment')='object' ORDER BY json_extract(binding,'$.relinquishment.observedAt') DESC,binding DESC LIMIT 1").get(taskId,expectedBinding);
+    const prior=row?JSON.parse(String(row.binding)):null;
+    if(!prior)throw new Error("Recorded startup relinquishment binding required");
+    // Replay still verifies the original native owner; it never releases a successor's reservation.
+    release(prior.binding,true);
+    this.#db.exec("COMMIT");return prior.relinquishment;
+   }
+   if(this.#db.prepare("SELECT state FROM tasks WHERE id=?").get(taskId)?.state!=="open")throw new Error("Open startup task required for relinquishment");
+   if(digest(binding)!==expectedBinding)throw new Error("Startup relinquishment owner binding changed");
+   const relinquishment=release(binding,false);
+   this.#db.prepare("INSERT OR IGNORE INTO owner_history VALUES(?,?)").run(taskId,canonical({binding,bindingDigest:expectedBinding,relinquishment}));
+   this.#db.prepare("DELETE FROM owners WHERE task_id=?").run(taskId);
+   this.#db.exec("COMMIT");return relinquishment;
+  }catch(error){this.#db.exec("ROLLBACK");throw error;}
+ }
  recoverOwner(taskId:string,expectedBinding:string,recover:(binding:NonNullable<ReturnType<StartupTasks["owner"]>>)=>unknown) {
   this.#db.exec("BEGIN IMMEDIATE");
   try {

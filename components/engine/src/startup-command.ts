@@ -4,6 +4,7 @@ import {lstatSync,realpathSync} from "node:fs";
 import {dirname,join} from "node:path";
 import {narrativeFile} from "./narrative-inputs.ts";
 import {recoverStartupOwner} from "./startup-owner-recovery.ts";
+import {relinquishStartupOwner} from "./startup-owner-relinquishment.ts";
 import {installStartupHooks} from "./startup-hook-installation.ts";
 import {startupHooks} from "./startup-hooks.ts";
 import {startupStatus} from "./startup-status.ts";
@@ -37,7 +38,7 @@ function startupHookConfiguration(workspace: string, receipts: string, install: 
 
 /** Observation stays passive; application requires the native parent's explicit work assessment. */
 export async function startupCommand(args:string[],scope?:{workspace:string;registry:string}) {
- if(!["observe","recover-observation","recover","recover-update","cancel-update","restore-update","retry-update","hooks","install-hooks","status","assess","prepare","apply"].includes(args[0]??""))throw new Error("Unsupported startup operation");
+ if(!["observe","recover-observation","recover","relinquish","recover-update","cancel-update","restore-update","retry-update","hooks","install-hooks","status","assess","prepare","apply"].includes(args[0]??""))throw new Error("Unsupported startup operation");
  const {values}=parseArgs({args:args.slice(1),strict:true,allowPositionals:false,options:{
   provider:{type:"string"},"event-file":{type:"string"},"event-stdin":{type:"boolean"},workspace:{type:"string"},registry:{type:"string"},receipts:{type:"string"},
   task:{type:"string"},"binding-digest":{type:"string"},authority:{type:"string"},"work-state":{type:"string"},reason:{type:"string"},
@@ -57,6 +58,12 @@ export async function startupCommand(args:string[],scope?:{workspace:string;regi
   throw new Error("Native Codex observations require this worktree's default startup receipt store");
  if(scope && ((values.workspace && realpathSync(values.workspace)!==realpathSync(scope.workspace)) ||
    (values.registry && realpathSync(values.registry)!==realpathSync(scope.registry))))throw new Error("Startup invocation differs from launcher scope");
+ if(args[0]==="relinquish") {
+  if(!values["binding-digest"] || !values.authority || values.task || values.provider || values["event-file"] || values["event-stdin"] ||
+    values["work-state"] || values.reason || values["operation-directory"] || values["command-digest"] || values["observation-token"])
+   throw new Error("Startup relinquishment requires only binding digest, authority and receipt scope");
+  return relinquishStartupOwner(values.receipts,values["binding-digest"],values.authority,{workspace,registry});
+ }
  if(args[0]==="recover-observation") {
   if(!values["observation-token"] || !values.authority || values.task || values.provider || values["event-file"] || values["event-stdin"] ||
     values["binding-digest"] || values["work-state"] || values.reason || values["operation-directory"] || values["command-digest"])
