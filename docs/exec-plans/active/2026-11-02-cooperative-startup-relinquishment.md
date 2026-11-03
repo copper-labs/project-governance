@@ -34,8 +34,8 @@ conceptual/transaction references, not proof of application correctness or time/
 - [x] Implement exact native-owner release and owning contract/guidance.
 - [x] Pass focused identity, concurrent-reader, interruption, replay and resume regressions/typecheck.
 - [x] Obtain Opus 5.5 high independent QA and reconcile material findings.
-- [ ] Complete affected shared-boundary and exact installed-archive proof.
-- [ ] Publish the approved next stable patch through normal narrative/hooks; verify tag/assets/latest.
+- [x] Complete affected shared-boundary and exact installed-archive proof.
+- [x] Publish the approved next stable patch through normal narrative/hooks; verify tag/assets/latest.
 
 The coherent batch includes its source, tests, specification, guide and release metadata. Validate
 locally; do not enable GitHub CI. Adopter identities, runtime/process observations and coordination
@@ -57,3 +57,10 @@ Deterministic history replay, successor refusal and short writer-lock proof are 
 pending update completion/cancellation recovery before cooperation; optional deeper recovery and
 future refresh-notice changes remain separate proposals. No accepted development or savings claim
 comes from these synthetic release checks.
+
+Stable4.5.4 is published from`f7a8e881f59008d7a89d81b17d2faa7e72663784`. Its final exact archive
+verifier passes, and tag/source, all three assets and downloaded digests, runtime metadata and
+immutable stable/latest readback match. The4.x tag workflow completed skipped; local proof remains
+required. The published archive SHA256 is`0c24935e63bf212c2fd4ce766644afb319dc77dcf57ec248d1ce746104f4daea`.
+Explicit cooperating owners can now use the normal verified bootstrap and update route. Actual
+adopter identities, hold-release/installation receipts and notifications remain in external records.
