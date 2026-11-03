@@ -5,7 +5,7 @@ type: spec
 status: current
 owner: project-governance
 created: 2026-03-02
-updated: 2026-10-16
+updated: 2026-11-02
 summary: Contract for the package runtime, its configuration boundary, focused execution model, and bounded local telemetry.
 ---
 
@@ -255,6 +255,16 @@ integrity literal. Removed defects are repairs, while new or content-changed def
 JSON, document shapes, and structural errors always block, and all mode stays strict because it has
 no before-image authority. A non-`node_modules` lock package with no resolved tarball is a local
 workspace member, not a registry coordinate; linked `node_modules` entries are also skipped.
+
+In modern npm lockfiles, a bundled entry may omit its own resolved URL and integrity only when
+its installation path is reachable through the enclosing archive's declared `bundleDependencies`
+and the bundled children's declared dependencies or optional dependencies. Resolve that closure
+inside the enclosing archive, including dependencies hoisted within it; never escape to another
+package tree. The enclosing package must be a non-link exact registry coordinate with its own
+trusted tarball URL and valid SHA-512 integrity. A bare `inBundle` flag, undeclared child or linked
+parent supplies no exemption. Explicit child URLs or hashes still receive the ordinary checks,
+and every child retains exact-version checks. Bundle handling does not change freshness evidence,
+registry trust, defect ratchets, legacy-lock interpretation or production dependency versions.
 
 An exact npm manifest dependency needs no external publication evidence when its consumer is the
 root or a declared root npm workspace, and its name and version match one unique declared local

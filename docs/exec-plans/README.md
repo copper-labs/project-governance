@@ -21,6 +21,9 @@ shows existing project-owned checks; it does not require a check after every edi
 
 ## Active
 
+- [Bundled dependency metadata](active/2026-11-02-bundled-dependency-metadata.md)
+  qualifies the prepared npm bundle parser correction and its maintained stable patch.
+
 - [Never-acquired cleanup](active/2026-11-02-never-acquired-cleanup.md)
   qualifies two failed-setup cases through existing explicit cleanup adapters and preserves original custody evidence.
 
