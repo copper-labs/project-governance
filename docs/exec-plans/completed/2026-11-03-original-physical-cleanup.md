@@ -2,7 +2,7 @@
 id: plan.original-physical-cleanup
 title: Finish cleanup for an original removed physical tester
 type: exec-plan
-status: active
+status: completed
 owner: project-governance
 created: 2026-11-03
 updated: 2026-11-03
@@ -34,7 +34,7 @@ phone cleanup. Fresh read-only original-device proof remains separate from synth
 - [x] Implement internal selection and preserve original failed evidence.
 - [x] Focused positive/negative/interruption/public-entry regression and typecheck/build.
 - [x] Required independent review/reconciliation, exact installed-archive and affected shared proof.
-- [ ] Publish qualified stable next patch and verify source/tag/assets/latest without GitHub CI.
+- [x] Publish qualified stable next patch and verify source/tag/assets/latest without GitHub CI.
 
 The generic specification owns behavior. Adopter identities, original external artifacts, exact case
 approval and live recovery receipts remain outside source. Prepare the reviewed archive once. Its
@@ -63,3 +63,9 @@ Final qualification is complete: focused source30/30, affected installed63/63 wi
 the exact clean-archive verifier pass. Publication uses the frozen qualified archive; this plan
 progress and authored release-note clarification change no packaged input. Preserve the original
 source/review/archive bindings and record the release commit's documentation-only difference.
+
+Stable4.5.5 is published, latest and immutable. The release tag and all three downloaded assets,
+archive SHA256/SHA512, lock source/version and update metadata were read back. The retained GitHub
+tag workflow completed skipped. Post-publication plan closeout changes no published archive or tag;
+adopter pins remain deliberate and separate. Exact publication and original cleanup records stay
+with the external evidence owner, not this generic source checkout.
