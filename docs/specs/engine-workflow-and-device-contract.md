@@ -353,6 +353,27 @@ change timestamps in an old report. A reported `legacyLockReleased: false` refus
 budget overruns and source failures remain failures; they do not prevent genuine completed cleanup.
 Read the unchanged original report; copying or editing it is not a way to pass freshness checks.
 
+For one settled native command with exclusively `local:` producer/storage reservations, the same
+explicit `--kind local-host` owner may instead select the exact original command's `result.json`
+as `--evidence`, with its original file-byte digest. This approved alternative removes a duplicate
+wrapper report, not native cleanup proof. The runtime requires the original single stage, local
+operations, confirmed original native cleanup, exact request/runtime/launch/guardian identity and recorded
+process membership. Missing membership is still refused. Fresh complete process/group absence,
+original worker and generation checks and whole-set release fencing remain mandatory. The receipt
+records `closureAuthority: original-confirmed-native-receipt` and `scope: local-producer-storage-only`.
+Cleanup confirmed later by owner recovery is not labeled original confirmation and cannot select
+this alternative. Copied receipts and arbitrary project result files cannot select it. Caller path
+aliases may resolve to the canonical original, but the original receipt itself cannot be a symlink.
+Normal reconciliation
+preserves original successful/failed stages, bytes and clocks and retires only the original reader.
+
+The explicit local-host selection remains the trusted owner's declaration that these obligations
+are local producer/storage reservations only. The `local:` prefix limits that declaration; it does
+not prove scope by itself. Do not select native-only evidence for any project mutex, continuing
+service, device, network, remote or otherwise external obligation. Such obligations retain their
+owner reports and qualified adapters. This is an explicit recovery choice, not automatic release
+of every completed local workflow or permission to rewrite missing historical evidence.
+
 `--kind local-host` is the bound owner's explicit selection for local producer/storage obligations.
 Opaque names alone do not prove that scope. It cannot replace device, network, remote, emulator or
 continuing-session custody readback. Known reserved claims and emulator recipes refuse; custom

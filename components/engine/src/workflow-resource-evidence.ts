@@ -1,5 +1,5 @@
 import { existsSync, realpathSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { digest, fileDigest, object } from "./core.ts";
 import { narrativeFile } from "./narrative-inputs.ts";
@@ -88,8 +88,26 @@ export function workflowNativeResourceEvidence(directory: string, run: WorkflowR
   return {commands,windows,identities,files,identify,assertCurrent,originalFailedLaunchesConfirmed: commands.length > 0 && originalFailedLaunchesConfirmed};
 }
 
-/** Local producer reports remain bound to their original execution window and process membership. */
+/** Explicit local owner selection can reuse native closure without inventing a duplicate report. */
 export function workflowResourceEvidence(directory: string, run: WorkflowRun, stages: WorkflowStage[], evidence: string, expected: string) {
+  const nativePath=join(directory,"commands",`${run.id}-0`,"result.json");
+  if(resolve(evidence)===nativePath || realpathSync(evidence)===nativePath) {
+    // The caller's existing local-host selection declares local producer/storage scope. Prefixes
+    // constrain that declaration; they cannot establish closure of a device, service or real mutex.
+    const recipe=run.binding.recipe;
+    if(recipe.stages.length!==1 || !recipe.resources.length || recipe.resources.some(resource=>!/^local:.+/u.test(resource)) ||
+        recipe.androidEmulator || recipe.androidAppSession || Object.values(recipe.operations).some(operation=>operation.effect!=="local"))
+      throw Error("Native-only cleanup requires one original local producer/storage command and exclusively local reservations");
+    if(realpathSync(nativePath)!==nativePath)throw Error("Original native cleanup receipt uses an alias");
+    const native=workflowNativeResourceEvidence(directory,run,stages);
+    if(native.commands.length!==1)throw Error("Original single native command evidence required");
+    if(native.commands.some(command=>command.cleanupRecovery))throw Error("Native-only cleanup requires the original supervisor's confirmed cleanup");
+    if(native.files.get(nativePath)!==expected)throw Error("Selected original native cleanup digest differs");
+    native.assertCurrent();
+    return {proof:{commands:native.commands,evidence:{path:nativePath,digest:expected},
+      identitiesDigest:digest([...native.identities]),stagesDigest:digest(stages),
+      closureAuthority:"original-confirmed-native-receipt",scope:"local-producer-storage-only"},assertCurrent:native.assertCurrent};
+  }
   return localReportEvidence(directory,run,stages,evidence,expected,true);
 }
 

@@ -181,3 +181,5 @@ shows existing project-owned checks; it does not require a check after every edi
 - [Cooperative startup relinquishment](active/2026-11-02-cooperative-startup-relinquishment.md): explicit owning-chat handoff for shared native hosts.
 
 - [Original removed physical tester cleanup](completed/2026-11-03-original-physical-cleanup.md): published4.5.5 with exact archive readback; adoption remains separate.
+
+- [Original native local cleanup](active/2026-11-03-native-local-cleanup.md): explicit local-host selection reuses original native closure without a duplicate wrapper report.
