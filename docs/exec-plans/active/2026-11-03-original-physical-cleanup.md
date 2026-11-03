@@ -33,7 +33,7 @@ phone cleanup. Fresh read-only original-device proof remains separate from synth
 - [x] Locate and verify exact original container/app/XCTest/guard identity without device mutations.
 - [x] Implement internal selection and preserve original failed evidence.
 - [x] Focused positive/negative/interruption/public-entry regression and typecheck/build.
-- [ ] Required independent review/reconciliation, exact installed-archive and affected shared proof.
+- [x] Required independent review/reconciliation, exact installed-archive and affected shared proof.
 - [ ] Publish qualified stable next patch and verify source/tag/assets/latest without GitHub CI.
 
 The generic specification owns behavior. Adopter identities, original external artifacts, exact case
@@ -58,3 +58,8 @@ correction; retain the final affected proof separately rather than inventing a c
 result. Scripts142 pass/5 skips and unchanged harness82/82 proof remain separately source-bound.
 Typecheck/build pass. Exact archive proof and qualified installed affected proof precede publication
 and live recovery. No result is counted as ordinary accepted development or a device run.
+
+Final qualification is complete: focused source30/30, affected installed63/63 with zero skips and
+the exact clean-archive verifier pass. Publication uses the frozen qualified archive; this plan
+progress and authored release-note clarification change no packaged input. Preserve the original
+source/review/archive bindings and record the release commit's documentation-only difference.
