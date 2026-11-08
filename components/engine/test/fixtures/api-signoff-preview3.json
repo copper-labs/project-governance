@@ -1,0 +1,41 @@
+{
+  "sourceCommit": "90cf3494f6de35b7790c364bbb7a5b0b3b06ace5",
+  "provenance": "Synthetic records generated once by unchanged old source; never human consent.",
+  "repositoryId": "a90fc274-1d40-40d6-8c65-03b168edfc14",
+  "schemas": [
+    "CREATE TABLE engine_api_signoff_head_v1 (\n          contract_id TEXT PRIMARY KEY, receipt_id TEXT NOT NULL REFERENCES engine_api_signoff_v1(id)\n        ) STRICT",
+    "CREATE TABLE engine_api_signoff_v1 (\n          id TEXT PRIMARY KEY, request_id TEXT UNIQUE NOT NULL, record TEXT NOT NULL\n        ) STRICT"
+  ],
+  "rows": [
+    {
+      "id": "51a80811-bbec-4268-8333-8e571c5629b3",
+      "request_id": "active",
+      "record": "{\"createdAt\":\"2026-11-08T21:08:40.236Z\",\"envelopeDigest\":\"sha256:1f2634472ce74f6b352555c78b77d2b1726dff69b4cd63b73e7da8811f37996d\",\"host\":{\"adapterDigest\":\"sha256:5942c93aa8c44028d789647f651351a4d92f4a0bb87e205c9a06684a02c9513f\",\"eventId\":\"synthetic-old-event\",\"executable\":\"/fixture/node\",\"hostExportDigest\":\"sha256:700a432c87535693501275f67e6699a48f387ed8544fac1aeb5fe181bed85b7e\",\"kind\":\"local-native-confirmation\",\"lockDigest\":\"sha256:15d97edbe39faccc7a714284b09060689d1dbd23c552ecae49791dc95a429e0f\",\"nodeVersion\":\"v24.16.0\",\"observedAt\":\"2026-10-29T00:00:00Z\",\"packageDigest\":\"sha256:7b8bae792c8d2776544ad65378bdeadc0fe6798d117e32d9026a1393f0111443\",\"packageVersion\":\"4.5.0-preview.3\",\"uid\":501,\"username\":\"synthetic\"},\"id\":\"51a80811-bbec-4268-8333-8e571c5629b3\",\"kind\":\"api-signoff-v1\",\"predecessor\":null,\"repositoryId\":\"a90fc274-1d40-40d6-8c65-03b168edfc14\",\"requestId\":\"active\",\"revision\":1,\"revocation\":null,\"revokedAt\":null,\"subject\":{\"cells\":[{\"language\":\"typescript\",\"platform\":\"ios\",\"product\":\"sample\"}],\"contractDigest\":\"sha256:304aeb6aeb9281204cf0b2723b2d0d855d70719de14de5aa270752aa275e307b\",\"contractId\":\"sample-api\",\"reviewDigest\":\"sha256:710544bb58c5207eaa1d83ae2f4a92f92be4a0fca9585b021bf1a0af5a57cfb2\",\"sections\":{\"methods\":\"sha256:b18ed63fa15a31367ffa234b4f42b207d283f51dd79bc38f75008efc93c10665\"},\"version\":1},\"subjectDigest\":\"sha256:d48dd0162425aeab6a782c98b74e311298dbcc4ab8838c521695e1859b9798e3\",\"supersededBy\":null}"
+    },
+    {
+      "id": "e01b1073-dda5-4cd0-84a4-3da0dbeab6e5",
+      "request_id": "prior",
+      "record": "{\"createdAt\":\"2026-11-08T21:08:40.238Z\",\"envelopeDigest\":\"sha256:5ab0a742032916002523e99f59b8a116d6faf62cc53f655332a5700ff14ac289\",\"host\":{\"adapterDigest\":\"sha256:5942c93aa8c44028d789647f651351a4d92f4a0bb87e205c9a06684a02c9513f\",\"eventId\":\"synthetic-old-event\",\"executable\":\"/fixture/node\",\"hostExportDigest\":\"sha256:700a432c87535693501275f67e6699a48f387ed8544fac1aeb5fe181bed85b7e\",\"kind\":\"local-native-confirmation\",\"lockDigest\":\"sha256:15d97edbe39faccc7a714284b09060689d1dbd23c552ecae49791dc95a429e0f\",\"nodeVersion\":\"v24.16.0\",\"observedAt\":\"2026-10-29T00:00:00Z\",\"packageDigest\":\"sha256:7b8bae792c8d2776544ad65378bdeadc0fe6798d117e32d9026a1393f0111443\",\"packageVersion\":\"4.5.0-preview.3\",\"uid\":501,\"username\":\"synthetic\"},\"id\":\"e01b1073-dda5-4cd0-84a4-3da0dbeab6e5\",\"kind\":\"api-signoff-v1\",\"predecessor\":null,\"repositoryId\":\"a90fc274-1d40-40d6-8c65-03b168edfc14\",\"requestId\":\"prior\",\"revision\":2,\"revocation\":null,\"revokedAt\":null,\"subject\":{\"cells\":[{\"language\":\"typescript\",\"platform\":\"ios\",\"product\":\"sample\"}],\"contractDigest\":\"sha256:304aeb6aeb9281204cf0b2723b2d0d855d70719de14de5aa270752aa275e307b\",\"contractId\":\"replaced-api\",\"reviewDigest\":\"sha256:710544bb58c5207eaa1d83ae2f4a92f92be4a0fca9585b021bf1a0af5a57cfb2\",\"sections\":{\"methods\":\"sha256:b18ed63fa15a31367ffa234b4f42b207d283f51dd79bc38f75008efc93c10665\"},\"version\":1},\"subjectDigest\":\"sha256:0aa90c913d20edcb466432c542271e4968c9004bca90a5306a101d6ccdabb5db\",\"supersededBy\":\"b0787424-f13a-4635-917e-3314e3dba7ca\"}"
+    },
+    {
+      "id": "9de3f3e8-01b8-49a2-a4b2-09a60d7dff39",
+      "request_id": "revoked",
+      "record": "{\"createdAt\":\"2026-11-08T21:08:40.237Z\",\"envelopeDigest\":\"sha256:30bcddbeadcbba65c9ae490a21ff97e6bc27b7d6bf02b233b89e527c0b81cd2e\",\"host\":{\"adapterDigest\":\"sha256:5942c93aa8c44028d789647f651351a4d92f4a0bb87e205c9a06684a02c9513f\",\"eventId\":\"synthetic-old-event\",\"executable\":\"/fixture/node\",\"hostExportDigest\":\"sha256:700a432c87535693501275f67e6699a48f387ed8544fac1aeb5fe181bed85b7e\",\"kind\":\"local-native-confirmation\",\"lockDigest\":\"sha256:15d97edbe39faccc7a714284b09060689d1dbd23c552ecae49791dc95a429e0f\",\"nodeVersion\":\"v24.16.0\",\"observedAt\":\"2026-10-29T00:00:00Z\",\"packageDigest\":\"sha256:7b8bae792c8d2776544ad65378bdeadc0fe6798d117e32d9026a1393f0111443\",\"packageVersion\":\"4.5.0-preview.3\",\"uid\":501,\"username\":\"synthetic\"},\"id\":\"9de3f3e8-01b8-49a2-a4b2-09a60d7dff39\",\"kind\":\"api-signoff-v1\",\"predecessor\":null,\"repositoryId\":\"a90fc274-1d40-40d6-8c65-03b168edfc14\",\"requestId\":\"revoked\",\"revision\":2,\"revocation\":{\"adapterDigest\":\"sha256:5942c93aa8c44028d789647f651351a4d92f4a0bb87e205c9a06684a02c9513f\",\"eventId\":\"synthetic-old-event\",\"executable\":\"/fixture/node\",\"hostExportDigest\":\"sha256:700a432c87535693501275f67e6699a48f387ed8544fac1aeb5fe181bed85b7e\",\"kind\":\"local-native-confirmation\",\"lockDigest\":\"sha256:15d97edbe39faccc7a714284b09060689d1dbd23c552ecae49791dc95a429e0f\",\"nodeVersion\":\"v24.16.0\",\"observedAt\":\"2026-10-29T00:00:00Z\",\"packageDigest\":\"sha256:7b8bae792c8d2776544ad65378bdeadc0fe6798d117e32d9026a1393f0111443\",\"packageVersion\":\"4.5.0-preview.3\",\"uid\":501,\"username\":\"synthetic\"},\"revokedAt\":\"2026-11-08T21:08:40.238Z\",\"subject\":{\"cells\":[{\"language\":\"typescript\",\"platform\":\"ios\",\"product\":\"sample\"}],\"contractDigest\":\"sha256:304aeb6aeb9281204cf0b2723b2d0d855d70719de14de5aa270752aa275e307b\",\"contractId\":\"revoked-api\",\"reviewDigest\":\"sha256:710544bb58c5207eaa1d83ae2f4a92f92be4a0fca9585b021bf1a0af5a57cfb2\",\"sections\":{\"methods\":\"sha256:b18ed63fa15a31367ffa234b4f42b207d283f51dd79bc38f75008efc93c10665\"},\"version\":1},\"subjectDigest\":\"sha256:eebcb5087f36062ed06e769f3d8cb0556fe3c3c6473c49cd5a555e5e9943c08c\",\"supersededBy\":null}"
+    },
+    {
+      "id": "b0787424-f13a-4635-917e-3314e3dba7ca",
+      "request_id": "successor",
+      "record": "{\"createdAt\":\"2026-11-08T21:08:40.238Z\",\"envelopeDigest\":\"sha256:4082fda2fb1e53dea2f22f91f7df54eb6b48aca5b919dc882f1eb149543775ec\",\"host\":{\"adapterDigest\":\"sha256:5942c93aa8c44028d789647f651351a4d92f4a0bb87e205c9a06684a02c9513f\",\"eventId\":\"synthetic-old-event\",\"executable\":\"/fixture/node\",\"hostExportDigest\":\"sha256:700a432c87535693501275f67e6699a48f387ed8544fac1aeb5fe181bed85b7e\",\"kind\":\"local-native-confirmation\",\"lockDigest\":\"sha256:15d97edbe39faccc7a714284b09060689d1dbd23c552ecae49791dc95a429e0f\",\"nodeVersion\":\"v24.16.0\",\"observedAt\":\"2026-10-29T00:00:00Z\",\"packageDigest\":\"sha256:7b8bae792c8d2776544ad65378bdeadc0fe6798d117e32d9026a1393f0111443\",\"packageVersion\":\"4.5.0-preview.3\",\"uid\":501,\"username\":\"synthetic\"},\"id\":\"b0787424-f13a-4635-917e-3314e3dba7ca\",\"kind\":\"api-signoff-v1\",\"predecessor\":{\"id\":\"e01b1073-dda5-4cd0-84a4-3da0dbeab6e5\",\"revision\":1},\"repositoryId\":\"a90fc274-1d40-40d6-8c65-03b168edfc14\",\"requestId\":\"successor\",\"revision\":1,\"revocation\":null,\"revokedAt\":null,\"subject\":{\"cells\":[{\"language\":\"typescript\",\"platform\":\"ios\",\"product\":\"sample\"}],\"contractDigest\":\"sha256:8eb6be3aa1a68f1e667e12d122ce582bc14a38a88340afebb01f6c9020a3ac71\",\"contractId\":\"replaced-api\",\"reviewDigest\":\"sha256:710544bb58c5207eaa1d83ae2f4a92f92be4a0fca9585b021bf1a0af5a57cfb2\",\"sections\":{\"methods\":\"sha256:b18ed63fa15a31367ffa234b4f42b207d283f51dd79bc38f75008efc93c10665\"},\"version\":1},\"subjectDigest\":\"sha256:1fcb473640fe1dd9bf0d807f41840be809cc06f703aae89422978c8c99f88d6e\",\"supersededBy\":null}"
+    }
+  ],
+  "heads": [
+    {
+      "contract_id": "replaced-api",
+      "receipt_id": "b0787424-f13a-4635-917e-3314e3dba7ca"
+    },
+    {
+      "contract_id": "sample-api",
+      "receipt_id": "51a80811-bbec-4268-8333-8e571c5629b3"
+    }
+  ]
+}

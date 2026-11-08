@@ -20,3 +20,8 @@ export type { DiagnosticManifest } from "./diagnostic-manifest.ts";
 export { authorizeProviderAssignment } from "./provider-admission.ts";
 export { authorizeProviderContinuation } from "./provider-continuation.ts";
 export { observeAndroidCapacity, observeAndroidEmulatorCleanup } from "./android-emulator.ts";
+
+// Exact human API decisions retain their existing repository ledger and native adapter.
+export { ApiSignoffStore } from "./api-signoff-store.ts";
+export { apiSignoffSubject, apiSignoffPredecessor } from "./api-signoff.ts";
+export type { ApiSignoffSubject, ApiSignoffReceipt, ApiSignoffLocator, ApiSignoffHostObservation, ApiSignoffPredecessor } from "./api-signoff.ts";

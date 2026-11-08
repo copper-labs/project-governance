@@ -21,6 +21,9 @@ shows existing project-owned checks; it does not require a check after every edi
 
 ## Active
 
+- [Native API decision restoration](active/2026-11-08-api-signoff-restoration.md)
+  restores verification of existing exact approvals and qualifies the shipped adapter.
+
 - [Local build reservation lifecycle](active/2026-11-03-build-reservation-lifecycle.md)
   closes normal and interrupted local build reservations through one native cleanup owner.
 

@@ -39,7 +39,7 @@ try {
     import assert from 'node:assert/strict';
     import * as host from '@organta/project-governance/host/v1';
     assert.equal(host.HOST_API_VERSION, 1);
-    for (const name of ['Store','proposeAction','authorizeAction','defaultPolicy','WorkflowStore','resolveWorkflowRecipe','recipeDigest','digest','fileDigest','ResourceRegistry','resourceRegistryPath']) assert.equal(typeof host[name], 'function', name);
+    for (const name of ['Store','proposeAction','authorizeAction','defaultPolicy','WorkflowStore','resolveWorkflowRecipe','recipeDigest','digest','fileDigest','ResourceRegistry','resourceRegistryPath','ApiSignoffStore','apiSignoffSubject','apiSignoffPredecessor']) assert.equal(typeof host[name], 'function', name);
     const store = new host.Store(':memory:');
     assert.ok(store.createTask('installed host API', []).taskId);
     store.close();
@@ -50,6 +50,12 @@ try {
   const pythonParser = await verifyPythonParser(pkg, root);
   const beforeStaging = readFileSync(join(pkg, "package.json"));
   const staging = await verifyExplicitStaging(pkg, archive, manifest, root);
+  const signoffPackage = join(staging.generationDirectory, 'node_modules/@organta/project-governance');
+  execFileSync(process.execPath, ['--test', fileURLToPath(new URL('./api-signoff.test.mjs', import.meta.url))], {
+    cwd: root, env: { ...process.env, GOVERNANCE_HOST_TEST_PACKAGE: signoffPackage,
+      GOVERNANCE_HOST_TEST_GENERATION: staging.generationDirectory }, stdio: 'pipe', timeout: 60000 });
+  const apiSignoff = { verification: 'passed', managedGeneration: 'passed', priorRecords: 'frozen-preview3',
+    nativeTransport: process.platform === 'darwin' ? 'synthetic-tested' : 'unqualified-skipped', realHumanConfirmation: 'not-exercised' };
   assert.deepEqual(readFileSync(join(pkg, "package.json")), beforeStaging, "Staging must preserve the installed parent package");
   execFileSync(process.execPath, ['--test', fileURLToPath(new URL('./workflow-host-binding.test.mjs', import.meta.url))], {
     encoding: 'utf8', timeout: 120000, env: { ...process.env,
@@ -66,7 +72,7 @@ try {
     : { status: 'unqualified', reason: 'qualified-backend-tools-explicitly-unavailable', execution: 'not-performed' };
   const receipt = { status: installedLint.status === 'passed' ? 'passed' : 'unqualified', evidence_directory: root,
     staging, prompt, greenfield, batchReview, majorDelivery, installedLint, pythonParser, decisionPilot: pilot, experiments,
-    hostApi: 'passed', workflowBinding: 'passed', version: manifest.version, installedCommand: 'passed',
+    apiSignoff, hostApi: 'passed', workflowBinding: 'passed', version: manifest.version, installedCommand: 'passed',
     scope: 'offline installation and inactive staging, original evaluation producers, installed greenfield first-task, deterministic delivery/lint setup, explicit real-backend qualification and batch-before-review preparation proof, compiled Python source/comment analysis, public host API, configured workflow binding and decision consumers with fixture inference; not full semantic qualification, accepted ordinary tasks or release provenance; no live device or benefit claim' };
   writeFileSync(join(root, 'archive-proof-receipt.json'), JSON.stringify(receipt, null, 2) + '\n');
   console.log(JSON.stringify(receipt));

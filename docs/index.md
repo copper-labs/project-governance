@@ -179,3 +179,6 @@ owns the 4.4 local-workflow simplification and its release checkpoint.
 The [demand-driven context specification](specs/engine-demand-driven-context.md) and
 [delivery plan](exec-plans/active/2026-10-30-demand-driven-context.md) own the 4.5 separation of
 required prompt guidance, explicit local retrieval, paid semantic selection and coverage telemetry.
+
+The [API decision restoration plan](exec-plans/active/2026-11-08-api-signoff-restoration.md)
+restores the [existing native API signoff contract](specs/api-signoff.md) in the stable package.
