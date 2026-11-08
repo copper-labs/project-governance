@@ -91,3 +91,9 @@ of a timed-out fixture. Integrated engine failures pass their focused reruns; co
 script batches also pass. Exact archive installation proof remains incomplete: repeated attempts
 time out at different unchanged proof steps. Retain this batch unpublished until that required
 proof completes; do not infer package qualification from the focused recovery results.
+
+The installation-proof interruption was traced to host system sleep, not a runtime policy failure.
+A process-scoped system-sleep assertion on AC allowed the unchanged proof to finish. The rebuilt
+4.5.9 archive is byte-identical to the affected regression-tested archive; installed host binding,
+check recovery, decision pilots, fresh startup, delivery and real lint backend proof all pass.
+The later-recovery batch is qualified for the approved stable patch and deliberate adoption.
