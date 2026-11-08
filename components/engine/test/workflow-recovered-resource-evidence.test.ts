@@ -12,9 +12,9 @@ const {workflowResourceRelease}=await import(moduleUrl("workflow-resource-releas
 const cli=process.env.GOVERNANCE_HOST_TEST_PACKAGE?join(process.env.GOVERNANCE_HOST_TEST_PACKAGE,"dist/engine/src/cli.js"):fileURLToPath(new URL("../src/cli.ts",import.meta.url));
 
 /** Controlled uncertain cleanup after a real failed native fixture, then the normal qualified recovery path. */
-async function fixture(reason="exit",missingExit=false){
+async function fixture(reason="exit",missingExit=false,exitCode:number|null=1,signal:string|null=null){
  const f=await ownerReleaseFixture(),path=join(f.command,"result.json"),raw=JSON.parse(readFileSync(path,"utf8"));
- raw.state="unknown";raw.cleanup="unknown";raw.reason=reason;if(missingExit){delete raw.exitCode;delete raw.signal;}writeFileSync(path,JSON.stringify(raw));
+ raw.state="unknown";raw.cleanup="unknown";raw.reason=reason;raw.exitCode=exitCode;raw.signal=signal;if(missingExit){delete raw.exitCode;delete raw.signal;}writeFileSync(path,JSON.stringify(raw));
  const db=new DatabaseSync(f.database),stage=f.store.stages(f.run.id)[0];
  db.prepare("UPDATE engine_stage SET state='unknown',result=? WHERE run_id=? AND id=?").run(JSON.stringify({...stage.result,state:"unknown",cleanup:"unknown",detail:reason}),f.run.id,stage.id);db.close();
  recoverCommandOwner(f.command,raw.requestDigest,"host:fixture-owner");
@@ -34,3 +34,19 @@ for(const change of ["recovery-digest","receipt-digest","missing-stage-binding",
 test("owner-loss cleanup never invents a known execution outcome",async()=>{const f=await fixture("owner-lost");try{assert.throws(()=>workflowResourceRelease(f.args,f.dir));assert.equal(f.held().length,2);assert.equal(JSON.parse(readFileSync(f.path,"utf8")).state,"unknown");}finally{f.close();}});
 
 for(const reason of ["exit","cancelled"]){test(`missing native exit/signal remains unknown for ${reason}`,async()=>{const f=await fixture(reason,true);try{assert.throws(()=>workflowResourceRelease(f.args,f.dir));assert.equal(f.held().length,2);assert.equal(JSON.parse(readFileSync(f.path,"utf8")).state,"unknown");}finally{f.close();}});}
+
+for(const [exitCode,signal] of [[1,null],[0,null],[null,"SIGTERM"]] as const)test(`deadline recovery remains failed with exit ${exitCode} signal ${signal} and preserves original receipts`,async()=>{
+ const f=await fixture("deadline",false,exitCode,signal);try{
+  const bytes=readFileSync(f.path),stage=f.store.stages(f.run.id)[0];
+  assert.equal(f.recovered.observed,1);assert.equal(stage.state,"failed");assert.equal(stage.result.detail,"deadline");
+  assert.equal(stage.result.cleanup,"confirmed");assert.equal(stage.result.exitCode,exitCode);assert.ok(stage.result.cleanupRecovery);
+  const result=spawnSync(process.execPath,[cli,"workflow-release-resources",...f.args],{cwd:f.dir,encoding:"utf8",timeout:15000});
+  assert.equal(result.status,0,result.stderr);assert.equal(f.held().length,0);assert.deepEqual(readFileSync(f.path),bytes);
+  assert.deepEqual(JSON.parse(readFileSync(f.receipt,"utf8")).observation.proof.commands[0].cleanupRecovery,stage.result.cleanupRecovery);
+  const closed=spawnSync(process.execPath,[cli,"workflow-reconcile-cleanup","--database",f.database,"--run",f.run.id,"--revision",String(f.recovered.run.revision),"--registry",f.registry.path,"--receipt",f.receipt,"--worker-directory",f.worker],{cwd:f.dir,encoding:"utf8",timeout:15000});
+  assert.equal(closed.status,1,closed.stderr);assert.equal(JSON.parse(closed.stdout).run.state,"failed");assert.deepEqual(readFileSync(f.path),bytes);
+ }finally{f.close();}
+});
+test("deadline recovery without retained exit or signal remains unresolved",async()=>{const f=await fixture("deadline",true);try{assert.equal(f.recovered.observed,0);assert.throws(()=>workflowResourceRelease(f.args,f.dir));assert.equal(f.held().length,2);}finally{f.close();}});
+
+for(const [exitCode,signal] of [[null,null],[null,"SIGterm"],[null,"TERM"],[1.5,null]] as const)test(`deadline recovery rejects incomplete outcome ${exitCode}/${signal}`,async()=>{const f=await fixture("deadline",false,exitCode,signal);try{const bytes=readFileSync(f.path);assert.equal(f.recovered.observed,0);assert.equal(f.store.stages(f.run.id)[0].state,"unknown");assert.throws(()=>workflowResourceRelease(f.args,f.dir));assert.equal(f.held().length,2);assert.deepEqual(readFileSync(f.path),bytes);assert.equal(JSON.parse(bytes.toString()).state,"unknown");}finally{f.close();}});

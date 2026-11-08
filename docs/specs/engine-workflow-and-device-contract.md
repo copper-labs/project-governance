@@ -1057,3 +1057,10 @@ report, imply successful production, or permit a new build. Record the original 
 `cleanupAuthority: fresh-native-and-mapped-resource-observation` in the existing release receipt.
 Version1 and ordinary local-host behavior remain unchanged. Recovery still releases the entire exact
 original claim set and uses the existing reconciliation/reader-release transaction.
+
+After independently qualified native cleanup, a retained deadline receipt with a known exit code
+or termination signal projects a failed workflow stage, even when its exit code was expected.
+The original unknown receipt and deadline reason remain unchanged and recovery provenance stays
+bound to that receipt. Missing exit/signal evidence remains unresolved. This restores ordinary native deadline failure semantics in both worker recovery and the
+executor's later-cleanup observation, with stricter retained-outcome requirements. Other unknown
+stop reasons remain unchanged. It does not infer success or release external resources by itself.

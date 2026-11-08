@@ -12,6 +12,8 @@ export function qualifiedWorkflowCommandCleanup(directory:string,receipt:Command
   const exitCode=receipt.exitCode,knownExit=typeof exitCode==="number"&&Number.isSafeInteger(exitCode);
   const knownSignal=typeof receipt.signal==="string"&&/^SIG[A-Z0-9]+$/u.test(receipt.signal);
   if(state==="unknown"&&receipt.reason==="exit"&&knownExit)state=expectedExitCodes.includes(exitCode)?"succeeded":"failed";
+  // A deadline is a failed execution even if its eventual exit code was expected.
+  if(state==="unknown"&&receipt.reason==="deadline"&&(knownExit||knownSignal))state="failed";
   if(state==="unknown"&&receipt.reason==="cancelled"&&(knownExit||knownSignal))state="cancelled";
   const recovery={receiptDigest:digest(receipt),recoveryDigest:fileDigest(join(directory,"owner-recovery.json"))};
   return{receipt:{...receipt,state,cleanup:"confirmed" as const},recovery,verificationFailed:state==="unknown"&&receipt.reason==="owner-lost"};

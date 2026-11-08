@@ -97,3 +97,16 @@ A process-scoped system-sleep assertion on AC allowed the unchanged proof to fin
 4.5.9 archive is byte-identical to the affected regression-tested archive; installed host binding,
 check recovery, decision pilots, fresh startup, delivery and real lint backend proof all pass.
 The later-recovery batch is qualified for the approved stable patch and deliberate adoption.
+
+## Deadline recovery projection
+
+The qualified cleanup projection omitted deadline failure although ordinary native execution
+already classifies a cleaned-up deadline as failed. Add that narrow mapping only with retained
+exit/signal and independent cleanup evidence. Test failed/zero exit, missing outcome, immutable
+originals and public release/reconciliation. Reuse unchanged qualification inputs; run affected
+executor/recovery checks, typecheck, Opus review and rebuilt installed archive proof.
+
+Opus confirmed the deadline change is a narrow parity correction with no material source defect.
+Reconciliation adds signal-only, null/malformed outcome and exact exit/provenance assertions.
+The shared executor observation is in scope; its existing recovery/cleanup tests run alongside
+worker/resource tests. Unchanged engine/harness/script proof from 4.5.9 remains separately retained.
