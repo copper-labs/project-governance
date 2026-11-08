@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test, mock } from "node:test";
 import { spawnSync, execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync, mkdirSync, symlinkSync, statSync, utimesSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, symlinkSync, statSync, utimesSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { api, moduleUrl, ownerReleaseFixture } from "./fixtures/workflow-owner-release.ts";
@@ -168,3 +169,83 @@ for(const target of ["request","guard","reference"])test("undeclared "+target+" 
   await assert.rejects(()=>workflowResourceReleaseCommand(f.observedArgs,f.dir),/Unexpected or missing recovery request fields/);assert.equal(f.held().length,3);
  }finally{f.close();}
 });
+
+ test("explicit fresh local closure preserves a failed original cleanup report",async()=>{
+ const f=await fixture(undefined,true);try{
+ const stamp=statSync(f.report),report=JSON.parse(readFileSync(f.report,"utf8"));report.processClosure={closed:false,error:"Synthetic process query timeout"};report.legacyLockHeld=true;report.legacyLockReleased=false;
+ writeFileSync(f.report,JSON.stringify(report));utimesSync(f.report,stamp.atime,stamp.mtime);
+ Object.assign(f.request,{version:2,mounts:[]});f.request.report.digest=api.fileDigest(f.report);f.save();
+ const original=readFileSync(f.report),native=readFileSync(join(f.command,"result.json"));
+ await workflowResourceReleaseCommand(f.observedArgs,f.dir);assert.equal(f.held().length,0);
+ assert.deepEqual(readFileSync(f.report),original);assert.deepEqual(readFileSync(join(f.command,"result.json")),native);
+ const proof=JSON.parse(readFileSync(f.receipt,"utf8")).observation.proof;
+ assert.equal(proof.original.cleanupAuthority,"fresh-native-and-mapped-resource-observation");
+ }finally{f.close();}
+ });
+
+for(const fault of ["version1","unjoined","live-lock","live-identity","live-snapshot","native","mounts-missing","mount-alias"])
+ test("fresh local closure retains exact claims for "+fault,async()=>{
+ const f=await fixture(undefined,fault!=="unjoined");try{
+ const stamp=statSync(f.report),report=JSON.parse(readFileSync(f.report,"utf8"));report.processClosure={closed:false};report.legacyLockHeld=true;report.legacyLockReleased=false;
+ if(fault==="live-identity")report.observedProcessIdentities[process.pid]="Wed Oct 28 12:00:00 2026";
+ if(fault==="live-snapshot")report.processClosure.after={observedTree:[{pid:process.pid,started:"Wed Oct 28 12:00:00 2026"}]};
+ writeFileSync(f.report,JSON.stringify(report));utimesSync(f.report,stamp.atime,stamp.mtime);Object.assign(f.request,{version:2,mounts:[]});f.request.report.digest=api.fileDigest(f.report);
+ if(fault==="version1"){report.processClosure.after={group:[],observedTree:[]};writeFileSync(f.report,JSON.stringify(report));utimesSync(f.report,stamp.atime,stamp.mtime);f.request.report.digest=api.fileDigest(f.report);Object.assign(f.request,{version:1});delete (f.request as any).mounts;}
+ if(fault==="mounts-missing")delete (f.request as any).mounts;
+ if(fault==="mount-alias")Object.assign(f.request,{mounts:["/tmp/../tmp/fixture"]});
+ if(fault==="live-lock")mkdirSync(f.guard);
+ if(fault==="native"){const p=join(f.command,"result.json"),r=JSON.parse(readFileSync(p,"utf8"));r.cleanup="unknown";writeFileSync(p,JSON.stringify(r));}
+ f.save();const expected:Record<string,RegExp>={version1:/Owner cleanup/,unjoined:/identity join/,"live-lock":/lock remains present/,"live-identity":/still present|PID reused/,"live-snapshot":/still present|PID reused/,native:/cleanup differs/,"mounts-missing":/request fields/,"mount-alias":/mount paths/};
+ f.save();await assert.rejects(()=>workflowResourceReleaseCommand(f.observedArgs,f.dir),expected[fault]!);assert.equal(f.held().length,3);
+ }finally{f.close();}
+ });
+ test("fresh mount verification refuses mounted descendants and ambiguous inventory",async()=>{
+ const {assertLocalMountsAbsent}=await import(moduleUrl("workflow-local-host-observation"));
+ assert.doesNotThrow(()=>assertLocalMountsAbsent(["/private/fixture/source mount"],"/dev/disk1 on / (apfs, local)\n"));
+ assert.throws(()=>assertLocalMountsAbsent(["/private/fixture"],"/dev/disk9 on /private/fixture/source mount (hfs, local)\n"),/remains present/);
+ assert.throws(()=>assertLocalMountsAbsent(["/private/fixture"],"unknown output"),/ambiguous/);
+ assert.throws(()=>assertLocalMountsAbsent(["/private/fixture"],""),/unavailable/);
+ });
+
+ test("fresh local proof accepts labelled native recovery without rewriting its original unknown receipt",async()=>{
+ const f=await fixture(undefined,true);try{
+ const {recoverCommandOwner}=await import(moduleUrl("command-owner-recovery"));
+ const {qualifiedWorkflowCommandCleanup}=await import(moduleUrl("workflow-command-cleanup"));
+ const {workflowObservedResourceEvidence}=await import(moduleUrl("workflow-resource-evidence"));
+ const native=join(f.command,"result.json"),raw=JSON.parse(readFileSync(native,"utf8"));raw.cleanup="unknown";raw.state="unknown";writeFileSync(native,JSON.stringify(raw));
+ const request=JSON.parse(readFileSync(join(f.command,"request.json"),"utf8"));recoverCommandOwner(f.command,api.digest(request),"host:synthetic-cleanup");
+ const qualified=qualifiedWorkflowCommandCleanup(f.command,raw,[0]),stages=f.store.stages(f.run.id);stages[0].result.cleanupRecovery=qualified.recovery;
+ const stamp=statSync(f.report),report=JSON.parse(readFileSync(f.report,"utf8"));report.processClosure={closed:false};report.legacyLockHeld=true;report.legacyLockReleased=false;writeFileSync(f.report,JSON.stringify(report));utimesSync(f.report,stamp.atime,stamp.mtime);
+ const bytes=readFileSync(native),proof=workflowObservedResourceEvidence(f.worker,f.run,stages,f.report,api.fileDigest(f.report),true);
+ assert.deepEqual(proof.proof.commands[0].cleanupRecovery,qualified.recovery);assert.deepEqual(readFileSync(native),bytes);
+ }finally{f.close();}
+ });
+
+ test("mount verification matches case and every delimiter, and refuses path aliases",async()=>{
+ const {assertLocalMountsAbsent}=await import(moduleUrl("workflow-local-host-observation"));
+ assert.throws(()=>assertLocalMountsAbsent(["/private/fixture"],"/dev/disk9 on /private/Fixture/a on b (hfs, local)\n"),/remains present/);
+ const root=realpathSync(mkdtempSync(join(tmpdir(),"mount-alias-")));try{symlinkSync(root,root+"-alias");assert.throws(()=>assertLocalMountsAbsent([join(root+"-alias","fixture")],"/dev/disk1 on / (apfs, local)\n"),/alias/);}finally{rmSync(root+"-alias");rmSync(root,{recursive:true});}
+ });
+ async function freshFixture(){
+ const f=await fixture(undefined,true),stamp=statSync(f.report),report=JSON.parse(readFileSync(f.report,"utf8"));
+ report.processClosure={closed:false};report.legacyLockHeld=true;report.legacyLockReleased=false;writeFileSync(f.report,JSON.stringify(report));utimesSync(f.report,stamp.atime,stamp.mtime);
+ Object.assign(f.request,{version:2,mounts:[]});f.request.report.digest=api.fileDigest(f.report);f.save();return f;
+ }
+ test("version2 recovery refuses an actually mounted original path through the public command",async()=>{
+ const f=await freshFixture();try{Object.assign(f.request,{mounts:["/"]});f.save();await assert.rejects(()=>workflowResourceReleaseCommand(f.observedArgs,f.dir),process.platform==="darwin"?/mount remains present/:/qualified only/);assert.equal(f.held().length,3);}finally{f.close();}
+ });
+ for(const change of ["closed","not-held","version1-mounts"])
+ test("version2 recovery refuses incompatible original shape: "+change,async()=>{
+ const f=await freshFixture();try{
+ if(change==="version1-mounts")f.request.version=1;
+ else{const stamp=statSync(f.report),r=JSON.parse(readFileSync(f.report,"utf8"));if(change==="closed")r.processClosure.closed=true;else r.legacyLockHeld=false;writeFileSync(f.report,JSON.stringify(r));utimesSync(f.report,stamp.atime,stamp.mtime);f.request.report.digest=api.fileDigest(f.report);}
+ f.save();await assert.rejects(()=>workflowResourceReleaseCommand(f.observedArgs,f.dir),change==="version1-mounts"?/request fields/:/original failed cleanup/);assert.equal(f.held().length,3);
+ }finally{f.close();}
+ });
+ test("version2 interrupted release reobserves and replay cannot release successor claims",async()=>{
+ const f=await freshFixture();try{
+ const stub=mock.method(api.ResourceRegistry.prototype,"release",()=>{throw Error("interrupted");});try{await assert.rejects(()=>workflowResourceReleaseCommand(f.observedArgs,f.dir),/interrupted/);}finally{stub.mock.restore();}
+ const bytes=readFileSync(f.receipt);await workflowResourceReleaseCommand(f.observedArgs,f.dir);assert.deepEqual(readFileSync(f.receipt),bytes);
+ const next=f.registry.acquire(f.request.leases.map((x:any)=>x.resource),"successor","successor");assert.equal((await workflowResourceReleaseCommand(f.observedArgs,f.dir)).replayed,true);for(const lease of next)f.registry.assertHeld(lease);
+ }finally{f.close();}
+ });

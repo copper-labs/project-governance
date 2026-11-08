@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { lstatSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { parseArgs } from "node:util";
@@ -11,7 +12,7 @@ import type { WorkflowRun } from "./workflow-store.ts";
 interface FileReference { path: string; digest: string }
 interface LocalGuard { directory: string; resources: string[] }
 interface ObservedLocalRequest {
-  version: 1; runId: string; revision: number; owner: string; authority: string;
+  version: 1|2; mounts?: string[]; runId: string; revision: number; owner: string; authority: string;
   workspace: string; database: string; workerDirectory: string; registry: string;
   bindingDigest: string; leases: Lease[]; generation: unknown;
   report: FileReference; approval: FileReference; mappingEvidence: FileReference;
@@ -38,9 +39,9 @@ export function observedLocalRequest(args: string[],workspace: string) {
   const path=resolve(values["request-file"]),raw=narrativeFile(dirname(path),path);
   if(realpathSync(path)!==path)throw Error("Recovery request uses an alias");
   const request=object(JSON.parse(raw)) as unknown as ObservedLocalRequest,requestDigest="sha256:"+createHash("sha256").update(raw).digest("hex");
-  exactKeys(object(request),["version","runId","revision","owner","authority","workspace","database","workerDirectory","registry","bindingDigest","leases","generation","report","approval","mappingEvidence","localOnly","historicalMutexMappingConfirmed","guards"]);
+  exactKeys(object(request),["version","runId","revision","owner","authority","workspace","database","workerDirectory","registry","bindingDigest","leases","generation","report","approval","mappingEvidence","localOnly","historicalMutexMappingConfirmed","guards",...(request.version===2?["mounts"]:[])]);
   snapshots.set(path,requestDigest);
-  if(request.version!==1||!Number.isSafeInteger(request.revision)||request.revision<1||
+  if(![1,2].includes(request.version)||!Number.isSafeInteger(request.revision)||request.revision<1||
       typeof request.runId!=="string"||typeof request.owner!=="string"||typeof request.authority!=="string"||
       !/^sha256:[a-f0-9]{64}$/u.test(request.bindingDigest)||request.localOnly!==true||request.historicalMutexMappingConfirmed!==true||
       !Array.isArray(request.leases)||!request.leases.length||!Array.isArray(request.guards)||!request.guards.length||request.guards.length>4096)
@@ -49,6 +50,7 @@ export function observedLocalRequest(args: string[],workspace: string) {
     if(typeof request[key]!=="string"||!isAbsolute(request[key])||realpathSync(request[key])!==request[key])throw Error("Original recovery paths must be canonical");
   if(realpathSync(workspace)!==request.workspace)throw Error("Approved recovery workspace differs");
   reference(request.report);reference(request.approval);reference(request.mappingEvidence);
+  if(request.version===2 && (!Array.isArray(request.mounts)||request.mounts.length>64||new Set(request.mounts).size!==request.mounts.length||request.mounts.some(path=>typeof path!=="string"||!isAbsolute(path)||resolve(path)!==path||/[\r\n\0]/u.test(path))))throw Error("Exact original local mount paths required");
   const mapped:string[]=[],parents=new Map<string,{dev:number;ino:number}>();
   for(const value of request.guards){
     const guard=object(value) as unknown as LocalGuard;
@@ -72,6 +74,7 @@ export function observedLocalRequest(args: string[],workspace: string) {
       if(realpathSync(parent)!==parent||!current.isDirectory()||current.dev!==identity.dev||current.ino!==identity.ino)throw Error("Local guard parent changed");
     }
     for(const guard of request.guards)absentLock(guard.directory);
+    if(request.version===2)assertLocalMountsAbsent(request.mounts!);
   };
   return {request,requestDigest,path,receipt:values.receipt,
     args:["--database",request.database,"--run",request.runId,"--revision",String(request.revision),"--worker-directory",request.workerDirectory,
@@ -84,7 +87,32 @@ export function observedLocalRequest(args: string[],workspace: string) {
         throw Error("Approved original recovery binding, leases or reader differ");
     },
     observe(){assertUnchanged();observeGuards();return {request:{path,digest:requestDigest},approval:request.approval,mappingEvidence:request.mappingEvidence,
+      ...(request.version===2?{mounts:request.mounts!.map(path=>({path,present:false}))}:{}),
       guards:request.guards.map(guard=>({directory:guard.directory,resources:guard.resources,present:false})),guardParents:[...parents].map(([path,identity])=>({path,...identity}))};},
     assertCurrent(){assertUnchanged();observeGuards();}
   };
+}
+
+/** Fresh mount inventory complements native process closure; no mounts are detached here. */
+export function assertLocalMountsAbsent(paths: string[], inventory?: string) {
+  if(!paths.length)return;
+  for(const path of paths){
+    let ancestor=path;
+    while(!lstatSync(ancestor,{throwIfNoEntry:false}))ancestor=dirname(ancestor);
+    if(realpathSync(ancestor)!==ancestor)throw Error("Local mount path uses an alias");
+  }
+  if(inventory===undefined){
+    if(process.platform!=="darwin")throw Error("Local mount recovery is qualified only on macOS");
+    inventory=execFileSync("/sbin/mount",[],{encoding:"utf8",timeout:10000,maxBuffer:1024*1024});
+  }
+  const lines=inventory.trim().split("\n");
+  if(!inventory.trim())throw Error("Mount inventory unavailable");
+  for(const line of lines){
+    const match=/^(.+) \([^\n]+\)$/u.exec(line);
+    if(!match)throw Error("Mount inventory is ambiguous");
+    const body=match[1]!,candidates=[...body.matchAll(/ on /gu)].map(value=>body.slice(value.index!+4)).filter(path=>path.startsWith("/"));
+    if(!candidates.length||candidates.some(path=>path.includes("\\")))throw Error("Mount inventory is ambiguous");
+    const normalize=(path:string)=>path.normalize("NFC").toLowerCase();
+    if(candidates.some(candidate=>paths.some(path=>normalize(candidate)===normalize(path)||normalize(candidate).startsWith(normalize(path)+"/"))))throw Error("Original local mount remains present");
+  }
 }

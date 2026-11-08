@@ -1030,3 +1030,30 @@ This applies only to the explicit
 mapping. Normal build admission retains its declared prefixes. Reserved platform, network,
 service and workspace namespaces retain their respective recovery owners. Original run,
 revision, native process evidence, file locks and release generation checks remain required.
+
+
+### Recovery after a failed cleanup observation
+
+Explicit `android-app-session` recovery may handle an owned-emulator boot stage that failed with
+confirmed native closure but never produced `android-emulator-owner.json`. Normal worker cleanup
+still requires the boot record. Missing-record recovery does not infer historical emulator ownership:
+it records the omission, requires the original failed boot, retained native membership, valid input binding and exact descriptor/leases, verifies all
+native processes absent and freshly verifies target absence, both ports closed, and original locks
+absent. Malformed or replaced records, aliases, successful boot stages and ambiguous observations
+refuse. Existing journal, generation, freshness and successor-ownership fences remain authoritative.
+
+An explicitly approved `local-host-observed` version2 request adds required `mounts: string[]` to
+the version1 fields. Supply the actual original local mount paths, or an empty list only when the
+original mapping establishes no mounts. This route handles an original failed report with
+`processClosure.closed: false`, `legacyLockHeld: true`, and `legacyLockReleased: false`. It requires
+an original process identity join and already qualified native closure, including supported later
+native recovery. It never recovers unknown native effects itself. Current process absence, actual
+mapped mutex absence, and absence of each original mount and its descendants are checked before
+release. Mount inventory is qualified on macOS; failed or ambiguous inventory refuses. Mount paths must
+have a canonical deepest existing ancestor. Conservative case-folded matching and every possible
+mount-output delimiter preserve paths containing spaces or the words " on ". Keep the lane
+idle through observation/release as required above. Current observations do not rewrite the original
+report, imply successful production, or permit a new build. Record the original false flags and
+`cleanupAuthority: fresh-native-and-mapped-resource-observation` in the existing release receipt.
+Version1 and ordinary local-host behavior remain unchanged. Recovery still releases the entire exact
+original claim set and uses the existing reconciliation/reader-release transaction.

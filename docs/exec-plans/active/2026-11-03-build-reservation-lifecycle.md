@@ -70,3 +70,24 @@ identities, case rules, deleted input handling and work-bound exceptions. A fail
 a path-specific blocking finding. Live working-tree reads keep their existing identity checks.
 Validate large staged inputs after live-file changes, chunk boundaries, normal policy exceptions,
 and the full required hook against the adopter's preserved candidate. Keep adopter evidence external.
+
+
+## Explicit later resource recovery
+
+Approved scope: failed owned-emulator boot with missing original ownership record, and failed local
+cleanup report after native command cleanup was separately recovered. Preserve failure history;
+use the existing explicit release/reconciliation route with fresh exact target/process/lock/mount
+observations. Normal worker cleanup, old request formats and live owners remain unchanged.
+
+The focused batch reproduces both failures, tests original-evidence preservation and refusal of
+live/ambiguous/changed identities, and checks interruption/successor replay. Complete typecheck,
+independent Opus review, affected workflow recovery tests and integrated/exact-archive proof before
+stable publication. Installation and exact recovery receipts remain outside source. No device run or
+SDK supervisor change is part of this runtime batch.
+
+The later-recovery batch passed independent Opus review after process-snapshot, mount-alias and
+portable-test corrections. Both affected compiled recovery suites pass, including targeted rerun
+of a timed-out fixture. Integrated engine failures pass their focused reruns; continuity and
+script batches also pass. Exact archive installation proof remains incomplete: repeated attempts
+time out at different unchanged proof steps. Retain this batch unpublished until that required
+proof completes; do not infer package qualification from the focused recovery results.

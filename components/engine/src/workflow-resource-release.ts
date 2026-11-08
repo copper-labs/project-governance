@@ -150,7 +150,7 @@ export async function workflowResourceReleaseCommand(args:string[],workspace=pro
       selected.assertOriginal(context.run,context.leases,context.reader);
       if(context.replay)return context.replay;
       if(!context.stages.some(stage=>stage.state==="failed")||context.stages.some(stage=>stage.result&&stage.result.state!=="failed"))throw Error("Observed recovery requires original failed local execution");
-      const original=workflowObservedResourceEvidence(context.directory,context.run,context.stages,selected.request.report.path,selected.request.report.digest);
+      const original=workflowObservedResourceEvidence(context.directory,context.run,context.stages,selected.request.report.path,selected.request.report.digest,selected.request.version===2);
       const proof={original:original.proof,...selected.observe()};
       return context.finish(proof,()=>{original.assertCurrent();selected.assertCurrent();});
     }finally{context.close();}

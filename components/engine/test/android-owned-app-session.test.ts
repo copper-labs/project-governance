@@ -3,8 +3,8 @@ import { syncBuiltinESMExports } from "node:module";
 import assert from "node:assert/strict";
 import { test,mock } from "node:test";
 import { spawnSync } from "node:child_process";
-import { readFileSync,writeFileSync,rmSync,mkdirSync,statSync,utimesSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync,writeFileSync,rmSync,mkdirSync,statSync,utimesSync,renameSync,symlinkSync } from "node:fs";
+import { join,dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { api,moduleUrl } from "./fixtures/workflow-owner-release.ts";
 import { ownedSessionFixture,closedProbes,resources,publicOwnedPreload } from "./fixtures/android-owned-session.ts";
@@ -30,3 +30,46 @@ test("public cleanup continuation closes original owned claims without rerunning
 test("normal settlement refuses a reused original native PID",async()=>{const f=await ownedSessionFixture();try{const owner=JSON.parse(readFileSync(join(f.command,"owner.json"),"utf8")),original=childProcess.execFileSync;const stub=mock.method(childProcess,"execFileSync",((file:any,args:any,options:any)=>file==="/bin/ps"&&args[0]==="-p"&&args[1]===String(owner.pid)?"Thu Jan  1 00:00:00 1970 S":original(file,args,options))as any);syncBuiltinESMExports();try{await assert.rejects(()=>ownedAndroidAppSessionCleanup(f.worker,f.run,f.store.stages(f.run.id),closedProbes,undefined,true),/PID was reused/);}finally{stub.mock.restore();syncBuiltinESMExports();}assert.equal(f.held().length,4);}finally{f.close();}});
 
 test("one original ownership lock may also guard a declared local obligation",async()=>{const f=await ownedSessionFixture();try{const recipe=f.run.binding.recipe,config=recipe.androidAppSession;const parsed=parseRecipe({...recipe,androidAppSession:{...config,localLocks:[{resource:"fixture-producer",path:config.emulator.lockPath},config.localLocks[1]]}});assert.equal(parsed.androidAppSession.localLocks[0].path,parsed.androidAppSession.emulator.lockPath);}finally{f.close();}});
+
+ test("explicit recovery of failed boot with missing ownership report preserves history",async()=>{
+ const f=await ownedSessionFixture(1);try{
+ rmSync(f.bootReport);const original=readFileSync(join(f.command,"result.json"));
+ await assert.rejects(()=>ownedAndroidAppSessionCleanup(f.worker,f.run,f.store.stages(f.run.id),closedProbes));
+ const released=await release(f.args,f.dir,closedProbes);assert.equal(released.state,"released");assert.equal(f.held().length,0);
+ assert.deepEqual(readFileSync(join(f.command,"result.json")),original);
+ const proof=JSON.parse(readFileSync(f.receipt,"utf8")).observation.proof;
+ assert.equal(proof.original.ownership.bootReport.status,"missing-after-failed-boot");
+ }finally{f.close();}
+ });
+
+for(const fault of ["online","port","lock","report-appears","native","revision"])
+ test("missing boot recovery retains claims for "+fault,async()=>{
+ const f=await ownedSessionFixture(1);try{
+ rmSync(f.bootReport);
+ if(fault==="native"){const path=join(f.command,"result.json"),r=JSON.parse(readFileSync(path,"utf8"));r.cleanup="unknown";writeFileSync(path,JSON.stringify(r));}
+ if(fault==="revision")f.args[f.args.indexOf("--revision")+1]=String(f.run.revision+1);
+ const probes={...closedProbes,...(fault==="online"?{devices:async()=>"List of devices attached\nemulator-5556\tdevice\n"}:{}),...(fault==="port"?{portClosed:async()=>false}:{}),...(fault==="lock"?{lockAbsent:async()=>false}:{}),...(fault==="report-appears"?{devices:async()=>{writeFileSync(f.bootReport,"{}");return"List of devices attached\n";}}:{})};
+ const expected:Record<string,RegExp>={online:/remain unresolved/,port:/remain unresolved/,lock:/remain unresolved/,"report-appears":/missing boot evidence changed/,native:/cleanup differs|native command receipt/,revision:/revision or workspace/};
+ await assert.rejects(()=>release(f.args,f.dir,probes),expected[fault]!);assert.equal(f.held().length,4);
+ }finally{f.close();}
+ });
+ test("missing boot recovery reobserves interrupted release and leaves successor claims alone",async()=>{
+ const f=await ownedSessionFixture(1);try{
+ rmSync(f.bootReport);const stub=mock.method(api.ResourceRegistry.prototype,"release",()=>{throw Error("interrupted");});
+ try{await assert.rejects(()=>release(f.args,f.dir,closedProbes),/interrupted/);}finally{stub.mock.restore();}
+ const bytes=readFileSync(f.receipt);await release(f.args,f.dir,closedProbes);assert.deepEqual(readFileSync(f.receipt),bytes);
+ const next=f.registry.acquire(resources,"successor","successor");assert.equal((await release(f.args,f.dir,{...closedProbes,devices:async()=>{throw Error("No replay probe");}})).replayed,true);
+ for(const lease of next)f.registry.assertHeld(lease);
+ }finally{f.close();}
+ });
+
+ for(const fault of ["stale","membership","artifact-alias","zero"])
+ test("missing boot recovery requires complete failed-native identity: "+fault,async()=>{
+ const f=await ownedSessionFixture(fault==="zero"?0:1);try{
+ rmSync(f.bootReport);
+ if(fault==="membership")rmSync(join(f.command,"group-members.json"));
+ if(fault==="artifact-alias"){const dir=dirname(f.bootReport);renameSync(dir,dir+"-real");symlinkSync(dir+"-real",dir);}
+ const stages=f.store.stages(f.run.id);if(fault==="stale")stages[0].result.inputValidity="stale";
+ await assert.rejects(()=>ownedAndroidAppSessionCleanup(f.worker,f.run,stages,closedProbes,undefined,false,true),fault==="artifact-alias"?/directory uses an alias/:/Missing boot ownership recovery/);assert.equal(f.held().length,4);
+ }finally{f.close();}
+ });

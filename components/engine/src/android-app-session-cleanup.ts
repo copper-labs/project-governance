@@ -17,7 +17,7 @@ export async function androidAppSessionEvidence(context:{values:Record<string,st
   if(!receipts.includes(evidence)||native.files.get(evidence)!==values["evidence-digest"]||fileDigest(evidence)!==values["evidence-digest"])
     throw Error("Evidence must be an original confirmed native command receipt");
   if(probe!==undefined&&(config.ownership==="owned-emulator"?typeof probe==="function":typeof probe!=="function"))throw Error("Cleanup probe shape differs from original Android lifetime");
-  const owned=config.ownership==="owned-emulator"?await ownedAndroidAppSessionCleanup(directory,run,stages,probe as AndroidOwnedSessionProbes|undefined,native):null;
+  const owned=config.ownership==="owned-emulator"?await ownedAndroidAppSessionCleanup(directory,run,stages,probe as AndroidOwnedSessionProbes|undefined,native,false,true):null;
   const checkHost=()=>{owned?.assertCurrent();native.assertCurrent();for(const lock of config.localLocks)absentLock(lock.path);};
   checkHost();
   const observation=owned?.observation??await observeAndroidAppSession(recipe.resources,config,recipe.workspace,probe as AndroidAppProbe|undefined),completed=performance.now();

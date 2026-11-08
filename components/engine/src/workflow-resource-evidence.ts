@@ -112,11 +112,11 @@ export function workflowResourceEvidence(directory: string, run: WorkflowRun, st
 }
 
 /** Explicit approved recovery records a missing historical join; ordinary reports still require it. */
-export function workflowObservedResourceEvidence(directory: string, run: WorkflowRun, stages: WorkflowStage[], evidence: string, expected: string) {
-  return localReportEvidence(directory,run,stages,evidence,expected,false);
+export function workflowObservedResourceEvidence(directory: string, run: WorkflowRun, stages: WorkflowStage[], evidence: string, expected: string, freshClosure=false) {
+  return localReportEvidence(directory,run,stages,evidence,expected,false,freshClosure);
 }
 
-function localReportEvidence(directory: string, run: WorkflowRun, stages: WorkflowStage[], evidence: string, expected: string, requireJoin: boolean) {
+function localReportEvidence(directory: string, run: WorkflowRun, stages: WorkflowStage[], evidence: string, expected: string, requireJoin: boolean, freshClosure=false) {
   const {commands,windows,identities,files,identify,originalFailedLaunchesConfirmed,assertCurrent:nativeCurrent}=workflowNativeResourceEvidence(directory,run,stages);
   if(!requireJoin){
     const worker=join(directory,"owner.json"),raw=narrativeFile(directory,worker);
@@ -125,14 +125,16 @@ function localReportEvidence(directory: string, run: WorkflowRun, stages: Workfl
   evidence=realpathSync(evidence);
   const raw=narrativeFile(directory,evidence), evidenceDigest="sha256:"+createHash("sha256").update(raw).digest("hex");
   if (!/^sha256:[a-f0-9]{64}$/u.test(expected) || evidenceDigest!==expected) throw new Error("Selected owner evidence digest differs");
-  const report=object(JSON.parse(raw)), closure=object(report.processClosure), after=object(closure.after);
+  const report=object(JSON.parse(raw)), closure=object(report.processClosure), after=freshClosure?{}:object(closure.after);
   if(!requireJoin&&report.status!=="failed")throw Error("Observed local recovery requires an original failed report");
   // Only explicit observed recovery also checks the actual mapped mutex. Never-held is
   // different from released; keep both original false flags in its immutable report.
   const neverAcquired = !requireJoin && report.legacyLockHeld===false && report.legacyLockReleased===false && originalFailedLaunchesConfirmed;
-  if (report.childStarted!==true || !["passed","failed","cancelled"].includes(String(report.status)) || closure.closed!==true ||
+  if(freshClosure && (requireJoin || report.status!=="failed" || closure.closed!==false || report.legacyLockHeld!==true || report.legacyLockReleased!==false))
+    throw Error("Fresh resource recovery requires an original failed cleanup of its held local lock");
+  if (report.childStarted!==true || !["passed","failed","cancelled"].includes(String(report.status)) || !freshClosure && (closure.closed!==true ||
       !Array.isArray(after.group) || after.group.length || !Array.isArray(after.observedTree) || after.observedTree.length ||
-      report.legacyLockReleased!==undefined && report.legacyLockReleased!==true && !neverAcquired) throw new Error("Owner cleanup remains unresolved");
+      report.legacyLockReleased!==undefined && report.legacyLockReleased!==true && !neverAcquired)) throw new Error("Owner cleanup remains unresolved");
   const ended=Number(report.ended)*1000, modified=statSync(evidence).mtimeMs, recorded=object(report.observedProcessIdentities);
   const entries=Object.entries(recorded);
   if (!entries.length || entries.length>4096 || typeof report.ended!=="number" || !Number.isFinite(ended) || !windows.some(window =>
@@ -140,8 +142,21 @@ function localReportEvidence(directory: string, run: WorkflowRun, stages: Workfl
   const joined=windows.some(window=>ended>=window.start && ended<=window.end && modified>=window.start && modified<=window.end &&
     entries.some(([pid,fp])=>window.ids.get(Number(pid))===String(fp).trim()));
   if(requireJoin&&!joined)throw new Error("Owner evidence is stale or belongs to another command");
-  if(!requireJoin&&joined&&!neverAcquired)throw new Error("Original identity join exists; use ordinary local-host cleanup");
+  if(freshClosure&&!joined)throw Error("Fresh closure requires an original native process identity join");
+  if(!requireJoin&&joined&&!neverAcquired&&!freshClosure)throw new Error("Original identity join exists; use ordinary local-host cleanup");
   for (const [pid,fingerprint] of entries) { if (!/^[1-9]\d*$/u.test(pid)) throw new Error("Invalid owner process identity"); identify({pid:Number(pid),fingerprint}); }
+  if(freshClosure){
+    // A failed query may still have recorded descendants outside its final identity map.
+    for(const phase of ["before","after"]){
+      if(closure[phase]===undefined)continue;
+      const snapshot=object(closure[phase]);
+      for(const key of ["group","observedTree"]){
+        if(snapshot[key]===undefined)continue;
+        if(!Array.isArray(snapshot[key]) || snapshot[key].length>4096)throw Error("Invalid original process snapshot");
+        for(const value of snapshot[key]){const row=object(value);identify({pid:row.pid,fingerprint:row.fingerprint??row.started});}
+      }
+    }
+  }
   files.set(evidence,evidenceDigest);
   const assertCurrent=()=>{
     nativeCurrent();
@@ -150,5 +165,6 @@ function localReportEvidence(directory: string, run: WorkflowRun, stages: Workfl
   assertCurrent();
   return { proof:{commands,evidence:{path:evidence,digest:evidenceDigest,modifiedAt:modified},identitiesDigest:digest([...identities]),stagesDigest:digest(stages),
     ...(!requireJoin?{historicalProcessJoin:joined?"present":"missing"}:{}),
+    ...(freshClosure?{cleanupAuthority:"fresh-native-and-mapped-resource-observation",originalProcessClosure:false,originalLegacyLockReleased:false}:{}),
     ...(neverAcquired?{legacyMutexEvidence:"original-never-acquired-and-fresh-absent",originalLegacyLockHeld:false,originalLegacyLockReleased:false}:{} )},assertCurrent };
 }

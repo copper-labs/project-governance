@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { realpathSync,statSync } from "node:fs";
-import { join } from "node:path";
+import { realpathSync,statSync,lstatSync } from "node:fs";
+import { join,dirname } from "node:path";
 import { digest,fileDigest,object } from "./core.ts";
 import { narrativeFile } from "./narrative-inputs.ts";
 import { commandEnvironment,processLiveFingerprint } from "./process-owner.ts";
@@ -15,7 +15,7 @@ const exec=promisify(execFile);
 export type AndroidOwnedSessionProbes=AndroidEmulatorCleanupProbes;
 
 /** Original native boot ownership plus unchanged owned-target shutdown; never dispatches device control. */
-export async function ownedAndroidAppSessionCleanup(directory:string,run:WorkflowRun,stages:WorkflowStage[],probes?:AndroidOwnedSessionProbes,originalNative?:ReturnType<typeof workflowNativeResourceEvidence>,settleNative=false) {
+export async function ownedAndroidAppSessionCleanup(directory:string,run:WorkflowRun,stages:WorkflowStage[],probes?:AndroidOwnedSessionProbes,originalNative?:ReturnType<typeof workflowNativeResourceEvidence>,settleNative=false,recoverMissing=false) {
   let native=originalNative??workflowNativeResourceEvidence(directory,run,stages,true);
   if(settleNative){
     // A normal worker can read the receipt just before its native supervisor exits. Wait only
@@ -34,6 +34,20 @@ export async function ownedAndroidAppSessionCleanup(directory:string,run:Workflo
   if(config?.ownership!=="owned-emulator"||!config.emulator)throw Error("Explicit original owned-emulator app session required");
   const owned=config.emulator,index=recipe.stages.findIndex(x=>x.id===owned.bootStage),stage=recipe.stages[index]!;
   const reportPath=join(directory,"commands",`${run.id}-${index}-artifacts`,"android-emulator-owner.json");
+  const assertArtifactDirectory=()=>{
+    const parent=dirname(reportPath),entry=lstatSync(parent,{throwIfNoEntry:false});
+    if(entry&&(!entry.isDirectory()||entry.isSymbolicLink()||realpathSync(parent)!==parent))throw Error("Original boot artifact directory uses an alias");
+  };
+  assertArtifactDirectory();
+  const missing=!lstatSync(reportPath,{throwIfNoEntry:false});
+  let original: Record<string,unknown>;
+  if(missing){
+    const failed=stages.find(value=>value.id===stage.id);
+    if(!recoverMissing || failed?.state!=="failed" || failed.result?.cleanup!=="confirmed" || failed.result.state!=="failed" || failed.result.inputValidity==="stale" ||
+       !native.commands.find(command=>command.stage===stage.id)?.membersDigest || failed.result.exitCode===0 || failed.result.exitCode===null)
+      throw Error("Missing boot ownership recovery requires explicit original failed native boot");
+    original={bootStage:stage.id,bootReport:{path:reportPath,status:"missing-after-failed-boot"},ownership:"not-reconstructed"};
+  }else{
   if(realpathSync(reportPath)!==reportPath)throw Error("Original boot evidence uses an alias");
   const report=object(JSON.parse(narrativeFile(directory,reportPath))),initial=object(report.initial),emulator=object(report.emulator);
   const commandIndex=native.commands.findIndex(x=>x.stage===stage.id),window=native.windows[commandIndex];
@@ -50,14 +64,15 @@ export async function ownedAndroidAppSessionCleanup(directory:string,run:Workflo
      emulator.pid===object(launch.child).pid||!Array.isArray(members.members)||!members.members.some(value=>{const member=object(value);return member.pid===emulator.pid&&member.fingerprint===emulator.fingerprint;}))
     throw Error("Owned emulator must be an original retained native descendant");
   const reportDigest=fileDigest(reportPath);native.files.set(reportPath,reportDigest);
-  const checkHost=()=>{native.assertCurrent();absentLock(owned.lockPath);for(const lock of config.localLocks)absentLock(lock.path);};
+  original={bootStage:stage.id,bootReport:{path:reportPath,digest:reportDigest},emulator:{pid:emulator.pid,fingerprint:emulator.fingerprint}};
+  }
+  const checkHost=()=>{assertArtifactDirectory();if(missing&&lstatSync(reportPath,{throwIfNoEntry:false}))throw Error("Original missing boot evidence changed");native.assertCurrent();absentLock(owned.lockPath);for(const lock of config.localLocks)absentLock(lock.path);};
   checkHost();
   const observedTarget=await observeAndroidEmulatorTargetCleanup({serial:config.serial,adb:config.adb,lockPath:owned.lockPath},recipe.workspace,[],probes??{
     devices:async()=>{const result=await exec(config.adb,["devices"],{timeout:5000,maxBuffer:65536,env:commandEnvironment({})});if(result.stderr)throw Error("ADB inventory reported an error");return result.stdout;},
     portClosed:observeClosedPort,lockAbsent:async path=>{absentLock(path);return true;}});
   if(!observedTarget)throw Error("Owned emulator, ports or ownership lock remain unresolved");
   checkHost();const completed=performance.now();
-  const original={bootStage:stage.id,bootReport:{path:reportPath,digest:reportDigest},emulator:{pid:emulator.pid,fingerprint:emulator.fingerprint}};
   const observation={kind:"android-owned-app-session-cleanup",version:1,serial:config.serial,userId:config.userId,
     packages:recipe.resources.filter(x=>x.startsWith("app:")).map(x=>({name:x.slice(4),ownedTargetAbsent:true})),
     localLocks:config.localLocks,localLocksAbsent:true,ownedLifecycle:"closed",sdkLifecycle:"unclaimed",target:observedTarget,originalOwnership:original,observedAt:observedTarget.observedAt};
