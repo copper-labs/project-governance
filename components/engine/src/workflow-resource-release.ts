@@ -135,7 +135,7 @@ export async function workflowResourceReleaseCommand(args:string[],workspace=pro
       if(first<0)throw Error("Original native build receipt required");
       const nativePath=join(context.directory,"commands",`${context.run.id}-${first}`,"result.json");
       if(realpathSync(context.values.evidence!)!==nativePath || boundedDigest(nativePath)!==context.values["evidence-digest"])throw Error("Original native build receipt required");
-      const observed=await observeLocalBuild(context.directory,context.run,context.stages,declaration);
+      const observed=await observeLocalBuild(context.directory,context.run,context.stages,declaration,true);
       try {
         return context.finish({...observed.proof,evidence:{path:nativePath,digest:context.values["evidence-digest"]},declaration:{path,digest:expected}},()=>{
           if(realpathSync(path)!==path || boundedDigest(path)!==expected)throw Error("Build cleanup declaration changed");

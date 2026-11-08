@@ -30,3 +30,9 @@ same value; custom checker commands receive it through their explicit environmen
 from an approval record or substitute an optional decision/JEV task ID. Missing, mismatched or
 expired approval still fails. This transport repair is unreleased; installed RC3 does not preserve
 the identity through this path.
+
+Captured Git inputs larger than the ordinary source buffer are scanned in bounded chunks for
+the same literal policy tokens. A token split across chunks remains detectable. The checker
+requires the complete Git read to succeed and preserves its captured blob identity. Input failures
+produce blocking findings naming the path. This does not alter the dependency surfaces, exception
+requirements, or permission to introduce CocoaPods. Working-tree identity checks remain effective.

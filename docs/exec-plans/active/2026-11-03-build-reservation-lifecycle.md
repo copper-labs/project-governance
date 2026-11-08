@@ -52,3 +52,21 @@ A nonblocking telemetry limitation remains: immutable observation attempts and t
 intent do not record which attempt was held at the transaction. Fresh checks still run synchronously
 before every release; historical observations are never release authority. Consider a small event
 join separately if diagnosis requires it. Do not add another approval or cleanup protocol for it.
+
+## Historical coordination names
+
+The explicit original-build recovery route rejected older bare coordination names before
+checking native closure. Accept these names only on that historical owner route. Keep normal
+admission and reserved namespaces strict. Regression proof covers the original release, replay
+after successor acquisition, missing project metadata and rejection outside recovery.
+
+## Apple checkpoint reader repair
+
+Apple policy discovery reads configured command-bearing surfaces, including large API metadata.
+The previous whole-file read limit aborted required checks without identifying the failing input.
+For captured immutable Git blobs, scan literal policy tokens in bounded stream chunks, retaining
+an overlap for split tokens and requiring successful Git process completion. Keep exact captured
+identities, case rules, deleted input handling and work-bound exceptions. A failed input produces
+a path-specific blocking finding. Live working-tree reads keep their existing identity checks.
+Validate large staged inputs after live-file changes, chunk boundaries, normal policy exceptions,
+and the full required hook against the adopter's preserved candidate. Keep adopter evidence external.

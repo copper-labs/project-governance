@@ -52,13 +52,13 @@ test("new build dispatch requires an explicit cleanup contract before claiming r
 });
 
 test("explicit legacy recovery shares native cleanup and preserves the original result",async()=>{
- const f=await ownerReleaseFixture(["local:legacy-build"],false,0,{producer:reportFree});
+ const f=await ownerReleaseFixture(["legacy-build-producer"],false,0,{producer:reportFree});
  try{
   const native=join(f.command,"result.json"),bytes=readFileSync(native),declaration=join(f.dir,"build-cleanup.json");writeFileSync(declaration,JSON.stringify({posixLockFiles:[]}));
   const args=[...f.args];args[args.indexOf("--kind")+1]="local-build";args[args.indexOf("--evidence")+1]=native;args[args.indexOf("--evidence-digest")+1]=api.fileDigest(native);
   args.push("--build-cleanup",declaration,"--build-cleanup-digest",api.fileDigest(declaration));
   assert.equal((await workflowResourceReleaseCommand(args,f.dir)).state,"released");assert.equal(f.held().length,0);assert.deepEqual(readFileSync(native),bytes);
-  const successor=f.registry.acquire(["local:legacy-build"],"next","next-run");
+  const successor=f.registry.acquire(["legacy-build-producer"],"next","next-run");
   assert.equal((await workflowResourceReleaseCommand(args,f.dir)).replayed,true);successor.forEach((lease:any)=>f.registry.assertHeld(lease));
  }finally{f.close();}
 });
@@ -192,3 +192,13 @@ test("admission refuses noncanonical ancestors and unsafe existing files before 
   assertBuildCleanupAdmission(recipe(join(dir,"not-created","work.lock")));
  }finally{rmSync(dir,{recursive:true});}
 });
+
+ test("legacy names are permitted only by explicit historical build recovery",async()=>{
+ const {assertLocalBuildScope}=await import(moduleUrl("local-build-cleanup"));
+ const recipe={resources:["legacy-build-producer"],operations:{x:{effect:"local"}}};
+ assert.throws(()=>assertLocalBuildScope(recipe as any,{posixLockFiles:[]},false),/exclusively declared/);
+ assert.doesNotThrow(()=>assertLocalBuildScope(recipe as any,{posixLockFiles:[]},false,true));
+ for(const name of ["device:fixture","remote:fixture","service:fixture","workspace-v1:fixture",
+   "Android-Pixel","IOS-Sim","android_emulator","iosSimulator","simulator","emulator-5554","DeviceOne","app-session"])
+ assert.throws(()=>assertLocalBuildScope({...recipe,resources:[name]} as any,{posixLockFiles:[]},false,true));
+ });

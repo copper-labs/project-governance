@@ -339,6 +339,8 @@ export class ValidationSubject {
     return structuredClone(this.baseSources()?.get(path) ?? entry(this.root, "git", path, this.#scope.base_ref!));
   }
 
+  get readsWorkingTree(): boolean { return this.#workingTree; }
+
   read(path: string, limit = SOURCE_CAPTURE_MAX_BYTES): Buffer {
     if (this.#projectionUnverified.has(path)) {
       const current = worktreeBytes(this.root, path, limit);

@@ -1020,3 +1020,13 @@ Validation covers normal success/failure, multiple stages, missing duplicate rep
 contention, lock replacement/aliasing, unsupported scope, interrupted release, no-replay recovery,
 successor ownership and exact installed execution. This is controlled runtime qualification, not
 product acceptance or measured development savings.
+
+Historical local-build recovery also accepts original bare coordination names consisting of
+letters, digits, underscores, periods and hyphens, excluding case-insensitive names starting
+with android, ios, simulator, emulator, device or app. These conservative exclusions preserve
+platform custody; arbitrary words inside an opaque coordination name do not classify its effects.
+This applies only to the explicit
+`workflow-release-resources --kind local-build` owner command with its hash-bound cleanup
+mapping. Normal build admission retains its declared prefixes. Reserved platform, network,
+service and workspace namespaces retain their respective recovery owners. Original run,
+revision, native process evidence, file locks and release generation checks remain required.

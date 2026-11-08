@@ -19,11 +19,12 @@ export function localBuild(value: unknown): LocalBuild {
   return {posixLockFiles:[...raw.posixLockFiles] as string[]};
 }
 
-export function assertLocalBuildScope(recipe: Recipe, descriptor: LocalBuild, checkCapability=true) {
+export function assertLocalBuildScope(recipe: Recipe, descriptor: LocalBuild, checkCapability=true, historicalRecovery=false) {
   localBuild(descriptor);
-  if(recipe.androidEmulator || recipe.androidAppSession || recipe.resources.some(resource=>/^(?:ios-|android[:-]|device:)/u.test(resource)))
+  if(recipe.androidEmulator || recipe.androidAppSession || recipe.resources.some(resource=>/^(?:ios-|android[:-]|device:)/u.test(resource) ||
+      (historicalRecovery && /^(?:android|ios|simulator|emulator|device|app)/iu.test(resource))))
     throw Error("Mixed build/device cleanup is unsupported; keep their reservations in separately owned workflows");
-  if(!recipe.resources.length || recipe.resources.some(resource=>! /^(?:local|build|gradle):.+/u.test(resource)) ||
+  if(!recipe.resources.length || recipe.resources.some(resource=>! /^(?:local|build|gradle):.+/u.test(resource) && !(historicalRecovery && /^[A-Za-z0-9][A-Za-z0-9_.-]*$/u.test(resource))) ||
      recipe.androidEmulator || recipe.androidAppSession || Object.values(recipe.operations).some(operation=>!["local","read"].includes(operation.effect)))
     throw Error("Local build cleanup requires exclusively declared local build reservations");
   if(descriptor.posixLockFiles.length) {
@@ -105,9 +106,9 @@ export async function holdBuildLocks(paths: string[]) {
 }
 
 /** The same evidence and lock checks serve normal completion and explicit old-run recovery. */
-export async function observeLocalBuild(directory: string, run: WorkflowRun, stages: WorkflowStage[], descriptor=run.binding.recipe.localBuild) {
+export async function observeLocalBuild(directory: string, run: WorkflowRun, stages: WorkflowStage[], descriptor=run.binding.recipe.localBuild, historicalRecovery=false) {
   if(!descriptor)throw Error("Local build cleanup declaration required before dispatch");
-  assertLocalBuildScope(run.binding.recipe,descriptor,false);
+  assertLocalBuildScope(run.binding.recipe,descriptor,false,historicalRecovery);
   const native=workflowNativeResourceEvidence(directory,run,stages,true);
   for(const path of native.files.keys())if(realpathSync(path)!==path)throw Error("Original build cleanup evidence uses an alias");
   // The supervisor can persist its receipt just before its own process exits.

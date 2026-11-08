@@ -1,5 +1,6 @@
+import { appleSource } from "./apple-source-scan.ts";
 import type { AnySchema } from "ajv";
-import { ValidationSubject, readSubjectSource, type ChangeScope } from "../change-subject.ts";
+import { ValidationSubject, type ChangeScope } from "../change-subject.ts";
 import { findingSummary, type Finding } from "../checker-results.ts";
 import { glob } from "../planning.ts";
 import { isoDate, schemaErrors } from "../schema-validation.ts";
@@ -25,7 +26,7 @@ function approvalError(item: Record<string, unknown>, workId: string, today: str
   if (!isoDate(String(item["expires"]))) return "matching CocoaPods exception has no valid expiry";
   return String(item["expires"]) < today ? "matching CocoaPods exception expired" : "";
 }
-export function checkAppleDependencies(subject: ValidationSubject, scope: ChangeScope, options: {
+export async function checkAppleDependencies(subject: ValidationSubject, scope: ChangeScope, options: {
   policy: Record<string, unknown>; exceptions: Record<string, unknown>; schema: AnySchema; workId: string; today: string; stage: string;
 }) {
   const findings: Finding[] = [], coco: string[] = [], spm: string[] = [];
@@ -33,15 +34,36 @@ export function checkAppleDependencies(subject: ValidationSubject, scope: Change
   if (!isoDate(options.today)) throw new Error("Invalid Apple policy evaluation date");
   if (!["auto", "always"].includes(String(options.policy["applies"]))) add("apple.policy-invalid", "config/policies/apple-dependencies.yaml", "Apple policy applies must be auto or always.");
   const paths = subject.paths();
-  const read = (path: string) => subject.source(path)?.file_type === "regular" ? subject.read(path).toString("utf8") : "";
-  for (const path of paths) { if (cocoapodsSurface(path, () => read(path))) coco.push(path); if (swiftpmSurface(path, () => read(path))) spm.push(path); }
+  const content = new Map<string, string>();
+  const read = (path: string) => content.get(path) ?? "";
+  const load = async (path: string) => {
+    if (content.has(path)) return;
+    try {
+      const source = subject.source(path);
+      if (!source || source.file_type !== "regular") return;
+      content.set(path, await appleSource(subject.root, source, () => subject.read(path), subject.readsWorkingTree));
+    }
+    catch { add("apple.input-unavailable", path, "Apple policy could not read this captured input."); }
+  };
+  for (const path of paths) {
+    let needed = false;
+    const probe = () => { needed = true; return ""; };
+    cocoapodsSurface(path, probe); swiftpmSurface(path, probe);
+    if (needed) await load(path);
+    if (cocoapodsSurface(path, () => read(path))) coco.push(path); if (swiftpmSurface(path, () => read(path))) spm.push(path); }
   const changedCoco: string[] = [], plans: string[] = [];
   for (const record of scope.records) {
     const source = record.after ?? record.before; if (!source || source.file_type !== "regular") continue;
-    const bytes = () => readSubjectSource(subject.root, source).toString("utf8");
-    if (cocoapodsSurface(record.path, bytes)) changedCoco.push(record.path);
+    let needed = false;
+    const byName = cocoapodsSurface(record.path, () => { needed = true; return ""; });
+    if (byName) changedCoco.push(record.path);
+    else if (needed) {
+      try { const text = await appleSource(subject.root, source); if (cocoapodsSurface(record.path, () => text)) changedCoco.push(record.path); }
+      catch { add("apple.input-unavailable", record.path, "Apple policy could not read this captured input."); }
+    }
     if (record.after && matches(record.path, ["docs/exec-plans/**/*.md", "docs/exec-plans/*.md"])) plans.push(record.path);
   }
+  for (const path of plans) await load(path);
   const detected = coco.length || spm.length || changedCoco.length || paths.some(path => path.endsWith(".swift") || path.endsWith(".xcodeproj/project.pbxproj")) || plans.some(path => contains(read(path).toLowerCase(), appleTerms));
   if (!detected && options.policy["applies"] === "auto" && !findings.length) return { version: 1, check: "apple-dependency-policy", status: "not-applicable", finding_count: 0, discovery: { swiftpm: [], cocoapods: [] }, findings };
   const errors = schemaErrors(options.schema, options.exceptions);
