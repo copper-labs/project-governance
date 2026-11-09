@@ -1,13 +1,14 @@
 /** Native API signoff adapter. Production input cannot supply identity or answer confirmation. */
-import { readFileSync, realpathSync, statSync, existsSync } from 'node:fs';
+import { readFileSync, realpathSync, statSync, existsSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { userInfo } from 'node:os';
+import { userInfo, tmpdir } from 'node:os';
 import { randomUUID, createHash } from 'node:crypto';
 import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import { loadHost, save, takeReceiptLock } from './workflow-host-binding.mjs';
 
+import { reviewPage } from './api-review-page.mjs';
 const hash = bytes => 'sha256:' + createHash('sha256').update(bytes).digest('hex');
 const read = path => JSON.parse(readFileSync(path, 'utf8'));
 const exact = (value, keys) => {
@@ -28,25 +29,25 @@ function identity(host, workspace) {
       !readFileSync(join(workspace, '.governance/runtime/bin/project-governance'), 'utf8').includes(join(host.root, 'dist/engine/src/cli.js')))
     throw new Error('Selected runtime differs from worktree installation');
   return { workspace, database, packageVersion: host.version, packageDigest: host.api.fileDigest(join(host.root, 'package.json')),
-    hostExportDigest: host.api.fileDigest(host.module), adapterDigest: hash(readFileSync(adapterPath)), lockDigest: host.api.fileDigest(pin) };
+    hostExportDigest: host.api.fileDigest(host.module), adapterDigest: hash(JSON.stringify([adapterPath, fileURLToPath(new URL('./api-review-page.mjs', import.meta.url)), fileURLToPath(new URL('./api-review-window.swift', import.meta.url))].map(path => hash(readFileSync(path))))), lockDigest: host.api.fileDigest(pin) };
 }
 
 function subjectSnapshot(host, request) {
   const subject = host.api.apiSignoffSubject(request.subject);
   if (typeof request.reviewFile !== 'string' || !request.reviewFile.startsWith('/')) throw new Error('Absolute readable review file required');
   const path = realpathSync(request.reviewFile), stat = statSync(path);
-  if (!stat.isFile() || stat.size < 1 || stat.size > 8000) throw new Error('API review must be a nonempty UTF-8 file of at most 8000 bytes');
+  if (!stat.isFile() || stat.size < 1 || stat.size > 2 * 1024 * 1024) throw new Error('API review must be a nonempty UTF-8 file of at most 2 MiB');
   const bytes = readFileSync(path);
-  if (bytes.length > 8000 || hash(bytes) !== subject.reviewDigest) throw new Error('API review artifact changed');
+  if (bytes.length > 2 * 1024 * 1024 || hash(bytes) !== subject.reviewDigest) throw new Error('API review artifact changed');
   const review = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
   if (!review.trim() || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\u202a-\u202e\u2066-\u2069]/u.test(review))
     throw new Error('API review contains unsupported control characters');
   return { subject, review, reviewFile: path };
 }
 
-function observation(snapshot) {
+function observation(snapshot, kind = 'local-native-confirmation') {
   const user = userInfo();
-  return { kind: 'local-native-confirmation', eventId: randomUUID(), observedAt: new Date().toISOString(),
+  return { kind, eventId: randomUUID(), observedAt: new Date().toISOString(),
     uid: user.uid, username: user.username, executable: realpathSync(process.execPath), nodeVersion: process.version,
     ...Object.fromEntries(['packageVersion', 'packageDigest', 'hostExportDigest', 'adapterDigest', 'lockDigest'].map(key => [key, snapshot[key]])) };
 }
@@ -61,11 +62,19 @@ async function nativeConfirmation(message) {
   } catch { return false; }
 }
 
-function approvalMessage(snapshot, request) {
-  const { subject, review } = snapshot;
-  const message = `Approve this exact API contract?\nContract: ${subject.contractId}\nDigest: ${subject.contractDigest}\nCells:\n${subject.cells.map(c => `${c.product} / ${c.language} / ${c.platform}`).join('\n')}\nSections:\n${Object.entries(subject.sections).map(([id, d]) => `${id}: ${d}`).join('\n')}\nReview digest: ${subject.reviewDigest}\nSupersedes: ${request.supersedes ? `${request.supersedes.id} revision ${request.supersedes.revision}` : 'none'}\n\nExact review:\n${review}\n\nThis records API approval only. It does not approve a build, publication or native feature parity. Attribution is to this local OS execution context, not an authenticated chat user or independently identified clicker.`;
-  if (message.length > 12000) throw new Error('API review exceeds native dialog size; use a smaller coherent contract');
-  return message;
+async function pageConfirmation(snapshot, request) {
+  if (process.platform !== 'darwin') throw new Error('Local API review requires macOS');
+  try { execFileSync('/usr/bin/xcode-select', ['-p'], {stdio:'pipe', timeout:5000}); }
+  catch { throw new Error('Local review requires installed macOS developer tools'); }
+  const directory = mkdtempSync(join(tmpdir(), 'governance-api-review-'));
+  const file = join(directory, 'review.html');
+  try {
+    writeFileSync(file, reviewPage(snapshot.review, JSON.stringify({subject:snapshot.subject, supersedes:request.supersedes}, null, 2), {contractId:snapshot.subject.contractId, cells:snapshot.subject.cells, supersedes:request.supersedes}), {mode:0o600});
+    const result = await promisify(execFile)('/usr/bin/swift', [fileURLToPath(new URL('./api-review-window.swift', import.meta.url)), file], {timeout: 3600000, maxBuffer: 1024 * 1024});
+    if (!['Confirm API decision', 'Cancel'].includes(result.stdout.trim())) throw new Error('Invalid review-window response');
+    return result.stdout.trim() === 'Confirm API decision';
+  } catch (error) { throw new Error('Local review window failed: ' + error.message); }
+  finally { rmSync(directory, {recursive:true, force:true}); }
 }
 
 /** Shipped callers always use native confirmation; fixture transport belongs outside this module. */
@@ -75,7 +84,7 @@ export async function approveApiSignoff(host, workspace, request, receiptPath) {
   exact(request, ['requestId', 'subject', 'reviewFile', 'supersedes']);
   const predecessor = host.api.apiSignoffPredecessor(request.supersedes);
   const initial = { ...identity(host, workspace), ...subjectSnapshot(host, request) };
-  const message = approvalMessage(initial, { ...request, supersedes: predecessor });
+
   receiptPath = resolve(receiptPath);
   if (!statSync(dirname(receiptPath)).isDirectory()) throw new Error('Receipt parent must exist');
   const release = takeReceiptLock(receiptPath);
@@ -89,11 +98,11 @@ export async function approveApiSignoff(host, workspace, request, receiptPath) {
       save(receiptPath, locator); return { status: 'approved', replayed: true, locator, revision: replay.revision };
     }
     if (existsSync(receiptPath)) throw new Error('Receipt path already exists without matching signoff');
-    if (await nativeConfirmation(message) !== true) throw new Error('Operator did not approve API contract');
+    if (await pageConfirmation(initial, {...request, supersedes:predecessor}) !== true) throw new Error('Operator did not approve API contract');
     const current = { ...identity(host, workspace), ...subjectSnapshot(host, request) };
     if (host.api.digest(initial) !== host.api.digest(current)) throw new Error('API review or runtime changed during confirmation');
     if (existsSync(receiptPath)) throw new Error('Receipt path appeared during confirmation');
-    const record = store.recordConfirmation(request.requestId, initial.subject, observation(current), predecessor);
+    const record = store.recordConfirmation(request.requestId, initial.subject, observation(current, 'local-page-confirmation'), predecessor);
     const locator = locatorFor(record); save(receiptPath, locator);
     return { status: 'approved', replayed: false, locator, revision: record.revision };
   } finally { try { store?.close(); } finally { release(); } }

@@ -193,3 +193,5 @@ shows existing project-owned checks; it does not require a check after every edi
 - [Confirmed failed-spawn cleanup](active/2026-11-08-failed-spawn-cleanup.md): repairs local-build release when the original supervisor confirms a failed spawn with no child identity.
 
 - [Workspace context guidance](active/2026-11-09-workspace-context-guidance.md) scopes attachment notices without changing admission.
+
+- [Readable local API review](active/2026-11-09-api-review-page.md) — complete local review and exact decision binding.

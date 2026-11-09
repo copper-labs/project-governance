@@ -25,16 +25,27 @@ empty sections and unknown fields refuse. The adopting extractor owns semantic n
 coverage, section membership and the meaning of the contract digest. Governance checks exact
 identity, not completeness or correctness of the API design.
 
-The host reads an exact UTF-8 review artifact, verifies its byte digest, and displays its entire
-text alongside all subject identities. The review is limited to 8000 bytes and the complete dialog
-to 12000 characters. Oversized reviews refuse rather than truncate; divide them into meaningful
-contract lineages. Control characters that obscure review refuse. A digest alone is not a readable
-review. The host rechecks review bytes, subject and runtime identity after confirmation.
+The host reads an exact UTF-8 review artifact and verifies its byte digest. Approval uses a
+scrollable macOS review window displaying the complete escaped Markdown content, including tables
+and code blocks. Contract, covered cells and replaced approval remain visible above the review. Raw digests appear in a separate details section. The native
+"Approve this review" button is disabled until the page finishes loading. Cancellation or window
+closure records no decision. The page has no script, network, form, navigation or HTTP approval
+endpoint; native controls alone return a decision. The host rechecks review, subject and runtime
+identity after confirmation. Reviews above 2 MiB refuse rather than truncate. This bound protects
+local rendering resources, not a limit on API count. Review completeness remains the adopting
+extractor's responsibility. Review links and raw HTML display as text, not active content.
+
+New approvals record `local-page-confirmation`; historical `local-native-confirmation` records
+remain verifiable. Neither asserts authenticated chat identity. The trusted local host does not
+resist malicious same-account writers, process instrumentation or UI automation. Agents must never
+activate the final approval control. Revocation retains its existing native confirmation route.
+The renderer and native window source are included in the new adapter observation digest. macOS
+Swift and WebKit are required; unavailable host tooling refuses without a dialog fallback.
 
 The production adapter observes the local OS execution UID/username, Node executable/version,
 selected package version and package/export/adapter/lock digests. It generates a confirmation-event
 ID and timestamp. Those fields are not request arguments. They describe the process context in
-which the native dialog returned confirmation. They do not authenticate a chat account, identify
+which the local confirmation surface returned confirmation. They do not authenticate a chat account, identify
 the person clicking, or resist malicious same-account writers, modified host code or UI automation.
 The existing trusted-local-host boundary remains explicit. No signing key or service is introduced.
 
@@ -110,7 +121,13 @@ fixtures cover review display, cancellation, changed inputs/runtime, provenance 
 noninteractive CLI verification and refusal of bypass arguments. Repeat host fixtures through the
 exact extracted candidate package and inspect its contents. Unshipped tests may replace the OS
 transport inside a synthetic process; they must not add a production answer switch. Such fixtures
-prove mechanics, not actual human consent. One real native confirmation/readback remains required
+prove mechanics, not actual human consent. One real human page confirmation/readback remains required
 before production
 baseline activation; it may coincide with that baseline's actual human approval. Publication,
 installation and adopting-gate acceptance are separate from local candidate qualification.
+
+The page may remain open for up to one hour while retaining the receipt lock; cancellation, host
+failure and timeout release it normally. Host failures are reported separately from cancellation.
+Older runtimes do not recognize page-confirmation provenance and refuse those new records. Upgrade
+consuming worktrees before using a new page receipt in their shared Git-common ledger; historical
+native receipts remain valid. Runtime rollback does not convert a page receipt into a native one.

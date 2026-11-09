@@ -10,7 +10,7 @@ export interface ApiSignoffSubject {
   reviewDigest: string;
 }
 export interface ApiSignoffHostObservation {
-  kind: "local-native-confirmation";
+  kind: "local-native-confirmation" | "local-page-confirmation";
   eventId: string;
   observedAt: string;
   uid: number;
@@ -80,7 +80,7 @@ export function apiSignoffSubject(value: unknown): ApiSignoffSubject {
 export function apiSignoffObservation(value: unknown): ApiSignoffHostObservation {
   const row = signoffFields(value, ["kind", "eventId", "observedAt", "uid", "username", "executable", "nodeVersion",
     "packageVersion", "packageDigest", "hostExportDigest", "adapterDigest", "lockDigest"], "host observation");
-  if (row.kind !== "local-native-confirmation" || !Number.isSafeInteger(row.uid) || Number(row.uid) < 0 ||
+  if (!["local-native-confirmation", "local-page-confirmation"].includes(String(row.kind)) || !Number.isSafeInteger(row.uid) || Number(row.uid) < 0 ||
       typeof row.observedAt !== "string" || !Number.isFinite(Date.parse(row.observedAt))) throw new Error("Invalid host observation");
   for (const key of ["eventId", "username", "executable", "nodeVersion", "packageVersion"]) text(row[key], key);
   for (const key of ["packageDigest", "hostExportDigest", "adapterDigest", "lockDigest"]) signoffDigest(row[key]);

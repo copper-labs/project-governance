@@ -20,12 +20,14 @@ const launcherApi = generation ? await import(pathToFileURL(join(root, 'dist/eng
 const nativeTest = (name, run) => test(name, { skip: process.platform !== 'darwin' }, run);
 
 /** Test-only OS transport: production code receives no callback and no fixture switch is shipped. */
-async function withFixtureDialog(confirm, operation) {
+async function withFixtureDialog(confirm, operation, expected = '/usr/bin/swift') {
   const original = childProcess.execFile;
   const fake = () => { throw new Error('Fixture expects the promisified native transport'); };
   fake[promisify.custom] = async (file, args) => {
-    assert.equal(file, '/usr/bin/osascript'); assert.match(args[1], /display dialog/);
-    return { stdout: await confirm(args[2]) === true ? 'Confirm API decision\n' : 'Cancel\n', stderr: '' };
+    assert.equal(file, expected);
+    const message = file === '/usr/bin/swift' ? readFileSync(args[1], 'utf8') : args[2];
+    const answer=await confirm(message);
+    return { stdout: typeof answer === 'string' ? answer : answer === true ? 'Confirm API decision\n' : 'Cancel\n', stderr: '' };
   };
   childProcess.execFile = fake; syncBuiltinESMExports();
   try { return await operation(); }
@@ -34,7 +36,7 @@ async function withFixtureDialog(confirm, operation) {
 const fixtureApproval = (host, workspace, request, receipt, confirm) =>
   withFixtureDialog(confirm, () => approveApiSignoff(host, workspace, request, receipt));
 const fixtureRevocation = (host, workspace, request, confirm) =>
-  withFixtureDialog(confirm, () => revokeApiSignoff(host, workspace, request));
+  withFixtureDialog(confirm, () => revokeApiSignoff(host, workspace, request), '/usr/bin/osascript');
 
 
 function fixture() {
@@ -62,13 +64,13 @@ function fixture() {
 nativeTest('fixture click binds exact review and host-observed provenance; normal verification and acknowledgement replay never prompt', async () => {
   const f = fixture(); let prompts = 0;
   const result = await fixtureApproval(host, f.workspace, f.request, f.receipt, async message => {
-    prompts++; assert.ok(message.includes(readFileSync(f.reviewFile, 'utf8'))); assert.ok(message.includes(f.subject.contractDigest));
-    assert.ok(message.includes('sample / typescript / ios')); return true;
+    prompts++; assert.ok(message.includes(readFileSync(f.reviewFile, 'utf8').trim())); assert.ok(message.includes(f.subject.contractDigest));
+    assert.ok(message.includes('sample') && message.includes('typescript') && message.includes('ios')); return true;
   });
   const expected = { locator: result.locator, subject: f.subject, reviewFile: f.reviewFile };
   const verified = verifyApiSignoff(host, f.workspace, expected);
   assert.equal(verified.hostObservation.uid, process.getuid()); assert.equal(verified.hostObservation.packageVersion, host.version);
-  assert.equal(verified.hostObservation.kind, 'local-native-confirmation'); assert.equal('messageId' in verified.hostObservation, false);
+  assert.equal(verified.hostObservation.kind, 'local-page-confirmation'); assert.equal('messageId' in verified.hostObservation, false);
   unlinkSync(f.receipt);
   const replay = await fixtureApproval(host, f.workspace, f.request, f.receipt, async () => { throw new Error('must not prompt'); });
   assert.equal(replay.locator.id, result.locator.id); assert.equal(prompts, 1); assert.equal(replay.replayed, true);
@@ -172,11 +174,11 @@ nativeTest('the normal packaged approval command reaches native transport withou
   writeFileSync(preload, `import childProcess from 'node:child_process';
 import {promisify} from 'node:util';
 import {syncBuiltinESMExports} from 'node:module';
-import {writeFileSync} from 'node:fs';
+import {writeFileSync,readFileSync} from 'node:fs';
 const fake=()=>{throw Error('Expected promisified transport')};
 fake[promisify.custom]=async (file,args)=>{
-  if(file!=='/usr/bin/osascript'||!args[1].includes('display dialog')||!args[2].includes('Exact review:')) throw Error('Unexpected native transport');
-  writeFileSync(${JSON.stringify(transportFile)},JSON.stringify({kind:'synthetic-native-transport',file,completeReview:args[2].includes('Sample API: operation fetch()')}));
+  if(file!=='/usr/bin/swift'||!args[0].endsWith('api-review-window.swift')) throw Error('Unexpected native transport');
+  writeFileSync(${JSON.stringify(transportFile)},JSON.stringify({kind:'synthetic-native-transport',file,completeReview:readFileSync(args[1],'utf8').includes('Sample API: operation fetch()')}));
   return {stdout:'Confirm API decision\\n',stderr:''};
 };
 childProcess.execFile=fake;syncBuiltinESMExports();
@@ -188,8 +190,8 @@ childProcess.execFile=fake;syncBuiltinESMExports();
   const approved = JSON.parse(result.stdout), transported = JSON.parse(readFileSync(transportFile, 'utf8'));
   assert.equal(transported.kind, 'synthetic-native-transport'); assert.equal(transported.completeReview, true);
   const verified = verifyApiSignoff(host, f.workspace, { locator: approved.locator, subject: f.subject, reviewFile: f.reviewFile });
-  assert.equal(verified.hostObservation.kind, 'local-native-confirmation');
-  assert.equal(verified.hostObservation.adapterDigest, host.api.fileDigest(packaged));
+  assert.equal(verified.hostObservation.kind, 'local-page-confirmation');
+  assert.equal(verified.hostObservation.adapterDigest, host.api.digest([packaged, join(root,'dist/engine/assets/host/api-review-page.mjs'), join(root,'dist/engine/assets/host/api-review-window.swift')].map(p=>host.api.fileDigest(p))));
   assert.equal(verified.hostObservation.packageVersion, host.version);
 });
 
@@ -224,4 +226,26 @@ test('packaged verification reads frozen preview records and rejects changed, mi
     }
   }
   assert.deepEqual(readFileSync(f.database), before);
+});
+
+ nativeTest('full large review is displayed without truncation and page provenance remains distinct', async () => {
+ const f=fixture(); const review='## Paired APIs\n'+('old → new declaration\n'.repeat(1500))+'END_OF_REVIEW';
+ writeFileSync(f.reviewFile,review); f.subject.reviewDigest=host.api.fileDigest(f.reviewFile);
+ const result=await fixtureApproval(host,f.workspace,f.request,f.receipt,async html=>{assert.ok(html.includes('END_OF_REVIEW'));return true;});
+ assert.equal(verifyApiSignoff(host,f.workspace,{locator:result.locator,subject:f.subject,reviewFile:f.reviewFile}).hostObservation.kind,'local-page-confirmation');
+ });
+
+nativeTest('packaged Swift window typechecks on the actual host',()=>{
+ execFileSync('/usr/bin/swiftc',['-typecheck',join(root,'dist/engine/assets/host/api-review-window.swift')],{timeout:60000,stdio:'pipe'});
+});
+nativeTest('transport faults are not attributed to a human cancellation',async()=>{
+ const f=fixture();await assert.rejects(fixtureApproval(host,f.workspace,f.request,f.receipt,async()=>{throw Error('synthetic host failure');}),/Local review window failed/);
+ assert.equal(existsSync(f.receipt),false);
+});
+
+nativeTest('only explicit Cancel is a cancellation; unknown output is a host fault',async()=>{
+ for(const output of ['Load failed\n','', 'approved']) {
+  const f=fixture();await assert.rejects(fixtureApproval(host,f.workspace,f.request,f.receipt,async()=>output),/Local review window failed/);assert.equal(existsSync(f.receipt),false);
+ }
+ const f=fixture();await assert.rejects(fixtureApproval(host,f.workspace,f.request,f.receipt,async()=>false),/Operator did not approve/);
 });
