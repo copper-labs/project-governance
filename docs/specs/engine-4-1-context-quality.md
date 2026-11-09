@@ -485,3 +485,12 @@ Open: host-supported consumption observations and case-specific calibration prom
 Resolve these through existing owners without adding another state or reporting authority.
 The requested podcast reconciliation is pending a transcript containing the intended harness material;
 unrelated source material contributes no release requirements.
+
+### Bounded changed-range capture
+
+Changed-range inventory retains Git path and hunk headers rather than buffering the full patch
+body. Changed source lines are drained and discarded; exact original hashes and the second
+snapshot still establish subject identity. Header output stays bounded at 32 MiB, individual
+headers at 16 KiB, with explicit refusal rather than partial success. Git has a 30-second deadline;
+the synchronous caller allows five additional seconds for worker shutdown. This is local capture,
+not optional content delivery, source exclusion, API acceptance or a wider provider allowance.

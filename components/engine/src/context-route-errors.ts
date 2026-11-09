@@ -41,6 +41,10 @@ export function recordContextFailure(root: string, error: unknown, providerCalle
       ? new ContextRouteError("invalid-arguments", "Invalid context-route arguments. Use context-route --help; --task is task prose, --decision-task is an ID.")
       : message.startsWith("Task context unavailable")
         ? new ContextRouteError("task-unavailable", `Task context ${message.match(/\(([a-z-]+)\)/u)?.[1] ?? "unavailable"}; create or resume this session's task, or supply --task <purpose> and --revision <revision>.`)
+        : message === "Git diff is not valid UTF-8"
+          ? new ContextRouteError("subject-encoding", "Git diff contains invalid UTF-8; source content was not substituted or truncated.")
+        : message === "Diff headers exceed capture bound"
+          ? new ContextRouteError("subject-header-limit", "Git diff path/hunk metadata exceeds the bounded capture limit; source content was not truncated.")
         : message.startsWith("Git comparison failed")
           ? new ContextRouteError("subject-unavailable", "The Git comparison is unavailable. Verify the repository and --base-ref; a new repository with no commits is supported.")
           : message.startsWith("Context configuration unavailable")

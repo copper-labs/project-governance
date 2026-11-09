@@ -236,3 +236,17 @@ test("addition normalization retains staged selection and real-byte drift refusa
     assert.equal(readSubjectSource(f.root, staged.records[0]!.after!).toString(), "first\n");
   } finally { f.close(); }
 });
+
+
+test("large diff bodies preserve exact hunk ranges without whole-patch buffering", () => {
+  const f = repository();
+  try {
+    const before = "a".repeat(1023) + "\n", after = "b".repeat(1023) + "\n";
+    writeFileSync(join(f.root, "large.txt"), before.repeat(18000));
+    f.git("add", "large.txt"); f.git("commit", "-qm", "large fixture");
+    writeFileSync(join(f.root, "large.txt"), after.repeat(18000));
+    const scope = resolveChangeScope(f.root, { baseRef: "HEAD" });
+    assert.deepEqual(scope.records.find(record => record.path === "large.txt")!.changed_ranges,
+      [{ start: 1, end: 18000 }]);
+  } finally { f.close(); }
+});

@@ -195,3 +195,5 @@ shows existing project-owned checks; it does not require a check after every edi
 - [Workspace context guidance](active/2026-11-09-workspace-context-guidance.md) scopes attachment notices without changing admission.
 
 - [Readable local API review](active/2026-11-09-api-review-page.md) — complete local review and exact decision binding.
+
+- [Bounded diff header capture](active/2026-11-09-streamed-diff-context.md)

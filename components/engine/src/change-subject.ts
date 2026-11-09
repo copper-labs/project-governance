@@ -1,3 +1,4 @@
+import { gitDiffHeaders } from "./git-diff-headers.ts";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { closeSync, constants, fstatSync, lstatSync, openSync, readSync, readlinkSync, realpathSync } from "node:fs";
@@ -242,7 +243,7 @@ export function resolveChangeScope(root: string, options: { staged?: boolean; al
       }
     }
     let current: string | null = null;
-    const lines = decode(git(root, ["-c", "core.quotePath=false", "diff", "--unified=0", "--no-color", "--no-ext-diff", "--no-textconv", "-M", "--diff-filter=ACMR", ...diff])).split("\n");
+    const lines = gitDiffHeaders(root, ["-c", "core.quotePath=false", "diff", "--unified=0", "--no-color", "--no-ext-diff", "--no-textconv", "-M", "--diff-filter=ACMR", ...diff]).split("\n");
     for (const line of lines) {
       if (line.startsWith("+++ b/")) { current = safeSubjectPath(line.slice(6)); continue; }
       if (line.startsWith("+++ ")) { current = null; if (line !== "+++ /dev/null") throw new Error("unsupported quoted Git hunk path"); continue; }
