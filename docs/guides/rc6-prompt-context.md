@@ -289,7 +289,10 @@ merely by upgrading.
 The Codex prompt hook creates the initial entry automatically and gives its entry ID in the packet.
 It also names the actual execution checkout and worktree locator. Shared hook definitions may come
 from the main checkout; that does not make the main checkout the execution target. Align the chat
-with the intended existing worktree before work. Missing local entries do not authorize a sibling lookup.
+with the intended existing worktree to restore automatic context, not as a prerequisite for
+independently authorized work. Explicit cross-checkout work follows that target's own admission and
+host permissions; required guidance and disclosure limits remain applicable. Missing local entries
+do not authorize a sibling lookup. See the [checkout-transition guide](../developer/guides/source-control-and-worktrees.md#keep-an-existing-conversation-usable-after-an-upgrade).
 
 Read an unchanged packet under the same session with:
 

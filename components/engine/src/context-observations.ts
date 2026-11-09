@@ -165,12 +165,12 @@ export function readPromptEntry(workspace: string, id: string) {
   try { entry = read(join(contextStateRoot(workspace), "prompt-entries"), `${id}.json`); }
   catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT")
-      throw new ContextRouteError("entry-unavailable-in-workspace", `Entry is unavailable in ${realpathSync(workspace)}. Align this chat and its commands with the same execution worktree; no sibling lookup or paid retry was attempted.`);
+      throw new ContextRouteError("entry-unavailable-in-workspace", `Entry is unavailable in ${realpathSync(workspace)}. This entry cannot supply context here; no sibling lookup or paid retry was attempted. Restore automatic context through supported host attachment. Other work retains its own admission and host permissions.`);
     throw new ContextRouteError("entry-unreadable", "The local entry cannot be read safely. Inspect context doctor and the current required originals.");
   }
   if (entry.version !== 1) throw new ContextRouteError("entry-format-unsupported", "The local entry format is unsupported. Use the current native packet reference.");
   if (entry.workspace !== realpathSync(workspace))
-    throw new ContextRouteError("entry-workspace-mismatch", `The recorded workspace differs from execution workspace ${realpathSync(workspace)}. Align the host at a pause seam.`);
+    throw new ContextRouteError("entry-workspace-mismatch", `The recorded workspace differs from execution workspace ${realpathSync(workspace)}. This entry cannot supply context here. Restore automatic context through supported host attachment. Other work retains its own admission and host permissions.`);
   if (entry.entryId !== id || typeof entry.session !== "string" || typeof entry.turn !== "string")
     throw new ContextRouteError("entry-malformed", "The local entry identity is malformed; inspect the current packet reference.",
       { stage: "entry-record", causeCode: "entry-record-identity", ...reference });

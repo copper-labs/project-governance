@@ -248,11 +248,22 @@ this comparison before releasing idle startup reservations; archiving and restor
 its directory and does not repair a mismatch. Record the saved checkpoint and next action in the
 existing handoff. A mismatch found before installation remains a separate continuation problem.
 
-If these locations differ, use the host's supported workspace operation for that conversation at
-its pause seam. If the host cannot attach it to the existing directory, continue the saved checkpoint
-in a chat attached to that directory. Reuse the existing Git worktree and branch; a runtime upgrade
-does not need another copy of the repository. Do not run a competing reattachment attempt while
-another owner is already repairing that conversation.
+When choosing a different implementation checkout, prefer establishing its host attachment before starting
+work there when the host supports it; prefer host-managed creation when a new isolated checkout is
+needed. Reuse an existing checkout rather than create another copy to repair attachment. Check this
+at the checkout transition, not before every command. Git registration alone does not attach a chat.
+
+If these locations differ, automatic context remains local to the chat's folder. The alignment
+notice is not a blanket stop-work instruction. Independently authorized work can continue in a
+target checkout explicitly selected by the operator or an existing assignment. Verify that checkout
+and follow its own admission, using its pinned runtime and task binding where required. Recorded
+bindings do not select a target. Host permissions, required guidance and review disclosure limits
+still apply. Do not consume the original folder's entry as
+target context or bypass a host access denial. Runtime admission never overrides host permissions: do not reach a denied target another way.
+An unsupported or failed attachment alone does not invalidate independently authorized work. Restore automatic prompt context through a supported host operation
+when available, or resume a saved checkpoint in a chat already attached to the existing directory.
+These restore automatic context, not authority for other work. If user action is necessary, explain
+that specific limitation without stopping unaffected work. Do not run competing reattachment attempts or modify host ownership records.
 
 For a CLI fork, verify the returned new conversation id and its actual working directory before
 continuing. Sending another message to the original desktop chat does not address the fork. A
@@ -263,7 +274,7 @@ distinguishes resume from fork and permits explicit directory configuration; the
 controls remain host-dependent. Governance diagnoses identity and never edits the host's session
 database to simulate reattachment.
 
-Then verify the exact runtime pin, local task binding and normal context entry in that directory.
+After restoring attachment, verify the exact runtime pin, local task binding and normal context entry in that directory.
 An installation/version/doctor pass proves installation health, not successful task continuation.
 Keep that distinction in the upgrade report until the continuing conversation produces a normal native
 prompt receipt in the intended checkout and resumes its saved task without repeating completed

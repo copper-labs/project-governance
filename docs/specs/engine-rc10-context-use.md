@@ -97,17 +97,17 @@ The prompt, rather than an old task's wording, remains the immediate retrieval q
 context is background. Breaking mixed intent into implementation tasks remains the coding agent's
 job under operator direction; retrieval does not create tasks or authorize actions.
 
-## A. One execution worktree for the prompt and its work
+## A. One primary worktree for automatic prompt context
 
 Record the native event workspace, canonical execution workspace/locator and hook definition source
 separately in the existing entry/route chain. Include the execution workspace in the compact packet
 header and continuation reference. Shared definitions are not a shared runtime or source index.
 
-The initial adoption contract is one primary execution worktree per chat. Rebind through a supported
-host operation at a pause seam; when an existing-directory rebind is unavailable, resume a verified
-checkpoint in a chat attached to that same existing directory. This does not require another Git
-branch or worktree. Incidental reads of an explicitly permitted companion repository do not change
-the primary execution workspace.
+Automatic prompt context has one primary execution worktree per chat. Establish the intended
+attachment at a checkout transition through a supported host operation when available. An existing
+checkout does not need a duplicate branch or worktree to restore automatic context. Explicitly
+scoped work in another checkout remains subject to its own admission, as described below;
+incidental reads do not change the primary prompt workspace.
 
 RC10 does not introduce transparent cross-worktree prompt redirection, a last-active-tree heuristic,
 or another session-target registry. Existing explicit continuity bindings remain authoritative within
@@ -119,8 +119,17 @@ the native execution worktree, report the native and bound locations before paid
 required local guidance available without JEV; do not claim it belongs to the external task. Inspect
 only bounded binding identities from the existing read-only shared continuity store, not sibling
 prompt packets or task prose. Ambiguous or unverifiable bindings do not select a destination.
-The operator must align the host chat to the intended existing checkout at a pause seam. Shared
-hook definitions alone are normal and must not trigger a mismatch.
+To restore automatic prompt context, align the host chat with the intended existing checkout through
+supported host operations. This context-selection pause is not a general execution or review gate.
+For work explicitly targeted by the operator or an existing assignment at another checkout, verify
+that checkout and follow its own admission, using its pinned runtime and task binding where required.
+Recorded bindings do not choose a target. Host permissions, required guidance and provider review
+disclosure limits still apply. Runtime admission never overrides a host access denial; do not reach
+a denied target another way. An already-attached chat with a saved checkpoint is another option for
+restoring automatic context, not a prerequisite for independently authorized work. Neither this notice nor a sibling binding
+grants authority, transfers a prompt packet, or bypasses a host access denial. A failed attachment
+alone must not be presented as cancellation of independently authorized work. Shared hook definitions
+alone are normal and must not trigger a mismatch.
 
 An entry from another worktree must not be consumed as local context. Report distinct typed reasons
 for an unavailable entry in the current workspace, explicit workspace/locator mismatch, stale task,

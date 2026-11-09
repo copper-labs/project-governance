@@ -91,6 +91,16 @@ test("a native primary prompt with an external explicit bind delivers local fall
     const packet = await promptContext("codex", event, f.main, { environment: {}, assetRoot: resolve("src/project_governance_runtime/assets/skills") });
     const text = (packet as any).hookSpecificOutput.additionalContext;
     assert.match(text, /Hosted selection is paused/); assert.match(text, /Required local fixture guidance/);
+    assert.match(text, /Hosted selection is paused for this entry, not independently authorized work/);
+    assert.match(text, /independently authorized work/);
+    assert.match(text, /pinned runtime and task binding where required/);
+    assert.match(text, /never overrides a host access denial/);
+    assert.match(text, /operator or an existing assignment/);
+    assert.match(text, /Recorded bindings do not select a target or grant authority/);
+    assert.match(text, /required guidance and review disclosure limits still apply/);
+    assert.match(text, /Do not use this entry as another checkout's context/);
+    assert.match(text, /not a prerequisite for independently authorized work/);
+    assert.match(text, /No sibling packet, task binding, permission or spending was transferred/);
     assert.ok(text.includes(f.main) && text.includes(f.linked)); assert.equal(calls, 0);
     const root = contextStateRoot(f.main), id = readdirSync(join(root, "prompt-entries"))[0]!.slice(0, -5), entry = readPromptEntry(f.main, id);
     assert.equal(entry.workspace, f.main); assert.equal(entry.scopeKind, "provisional-session");
@@ -98,7 +108,11 @@ test("a native primary prompt with an external explicit bind delivers local fall
     assert.equal((entry.workspaceIdentity as any).targetSelection, "not-performed");
     assert.ok(!JSON.stringify(entry).includes(event.prompt)); assert.equal(fileDigest(defaultDbPath(f.main)), before);
     assert.equal(existsSync(join(contextStateRoot(f.linked), "prompt-entries")), false);
-    assert.throws(() => readPromptEntry(f.linked, id), /unavailable in/);
+    assert.throws(() => readPromptEntry(f.linked, id), error => {
+      assert.match(String(error), /unavailable in/);
+      assert.match(String(error), /Other work retains its own admission and host permissions/);
+      return true;
+    });
     const followup = await contextRouteCommand(["--retrieval", "semantic", "--task", "Inspect local rules"], f.main,
       resolve("src/project_governance_runtime/assets/skills"), undefined, { session: "host-session" });
     assert.equal(followup.selection.retrieval.reason, "native-workspace-alignment-required");
@@ -113,6 +127,15 @@ test("a native primary prompt with an external explicit bind delivers local fall
     const diagnosis = contextDoctor(f.main);
     assert.equal(diagnosis.workspaceIdentity.status, "external-binding");
     assert.ok(diagnosis.findings.some(item => item.id === "context.session-workspace-alignment"));
+    const entryPath = join(root, "prompt-entries", `${id}.json`);
+    const originalEntry = readFileSync(entryPath, "utf8");
+    writeFileSync(entryPath, JSON.stringify({ ...JSON.parse(originalEntry), workspace: f.linked }));
+    assert.throws(() => readPromptEntry(f.main, id), error => {
+      assert.equal((error as any).code, "entry-workspace-mismatch");
+      assert.match(String(error), /Other work retains its own admission and host permissions/);
+      return true;
+    });
+    writeFileSync(entryPath, originalEntry);
   } finally { globalThis.fetch = fetch; f.cleanup(); }
 });
 
@@ -124,6 +147,7 @@ test("multiple external bindings are reported without choosing a target", () => 
     assert.equal(result.status, "ambiguous-bindings"); assert.equal(result.paidSelectionAllowed, false);
     assert.deepEqual(new Set(result.bindings.map(binding => binding.workspace)), new Set([f.linked, second]));
     assert.equal(result.targetSelection, "not-performed");
+    assert.match(contextWorkspaceAlignmentMessage(result), /Recorded bindings do not select a target or grant authority/);
   } finally { f.cleanup(); }
 });
 
@@ -152,6 +176,8 @@ test("an incomplete bounded binding scan pauses advice without inventing a works
     assert.equal(result.status, "binding-scan-incomplete"); assert.equal(result.alignmentRequired, false);
     assert.equal(result.paidSelectionAllowed, false); assert.deepEqual(result.bindings, []);
     assert.match(contextWorkspaceAlignmentMessage(result), /inventory is incomplete/);
+    assert.match(contextWorkspaceAlignmentMessage(result), /For work explicitly targeted by the operator/);
+    assert.match(contextWorkspaceAlignmentMessage(result), /where required/);
   } finally { Store.prototype.sessionBindings = inspect; f.cleanup(); }
 });
 

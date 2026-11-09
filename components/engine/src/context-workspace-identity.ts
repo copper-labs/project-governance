@@ -60,8 +60,9 @@ export function contextWorkspaceAlignmentMessage(identity: ReturnType<typeof con
   const shown = workspaces.slice(0, 2).map(path => path.length > 512 ? path.slice(0, 509) + "..." : path);
   return `Governance native context is local to ${JSON.stringify(identity.workspace)}. ` +
     (workspaces.length ? `This session has active explicit task bindings in ${JSON.stringify(shown)}${workspaces.length > shown.length ? ` and ${workspaces.length - shown.length} more recorded checkouts` : ""}. ` : "The session binding inventory is incomplete. ") +
-    "Hosted selection is paused for this native entry; local required guidance remains available. " +
-    "At a pause seam, align the chat and its commands with the intended existing checkout using the host's supported workspace operation. " +
-    "If the host cannot reattach this chat, resume its checkpoint in a chat attached to that same existing directory. " +
-    "No new branch or worktree is needed. No sibling packet, task binding, permission or spending was transferred.";
+    "Hosted selection is paused for this entry, not independently authorized work. Recorded bindings do not select a target or grant authority. " +
+    "For work explicitly targeted by the operator or an existing assignment at another checkout, verify that checkout and follow its own admission; use its pinned runtime and task binding where required. " +
+    "Host access, required guidance and review disclosure limits still apply. Runtime admission never overrides a host access denial; do not reach a denied target another way. Do not use this entry as another checkout's context. " +
+    "Restore automatic context through supported host attachment, or a saved checkpoint in a chat already attached to that existing checkout. This is not a prerequisite for independently authorized work. " +
+    "No sibling packet, task binding, permission or spending was transferred.";
 }
