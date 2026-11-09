@@ -25,9 +25,9 @@ qualify mechanics only. Independent review and exact package proof precede relea
 approval/readback remains a separate adopter acceptance step.
 
 - [x] Implementation: complete renderer, native window and truthful provenance.
-- [ ] Verification: focused tests, host display/cancel, independent review, archive proof.
-- [ ] Closeout: publish qualified patch and hand off adoption at an owner-confirmed safe seam.
+- [x] Verification: focused tests, host display/cancel, independent review, archive proof.
+- [x] Closeout: publish qualified patch and hand off adoption at an owner-confirmed safe seam.
 
 Focused adapter/store/render tests and actual Swift typecheck pass. Real window display/cancel was observed without a ledger approval. Opus 5.5 high review and recheck found no remaining release blockers; small rendering/test findings were reconciled.
 
-Next action: exact final archive proof, normal source hooks and release readback. Human page approval remains an adopter acceptance step. Timeout descendant cleanup is not independently qualified; a terminated adapter cannot record a later decision.
+Exact final archive installation proof and normal commit/push hooks passed. Release 4.5.14 is published as latest stable. Downloaded archive, lock and update metadata match the qualified local bytes; the remote tag resolves to the declared source commit. Adoption instructions are handed off separately; consumer upgrades remain pending their safe transition. Human page approval remains an adopter acceptance step. Timeout descendant cleanup is not independently qualified; a terminated adapter cannot record a later decision.
