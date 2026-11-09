@@ -21,8 +21,7 @@ then independent review and exact installed archive proof. The synchronous captu
 a small Node child drains Git asynchronously, with its own deadline and Git termination.
 
 - [x] Implementation: original fails; streamed reader passes the large-patch reproducer.
-- [ ] Verification: subject/packet/parser tests, context regressions, independent review and package proof.
-- [ ] Closeout: qualified stable patch and supported adopter transition.
+- [x] Verification: subject/packet/parser tests, context regressions, independent review and package proof.
+- [x] Closeout: qualified stable patch and supported adopter transition.
 
-Current evidence: 16 subject/packet tests and build pass. Next: parser/context regression batch and
-independent review. No installed payload modified and no ordinary development acceptance inferred.
+Evidence: 27 focused tests, build, compiled exact-archive large-diff regression and installed archive proof passed. Opus 5.5 high review and recheck reconciled; normal source hooks passed. Stable 4.5.15 published and all release assets/tag/source read back. Supported private adopter upgrades and required context refresh passed. No API baseline changes or ordinary development acceptance inferred.
