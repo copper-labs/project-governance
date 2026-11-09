@@ -15,7 +15,7 @@ const {commandProcesses}=await import(moduleUrl("command-owner-recovery"));
 const {RuntimeGenerations}=await import(moduleUrl("runtime-generations"));
 
 /** A real benign native command writes its closure report, fails, and leaves custom leases unknown. */
-export async function ownerReleaseFixture(resources:string[]=["fixture-local-producer","fixture-local-storage"], observation:boolean|"simulator"=false, exitCode=1, options?:{recipe?:(dir:string)=>Record<string,unknown>;argv?:(dir:string,script:string)=>string[];expectedState?:string;registryPath?:string;producer?:(dir:string)=>string;workerPreload?:string;stages?:Array<{id:string;operation:string;deadlineMs:number;dependsOn?:string[];cleanup?:boolean}>}) {
+export async function ownerReleaseFixture(resources:string[]=["fixture-local-producer","fixture-local-storage"], observation:boolean|"simulator"=false, exitCode=1, options?:{allowMissingReport?:boolean;recipe?:(dir:string)=>Record<string,unknown>;argv?:(dir:string,script:string)=>string[];expectedState?:string;registryPath?:string;producer?:(dir:string)=>string;workerPreload?:string;stages?:Array<{id:string;operation:string;deadlineMs:number;dependsOn?:string[];cleanup?:boolean}>}) {
   const dir=realpathSync(mkdtempSync(join(tmpdir(),"workflow-owner-release-"))),database=join(dir,"harness.sqlite");
   const report=join(dir,"closure.json"),script=join(dir,"producer.mjs"),receipt=join(dir,"release.json");
   writeFileSync(script,options?.producer?.(dir)??`import{writeFileSync}from'node:fs';import{execFileSync}from'node:child_process';
@@ -56,13 +56,13 @@ observedProcessIdentities:{[process.pid]:fingerprint},legacyLockReleased:true,en
         const path=join(worker,"commands",submitted.id+"-"+index);if(!existsSync(join(path,"launch.json")))continue;
         const launch=JSON.parse(readFileSync(join(path,"launch.json"),"utf8")),guardian=JSON.parse(readFileSync(join(path,"guardian.json"),"utf8"));
         const members=existsSync(join(path,"group-members.json"))?JSON.parse(readFileSync(join(path,"group-members.json"),"utf8")).members:[];
-        pids.push(launch.owner.pid,guardian.pid,launch.child.pid,...members.map((m:any)=>m.pid));groups.push(launch.child.processGroup);
+        pids.push(launch.owner.pid,guardian.pid,...members.map((m:any)=>m.pid));if(launch.child){pids.push(launch.child.pid);groups.push(launch.child.processGroup);}
       }
       if(!commandProcesses().some((row:any)=>pids.includes(row.pid)||groups.includes(row.group))){ready=true;break;}
     }await delay(25);
   }
   if(!ready)throw new Error("Synthetic native worker failed to close");
-  const run=store.read(submitted.id),hash=api.fileDigest(report);
+  const run=store.read(submitted.id),hash=options?.allowMissingReport&&!existsSync(report)?api.fileDigest(join(command,"result.json")):api.fileDigest(report);
   const args=["--database",database,"--run",run.id,"--revision",String(run.revision),"--worker-directory",worker,"--registry",registry.path,
     "--authority",binding.authorityRef,"--kind","local-host","--evidence",report,"--evidence-digest",hash,"--receipt",receipt];
   return{dir,database,report,receipt,worker,command,store,registry,run,args,generations,

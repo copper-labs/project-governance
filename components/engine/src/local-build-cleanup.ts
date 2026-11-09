@@ -109,7 +109,7 @@ export async function holdBuildLocks(paths: string[]) {
 export async function observeLocalBuild(directory: string, run: WorkflowRun, stages: WorkflowStage[], descriptor=run.binding.recipe.localBuild, historicalRecovery=false) {
   if(!descriptor)throw Error("Local build cleanup declaration required before dispatch");
   assertLocalBuildScope(run.binding.recipe,descriptor,false,historicalRecovery);
-  const native=workflowNativeResourceEvidence(directory,run,stages,true);
+  const native=workflowNativeResourceEvidence(directory,run,stages,true,true);
   for(const path of native.files.keys())if(realpathSync(path)!==path)throw Error("Original build cleanup evidence uses an alias");
   // The supervisor can persist its receipt just before its own process exits.
   const grace=Math.max(0,...Object.values(run.binding.recipe.operations).map(op=>op.terminationGraceMs??30000));

@@ -12,7 +12,7 @@ import { startTime } from "./workflow-reader-recovery.ts";
 import type { WorkflowRun, WorkflowStage } from "./workflow-store.ts";
 
 /** Host-owned reports supplement original native evidence; they never supply executable instructions. */
-export function workflowNativeResourceEvidence(directory: string, run: WorkflowRun, stages: WorkflowStage[], originalNativeClosure=false) {
+export function workflowNativeResourceEvidence(directory: string, run: WorkflowRun, stages: WorkflowStage[], originalNativeClosure=false, confirmedSpawnFailure=false) {
   const files = new Map<string,string>(), identities = new Map<number,string>(), groups: number[] = [];
   const absentMemberships:string[]=[];
   const read = (path: string) => { const text = narrativeFile(directory,path); files.set(path,"sha256:"+createHash("sha256").update(text).digest("hex")); return object(JSON.parse(text)); };
@@ -56,8 +56,23 @@ export function workflowNativeResourceEvidence(directory: string, run: WorkflowR
     }
     const owner=read(join(command,"owner.json")), guardian=read(join(command,"guardian.json")), launch=read(join(command,"launch.json"));
     if (owner.requestDigest!==requestDigest || guardian.version!==1 || guardian.requestDigest!==requestDigest ||
-        launch.version!==1 || launch.requestDigest!==requestDigest || launch.state!=="spawned" || !isLocalMachine(launch) ||
+        launch.version!==1 || launch.requestDigest!==requestDigest || !isLocalMachine(launch) ||
         digest(launch.owner)!==digest({pid:owner.pid,fingerprint:owner.fingerprint})) throw new Error("Original command ownership differs");
+    if (launch.state === "intent" && originalNativeClosure && confirmedSpawnFailure) {
+      // A genuine failed spawn has no child identity. An unfinished intent alone proves nothing.
+      if (qualified?.recovery || rawReceipt.state !== "failed" || rawReceipt.reason !== "spawn-failed" ||
+          rawReceipt.cleanup !== "confirmed" || rawReceipt.exitCode !== null || rawReceipt.signal !== null ||
+          "child" in launch || existsSync(join(command,"group-members.json")) ||
+          launch.startedAt !== receipt.startedAt || !Number.isFinite(Date.parse(receipt.startedAt)) ||
+          !Number.isFinite(Date.parse(receipt.endedAt)) || Date.parse(receipt.endedAt)<Date.parse(receipt.startedAt))
+        throw new Error("Original failed-spawn cleanup evidence differs");
+      identify(owner); identify(guardian);
+      absentMemberships.push(join(command,"group-members.json"));
+      commands.push({stage:stage.id,requestDigest,receiptDigest:digest(originalReceipt),launchDigest:digest(launch),
+        membersDigest:null,closureAuthority:"original-confirmed-native-receipt",launchState:"spawn-failed"});
+      continue;
+    }
+    if (launch.state !== "spawned") throw new Error("Original command ownership differs");
     const child=object(launch.child);
     if (child.processGroup!==child.pid) throw new Error("Original command process group differs");
     const previousIds=new Set(identities.keys());

@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import assert from "node:assert/strict";
 import { test, mock } from "node:test";
 import { mkdtempSync, realpathSync, writeFileSync, readFileSync, renameSync, symlinkSync, rmSync, existsSync, mkdirSync, readdirSync, linkSync } from "node:fs";
@@ -202,3 +203,76 @@ test("admission refuses noncanonical ancestors and unsafe existing files before 
    "Android-Pixel","IOS-Sim","android_emulator","iosSimulator","simulator","emulator-5554","DeviceOne","app-session"])
  assert.throws(()=>assertLocalBuildScope({...recipe,resources:[name]} as any,{posixLockFiles:[]},false,true));
  });
+
+
+test("original failed spawn releases a declared build without inventing child evidence",async()=>{
+ const f=await ownerReleaseFixture(["build:spawn-failed"],false,1,{recipe:()=>({localBuild:{posixLockFiles:[]}}),allowMissingReport:true,argv:(_dir,script)=>[script],expectedState:"failed"});
+ try{
+  const receipt=JSON.parse(readFileSync(join(f.command,"result.json"),"utf8"));
+  assert.equal(receipt.reason,"spawn-failed");assert.equal(receipt.cleanup,"confirmed");assert.equal(receipt.exitCode,null);
+  assert.equal(JSON.parse(readFileSync(join(f.command,"launch.json"),"utf8")).state,"intent");
+  assert.equal(f.held().length,0);assert.equal(existsSync(f.report),false);
+ }finally{f.close();}
+});
+
+
+test("failed-spawn recovery preserves originals and rejects contradictory evidence",async()=>{
+ const f=await ownerReleaseFixture(["legacy-spawn-producer"],false,1,{allowMissingReport:true,argv:(_dir,script)=>[script]});
+ try {
+  const native=join(f.command,"result.json"),launch=join(f.command,"launch.json"),membership=join(f.command,"group-members.json");
+  const original=readFileSync(native),originalLaunch=readFileSync(launch);
+  const observe=()=>observeLocalBuild(f.worker,f.run,f.store.stages(f.run.id),{posixLockFiles:[]},true);
+  const proof=await observe();proof.assertCurrent();await proof.close();assert.equal(f.held().length,1);
+  for(const patch of [{reason:"owner-lost"},{cleanup:"unknown"},{exitCode:0},{signal:"SIGTERM"}]) {
+   writeFileSync(native,JSON.stringify({...JSON.parse(original.toString()),...patch}));
+   await assert.rejects(observe);writeFileSync(native,original);
+  }
+  writeFileSync(launch,JSON.stringify({...JSON.parse(originalLaunch.toString()),child:{pid:42,processGroup:42}}));
+  await assert.rejects(observe,/failed-spawn/);writeFileSync(launch,originalLaunch);
+  writeFileSync(membership,"{}");await assert.rejects(observe,/failed-spawn/);rmSync(membership);
+  const declaration=join(f.dir,"build-cleanup.json");writeFileSync(declaration,JSON.stringify({posixLockFiles:[]}));
+  const args=[...f.args];args[args.indexOf("--kind")+1]="local-build";args[args.indexOf("--evidence")+1]=native;args[args.indexOf("--evidence-digest")+1]=api.fileDigest(native);
+  args.push("--build-cleanup",declaration,"--build-cleanup-digest",api.fileDigest(declaration));
+  assert.equal((await workflowResourceReleaseCommand(args,f.dir)).state,"released");
+  assert.equal(f.held().length,0);assert.deepEqual(readFileSync(native),original);assert.deepEqual(readFileSync(launch),originalLaunch);
+ }finally{f.close();}
+});
+
+
+test("failed spawn still fences live owners, device callers and late contradictory evidence",async()=>{
+ const {workflowNativeResourceEvidence}=await import(moduleUrl("workflow-resource-evidence"));
+ const f=await ownerReleaseFixture(["legacy-spawn"],false,1,{allowMissingReport:true,argv:(_d,s)=>[s]});
+ try {
+  const stages=f.store.stages(f.run.id),check=()=>workflowNativeResourceEvidence(f.worker,f.run,stages,true,true);
+  assert.throws(()=>workflowNativeResourceEvidence(f.worker,f.run,stages,true),/ownership differs/);
+  assert.throws(()=>workflowNativeResourceEvidence(f.worker,f.run,stages,false),/ownership differs/);
+  const guardian=join(f.command,"guardian.json"),bytes=readFileSync(guardian),g=JSON.parse(bytes.toString());
+  writeFileSync(guardian,JSON.stringify({...g,pid:process.pid,fingerprint:execFileSync('/bin/ps',['-p',String(process.pid),'-o','lstart='],{encoding:'utf8'}).trim()}));
+  assert.throws(check().assertCurrent,/still present/);
+  writeFileSync(guardian,JSON.stringify({...g,fingerprint:'invalid'}));assert.throws(check,/identity unavailable/);writeFileSync(guardian,bytes);
+  const proof=check(),members=join(f.command,'group-members.json');writeFileSync(members,'{}');assert.throws(proof.assertCurrent,/membership evidence changed/);rmSync(members);
+  const owner=join(f.command,'owner.json'),launch=join(f.command,'launch.json'),ownerBytes=readFileSync(owner),launchBytes=readFileSync(launch);
+  const live={pid:process.pid,fingerprint:execFileSync('/bin/ps',['-p',String(process.pid),'-o','lstart='],{encoding:'utf8'}).trim()};
+  writeFileSync(owner,JSON.stringify({...JSON.parse(ownerBytes.toString()),...live}));writeFileSync(launch,JSON.stringify({...JSON.parse(launchBytes.toString()),owner:live}));
+  assert.throws(check().assertCurrent,/still present/);writeFileSync(owner,ownerBytes);writeFileSync(launch,launchBytes);
+  writeFileSync(launch,JSON.stringify({...JSON.parse(launchBytes.toString()),startedAt:'2000-01-01T00:00:00.000Z'}));assert.throws(check,/failed-spawn/);writeFileSync(launch,launchBytes);
+  const result=join(f.command,'result.json'),original=readFileSync(result);
+  for(const change of [{state:'succeeded'},{reason:'exit'},{signal:'SIGTERM'}]){
+   writeFileSync(result,JSON.stringify({...JSON.parse(original.toString()),...change}));assert.throws(check,/failed-spawn/);writeFileSync(result,original);
+  }
+  rmSync(result);assert.throws(check);writeFileSync(result,original);
+  assert.equal(f.held().length,1);
+ }finally{f.close();}
+});
+
+test("failed spawn retains a busy real lock then resumes without changing its failed receipt",async()=>{
+ const dir=realpathSync(mkdtempSync(join(tmpdir(),'spawn-lock-'))),lock=join(dir,'build.lock');writeFileSync(lock,'original');
+ const held=await holdBuildLocks([lock]);
+ const f=await ownerReleaseFixture(['build:failed-spawn'],false,1,{allowMissingReport:true,argv:(_d,s)=>[s],recipe:()=>({localBuild:{posixLockFiles:[lock]}})});
+ try {
+  assert.equal(f.held().length,1);assert.match(f.store.cleanupBlocker(f.run.id).reason,/busy or unavailable/);
+  const result=join(f.command,'result.json'),bytes=readFileSync(result);await held.close();
+  const resumed=await resumeStoppedWorkflowCleanup(f.worker,f.database,f.run.id,f.run.revision);
+  assert.equal(resumed.run.state,'failed');assert.equal(f.held().length,0);assert.deepEqual(readFileSync(result),bytes);assert.equal(readFileSync(lock,'utf8'),'original');
+ }finally{await held.close();f.close();rmSync(dir,{recursive:true});}
+});

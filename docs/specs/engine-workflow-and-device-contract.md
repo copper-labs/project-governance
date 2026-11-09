@@ -989,6 +989,12 @@ closure; later qualified owner recovery retains its distinct provenance. Pending
 commands prevent release. Blocked commands that were never dispatched need no manufactured report.
 Project wrappers do not need to duplicate native closure in a second report.
 
+An original confirmed `spawn-failed` result with an intact launch intent may establish that no
+child was created. Local-build cleanup requires matching request/owner/guardian and start identity,
+null exit/signal, no child or membership record, and fresh owner/guardian absence. Intent alone,
+unknown cleanup or later owner recovery cannot supply this proof. Real-lock and reservation fences
+remain required; release preserves the original failed result.
+
 For each existing declared POSIX file, the runtime acquires a nonblocking exclusive record lock,
 checks canonical parent and file identity, and holds the lock through the reservation-release
 transaction. A busy, replaced, symlinked or ambiguous file refuses release. No lock file is created,
