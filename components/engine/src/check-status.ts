@@ -21,6 +21,11 @@ export function readCheckRecord(path: string): Record<string, unknown> | null {
 }
 /** Observation reports partial native evidence without retrying work or inferring completion from a dead caller. */
 export function inspectCheckRun(id: string, root = checkRunRoot()) {
+  const observed = inspectCheckSnapshot(id, root);
+  // Claim/owner and result publication can cross one observation. Refresh only an incomplete snapshot.
+  return observed.state === "incomplete" ? inspectCheckSnapshot(id, root) : observed;
+}
+function inspectCheckSnapshot(id: string, root: string) {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u.test(id)) throw new Error("Invalid check run id");
   const directory = join(root, id), intent = readCheckRecord(join(directory, "run.json"));
   if (!intent || intent["id"] !== id || intent["version"] !== 1) throw new Error("Run intent unavailable or invalid");

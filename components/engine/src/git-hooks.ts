@@ -44,8 +44,11 @@ function resolvedPushCommit(root: string, ref: string): string {
 function pushComparisonBase(root: string, environment: NodeJS.ProcessEnv): string {
   return resolvedPushCommit(root, environment.GOVERNANCE_BASE_REF?.trim() || "@{upstream}");
 }
-function pushCheckArguments(candidate: string, base: string): string[] {
-  return ["--summary", "--stage", "pre-push", "--mode", "impacted", "--candidate-ref", candidate, "--base-ref", base];
+function pushCheckArguments(candidate: string, base: string, environment: NodeJS.ProcessEnv): string[] {
+  const timeout = environment.GOVERNANCE_PRE_PUSH_TIMEOUT_SECONDS;
+  // The normal check parser owns numeric bounds and refuses invalid values before dispatch.
+  return ["--summary", "--stage", "pre-push", "--mode", "impacted", "--candidate-ref", candidate, "--base-ref", base,
+    ...(timeout === undefined ? [] : ["--timeout-seconds", timeout])];
 }
 
 /** Actual Git pushes supply immutable endpoints; remote names and locations never enter the check request. */
@@ -53,7 +56,7 @@ export async function prePushCheckArguments(root: string, args: string[], input:
   if (!args.length) return hookCheckArguments(root, "pre-push", args, environment);
   if (args.length !== 2) throw new Error("pre-push expects Git's remote name and location");
   const update = await readPushRefUpdate(input);
-  return pushCheckArguments(exactPushCommit(root, update.candidate), update.remote ? exactPushCommit(root, update.remote) : pushComparisonBase(root, environment));
+  return pushCheckArguments(exactPushCommit(root, update.candidate), update.remote ? exactPushCommit(root, update.remote) : pushComparisonBase(root, environment), environment);
 }
 
 /** Hook inputs choose a fixed check boundary, not arbitrary runtime commands or install actions. */
@@ -67,7 +70,7 @@ export function hookCheckArguments(root: string, hook: string, args: string[], e
       return ["--summary", "--stage", hook, "--mode", "impacted", "--staged"];
     case "pre-push":
       if (args.length) throw new Error("Native pre-push requires captured Git ref input");
-      return pushCheckArguments(resolvedPushCommit(root, "HEAD"), pushComparisonBase(root, environment));
+      return pushCheckArguments(resolvedPushCommit(root, "HEAD"), pushComparisonBase(root, environment), environment);
     case "pre-pr": {
       const { values } = parseArgs({ args, strict: true, allowPositionals: false,
         options: { "pr-body-file": { type: "string" }, "pr-title": { type: "string" } } });

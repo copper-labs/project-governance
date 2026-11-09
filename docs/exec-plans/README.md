@@ -21,6 +21,9 @@ shows existing project-owned checks; it does not require a check after every edi
 
 ## Active
 
+- [Native check observation and push budget](active/2026-11-09-native-check-observation.md)
+  preserves original check observation across publication races and supports a bounded native push budget.
+
 - [Committed pre-push capture repair](active/2026-10-10-committed-pre-push-capture.md)
   binds native checks to the actual pushed commit and preserves bounded preparation diagnostics.
   Qualification and deliberate local candidate adoption remain separate from publication.

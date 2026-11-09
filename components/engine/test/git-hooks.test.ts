@@ -151,3 +151,23 @@ test("native CLI reads pre-push stdin and rejects unsupported updates before dis
     assert.ok(!existsSync(join(f.root, "state/project-governance/check-runs")));
   } finally { f.close(); }
 });
+
+
+test("pre-push alone forwards an explicit budget through the existing deadline validator", async () => {
+  const f = pushFixture(), builtin = fileURLToPath(new URL("../../../src/project_governance_runtime/packs/", import.meta.url));
+  try {
+    const env = { GOVERNANCE_BASE_REF: f.base, GOVERNANCE_PRE_PUSH_TIMEOUT_SECONDS: "600" };
+    const native = await prePushCheckArguments(f.root, ["origin", "private-location"], updateInput(f.candidate, f.base), env);
+    const manual = hookCheckArguments(f.root, "pre-push", [], env);
+    for (const args of [native, manual]) assert.equal(prepareCommand(args, f.root, builtin, "check").deadlineMs, 600000);
+    const defaults = await prePushCheckArguments(f.root, ["origin", "private-location"], updateInput(f.candidate, f.base), {});
+    assert.equal(prepareCommand(defaults, f.root, builtin, "check").deadlineMs, 300000);
+    assert.ok(!hookCheckArguments(f.root, "pre-commit", [], env).includes("--timeout-seconds"));
+    assert.ok(!hookCheckArguments(f.root, "commit-msg", ["message.txt"], env).includes("--timeout-seconds"));
+    assert.ok(!hookCheckArguments(f.root, "pre-pr", ["--pr-title", "Useful outcome", "--pr-body-file", "body.md"], env).includes("--timeout-seconds"));
+    for (const value of ["", " ", "0", "-1", "NaN", "Infinity", "86401", "0.0001", "--summary"]) {
+      const args = await prePushCheckArguments(f.root, ["origin", "private-location"], updateInput(f.candidate, f.base), { GOVERNANCE_PRE_PUSH_TIMEOUT_SECONDS: value });
+      assert.throws(() => prepareCommand(args, f.root, builtin, "check"), error => error instanceof Error, `Invalid configured timeout: ${value}`);
+    }
+  } finally { f.close(); }
+});

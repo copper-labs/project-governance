@@ -174,6 +174,12 @@ and `GOVERNANCE_DECISION_CONTEXT` remain available. Detached checks freeze inten
 content; `check-status --run <id>` returns compact terminal evidence and `--full` retrieves the full
 projection. Required failures, status, cleanup and original artifact references remain visible.
 `check-reconcile --run <id>` recovers only verified terminal ownership; it never reruns a check.
+After a foreground observation gap, reconnect to the original run with `check-status`; do not
+resubmit validation solely because the observer returned `outcome-unknown`. Foreground checks retain
+that run within its existing deadline; a missing owner never establishes success. Observation does
+not resume an already-aborted Git operation or make a later hook reuse its receipt. For a deliberately
+measured native pre-push budget, set `GOVERNANCE_PRE_PUSH_TIMEOUT_SECONDS=600` on the ordinary push.
+The default stays 300 seconds, existing numeric deadline bounds apply, and required checks remain.
 `plan --compare-run <id>` compares advice with existing matching native results without executing
 extra checks. Smaller delivery is an observation, not evidence of accepted-work savings.
 
