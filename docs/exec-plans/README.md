@@ -21,6 +21,9 @@ shows existing project-owned checks; it does not require a check after every edi
 
 ## Active
 
+- [Batched secret scanning](active/2026-11-10-batched-secret-scan.md)
+  removes per-blob Git process overhead while retaining exhaustive security coverage and normal hook proof.
+
 - [Native check observation and push budget](active/2026-11-09-native-check-observation.md)
   preserves original check observation across publication races and supports a bounded native push budget.
 
