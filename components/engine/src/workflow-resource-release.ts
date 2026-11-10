@@ -1,3 +1,4 @@
+import { iosRemovedAppEvidence } from "./ios-removed-app-cleanup.ts";
 import { localBuild, observeLocalBuild } from "./local-build-cleanup.ts";
 import { createHash } from "node:crypto";
 import type { AndroidOwnedSessionProbes } from "./android-owned-app-session.ts";
@@ -21,11 +22,11 @@ import { simulatorBuildClaims, simulatorBuildEvidence, type SimulatorBuildProbes
 import type { WorkflowCleanupReceipt } from "./workflow-resource-recovery.ts";
 
 /** Public trusted-local-owner surface; evidence can retire old claims, never authorize new work. */
-function prepareResourceRelease(args: string[], workspace: string, kind: "local-build"|"local-host"|"local-host-observed"|"ios-observation"|"ios-simulator-build"|"android-app-session", approvedScopeDigest?:string) {
+function prepareResourceRelease(args: string[], workspace: string, kind: "local-build"|"local-host"|"local-host-observed"|"ios-observation"|"ios-removed-app"|"ios-simulator-build"|"android-app-session", approvedScopeDigest?:string) {
   const local=kind==="local-build"||kind==="local-host"||kind==="local-host-observed";
   const names=["database","run","revision","worker-directory","registry","authority","kind","evidence","evidence-digest","receipt",...(!local&&kind!=="android-app-session"?["local-resource","lock-directory"]:[]),...(kind==="ios-simulator-build"?["simulator-lock-directory"]:[])];
   const {values}=parseArgs({args,strict:true,allowPositionals:false,options:Object.fromEntries(names.map(key=>[key,{type:"string" as const}]))});
-  if (names.some(key=>!(kind==="ios-observation"&&key==="local-resource")&&!values[key]) || values.kind!==kind || !/^\d+$/u.test(values.revision!) ||
+  if (names.some(key=>!((kind==="ios-observation"||kind==="ios-removed-app")&&key==="local-resource")&&!values[key]) || values.kind!==kind || !/^\d+$/u.test(values.revision!) ||
       !Number.isSafeInteger(Number(values.revision))) throw new Error("Complete original workflow, revision, owner adapter and evidence binding required");
   const database=realpathSync(values.database!), directory=realpathSync(values["worker-directory"]!), registryPath=realpathSync(values.registry!);
   if (!statSync(database).isFile() || !statSync(registryPath).isFile()) throw new Error("Existing original stores required");
@@ -41,7 +42,7 @@ function prepareResourceRelease(args: string[], workspace: string, kind: "local-
       throw new Error("Original resource owner, workflow revision or workspace differs");
     if (kind==="android-app-session") {assertAndroidAppSession(run.binding.recipe);if(!run.binding.recipe.androidAppSession)throw Error("Original Android app-session descriptor required");}
     if (kind==="ios-simulator-build") simulatorBuildClaims(run.binding.recipe,values["local-resource"]!);
-    if (kind==="ios-observation") iosObservationClaims(run.binding.recipe,values["local-resource"]!);
+    if (kind==="ios-observation"||kind==="ios-removed-app") iosObservationClaims(run.binding.recipe,values["local-resource"]!);
     if (local && (run.binding.recipe.androidEmulator || run.binding.recipe.androidAppSession || run.binding.recipe.resources.some(resource=>
         resource.startsWith("workspace-v1:") && JSON.parse(resource.slice("workspace-v1:".length)).session!==null ||
         /^(?:ios-|android[:-]|app:|simulator:|emulator:|device:|tcp:|port:|metro:|service:|remote:)/u.test(resource))))
@@ -51,7 +52,7 @@ function prepareResourceRelease(args: string[], workspace: string, kind: "local-
     const identity=workflowRecoveryIdentity(directory,database,run), leases=registry.originalLeases(run.id,run.owner);
     if (digest(leases.map(lease=>lease.resource).sort())!==digest([...run.binding.recipe.resources].sort())) throw new Error("Original lease scope differs");
     const receiptPath=resolve(values.receipt!), bindingDigest=digest(run.binding), workerRequestDigest=digest(identity.request);
-    const observationKind=kind==="local-build"?"workflow-local-build-cleanup":kind==="local-host-observed"?"workflow-local-host-observed-cleanup":kind==="android-app-session"?"workflow-android-app-session-cleanup":kind==="local-host"?"workflow-local-host-cleanup":kind==="ios-observation"?"workflow-ios-observation-cleanup":"workflow-ios-simulator-build-cleanup";
+    const observationKind=kind==="local-build"?"workflow-local-build-cleanup":kind==="local-host-observed"?"workflow-local-host-observed-cleanup":kind==="android-app-session"?"workflow-android-app-session-cleanup":kind==="local-host"?"workflow-local-host-cleanup":kind==="ios-removed-app"?"workflow-ios-removed-app-cleanup":kind==="ios-observation"?"workflow-ios-observation-cleanup":"workflow-ios-simulator-build-cleanup";
     const scopeDigest=approvedScopeDigest??(kind==="android-app-session"?digest(run.binding.recipe.androidAppSession):(kind==="local-host"||kind==="local-build")?null:digest({localResource:values["local-resource"]??null,lockDirectory:values["lock-directory"],...(kind==="ios-simulator-build"?{simulatorLockDirectory:values["simulator-lock-directory"]}:{})}));
     const validate=(receipt: WorkflowCleanupReceipt) => {
       const observation=object(receipt.observation,"resource owner observation");
@@ -93,6 +94,11 @@ function prepareResourceRelease(args: string[], workspace: string, kind: "local-
     assertGeneration();
     }
     return {values,run,stages,directory,replay,leases,reader:identity.reader,
+      assertDeviceExclusive:()=>{
+        const device=run.binding.recipe.resources.find(resource=>resource.startsWith("ios-device:"))?.slice(11).toLowerCase();
+        if(!device || registry.inspect().some(lease=>lease.state==="held"&&lease.operation!==run.id&&
+          (lease.resource.toLowerCase()===`ios:${device}`||lease.resource.toLowerCase()===`ios-device:${device}`||lease.resource.toLowerCase().startsWith(`ios-app:${device}:`))))throw Error("Another device owner remains active");
+      },
       close:()=>{registry.close();store.close();},
       finish:(proof:unknown,assertCurrent:()=>void,compatible=(previous:unknown,current:unknown)=>digest(previous)===digest(current))=>{
         const receipt: WorkflowCleanupReceipt={runId:run.id,bindingDigest,leases,
@@ -155,11 +161,11 @@ export async function workflowResourceReleaseCommand(args:string[],workspace=pro
       return context.finish(proof,()=>{original.assertCurrent();selected.assertCurrent();});
     }finally{context.close();}
   }
-  if(values.kind!=="ios-observation"&&values.kind!=="ios-simulator-build"&&values.kind!=="android-app-session")return workflowResourceRelease(args,workspace);
+  if(values.kind!=="ios-removed-app"&&values.kind!=="ios-observation"&&values.kind!=="ios-simulator-build"&&values.kind!=="android-app-session")return workflowResourceRelease(args,workspace);
   const context=prepareResourceRelease(args,workspace,values.kind);
   try {
     if(context.replay)return context.replay;
-    const observed=values.kind==="android-app-session"?await androidAppSessionEvidence(context,probes as AndroidAppProbe|AndroidOwnedSessionProbes):values.kind==="ios-observation"?await iosObservationEvidence(context,probes as IosObservationProbes):await simulatorBuildEvidence(context,probes as SimulatorBuildProbes);
+    const observed=values.kind==="ios-removed-app"?await iosRemovedAppEvidence(context,probes as IosObservationProbes):values.kind==="android-app-session"?await androidAppSessionEvidence(context,probes as AndroidAppProbe|AndroidOwnedSessionProbes):values.kind==="ios-observation"?await iosObservationEvidence(context,probes as IosObservationProbes):await simulatorBuildEvidence(context,probes as SimulatorBuildProbes);
     return context.finish(observed.proof,observed.assertCurrent,observed.compatible);
   } finally {context.close();}
 }

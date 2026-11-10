@@ -15,7 +15,7 @@ const {commandProcesses}=await import(moduleUrl("command-owner-recovery"));
 const {RuntimeGenerations}=await import(moduleUrl("runtime-generations"));
 
 /** A real benign native command writes its closure report, fails, and leaves custom leases unknown. */
-export async function ownerReleaseFixture(resources:string[]=["fixture-local-producer","fixture-local-storage"], observation:boolean|"simulator"=false, exitCode=1, options?:{allowMissingReport?:boolean;recipe?:(dir:string)=>Record<string,unknown>;argv?:(dir:string,script:string)=>string[];expectedState?:string;registryPath?:string;producer?:(dir:string)=>string;workerPreload?:string;stages?:Array<{id:string;operation:string;deadlineMs:number;dependsOn?:string[];cleanup?:boolean}>}) {
+export async function ownerReleaseFixture(resources:string[]=["fixture-local-producer","fixture-local-storage"], observation:boolean|"simulator"=false, exitCode=1, options?:{cancelWhenReport?:boolean;allowMissingReport?:boolean;recipe?:(dir:string)=>Record<string,unknown>;argv?:(dir:string,script:string)=>string[];expectedState?:string;registryPath?:string;producer?:(dir:string)=>string;workerPreload?:string;stages?:Array<{id:string;operation:string;deadlineMs:number;dependsOn?:string[];cleanup?:boolean}>}) {
   const dir=realpathSync(mkdtempSync(join(tmpdir(),"workflow-owner-release-"))),database=join(dir,"harness.sqlite");
   const report=join(dir,"closure.json"),script=join(dir,"producer.mjs"),receipt=join(dir,"release.json");
   writeFileSync(script,options?.producer?.(dir)??`import{writeFileSync}from'node:fs';import{execFileSync}from'node:child_process';
@@ -49,6 +49,7 @@ observedProcessIdentities:{[process.pid]:fingerprint},legacyLockReleased:true,en
   const command=join(worker,"commands",submitted.id+"-0");
   let ready=false;
   for(let attempt=0;attempt<200;attempt++){
+    if(options?.cancelWhenReport&&existsSync(report)&&!store.read(submitted.id).cancelRequested)store.cancel(submitted.id,binding.authorityRef);
     if(store.read(submitted.id).state===(options?.expectedState??"unknown") &&
        !store.stages(submitted.id).some((stage:any)=>["pending","running"].includes(stage.state))){
       const owner=JSON.parse(readFileSync(join(worker,"owner.json"),"utf8")),pids=[owner.pid],groups:number[]=[];

@@ -1081,3 +1081,27 @@ unsampled exception; the existing sampled-membership route is unchanged. Preserv
 ownership. Existing exact target absence, closed ports, absent original locks, reader/lease
 fences and transactional whole-set release remain mandatory. Successful native runs lacking
 the boot record remain excluded. This does not dispatch or repeat any device operation.
+
+### Cancelled removed-app recovery
+
+The explicit `workflow-release-resources --kind ios-removed-app` route covers one cancelled,
+input-valid local command with exactly matching `ios-device:` and `ios-app:` claims. It requires
+original supervisor-confirmed native closure and recorded membership, with no later cleanup substitution.
+It does not extend ordinary completion or the existing observation-only/XCTest routes.
+
+The existing evidence argument selects a version-1 manifest containing `runId`, `bindingDigest`
+and `files`, plus `outputInput` (an original recipe input path) and `outputKey` (its JSON key).
+The unchanged input bytes must name the canonical output directory containing every selected record.
+Each of `installation`, `launch`, `uninstall`, `absence` and `guard` names an absolute
+original `path` and SHA-256 `digest`. These originals must fall inside the native command window in acquire, install, launch, uninstall, absence order.
+Acknowledged device records must agree on device, bundle and installed executable container; the
+original acquired lock must belong to a recorded native process. `--lock-directory` selects that
+original canonical lock, which must now be absent. The manifest joins originals; it creates no
+replacement acceptance or application-cleanup claim.
+
+Fresh device details, full app inventory and process inventory must confirm the same booted device,
+target bundle absence and original container process absence. Other device owners, changed evidence,
+live original processes, stale observations, revision/lease/reader changes and ambiguous identities
+retain the reservations. The existing release/reconcile path retires only the original generations
+and preserves cancellation and any original negative application-cleanup result. Recovery neither
+reinstalls an app nor modifies its data.

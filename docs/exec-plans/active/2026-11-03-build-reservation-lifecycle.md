@@ -131,3 +131,18 @@ against the final compiled archive. Typecheck passed. Opus 5.5 high recheck foun
 after preserving the sampled recovery route and correcting refusal assertions. Generic recovered
 cleanup tests cover the shared evidence guard; a dedicated unsampled recovered-file fixture remains
 optional coverage. Full installed archive proof is the remaining publication gate at this seam.
+
+### Cancelled removed-app recovery batch
+
+Operator-approved scope: reuse the existing removed-app physical observer for a cancelled local
+workflow with modern device/app claims. Original device records and fresh absence establish only
+reservation closure, never successful application cleanup. Keep historical XCTest and no-launch
+observation contracts unchanged.
+
+- [x] Implement the explicit evidence join and focused positive/negative regression batch.
+- [ ] Verify source/compiled regressions, independent Opus review and exact archive installation.
+- [ ] Publish the qualified patch with hosted CI skipped. Adoption evidence remains outside source.
+
+Validate the original cancellation and negative cleanup report remain unchanged. Reject live or
+ambiguous device processes, reinstallation, wrong device/owner/revision/container, stale or modified
+originals, retained locks and conflicting owners. Reuse existing lease and runtime-reader fences.
