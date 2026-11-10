@@ -21,9 +21,6 @@ shows existing project-owned checks; it does not require a check after every edi
 
 ## Active
 
-- [Cowork host plugin](active/2026-11-10-cowork-host-plugin.md)
-  delivers the native development loop and distributable Claude Desktop integration.
-
 - [Native API decision restoration](active/2026-11-08-api-signoff-restoration.md)
   restores verification of existing exact approvals and qualifies the shipped adapter.
 
@@ -127,6 +124,9 @@ shows existing project-owned checks; it does not require a check after every edi
   Gemini, Claude, and Codex wrappers independently of later implementation-plan improvements.
 
 ## Completed
+
+- [Cowork host plugin](completed/2026-11-10-cowork-host-plugin.md)
+  delivered the qualified native development loop and distributable plugin in stable 4.6.0.
 
 - [RC10.4 large-evidence and review reliability](completed/2026-10-02-rc10-4-evidence-capture.md)
   published the streamed identity and automatic artifact correction after local, independent and

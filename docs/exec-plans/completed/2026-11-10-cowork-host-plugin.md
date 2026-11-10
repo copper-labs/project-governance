@@ -2,7 +2,7 @@
 id: plan.cowork-host-plugin
 title: Distributable Cowork Governance plugin
 type: exec-plan
-status: active
+status: completed
 owner: project-governance
 created: 2026-11-10
 updated: 2026-11-10
@@ -17,7 +17,7 @@ Deliver the [Cowork plugin contract](../../specs/cowork-host-plugin.md), includi
 development journey, portable team distribution, Opus review and stable publication. No Codex plugin,
 provider expansion, device execution or automatic adopter upgrades. No GitHub CI.
 
-Delivery: implementation and host journey verified; stable publication remains pending release proof and normal Git gates.
+Delivery: implementation, host qualification, independent review and stable 4.6.0 publication are complete.
 
 ## Batches and checkpoints
 
@@ -56,7 +56,7 @@ changes. Failure or new evidence may justify an earlier focused check; record wh
 - [x] Complete a real Cowork task/context/edit/failing-check/fix/passing-check/checkpoint/hook-commit journey.
 - [x] Complete Opus 5.5 high final code review and reconcile findings against preserved evidence.
 - [x] Complete local normal hooks, affected broad boundary proof and exact archive installation proof.
-- [ ] Publish the appropriate stable version and verify tag/source/assets/digests/latest readback, with GitHub CI skipped.
+- [x] Publish the appropriate stable version and verify tag/source/assets/digests/latest readback, with GitHub CI skipped.
 
 The new host execution boundary requires broad release proof. Reuse qualified unchanged evidence
 only when its bindings remain valid. Do not restart the user’s application or unrelated agents for
@@ -84,7 +84,9 @@ A real Claude Desktop journey completed native edit/fail/fix/pass/checkpoint/hoo
 qualification is Apple Silicon; alternate paths are fixtures, not a second physical machine.
 
 Normal source hooks passed after adding authoritative dependency dates and the missing plan-index
-link. Publication and remote readback are the remaining release steps.
+link. Stable 4.6.0 is published from the reviewed source lineage. Remote tag, all four asset bytes,
+installation metadata, immutable status and latest channel were verified. GitHub CI did not run.
+Existing project pins remain unchanged.
 Operational artifacts, adoption paths and model audit records remain outside source.
 
 Update progress at these major seams. Keep original failed proof alongside corrected proof. Source
