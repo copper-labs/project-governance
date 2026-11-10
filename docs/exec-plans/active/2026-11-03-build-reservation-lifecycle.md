@@ -163,7 +163,7 @@ worker relaxation or device control. The previous source reproducer failed as ex
 
 - [x] Implement the narrow route and source regression cases.
 - [x] Verify focused/shared checks, Opus 5.5 high review and exact installed archive.
-- [ ] Publish qualified stable patch with hosted CI skipped; adoption remains separate.
+- [x] Publish qualified stable patch with hosted CI skipped; adoption remains separate.
 
 Checkpoint: source and installed positive release/reconcile, unavailable-history attribution,
 missing membership, wrong/live ownership, revision, changed originals and target/port/lock refusal.
@@ -175,3 +175,8 @@ Typecheck and exact clean-install archive proof passed. Opus 5.5 high review/rec
 its medium coverage finding is addressed. Low redundant-guard/test-strength suggestions remain
 nonblocking. The test-only Apple assertion correction restores strict indexed-access typing.
 Ready for the authorized patch publication; no hosted CI or automatic adopter selection.
+
+Stable 4.5.18 published from `06461b750345aac758288cdb956f09b4f4b87401`.
+Downloaded archive, lock and metadata match the qualified artifacts; tag/source and stable/latest
+readback passed. No hosted CI ran. Exact recovery and adopter installation evidence remains outside
+the source checkout. Publication does not change any installed runtime pin.
