@@ -1,0 +1,33 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, realpathSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { randomUUID } from "node:crypto";
+import { execFileSync } from "node:child_process";
+import { durableJson } from "../src/core.ts";
+import { coworkTaskStart } from "../src/cowork-tasks.ts";
+import { coworkCheckObserve } from "../src/cowork-checks.ts";
+import { checkRunRoot } from "../src/check-run.ts";
+
+test("Cowork reconnect and cancellation preserve native run and task ownership", async t => {
+  const temporary = realpathSync(mkdtempSync(join(tmpdir(), "cowork checks ")));
+  const previous = process.env["XDG_STATE_HOME"];
+  process.env["XDG_STATE_HOME"] = join(temporary, "state");
+  t.after(() => { if (previous === undefined) delete process.env["XDG_STATE_HOME"]; else process.env["XDG_STATE_HOME"] = previous; rmSync(temporary, { recursive: true, force: true }); });
+  const root = join(temporary, "project"); mkdirSync(root); execFileSync("git", ["init", "-q", root]);
+  const task = coworkTaskStart(root, { outcome: "Check fixture", scope: ["."], acceptance: ["Checked"], constraints: [] });
+  const id = randomUUID(), directory = join(checkRunRoot(), id); mkdirSync(directory, { recursive: true });
+  durableJson(join(directory, "dispatch.json"), { root, taskBinding: { taskId: task.task.taskId } });
+  durableJson(join(directory, "run.json"), { version: 1, id, state: "queued", owner: null, plan: { execution_order: [] } });
+  const input = { session: task.session, task_id: task.task.taskId, expected_version: 1, run_id: id };
+  const observed = await coworkCheckObserve(root, input, "check-status");
+  assert.ok("state" in observed); assert.equal(observed.state, "queued");
+  assert.equal((await coworkCheckObserve(root, input, "check-cancel")).status, "cancellation-requested");
+  const marker = JSON.parse(readFileSync(join(directory, "cancel.json"), "utf8"));
+  assert.equal(marker.run_id, id); assert.equal(marker.authority, task.session);
+  await assert.rejects(coworkCheckObserve(root, { ...input, expected_version: 2 }, "check-cancel"), /version-conflict/u);
+  durableJson(join(directory, "dispatch.json"), { root, taskBinding: { taskId: randomUUID() } });
+  await assert.rejects(coworkCheckObserve(root, input, "check-status"), /binding-mismatch/u);
+  assert.deepEqual(JSON.parse(readFileSync(join(directory, "cancel.json"), "utf8")), marker);
+});

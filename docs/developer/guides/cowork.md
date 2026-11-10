@@ -2,7 +2,7 @@
 id: guide.cowork
 title: Use Governance from Cowork
 type: guide
-status: draft
+status: current
 owner: project-governance
 created: 2026-11-10
 updated: 2026-11-10
@@ -14,9 +14,8 @@ summary: Register a Mac checkout and use its pinned native runtime through the d
 The plugin connects Cowork to the real project on your Mac. Tasks, edits, checks and local commits
 use that project's pinned Governance installation. No Codex installation is required.
 
-This integration is in qualification. Do not treat a draft package as a published supported release.
-The [owning specification](../../specs/cowork-host-plugin.md) and
-[delivery plan](../../exec-plans/active/2026-11-10-cowork-host-plugin.md) track the remaining proof.
+Use Governance 4.6.0 and the matching plugin ZIP. The
+[owning specification](../../specs/cowork-host-plugin.md) defines the integration and its boundaries.
 
 ## Set up a project
 
@@ -59,8 +58,9 @@ The plugin's supported Node bundle runs through Claude Desktop. The native Gover
 requires its own declared Node version. Setup captures its location; it does not depend on the GUI
 app finding the user's shell configuration.
 
-Qualification must state the tested Claude Desktop version and Mac architecture. Alternate-path
-fixtures demonstrate portable configuration, not testing on a second physical Mac. The plugin does
+The native host journey was verified on Claude Desktop 4.23118.1 on Apple Silicon (arm64).
+Intel Macs and other Desktop versions are not yet qualified. Alternate-home, Node and project-path
+fixtures, including spaces, demonstrate portable configuration, not testing on a second physical Mac. The plugin does
 not expose arbitrary shell commands, credential reads, deployment or remote publication.
 
 Check run IDs and harness evidence IDs are different. Checkpoints may describe retained runs in their

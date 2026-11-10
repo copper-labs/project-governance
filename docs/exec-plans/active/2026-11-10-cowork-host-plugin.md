@@ -39,10 +39,10 @@ commands and detached workers. Author tests with implementation; run them when t
 is ready, not after every helper. Review substantive boundary decisions with Opus as needed.
 
 - [x] Implement all tool operations, native candidate integrity and portable setup.
-- [ ] Verify typed input rejection, path/entry integrity, stale edits, session isolation, output bounds,
+- [x] Verify typed input rejection, path/entry integrity, stale edits, session isolation, output bounds,
       index preservation, check failure/success, reconnect and explicit cancellation.
 - [x] Verify the full loop against an exact archive installed into a clean synthetic project.
-- [ ] Update owning host deferrals and developer documentation to match implemented support.
+- [x] Update owning host deferrals and developer documentation to match implemented support.
 
 Focused checkpoint: `npm run typecheck`, `npm run build`, and the new Cowork owner test batch plus
 directly affected runtime-invocation/installation/check tests. Record the exact selected test command
@@ -52,10 +52,10 @@ changes. Failure or new evidence may justify an earlier focused check; record wh
 ### B2 — Package, qualify and release
 
 - [x] Generate a distributable plugin asset from source, with no machine-local settings or hardcoded author paths.
-- [ ] Verify alternate home/Node/project paths, spaces, missing prerequisites and compatibility handling.
+- [x] Verify alternate home/Node/project paths, spaces, missing prerequisites and compatibility handling.
 - [x] Complete a real Cowork task/context/edit/failing-check/fix/passing-check/checkpoint/hook-commit journey.
 - [x] Complete Opus 5.5 high final code review and reconcile findings against preserved evidence.
-- [ ] Complete local normal hooks, affected broad boundary proof and exact archive installation proof.
+- [x] Complete local normal hooks, affected broad boundary proof and exact archive installation proof.
 - [ ] Publish the appropriate stable version and verify tag/source/assets/digests/latest readback, with GitHub CI skipped.
 
 The new host execution boundary requires broad release proof. Reuse qualified unchanged evidence
@@ -65,26 +65,26 @@ Do not publish a status-only plugin in place of the promised development loop.
 
 ## Current / next
 
-Source is isolated from ongoing release work. Opus 5.5 high design review and focused recheck are
-reconciled. Portable plugin transport, native child execution and synthetic file access are qualified.
-The installed-archive synthetic journey now proves registration/refresh, task start/resume, context,
-native nested file editing, a genuine documentation failure, correction, passing checks, checkpoint,
-and a hook-backed first commit with confirmed cleanup. Original failed runs are retained. They caught
-an omitted comparison base and duplicated check dispatch with an invalid timestamp; Cowork now reuses
-the CLI's dispatch owner. The fixture also caught missing Git hook setup, which was completed normally
-before resuming the same commit step without repeating passed checks.
+Implementation and Opus 5.5 high review are complete. All code findings are reconciled. The final
+review's missing Cowork dependency-install step is present in both source readiness and release
+workflows; clean root/harness/Cowork installation and typechecking passed. The 4.x publication path
+remains manual and does not execute those workflows.
 
-Registration refresh keeps worktree identity stable. Native commit finalization is durable separately
-from its enclosing receipt and status verifies the original immutable tree. These newer paths still
-need their remaining focused interruption/compatibility fixtures. The portable MCP transport builds
-and its protocol smoke test exposes the intended 15 tools. The first broad run passed (1,964 tests,
-34 explicit skips); subsequent review corrections require focused proof. Opus 5.5 high code review
-completed and identified commit rejection/recovery, stale-registration diagnostics, unrelated-file
-handling and a shared startup regression. Reconciliation is in progress. The real host journey proved
-edit/fail/fix/pass but stopped when check run IDs were supplied as checkpoint evidence IDs. Tool schema,
-guidance and the refusal now distinguish these identities; task status exposes valid evidence IDs.
-The completed checks were reused: the real host journey subsequently checkpointed and committed through normal hooks with confirmed cleanup. A fresh corrected archive also completed the native journey, transport readback and stale-revision refusal. Remaining edge fixtures, focused Opus recheck,
-exact release archive proof and publication remain outstanding. B1/B2 stay open until those pass.
+The source broad suite passed 1,964 tests with 34 explicit skips. Focused Cowork regressions cover
+identity, stale edits, safe paths, checkpoint evidence, native commit rejection and durable status.
+The additional cancellation fixture verifies task-bound marker admission and reconnect; the existing
+native cancellation test proves process termination and prevention of subsequent commands.
+
+The exact installed package suite passed. The final archive differs from that suite's archive only
+in the reviewed CLI diagnostic mapping; focused diagnostic proof and the final installed journey
+cover that delta. The final journey verifies selected edits/deletions and unrelated index preservation.
+Alternate home/project paths with spaces and an alternate Node executable passed. Missing Node,
+changed runtime entry/tree and stale registration refuse safely; restored registration reconnects.
+A real Claude Desktop journey completed native edit/fail/fix/pass/checkpoint/hook-commit. Physical host
+qualification is Apple Silicon; alternate paths are fixtures, not a second physical machine.
+
+Normal source hooks passed after adding authoritative dependency dates and the missing plan-index
+link. Publication and remote readback are the remaining release steps.
 Operational artifacts, adoption paths and model audit records remain outside source.
 
 Update progress at these major seams. Keep original failed proof alongside corrected proof. Source
