@@ -140,9 +140,16 @@ reservation closure, never successful application cleanup. Keep historical XCTes
 observation contracts unchanged.
 
 - [x] Implement the explicit evidence join and focused positive/negative regression batch.
-- [ ] Verify source/compiled regressions, independent Opus review and exact archive installation.
-- [ ] Publish the qualified patch with hosted CI skipped. Adoption evidence remains outside source.
+- [x] Verify source/compiled regressions, independent Opus review and exact archive installation.
+- [x] Publish the qualified patch with hosted CI skipped. Adoption evidence remains outside source.
 
 Validate the original cancellation and negative cleanup report remain unchanged. Reject live or
 ambiguous device processes, reinstallation, wrong device/owner/revision/container, stale or modified
 originals, retained locks and conflicting owners. Reuse existing lease and runtime-reader fences.
+
+Release closeout: stable 4.5.17 published from `447dcc10a5b9d0fa63f1f789cd6d4c2774ece2a4`.
+The installed shared regression batch passed 119/119; the strengthened final focused batch passed
+28/28, including installed generation loss. Opus 5.5 high review and rechecks have no remaining
+blockers. Exact archive clean-install proof, tag/source identity and downloaded asset readback
+passed. Hosted CI was skipped. Recovery preserves cancelled outcomes; adopter activation remains
+a separate owned operation and is not implied by publication.
