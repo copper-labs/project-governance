@@ -1043,7 +1043,7 @@ revision, native process evidence, file locks and release generation checks rema
 Explicit `android-app-session` recovery may handle an owned-emulator boot stage that failed with
 confirmed native closure but never produced `android-emulator-owner.json`. Normal worker cleanup
 still requires the boot record. Missing-record recovery does not infer historical emulator ownership:
-it records the omission, requires the original failed boot, retained native membership, valid input binding and exact descriptor/leases, verifies all
+it records the omission, requires the original failed boot, retained native membership (or the original-confirmed fast-failure exception below), valid input binding and exact descriptor/leases, verifies all
 native processes absent and freshly verifies target absence, both ports closed, and original locks
 absent. Malformed or replaced records, aliases, successful boot stages and ambiguous observations
 refuse. Existing journal, generation, freshness and successor-ownership fences remain authoritative.
@@ -1070,3 +1070,14 @@ The original unknown receipt and deadline reason remain unchanged and recovery p
 bound to that receipt. Missing exit/signal evidence remains unresolved. This restores ordinary native deadline failure semantics in both worker recovery and the
 executor's later-cleanup observation, with stricter retained-outcome requirements. Other unknown
 stop reasons remain unchanged. It does not infer success or release external resources by itself.
+
+### Fast failed boot without a membership sample
+
+Explicit historical owned-emulator recovery may accept a failed native command that ended
+before membership sampling when its original supervisor confirmed cleanup. Require the original
+request, runtime, launch, guardian and owner bindings; known nonzero failed exit; valid inputs;
+and fresh original process/group absence. Recovered/inferred cleanup does not qualify for this
+unsampled exception; the existing sampled-membership route is unchanged. Preserve missing membership as `not-recorded`, never reconstruct boot
+ownership. Existing exact target absence, closed ports, absent original locks, reader/lease
+fences and transactional whole-set release remain mandatory. Successful native runs lacking
+the boot record remain excluded. This does not dispatch or repeat any device operation.

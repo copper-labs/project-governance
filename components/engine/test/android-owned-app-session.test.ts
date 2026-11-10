@@ -63,13 +63,39 @@ for(const fault of ["online","port","lock","report-appears","native","revision"]
  }finally{f.close();}
  });
 
- for(const fault of ["stale","membership","artifact-alias","zero"])
+ for(const fault of ["stale","artifact-alias","zero"])
  test("missing boot recovery requires complete failed-native identity: "+fault,async()=>{
  const f=await ownedSessionFixture(fault==="zero"?0:1);try{
  rmSync(f.bootReport);
- if(fault==="membership")rmSync(join(f.command,"group-members.json"));
  if(fault==="artifact-alias"){const dir=dirname(f.bootReport);renameSync(dir,dir+"-real");symlinkSync(dir+"-real",dir);}
  const stages=f.store.stages(f.run.id);if(fault==="stale")stages[0].result.inputValidity="stale";
  await assert.rejects(()=>ownedAndroidAppSessionCleanup(f.worker,f.run,stages,closedProbes,undefined,false,true),fault==="artifact-alias"?/directory uses an alias/:/Missing boot ownership recovery/);assert.equal(f.held().length,4);
+ }finally{f.close();}
+ });
+
+ test("fast failed boot without sampled membership releases and preserves failure",async()=>{
+ const f=await ownedSessionFixture(1);try{
+ rmSync(f.bootReport);rmSync(join(f.command,"group-members.json"));
+ const raw=readFileSync(join(f.command,"result.json"));
+ const result=publicCall(f,"workflow-release-resources",f.args);assert.equal(result.status,0,result.stderr);
+ assert.equal(f.held().length,0);assert.deepEqual(readFileSync(join(f.command,"result.json")),raw);
+ const proof=JSON.parse(readFileSync(f.receipt,"utf8")).observation.proof;
+ assert.equal(proof.original.commands[0].membershipHistory,"not-recorded");
+ const settled=publicCall(f,"workflow-reconcile-cleanup",["--database",f.database,"--run",f.run.id,"--revision",String(f.run.revision),"--registry",f.registry.path,"--receipt",f.receipt,"--worker-directory",f.worker]);
+ assert.equal(settled.status,1,settled.stderr);assert.equal(JSON.parse(settled.stdout).run.state,"failed");
+ }finally{f.close();}
+ });
+ for(const fault of ["success","unknown-cleanup","wrong-owner","live-owner","revision","online","port","lock","membership-appears"])
+ test("unsampled failed boot refuses "+fault,async()=>{
+ const f=await ownedSessionFixture(fault==="success"?0:1);try{
+ rmSync(f.bootReport);rmSync(join(f.command,"group-members.json"));
+ if(fault==="revision")f.args[f.args.indexOf("--revision")+1]=String(f.run.revision+1);
+ if(fault==="unknown-cleanup"){const p=join(f.command,"result.json"),r=JSON.parse(readFileSync(p,"utf8"));r.cleanup="unknown";writeFileSync(p,JSON.stringify(r));}
+ if(fault==="wrong-owner"){const p=join(f.command,"owner.json"),r=JSON.parse(readFileSync(p,"utf8"));r.requestDigest="sha256:"+"0".repeat(64);writeFileSync(p,JSON.stringify(r));}
+ let stub;
+ if(fault==="live-owner"){const owner=JSON.parse(readFileSync(join(f.command,"owner.json"),"utf8"));const original=childProcess.execFileSync;stub=mock.method(childProcess,"execFileSync",((file:any,args:any,options:any)=>file==="/bin/ps"&&args?.includes("pid=,ppid=,pgid=,stat=")?String(original(file,args,options)).trimEnd()+`\n${owner.pid} 1 ${owner.pid} S\n`:original(file,args,options))as any);syncBuiltinESMExports();}
+ const probes={...closedProbes,...(fault==="online"?{devices:async()=>"List of devices attached\nemulator-5556\tdevice\n"}:{}),...(fault==="port"?{portClosed:async()=>false}:{}),...(fault==="lock"?{lockAbsent:async()=>false}:{}),...(fault==="membership-appears"?{devices:async()=>{writeFileSync(join(f.command,"group-members.json"),"{}");return"List of devices attached\n";}}:{})};
+ const expected:Record<string,RegExp>={success:/Missing boot ownership recovery/,"unknown-cleanup":/cleanup differs|native command receipt/,"wrong-owner":/ownership differs/,"live-owner":/Original command owner or process group still present/,revision:/revision or workspace/,online:/remain unresolved/,port:/remain unresolved/,lock:/remain unresolved/,"membership-appears":/membership evidence changed/};
+ try{await assert.rejects(()=>release(f.args,f.dir,probes),expected[fault]!);assert.equal(f.held().length,4);}finally{stub?.mock.restore();syncBuiltinESMExports();}
  }finally{f.close();}
  });

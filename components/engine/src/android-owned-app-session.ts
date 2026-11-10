@@ -42,9 +42,9 @@ export async function ownedAndroidAppSessionCleanup(directory:string,run:Workflo
   const missing=!lstatSync(reportPath,{throwIfNoEntry:false});
   let original: Record<string,unknown>;
   if(missing){
-    const failed=stages.find(value=>value.id===stage.id);
+    const failed=stages.find(value=>value.id===stage.id),command=native.commands.find(value=>value.stage===stage.id);
     if(!recoverMissing || failed?.state!=="failed" || failed.result?.cleanup!=="confirmed" || failed.result.state!=="failed" || failed.result.inputValidity==="stale" ||
-       !native.commands.find(command=>command.stage===stage.id)?.membersDigest || failed.result.exitCode===0 || failed.result.exitCode===null)
+       (!command || (!command.membersDigest && (command.cleanupRecovery || command.closureAuthority!=="original-confirmed-native-receipt" || command.membershipHistory!=="not-recorded"))) || failed.result.exitCode===0 || failed.result.exitCode===null)
       throw Error("Missing boot ownership recovery requires explicit original failed native boot");
     original={bootStage:stage.id,bootReport:{path:reportPath,status:"missing-after-failed-boot"},ownership:"not-reconstructed"};
   }else{

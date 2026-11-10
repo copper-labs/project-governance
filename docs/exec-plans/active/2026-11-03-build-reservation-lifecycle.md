@@ -110,3 +110,24 @@ Opus confirmed the deadline change is a narrow parity correction with no materia
 Reconciliation adds signal-only, null/malformed outcome and exact exit/provenance assertions.
 The shared executor observation is in scope; its existing recovery/cleanup tests run alongside
 worker/resource tests. Unchanged engine/harness/script proof from 4.5.9 remains separately retained.
+
+## Fast failed preflight recovery
+
+Approved focused follow-up: allow original supervisor-confirmed closure when a failed owned
+emulator command finishes before its first membership sample. Retain original failure, explicit
+historical recovery, all identity and fresh resource checks. Do not extend successful missing-boot
+recovery. Reproducer fails against the prior source. One coherent batch covers public release and
+reconciliation, missing-history attribution, live/wrong-owner/ambiguous evidence rejection, then
+Opus 5.5 high review and installed exact-archive proof. Adopter identities stay outside source.
+
+Research: Node's [child-process contract](https://nodejs.org/api/child_process.html) separates
+process exit from stream closure and permits detached children. Neither exit status nor elapsed
+time proves resource closure. Reuse the existing supervisor proof and fresh identity/target checks,
+rather than treating a fast duration as authority. Reviewed 2026-11-10; update date not established.
+
+The source regression reproduced the prior refusal. Final focused cases passed (10/10),
+related recovery checks passed (73, with six skips), and all 48 owned-emulator cases passed
+against the final compiled archive. Typecheck passed. Opus 5.5 high recheck found no blockers
+after preserving the sampled recovery route and correcting refusal assertions. Generic recovered
+cleanup tests cover the shared evidence guard; a dedicated unsampled recovered-file fixture remains
+optional coverage. Full installed archive proof is the remaining publication gate at this seam.
