@@ -1,3 +1,4 @@
+import { gitOperationAdmission } from "./git-operation-admission.ts";
 import {execFileSync} from "node:child_process";
 import {closeSync,constants,fstatSync,lstatSync,openSync,readdirSync,readlinkSync,readSync,realpathSync} from "node:fs";
 import {dirname,join} from "node:path";
@@ -8,7 +9,8 @@ import {digest} from "./core.ts";
 const lockPath="config/governance/runtime.lock.yaml";
 const prefixes=["config/governance/","config/validation/",".githooks/",".codex/",".claude/",".agents/"];
 const entries=new Set(["AGENTS.md","AGENTS.override.md","CLAUDE.md","GEMINI.md","tools/governance-bootstrap.py","tools/governance-startup.py"]);
-const authority=(path:string)=>entries.has(path)||prefixes.some(prefix=>path.startsWith(prefix));
+export const governanceAuthorityPath=(path:string)=>entries.has(path)||prefixes.some(prefix=>path.startsWith(prefix));
+const authority=governanceAuthorityPath;
 
 /** Read-only admission. A later transaction must still fingerprint and preserve unrelated work. */
 export function startupGitAdmission(workspace:string,environment:NodeJS.ProcessEnv=process.env) {
@@ -16,21 +18,12 @@ export function startupGitAdmission(workspace:string,environment:NodeJS.ProcessE
 }
 interface LockTransition {original:string;candidate:string}
 function collectAdmission(workspace:string,environment:NodeJS.ProcessEnv,transition?:LockTransition) {
- for(const name of ["GIT_DIR","GIT_WORK_TREE","GIT_COMMON_DIR","GIT_INDEX_FILE","GIT_OBJECT_DIRECTORY","GIT_ALTERNATE_OBJECT_DIRECTORIES","GOVERNANCE_UPDATE_TOKEN"])
-  if(environment[name])throw new Error("Startup cannot run inside a redirected Git or update transaction");
- const root=realpathSync(workspace);
- const git=(...args:string[])=>execFileSync("git",args,{cwd:root,env:{...environment,GIT_OPTIONAL_LOCKS:"0"},
-  timeout:5000,maxBuffer:16*1024*1024,stdio:["ignore","pipe","pipe"]});
+ const shared=gitOperationAdmission(workspace,environment);
+ const root=shared.root,git=shared.git;
  const text=(...args:string[])=>new TextDecoder("utf-8",{fatal:true}).decode(git(...args));
- const names=(...args:string[])=>text(...args).split("\0").filter(Boolean);
- if(realpathSync(text("rev-parse","--show-toplevel").trim())!==root)throw new Error("Startup requires the Git worktree root");
- for(const marker of ["MERGE_HEAD","REBASE_HEAD","CHERRY_PICK_HEAD","REVERT_HEAD","rebase-merge","rebase-apply","sequencer","index.lock","HEAD.lock","packed-refs.lock"]){
-  const path=text("rev-parse","--path-format=absolute","--git-path",marker).trim();
-  if(lstatSync(path,{throwIfNoEntry:false}))throw new Error("Git has an active operation: "+marker);
- }
- const branch=text("symbolic-ref","--quiet","HEAD").trim(),head=text("rev-parse","--verify","HEAD").trim();
- if(!branch.startsWith("refs/heads/") || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(head))throw new Error("Startup requires a committed branch");
- if(git("ls-files","--unmerged","-z").length)throw new Error("Resolve Git conflicts before startup adoption");
+ const names=(...args:string[])=>new TextDecoder("utf-8",{fatal:true}).decode(git(...args)).split("\0").filter(Boolean);
+ const branch=shared.branch,head=shared.head;
+ if(!head || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(head))throw new Error("Startup requires a committed branch");
  const changed=[...new Set([...names("diff","--no-renames","--name-only","-z","HEAD"),
   ...names("diff","--cached","--no-renames","--name-only","-z"),...names("ls-files","--others","--exclude-standard","-z")])].sort();
  if(changed.length>2048)throw new Error("Startup changed-file inventory exceeds limit");

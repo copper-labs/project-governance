@@ -1,3 +1,4 @@
+import { coworkEffect } from "./cowork-operations.ts";
 import { parseDecisionTelemetryArgs } from "./decision-history.ts";
 import { COMMAND_RECOVERY_COMMANDS } from "./provider-job-command.ts";
 import { spawn } from "node:child_process";
@@ -18,6 +19,7 @@ const writeCommands = new Set([...COMMAND_RECOVERY_COMMANDS, "evaluate", "lint-a
 
 export function managedCommandEffect(command: string, args: readonly string[] = []): "read" | "write" | null {
   if (["--help", "-h", "help"].includes(command)) return "read";
+  if (command === "cowork") return args.length === 1 ? coworkEffect(args[0]) : null;
   if (command === "task-facts") return "read";
   if (command === "release-evaluation" && args[0] === "capture") return "write";
   if (command === "context-index") return "write";
@@ -41,6 +43,11 @@ export async function invokeRuntimeGeneration(registryPath: string, args: string
     const startupToken=startupHookAdmission(args,workspace,registryPath,generations.state().maintenance);
     reader = generations.acquire(`invocation:${randomUUID()}`, startupToken??probe);
     const installation = inspectRuntimeGeneration(reader.directory);
+    if (args[0] === "cowork" && (!process.argv[1] || realpathSync(process.argv[1]) !== installation.executable))
+      throw new Error("cowork-registration-stale");
+    if (args[0] === "cowork" && process.env.GOVERNANCE_COWORK_REVISION !== undefined &&
+        (process.env.GOVERNANCE_COWORK_REVISION !== String(reader.revision) || process.env.GOVERNANCE_COWORK_LOCK_DIGEST !== installation.lockDigest))
+      throw new Error("cowork-registration-stale");
     const lockPath = "config/governance/runtime.lock.yaml";
     if (realpathSync(join(workspace, lockPath)) !== join(workspace, lockPath)) throw new Error("Runtime lock cannot use a symlink");
     const lock = compiledRuntimeLock(parse(narrativeFile(workspace, lockPath)));

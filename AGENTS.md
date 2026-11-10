@@ -38,6 +38,7 @@ The compiled TypeScript package owns current source development under `component
 ```sh
 npm ci --ignore-scripts
 npm ci --prefix components/harness --ignore-scripts
+npm ci --prefix components/cowork --ignore-scripts
 npm run build
 node dist/engine/src/cli.js --help
 ```

@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+import { coworkErrorCode } from "./cowork-errors.ts";
+import { coworkFileIdentity } from "./cowork-files.ts";
+import { coworkCommand } from "./cowork-command.ts";
 import { workflowResourceReleaseCommand } from "./workflow-resource-release.ts";
 import { evaluationCommand } from "./evaluation-command.ts";
 import { RELEASE_VERSION } from "./release-version.ts";
@@ -83,7 +86,7 @@ import { installLintSetup } from "./lint-installation.ts";
 import { readReleaseEvaluation, releaseEvaluationMarkdown } from "./release-evaluation.ts";
 
 /** Public argument parsing rejects conflicting subjects before reading a candidate. */
-export function prepareCommand(args: string[], root: string, builtinDirectory: string, command: "plan" | "check" = "plan") {
+export function prepareCommand(args: string[], root: string, builtinDirectory: string, command: "plan" | "check" = "plan", capture?: { session: string; candidate: Array<{ path: string; expected: string }> }) {
   const { values, positionals } = parseArgs({ args, strict: true, allowPositionals: false, options: {
     stage: { type: "string" }, mode: { type: "string", default: "impacted" }, staged: { type: "boolean" },
     "changed-path": { type: "string", multiple: true }, "base-ref": { type: "string" }, "candidate-ref": { type: "string" }, pack: { type: "string", multiple: true },
@@ -113,8 +116,20 @@ export function prepareCommand(args: string[], root: string, builtinDirectory: s
   if (!stage && (!packs.length || mode === "all")) throw new Error("--stage is required for this selection");
   if (mode === "all" && (values.staged || paths.length || baseRef)) throw new Error("All mode cannot combine with a comparison scope");
   if (values.staged && (paths.length || baseRef || stage !== "pre-commit")) throw new Error("Staged scope requires pre-commit and cannot combine with paths or a base");
+  const verifyCandidate = () => {
+    if (!capture) return;
+    if (capture.candidate.length !== paths.length || new Set(paths).size !== paths.length ||
+        capture.candidate.some(item => !paths.includes(item.path) || coworkFileIdentity(root, item.path) !== item.expected))
+      throw new Error("cowork-check-candidate-conflict");
+  };
+  verifyCandidate();
   const scope = resolveChangeScope(root, { all: mode === "all" || stage === "commit-msg", staged: values.staged ?? (stage === "pre-commit" && !paths.length && !baseRef && !candidateRef),
     paths, ...(baseRef ? { baseRef } : {}), ...(candidateRef ? { candidateRef } : {}) });
+  verifyCandidate();
+  if (capture && scope.records.some(record => {
+    const expected = capture.candidate.find(item => item.path === record.path)?.expected;
+    return expected === undefined || (record.after ? record.after.kind !== "worktree" || record.after.identity !== expected : expected !== "absent");
+  })) throw new Error("cowork-check-capture-conflict");
   const subject = new ValidationSubject(root, scope), registry = loadSubjectPacks(subject, builtinDirectory);
   const narrative = command === "check" ? narrativeInputs(root, {
     ...(typeof values["commit-message-file"] === "string" ? { commitFile: values["commit-message-file"] } : {}),
@@ -128,7 +143,7 @@ export function prepareCommand(args: string[], root: string, builtinDirectory: s
     ...(values["decision-purpose"] === undefined ? {} : { purpose: values["decision-purpose"] }),
     ...(values["review-rules"] === undefined ? {} : { reviewRules: values["review-rules"] }),
   };
-  const binding = resolveTaskContext(root, { ...decisionOptions,
+  const binding = resolveTaskContext(root, { ...decisionOptions, ...(capture ? { session: capture.session } : {}),
     ...(values["decision-context"] ? { path: values["decision-context"] } : {}) });
   decisionOptions.binding = taskBindingReceipt(binding);
   if (binding.context) {
@@ -152,6 +167,15 @@ export function prepareCommand(args: string[], root: string, builtinDirectory: s
     progress = { path, batch: batch.id, digest: parsed.digest, items: items.map(item => item.id) };
   }
   return { plan, progress, scope, subject, registry, narrative, workId, decisionOptions, deadlineMs, ...observation, jsonOutput: typeof jsonOutput === "string" ? jsonOutput : null, summary: values.summary === true, detach: values["detach"] === true };
+}
+
+export function dispatchPreparedChecks(prepared: ReturnType<typeof prepareCommand>) {
+  return dispatchChecks(prepared.registry, prepared.plan, {
+      subject: prepared.subject, scope: prepared.scope, assets: new PackagedCheckerAssets(), packIds: new Set(Object.keys(prepared.registry)),
+      stage: prepared.plan.stage ?? "", asOf: new Date().toISOString(), workId: prepared.workId, ...prepared.narrative,
+    }, { deadlineMs: prepared.deadlineMs, ...(prepared.decisionOptions.context ? { decisionContext: prepared.decisionOptions.context } : {}),
+      ...(prepared.decisionOptions.binding ? { taskBinding: prepared.decisionOptions.binding } : {}),
+      ...checkObservationContext(prepared.trigger, prepared.expectedStatus) });
 }
 
 export function planCommand(args: string[], root: string, builtinDirectory: string) {
@@ -206,6 +230,13 @@ Use the owning command contract for structured request fields.
   --version                 Print the runtime version
   --help, -h, help           Show this help without opening project state`);
       return 0;
+    }
+    if (command === "cowork") {
+      try { console.log(JSON.stringify(await coworkCommand(args.slice(1), process.cwd()))); return 0; }
+      catch (error) {
+        const code = error instanceof ContextRouteError ? error.code : coworkErrorCode(error);
+        console.log(JSON.stringify({ status: "failed", code, retry: "inspect-before-retry" })); return 2;
+      }
     }
     if (command === "evaluate") { const value = await evaluationCommand(args.slice(1), process.cwd()); console.log(JSON.stringify(value.result)); return value.exitCode; }
     if (command === "harness") {
@@ -548,12 +579,7 @@ Use the owning command contract for structured request fields.
       console.log(JSON.stringify({ ...(prepared.summary ? checkSummary(result) : result), ...(advice.value ? { decisionAdvice: advice.value } : {}) }));
       return advice.exitCode ?? (result.status === "ready" ? 0 : 1);
     }
-    const submission = dispatchChecks(prepared.registry, prepared.plan, {
-      subject: prepared.subject, scope: prepared.scope, assets: new PackagedCheckerAssets(), packIds: new Set(Object.keys(prepared.registry)),
-      stage: prepared.plan.stage ?? "", asOf: new Date().toISOString(), workId: prepared.workId, ...prepared.narrative,
-    }, { deadlineMs: prepared.deadlineMs, ...(prepared.decisionOptions.context ? { decisionContext: prepared.decisionOptions.context } : {}),
-      ...(prepared.decisionOptions.binding ? { taskBinding: prepared.decisionOptions.binding } : {}),
-      ...checkObservationContext(prepared.trigger, prepared.expectedStatus) });
+    const submission = dispatchPreparedChecks(prepared);
     if (prepared.detach) {
       const advice = await withDecisionCancellation(options => checkDecisionAdvice(prepared, { ...prepared.decisionOptions, runId: submission.run_id }, true, options));
       console.log(JSON.stringify({ status: "submitted", ...submission, ...(advice.value ? { decisionAdvice: advice.value } : {}) })); return advice.exitCode ?? 0;
@@ -589,6 +615,10 @@ Use the owning command contract for structured request fields.
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
   } catch (error) {
+    if (args[0] === "runtime-run" && args[args.indexOf("--") + 1] === "cowork") {
+      const code = error instanceof Error && /^cowork-[a-z0-9-]+$/u.test(error.message) ? error.message : "cowork-runtime-unavailable";
+      console.log(JSON.stringify({ status: "failed", code })); return 2;
+    }
     // CLI parsing errors contain flags, not file contents. Source-loading diagnostics remain private.
     console.error(JSON.stringify(error instanceof ContextRouteError ? { status: "failed", code: error.code, error: error.message, receipt: error.receiptPath,
       ...(error.diagnostic ? { diagnostic: error.diagnostic } : {}), ...(error.recovery ? { recovery: error.recovery } : {}) }

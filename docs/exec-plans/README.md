@@ -21,6 +21,9 @@ shows existing project-owned checks; it does not require a check after every edi
 
 ## Active
 
+- [Cowork host plugin](active/2026-11-10-cowork-host-plugin.md)
+  delivers the native development loop and distributable Claude Desktop integration.
+
 - [Native API decision restoration](active/2026-11-08-api-signoff-restoration.md)
   restores verification of existing exact approvals and qualifies the shipped adapter.
 

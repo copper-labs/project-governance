@@ -1,5 +1,20 @@
 version: 1
 capabilities:
+  - id: cowork-native-projects
+    title: Work on registered Mac projects from Cowork
+    aliases: [cowork, claude-desktop-plugin]
+    tasks:
+      - register and refresh a native project connection
+      - use native tasks files checks and commits from Cowork
+    symbols: [project-governance cowork, coworkCommand, registerCoworkProject]
+    reference: docs/specs/cowork-host-plugin.md
+    guides:
+      - docs/developer/guides/cowork.md
+    sources:
+      - components/engine/src/cowork-command.ts
+      - components/engine/src/cowork-registration.ts
+      - components/cowork/src/server.ts
+      - components/cowork/src/transport.ts
   - id: local-workflow-policy
     title: Run local development with proportionate governance
     aliases: [workflow-bind, trusted-development, minimum-guardrails]

@@ -1,3 +1,4 @@
+import { finalizeCoworkCommit, rejectedCoworkCommit, type CoworkCommitBinding } from "./cowork-commit-binding.ts";
 import {requireMachineIdentity} from "./machine-identity.ts";
 import { commandProcesses, recordedCommandMembers } from "./command-owner-recovery.ts";
 import { startCommandGuardian } from "./command-guardian.ts";
@@ -24,6 +25,7 @@ import { runtimeExecutionIdentity, type RuntimeExecutionIdentity } from "./runti
 export interface CommandRequest {
   version: 1; id: string; operation: CommandOperation; deadlineMs: number; outputLimit: number;
   ownerDigest: string; stdin?: string;
+  commitBinding?: CoworkCommitBinding;
   executionIdentity?: RuntimeExecutionIdentity;
   idleTimeoutMs?: number;
   completion?: CompletionTarget;
@@ -41,6 +43,7 @@ export interface CommandRequest {
 }
 export interface CommandReceipt {
   runtimeVersion?: string; archiveDigest?: string | null;
+  commitResult?: ReturnType<typeof finalizeCoworkCommit> | ReturnType<typeof rejectedCoworkCommit> | { status: "recovery-required" };
   version: 1; requestDigest: string; state: "succeeded" | "failed" | "cancelled" | "unknown";
   exitCode: number | null; signal: string | null; reason: string; cleanup: "confirmed" | "unknown";
   startedAt: string; endedAt: string; durationMs: number; log: string; logBytes: number; stdout?: string; stderr?: string; providerResult?: string; providerResultDigest?: string; providerEvents?: string;
@@ -391,6 +394,14 @@ async function execute(directory: string, expectedDigest: string): Promise<void>
   const receipt: CommandReceipt = { version: 1, ...request.executionIdentity, requestDigest: expectedDigest,
     state: cleanup === "unknown" ? "unknown" : reason === "cancelled" ? "cancelled" : success ? "succeeded" : "failed",
     exitCode, signal: exitSignal, reason, cleanup, startedAt, endedAt: new Date().toISOString(), durationMs: Date.now() - started, log, logBytes: bytes, stdout, stderr, ...(providerEvents ? { providerEvents } : {}), ...(providerResult ? { providerResult, providerResultDigest: fileDigest(providerResult) } : {}) };
+  if (request.commitBinding) {
+    try {
+      if (receipt.cleanup !== "confirmed" || !["succeeded", "failed"].includes(receipt.state)) throw new Error("commit outcome unresolved");
+      receipt.commitResult = receipt.state === "succeeded" ? finalizeCoworkCommit(request.commitBinding) : rejectedCoworkCommit(request.commitBinding);
+      durableJson(join(directory, "commit-finalization.json"), { version: 1, requestDigest: expectedDigest,
+        bindingDigest: digest(request.commitBinding), result: receipt.commitResult, endedAt: receipt.endedAt });
+    } catch { receipt.commitResult = { status: "recovery-required" }; }
+  }
   durableJson(join(directory, "result.json"), receipt);
   if (registry) {
     try { if (cleanup === "confirmed") registry.release(leases, digest(receipt)); }

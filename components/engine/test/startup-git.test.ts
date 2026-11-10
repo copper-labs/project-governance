@@ -18,6 +18,7 @@ test("startup Git admission preserves unrelated work and rejects authority overl
   writeFileSync(join(root,"code.txt"),"staged\n");git("add","code.txt");writeFileSync(join(root,"code.txt"),"unstaged\n");
   writeFileSync(join(root,"new file.txt"),"new\n");
   const before=git("status","--porcelain=v1"),admission=startupGitAdmission(root);
+  assert.equal(startupGitAdmission(root,{...process.env,GIT_CONFIG_NOSYSTEM:"1"}).admission,"preflight-only");
   assert.deepEqual(admission.changed,["code.txt","new file.txt"]);assert.equal(admission.admission,"preflight-only");
   assert.equal(git("status","--porcelain=v1"),before);
   const snapshot=startupGitSnapshot(root);assertStartupGitSnapshot(snapshot);

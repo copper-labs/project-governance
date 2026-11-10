@@ -30,6 +30,7 @@ jobs:
           node-version: '24.16.0'
       - run: npm ci --ignore-scripts
       - run: npm ci --prefix components/harness --ignore-scripts
+      - run: npm ci --prefix components/cowork --ignore-scripts
       # Existing wheel owners remain active until deliberate adopter cutover.
       - run: python3 -m pip install -r requirements-dev.txt -r requirements-lint-dev.txt
       - run: python3 -m unittest discover -s tests -p 'test_runtime_*.py'

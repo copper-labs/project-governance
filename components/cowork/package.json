@@ -1,0 +1,9 @@
+{
+  "name": "@organta/governance-cowork-plugin",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "dependencies": { "@modelcontextprotocol/server": "2.4.0", "zod": "4.2.0" },
+  "devDependencies": { "esbuild": "0.28.2" }
+}

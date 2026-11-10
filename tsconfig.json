@@ -6,5 +6,5 @@
     "allowImportingTsExtensions": true, "noEmit": true, "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["components/engine/**/*.ts", "components/harness/src/**/*.ts"]
+  "include": ["components/engine/**/*.ts", "components/harness/src/**/*.ts", "components/cowork/src/**/*.ts"]
 }

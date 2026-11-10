@@ -76,6 +76,9 @@ For authored documentation and saved review artifacts, follow the
 [live-document and evidence contract](../specs/developer-documentation-system.md#compiled-runtime-live-documents-and-saved-evidence).
 Preserve raw snapshots and validate their authored summaries; recorded evidence is not a new guide.
 
+For the Cowork integration under qualification, see [Use Governance from Cowork](guides/cowork.md).
+The plugin is maintained and packaged in this repository; it does not require Codex.
+
 ## Work Across Branches And Codex Chats
 
 Use [Work Safely Across Git Worktrees and Codex Chats](guides/source-control-and-worktrees.md)
