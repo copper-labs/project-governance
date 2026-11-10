@@ -1045,7 +1045,7 @@ confirmed native closure but never produced `android-emulator-owner.json`. Norma
 still requires the boot record. Missing-record recovery does not infer historical emulator ownership:
 it records the omission, requires the original failed boot, retained native membership (or the original-confirmed fast-failure exception below), valid input binding and exact descriptor/leases, verifies all
 native processes absent and freshly verifies target absence, both ports closed, and original locks
-absent. Malformed or replaced records, aliases, successful boot stages and ambiguous observations
+absent. Malformed or replaced records, aliases, unsupported successful boot stages and ambiguous observations
 refuse. Existing journal, generation, freshness and successor-ownership fences remain authoritative.
 
 An explicitly approved `local-host-observed` version2 request adds required `mounts: string[]` to
@@ -1079,8 +1079,7 @@ request, runtime, launch, guardian and owner bindings; known nonzero failed exit
 and fresh original process/group absence. Recovered/inferred cleanup does not qualify for this
 unsampled exception; the existing sampled-membership route is unchanged. Preserve missing membership as `not-recorded`, never reconstruct boot
 ownership. Existing exact target absence, closed ports, absent original locks, reader/lease
-fences and transactional whole-set release remain mandatory. Successful native runs lacking
-the boot record remain excluded. This does not dispatch or repeat any device operation.
+fences and transactional whole-set release remain mandatory. Successful native runs without sampled membership remain excluded. This does not dispatch or repeat any device operation.
 
 ### Cancelled removed-app recovery
 
@@ -1105,3 +1104,16 @@ live original processes, stale observations, revision/lease/reader changes and a
 retain the reservations. The existing release/reconcile path retires only the original generations
 and preserves cancellation and any original negative application-cleanup result. Recovery neither
 reinstalls an app nor modifies its data.
+
+### Successful legacy owned-emulator recovery
+
+Explicit `android-app-session` recovery also accepts one successful, input-valid native command
+with exactly one emulator and one app claim, no local claims, retained process membership and
+original supervisor-confirmed cleanup. Later inferred cleanup does not qualify. Ordinary cleanup
+still requires the boot artifact. This exception records `missing-after-successful-run` and
+`historicalBootOwnership: unavailable`; it never constructs a historical boot record.
+
+Fresh original process/group absence, target absence, both closed ports and absent ownership lock
+remain required. Existing owner, revision, original lease generation and runtime-reader fences
+apply to the exact whole claim set. Reconciliation preserves the successful result and all original
+receipts. Malformed existing boot reports never enter this missing-report route.

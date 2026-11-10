@@ -153,3 +153,25 @@ The installed shared regression batch passed 119/119; the strengthened final foc
 blockers. Exact archive clean-install proof, tag/source identity and downloaded asset readback
 passed. Hosted CI was skipped. Recovery preserves cancelled outcomes; adopter activation remains
 a separate owned operation and is not implied by publication.
+
+### Successful legacy Android recovery batch
+
+Operator-approved follow-up: one successful native command, retained membership, original
+supervisor cleanup and exactly two emulator/app claims may use fresh closure to recover missing
+historical boot evidence. Preserve the successful result and mark history unavailable. No ordinary
+worker relaxation or device control. The previous source reproducer failed as expected.
+
+- [x] Implement the narrow route and source regression cases.
+- [x] Verify focused/shared checks, Opus 5.5 high review and exact installed archive.
+- [ ] Publish qualified stable patch with hosted CI skipped; adoption remains separate.
+
+Checkpoint: source and installed positive release/reconcile, unavailable-history attribution,
+missing membership, wrong/live ownership, revision, changed originals and target/port/lock refusal.
+Reuse the Node child-process research above: exit alone cannot establish absence of descendants.
+
+Qualification: 63 source cases and 172 installed shared cases passed. The additional genuine
+inferred-cleanup refusal regression passed against the same archive, preserving original bytes.
+Typecheck and exact clean-install archive proof passed. Opus 5.5 high review/recheck approved;
+its medium coverage finding is addressed. Low redundant-guard/test-strength suggestions remain
+nonblocking. The test-only Apple assertion correction restores strict indexed-access typing.
+Ready for the authorized patch publication; no hosted CI or automatic adopter selection.

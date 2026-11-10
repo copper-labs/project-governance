@@ -69,7 +69,7 @@ for(const mode of ['wrong-device','wrong-identifier','outside-output','reinstall
   if(mode==='changed-digest')writeFileSync(f.manifest,readFileSync(f.manifest,'utf8')+' ');
   if(mode==='conflicting-owner'){const stub=mock.method(f.registry.constructor.prototype,'inspect',()=>[{resource:`ios:${udid}`,state:'held',operation:'other'}]);try{await assert.rejects(()=>release(f.args,f.dir,p),/Another device owner/);}finally{stub.mock.restore();}return;}
   const expected:Record<string,RegExp>={'wrong-device':/Fresh removed-app closure/,'wrong-identifier':/Fresh removed-app closure/,'outside-output':/Canonical original device record/,'reinstalled':/Fresh removed-app closure/,'live-process':/Fresh removed-app closure/,'ambiguous-process':/Fresh removed-app closure/,'wrong-owner':/owner, workflow revision/,'wrong-revision':/owner, workflow revision/,'lock':/lock remains present/,'duplicate-installation':/identity is ambiguous/,'wrong-filter':/bundle filter differs/,'unacknowledged':/acknowledged device command/,'wrong-container':/launch container differs/,'wrong-guard':/lock owner differs/,'outside-window':/window or identity/,'wrong-order':/record order differs/,'wrong-output':/output input changed/,'wrong-lock-path':/lock owner differs/,'changed-digest':/manifest digest differs/};
-  await assert.rejects(()=>release(f.args,f.dir,p),expected[mode]);assert.equal(f.held().length,2);
+  await assert.rejects(()=>release(f.args,f.dir,p),expected[mode]!);assert.equal(f.held().length,2);
  }finally{f.close();}
 });
 for(const race of ['record','manifest','lock','conflict','revision'])test('removed-app refuses probe race: '+race,async()=>{

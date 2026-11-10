@@ -6,12 +6,13 @@ export const serial="emulator-5556",resources=[`android:${serial}`,"app:example.
 export const closedProbes={devices:async()=>"List of devices attached\n",portClosed:async()=>true,lockAbsent:async()=>true};
 
 /** Only benign Node descendants and injected transport/port facts; no emulator or device execution. */
-export async function ownedSessionFixture(exitCode=0,normal=false,registryPath?:string){
+export async function ownedSessionFixture(exitCode=0,normal=false,registryPath?:string,twoClaims=false){
+ const selectedResources=twoClaims?resources.slice(0,2):resources;
  const root=realpathSync(mkdtempSync(join(tmpdir(),"owned-android-fixture-"))),adb=join(root,"adb"),preload=join(root,"ports.mjs");
  writeFileSync(adb,`#!${process.execPath}\nprocess.stdout.write(${JSON.stringify(normal?"List of devices attached\n":"unavailable")});\n`);chmodSync(adb,0o700);
  writeFileSync(preload,`import net from'node:net';import{EventEmitter}from'node:events';import{syncBuiltinESMExports}from'node:module';net.connect=options=>{if(options.host!=='127.0.0.1'||![5556,5557].includes(options.port))throw Error('Unexpected probe');const socket=new EventEmitter;socket.setTimeout=()=>socket;socket.destroy=()=>{};queueMicrotask(()=>socket.emit('error',{code:'ECONNREFUSED'}));return socket;};syncBuiltinESMExports();`);
- try{const f=await ownerReleaseFixture(resources,false,exitCode,{...(registryPath?{registryPath}:{}),expectedState:normal?exitCode===0?"succeeded":"failed":"unknown",...(normal?{workerPreload:preload}:{}),
-  recipe:dir=>({androidAppSession:{ownership:"owned-emulator",serial,adb,userId:0,emulator:{bootStage:"native",lockPath:join(dir,"emulator.lock")},localLocks:resources.slice(2).map((resource,i)=>({resource,path:join(dir,`local-${i}.lock`)}))}}),
+ try{const f=await ownerReleaseFixture(selectedResources,false,exitCode,{...(registryPath?{registryPath}:{}),expectedState:normal?exitCode===0?"succeeded":"failed":"unknown",...(normal?{workerPreload:preload}:{}),
+  recipe:dir=>({androidAppSession:{ownership:"owned-emulator",serial,adb,userId:0,emulator:{bootStage:"native",lockPath:join(dir,"emulator.lock")},localLocks:selectedResources.slice(2).map((resource,i)=>({resource,path:join(dir,`local-${i}.lock`)}))}}),
   producer:dir=>`import{spawn,execFileSync}from'node:child_process';import{mkdirSync,writeFileSync,readFileSync,existsSync,rmSync}from'node:fs';import{join}from'node:path';import{once}from'node:events';
 await new Promise(r=>setTimeout(r,400));const initial={targetAbsent:true,portsClosed:[5556,5557],lockAcquired:true,observedAt:new Date().toISOString()};
 const lock=${JSON.stringify(join(dir,"emulator.lock"))};mkdirSync(lock);const child=spawn(process.execPath,['-e','setInterval(()=>{},100)'],{stdio:'ignore'});

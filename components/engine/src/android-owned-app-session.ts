@@ -43,10 +43,18 @@ export async function ownedAndroidAppSessionCleanup(directory:string,run:Workflo
   let original: Record<string,unknown>;
   if(missing){
     const failed=stages.find(value=>value.id===stage.id),command=native.commands.find(value=>value.stage===stage.id);
-    if(!recoverMissing || failed?.state!=="failed" || failed.result?.cleanup!=="confirmed" || failed.result.state!=="failed" || failed.result.inputValidity==="stale" ||
-       (!command || (!command.membersDigest && (command.cleanupRecovery || command.closureAuthority!=="original-confirmed-native-receipt" || command.membershipHistory!=="not-recorded"))) || failed.result.exitCode===0 || failed.result.exitCode===null)
-      throw Error("Missing boot ownership recovery requires explicit original failed native boot");
-    original={bootStage:stage.id,bootReport:{path:reportPath,status:"missing-after-failed-boot"},ownership:"not-reconstructed"};
+    const failedBoot=failed?.state==="failed" && failed.result?.cleanup==="confirmed" && failed.result.state==="failed" && failed.result.inputValidity!=="stale" &&
+      command && (command.membersDigest || (!command.cleanupRecovery && command.closureAuthority==="original-confirmed-native-receipt" && command.membershipHistory==="not-recorded")) && failed.result.exitCode!==0 && failed.result.exitCode!==null;
+    // Successful legacy runs need retained membership and original supervisor closure. A fresh
+    // absent target closes the reservation; it cannot reconstruct historical boot ownership.
+    const nativeResult=object(JSON.parse(narrativeFile(directory,join(directory,"commands",`${run.id}-${index}`,"result.json"))));
+    const successfulRun=recipe.stages.length===1 && stages.length===1 && recipe.resources.length===2 && config.localLocks.length===0 &&
+      failed?.state==="succeeded" && failed.result?.state==="succeeded" && failed.result.inputValidity==="valid" && failed.result.cleanup==="confirmed" && failed.result.exitCode===0 &&
+      command?.membersDigest && !command.cleanupRecovery && nativeResult.state==="succeeded" && nativeResult.exitCode===0 && nativeResult.cleanup==="confirmed";
+    if(!recoverMissing || (!failedBoot && !successfulRun))
+      throw Error("Missing boot ownership recovery requires original failed boot or single successful two-claim native run with retained membership");
+    original={bootStage:stage.id,bootReport:{path:reportPath,status:successfulRun?"missing-after-successful-run":"missing-after-failed-boot"},ownership:"not-reconstructed",
+      ...(successfulRun?{historicalBootOwnership:"unavailable"}:{})};
   }else{
   if(realpathSync(reportPath)!==reportPath)throw Error("Original boot evidence uses an alias");
   const report=object(JSON.parse(narrativeFile(directory,reportPath))),initial=object(report.initial),emulator=object(report.emulator);

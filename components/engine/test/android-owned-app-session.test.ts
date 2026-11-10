@@ -99,3 +99,63 @@ for(const fault of ["online","port","lock","report-appears","native","revision"]
  try{await assert.rejects(()=>release(f.args,f.dir,probes),expected[fault]!);assert.equal(f.held().length,4);}finally{stub?.mock.restore();syncBuiltinESMExports();}
  }finally{f.close();}
  });
+
+ test("successful two-claim missing boot recovery preserves success and unavailable history",async()=>{
+ const f=await ownedSessionFixture(0,false,undefined,true);try{
+ rmSync(f.bootReport);const raw=readFileSync(join(f.command,"result.json")),stages=f.store.stages(f.run.id);
+ await assert.rejects(()=>ownedAndroidAppSessionCleanup(f.worker,f.run,stages,closedProbes),/Missing boot ownership recovery/);
+ const result=publicCall(f,"workflow-release-resources",f.args);assert.equal(result.status,0,result.stdout+result.stderr);
+ assert.equal(f.held().length,0);assert.deepEqual(readFileSync(join(f.command,"result.json")),raw);
+ const proof=JSON.parse(readFileSync(f.receipt,"utf8")).observation.proof;
+ assert.equal(proof.original.ownership.bootReport.status,"missing-after-successful-run");assert.equal(proof.original.ownership.historicalBootOwnership,"unavailable");assert.equal(proof.original.ownership.ownership,"not-reconstructed");
+ const settled=publicCall(f,"workflow-reconcile-cleanup",["--database",f.database,"--run",f.run.id,"--revision",String(f.run.revision),"--registry",f.registry.path,"--receipt",f.receipt,"--worker-directory",f.worker]);
+ assert.equal(settled.status,0,settled.stderr);assert.equal(JSON.parse(settled.stdout).run.state,"succeeded");assert.deepEqual(f.store.stages(f.run.id),stages);
+ }finally{f.close();}
+ });
+ for(const fault of ["membership-missing","unknown-cleanup","wrong-owner","live-owner","revision","online","offline","port","lock","membership-changed","report-appears"])
+ test("successful missing boot refuses "+fault,async()=>{
+ const f=await ownedSessionFixture(0,false,undefined,true);try{
+ rmSync(f.bootReport);if(fault==="membership-missing")rmSync(join(f.command,"group-members.json"));
+ if(fault==="revision")f.args[f.args.indexOf("--revision")+1]=String(f.run.revision+1);
+ if(fault==="unknown-cleanup"){const p=join(f.command,"result.json"),r=JSON.parse(readFileSync(p,"utf8"));r.cleanup="unknown";writeFileSync(p,JSON.stringify(r));}
+ if(fault==="wrong-owner"){const p=join(f.command,"owner.json"),r=JSON.parse(readFileSync(p,"utf8"));r.requestDigest="sha256:"+"0".repeat(64);writeFileSync(p,JSON.stringify(r));}
+ let stub;
+ if(fault==="live-owner"){const owner=JSON.parse(readFileSync(join(f.command,"owner.json"),"utf8"));const original=childProcess.execFileSync;stub=mock.method(childProcess,"execFileSync",((file:any,args:any,options:any)=>file==="/bin/ps"&&args?.includes("pid=,ppid=,pgid=,stat=")?String(original(file,args,options)).trimEnd()+`\n${owner.pid} 1 ${owner.pid} S\n`:original(file,args,options))as any);syncBuiltinESMExports();}
+ const probes={...closedProbes,...(fault==="report-appears"?{devices:async()=>{writeFileSync(f.bootReport,"{}");return"List of devices attached\n";}}:{}),...(fault==="offline"?{devices:async()=>"List of devices attached\nemulator-5556\toffline\n"}:{}),...(fault==="online"?{devices:async()=>"List of devices attached\nemulator-5556\tdevice\n"}:{}),...(fault==="port"?{portClosed:async()=>false}:{}),...(fault==="lock"?{lockAbsent:async()=>false}:{}),...(fault==="membership-changed"?{devices:async()=>{writeFileSync(join(f.command,"group-members.json"),"{}");return"List of devices attached\n";}}:{})};
+ const expected:Record<string,RegExp>={"membership-missing":/Missing boot ownership recovery/,"unknown-cleanup":/cleanup differs|native command receipt/,"wrong-owner":/ownership differs/,"live-owner":/Original command owner or process group still present/,revision:/revision or workspace/,online:/remain unresolved/,port:/remain unresolved/,lock:/remain unresolved/,"membership-changed":/cleanup evidence changed/,"report-appears":/missing boot evidence changed/,offline:/remain unresolved/};
+ try{await assert.rejects(()=>release(f.args,f.dir,probes),expected[fault]!);assert.equal(f.held().length,2);}finally{stub?.mock.restore();syncBuiltinESMExports();}
+ }finally{f.close();}
+ });
+
+for(const fault of ["stale", "multi-stage", "raw-failure"]) test("successful missing boot refuses " + fault,async()=>{
+ const f=await ownedSessionFixture(0,false,undefined,true);try{
+ rmSync(f.bootReport);const stages=f.store.stages(f.run.id);
+ if(fault==="stale")stages[0].result.inputValidity="stale";
+ if(fault==="multi-stage")stages.push({...stages[0],id:"extra"});
+ if(fault==="raw-failure"){const p=join(f.command,"result.json"),r=JSON.parse(readFileSync(p,"utf8"));r.state="failed";writeFileSync(p,JSON.stringify(r));}
+ await assert.rejects(()=>ownedAndroidAppSessionCleanup(f.worker,f.run,stages,closedProbes,undefined,false,true),/Missing boot ownership recovery|native command receipt|cleanup differs/);
+ assert.equal(f.held().length,2);
+ }finally{f.close();}
+});
+
+test("successful missing boot rejects later inferred native cleanup",async()=>{
+ const {DatabaseSync}=await import("node:sqlite");
+ const {recoverCommandOwner}=await import(moduleUrl("command-owner-recovery"));
+ const {recoverStoppedWorkflow}=await import(moduleUrl("workflow-worker-recovery"));
+ const {workflowNativeResourceEvidence}=await import(moduleUrl("workflow-resource-evidence"));
+ const f=await ownedSessionFixture(0,false,undefined,true);try{
+  rmSync(f.bootReport);const path=join(f.command,"result.json"),raw=JSON.parse(readFileSync(path,"utf8"));
+  raw.state="unknown";raw.cleanup="unknown";raw.reason="exit";writeFileSync(path,JSON.stringify(raw));
+  const original=readFileSync(path),db=new DatabaseSync(f.database),stage=f.store.stages(f.run.id)[0];
+  db.prepare("UPDATE engine_stage SET state='unknown',result=? WHERE run_id=? AND id=?").run(JSON.stringify({...stage.result,state:"unknown",cleanup:"unknown",detail:"exit"}),f.run.id,stage.id);db.close();
+  recoverCommandOwner(f.command,raw.requestDigest,"host:fixture-owner");
+  const recovered=await recoverStoppedWorkflow(f.worker,f.database,f.run.id,f.run.revision),stages=f.store.stages(f.run.id);
+  assert.equal(stages[0].state,"succeeded");assert.ok(stages[0].result.cleanupRecovery);
+  const native=workflowNativeResourceEvidence(f.worker,recovered.run,stages,true);
+  assert.ok(native.commands[0].membersDigest);assert.ok(native.commands[0].cleanupRecovery);
+  f.args[f.args.indexOf("--revision")+1]=String(recovered.run.revision);
+  f.args[f.args.indexOf("--evidence-digest")+1]=api.fileDigest(path);
+  await assert.rejects(()=>release(f.args,f.dir,closedProbes),/Missing boot ownership recovery/);
+  assert.equal(f.held().length,2);assert.deepEqual(readFileSync(path),original);
+ }finally{f.close();}
+});
