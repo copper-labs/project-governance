@@ -21,6 +21,9 @@ shows existing project-owned checks; it does not require a check after every edi
 
 ## Active
 
+- [Pre-push comparison diagnostics](active/2026-11-10-pre-push-base-diagnostic.md)
+  explains missing comparison input and carries declared first-push targets through native Git.
+
 - [Native API decision restoration](active/2026-11-08-api-signoff-restoration.md)
   restores verification of existing exact approvals and qualifies the shipped adapter.
 

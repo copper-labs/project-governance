@@ -5,7 +5,7 @@ type: guide
 status: current
 owner: project-governance
 created: 2026-09-25
-updated: 2026-10-04
+updated: 2026-11-10
 summary: A practical workflow for owning changes, using Codex worktrees, integrating reviewed commits, adopting governance and cleaning up without disturbing other agents.
 ---
 
@@ -73,6 +73,29 @@ Use project-owned [local environment setup](https://learn.chatgpt.com/docs/envir
 for repeatable worktree preparation. Our recommended setup installs declared dependencies and the
 already approved governance pin; it does not discover a newer release, merge branches, run full CI
 or launch devices on every new chat. Keep credentials in the approved local environment, not Git.
+
+## Prepare the first push
+
+For a named branch without an upstream, use the remote-tracking integration target already declared
+by the task or project. Set `declared_target` to that exact `<remote>/<integration-branch>` and run
+this preparation in the owning checkout before its first push:
+
+```sh
+git branch --set-upstream-to="$declared_target"
+```
+
+Git validates the target and records it as this branch's upstream. Missing or invalid targets stop
+preparation. Keep an existing upstream unless its change is deliberate. This command preserves the
+branch tip, index and files, including dirty work and divergent local integration branches.
+
+Use the project's ordinary authorized `git push --set-upstream <remote> <topic>:refs/heads/<topic>` afterward. During
+the first push, the explicit topic refspec selects the feature destination, and the managed hook resolves the declared upstream into the exact comparison commit
+and takes the candidate from Git's ref-update input. After success, Git records the published topic
+as its upstream. Existing remote branches continue to use Git's supplied old remote commit.
+
+A missing comparison returns `pre-push-base-unavailable` before dispatch. The explicit
+`GOVERNANCE_BASE_REF` invocation remains available for a deliberately selected comparison. The
+packaged Work skill supplies the same preparation at implementation entry.
 
 ## Keep parallel work from colliding
 

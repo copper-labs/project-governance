@@ -28,6 +28,17 @@ function metadataPath(root: string, name: string): string {
     { cwd: root, encoding: "utf8", timeout: 5000, maxBuffer: 16384, stdio: ["ignore", "pipe", "pipe"] }).trim();
 }
 
+/** Fixed public guidance for a refused comparison; Git output and operator-supplied references stay private. */
+export class PrePushBaseError extends Error {
+  readonly code = "pre-push-base-unavailable";
+  /** Select guidance by its existing authority without reflecting the configured value. */
+  constructor(configured: boolean) {
+    super(configured
+      ? "Configured pre-push comparison base is unavailable. Set GOVERNANCE_BASE_REF to an existing intended base commit before retrying."
+      : "Pre-push comparison base is unavailable. Set GOVERNANCE_BASE_REF to the intended base commit, or configure this branch's upstream, before retrying.");
+  }
+}
+
 const commitOid = (value: string) => /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(value) && !/^0+$/u.test(value);
 function pushGit(root: string, args: string[]): string {
   try { return execFileSync("git", args, { cwd: root, encoding: "utf8", timeout: 5000, maxBuffer: 16384,
@@ -42,7 +53,9 @@ function resolvedPushCommit(root: string, ref: string): string {
   return exactPushCommit(root, pushGit(root, ["rev-parse", "--verify", "--end-of-options", `${ref}^{commit}`]));
 }
 function pushComparisonBase(root: string, environment: NodeJS.ProcessEnv): string {
-  return resolvedPushCommit(root, environment.GOVERNANCE_BASE_REF?.trim() || "@{upstream}");
+  const configured = environment.GOVERNANCE_BASE_REF?.trim();
+  try { return resolvedPushCommit(root, configured || "@{upstream}"); }
+  catch { throw new PrePushBaseError(Boolean(configured)); }
 }
 function pushCheckArguments(candidate: string, base: string): string[] {
   return ["--summary", "--stage", "pre-push", "--mode", "impacted", "--candidate-ref", candidate, "--base-ref", base];

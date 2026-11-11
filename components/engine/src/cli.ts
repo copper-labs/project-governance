@@ -39,7 +39,7 @@ import { kmpDoctorFindings } from "./checkers/kmp-doctor.ts";
 import { decisionTelemetryCommand } from "./decision-history.ts";
 import { contextStateRoot } from "./context-command.ts";
 import { installGitHooks, planGitHookInstallation } from "./git-hook-installation.ts";
-import { hookCheckArguments, prePushCheckArguments } from "./git-hooks.ts";
+import { hookCheckArguments, prePushCheckArguments, PrePushBaseError } from "./git-hooks.ts";
 import { inspectRuntimeGeneration } from "./runtime-inspection.ts";
 import { invokeRuntimeGeneration } from "./runtime-invocation.ts";
 import { contextRouteCommand } from "./context-route-command.ts";
@@ -619,9 +619,10 @@ Use the owning command contract for structured request fields.
       const code = error instanceof Error && /^cowork-[a-z0-9-]+$/u.test(error.message) ? error.message : "cowork-runtime-unavailable";
       console.log(JSON.stringify({ status: "failed", code })); return 2;
     }
-    // CLI parsing errors contain flags, not file contents. Source-loading diagnostics remain private.
+    // Only purpose-built public diagnostics cross this boundary; raw source-loading and Git errors remain private.
     console.error(JSON.stringify(error instanceof ContextRouteError ? { status: "failed", code: error.code, error: error.message, receipt: error.receiptPath,
       ...(error.diagnostic ? { diagnostic: error.diagnostic } : {}), ...(error.recovery ? { recovery: error.recovery } : {}) }
+      : error instanceof PrePushBaseError ? { status: "failed", code: error.code, error: error.message }
       : { status: "failed", error: error instanceof TypeError ? "Invalid invocation" : "Command could not complete; inspect its operation receipt when available." }));
     return 2;
   }
