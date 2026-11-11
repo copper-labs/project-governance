@@ -5,10 +5,12 @@ import { join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { digest, durableJson, object } from "./core.ts";
 import { narrativeFile } from "./narrative-inputs.ts";
-import { commandProcesses, hasConfirmedCommandCleanup, recordedCommandMembers, recoverCommandOwner } from "./command-owner-recovery.ts";
+import { commandProcesses, hasConfirmedCommandCleanup, recordedCommandMembers, recoverCommandOwner, commandIncarnationTracking } from "./command-owner-recovery.ts";
 import { reconcileCommand } from "./command-recovery.ts";
 import { deliverCommandCompletion } from "./completion-delivery.ts";
-import { observeCommand, processFingerprint, processLiveFingerprint } from "./process-owner.ts";
+import { observeCommand, processFingerprint, processLiveFingerprint, processIncarnation, processLiveIncarnation, captureCommandIdentity } from "./process-owner.ts";
+
+import { commandProcessesPresent, commandIdentityFields, isProcessFingerprint, type ProcessIdentity } from "./command-processes.ts";
 
 const SELF = fileURLToPath(import.meta.url);
 const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -20,9 +22,14 @@ export function confirmCommandGuardianAcknowledgement(directory: string, request
   if (record.pid !== pid) return false;
   if (record.requestDigest !== requestDigest || typeof record.fingerprint !== "string" || !record.fingerprint)
     throw new Error("Guardian acknowledgment mismatch");
-  const fingerprint = processFingerprint(pid);
-  if (fingerprint === record.fingerprint) return true;
-  if (allowCompletedCleanup && fingerprint === null) {
+  const request = object(JSON.parse(narrativeFile(directory, "request.json")));
+  if (digest(request) !== requestDigest) throw new Error("Guardian request changed");
+  const positive = request.processIdentityVersion === 1;
+  if (positive && (request.processIdentityTimezone !== "UTC" || record.processIdentityVersion !== 1 ||
+      record.processIdentityTimezone !== "UTC" || !isProcessFingerprint(record.incarnation))) throw new Error("Guardian UTC identity unavailable");
+  const observed = positive ? processIncarnation(pid) : processFingerprint(pid);
+  if (observed === (positive ? record.incarnation : record.fingerprint)) return true;
+  if (allowCompletedCleanup && observed === null) {
     // A failed identity lookup is not evidence of absence; full inspection must also succeed.
     if (commandProcesses().some(row => row.pid === pid)) throw new Error("Guardian acknowledgment mismatch");
     const completed = observeCommand(directory, requestDigest);
@@ -53,14 +60,24 @@ async function guard(directory: string, requestDigest: string): Promise<void> {
   if (digest(request) !== requestDigest) throw new Error("Guardian request mismatch");
   const owner = read("owner.json");
   if (owner.requestDigest !== requestDigest || !owner.fingerprint) throw new Error("Guardian owner mismatch");
-  const fingerprint = processFingerprint(process.pid);
-  if (!fingerprint) throw new Error("Guardian identity unavailable");
-  durableJson(join(directory, "guardian.json"), { version: 1, requestDigest, pid: process.pid, fingerprint });
+  const identity = request.processIdentityVersion === 1 ? captureCommandIdentity(process.pid)
+    : { pid: process.pid, fingerprint: processFingerprint(process.pid) };
+  if (!identity?.fingerprint || request.processIdentityVersion === 1 && request.processIdentityTimezone !== "UTC") throw new Error("Guardian identity unavailable");
+  durableJson(join(directory, "guardian.json"), { version: 1, requestDigest, ...identity,
+    ...(request.processIdentityVersion === 1 ? { processIdentityVersion: 1, processIdentityTimezone: "UTC" } : {}) });
   const known = new Map<number, string>();
+  const history = request.processIdentityVersion === 1 ? new Map<string, ProcessIdentity>() : undefined;
   if (existsSync(join(directory, "group-members.json"))) {
     const launch = read("launch.json");
-    recordedCommandMembers(directory, requestDigest, object(launch.child).processGroup);
-    for (const entry of read("group-members.json").members as Array<{pid:number;fingerprint:string}>) known.set(entry.pid, entry.fingerprint);
+    // The worker seeds members before publishing the spawned launch. Intent is not a cleanup grant.
+    if (launch.state === "spawned") {
+      const members = recordedCommandMembers(directory, requestDigest, object(launch.child).processGroup);
+      commandIncarnationTracking(request, launch, members, owner);
+      for (const entry of members.members) {
+        known.set(entry.pid, history ? entry.incarnation! : entry.fingerprint);
+        history?.set(JSON.stringify([entry.pid, entry.incarnation]), entry);
+      }
+    } else if (launch.state !== "intent") throw new Error("Guardian launch unresolved");
   }
   const collect = () => {
     if (!existsSync(join(directory, "launch.json"))) return;
@@ -69,8 +86,16 @@ async function guard(directory: string, requestDigest: string): Promise<void> {
     const child = object(launch.child);
     if (launch.requestDigest !== requestDigest || !Number.isSafeInteger(child.pid) || Number(child.pid) < 2 ||
         child.processGroup !== child.pid || typeof child.fingerprint !== "string" || !child.fingerprint) throw new Error("Guardian launch identity mismatch");
-    if (!known.size) known.set(Number(child.pid), child.fingerprint);
-    return collectCommandGroup(directory, requestDigest, Number(child.pid), known);
+    const members = recordedCommandMembers(directory, requestDigest, child.processGroup);
+    commandIncarnationTracking(request, launch, members, owner);
+    if (!known.size) {
+      for (const entry of members.members) {
+        known.set(entry.pid, history ? entry.incarnation! : entry.fingerprint);
+        history?.set(JSON.stringify([entry.pid, entry.incarnation]), entry);
+      }
+      if (!known.size) known.set(Number(child.pid), child.fingerprint);
+    }
+    return collectCommandGroup(directory, requestDigest, Number(child.pid), known, history);
   };
   while (true) {
     if (existsSync(join(directory, "result.json"))) {
@@ -80,22 +105,27 @@ async function guard(directory: string, requestDigest: string): Promise<void> {
     }
     collect();
     // A failed ps call throws, preserving obligations instead of treating inspection failure as death.
-    if (!commandProcesses().some(row => row.pid === owner.pid)) break;
+    if (!commandProcessesPresent(commandProcesses(), [commandIdentityFields(owner)],
+      undefined, request.processIdentityVersion === 1)) break;
     await pause(250);
   }
   const launch = read("launch.json");
-  if (launch.requestDigest !== requestDigest || launch.state !== "spawned" || digest(launch.owner) !== digest({ pid: owner.pid, fingerprint: owner.fingerprint }))
+  if (launch.requestDigest !== requestDigest || launch.state !== "spawned" || digest(launch.owner) !== digest(commandIdentityFields(owner)))
     throw new Error("Guardian launch unresolved");
   const child = object(launch.child);
   if (!Number.isSafeInteger(child.pid) || Number(child.pid) < 2 || child.processGroup !== child.pid || !child.fingerprint)
     throw new Error("Guardian child identity unavailable");
+  const present = () => {
+    const members = recordedCommandMembers(directory, requestDigest, child.processGroup);
+    const positive = commandIncarnationTracking(request, launch, members, owner);
+    return commandProcessesPresent(commandProcesses(), [commandIdentityFields(child), ...members.members], Number(child.processGroup), positive);
+  };
   for (const signal of ["SIGTERM", "SIGKILL"] as const) {
-    const rows = commandProcesses();
     const members = collect() ?? [];
-    if (!members.length && !rows.some(row => row.pid === child.pid || row.group === child.processGroup)) break;
+    if (!present()) break;
     if (!members.length) throw new Error("Guardian group has no matching recorded member; cleanup unresolved");
     for (const member of members) {
-      if (processLiveFingerprint(member.pid) !== member.fingerprint) continue;
+      if (request.processIdentityVersion === 1 ? processLiveIncarnation(member.pid) !== member.incarnation : processLiveFingerprint(member.pid) !== member.fingerprint) continue;
       try { process.kill(member.pid, signal); }
       catch (error) { if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error; }
     }
@@ -103,8 +133,8 @@ async function guard(directory: string, requestDigest: string): Promise<void> {
     if (!Number.isSafeInteger(grace) || Number(grace) < 1 || Number(grace) > 30000) throw new Error("Invalid termination grace");
     const until = Date.now() + (signal === "SIGTERM" ? Number(grace) : 2000);
     while (Date.now() < until) {
-      const remaining = collect() ?? [];
-      if (!remaining.length && !commandProcesses().some(row => row.pid === child.pid || row.group === child.processGroup)) break;
+      collect();
+      if (!present()) break;
       await pause(50);
     }
   }

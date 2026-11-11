@@ -209,3 +209,5 @@ shows existing project-owned checks; it does not require a check after every edi
 - [Readable local API review](active/2026-11-09-api-review-page.md) — complete local review and exact decision binding.
 
 - [Bounded diff header capture](active/2026-11-09-streamed-diff-context.md)
+
+- [Native command process incarnations](active/2026-11-11-command-incarnation-tracking.md) preserves positive cleanup identity under PID reuse while retaining conservative legacy recovery.

@@ -270,6 +270,24 @@ processes before reporting terminal completion. The wrapper cannot promise clean
 remote or daemonized work; assignments must name any intentionally retained background services.
 The result does not imply that cancelling a process rolls back edits or remote actions.
 
+New compiled command requests opt into `processIdentityVersion: 1` when submitted. The original
+request, launch and bounded member history must all carry that contract and its fixed UTC context.
+The additional `incarnation` field is captured and compared in UTC with the C locale, independently
+of the existing diagnostic `fingerprint`; legacy task/startup fingerprints and native application
+timezone stay unchanged. One successful native inventory binds PID, UTC start identity, parent and
+process group together; missing, mixed or malformed start
+metadata never proves absence. A newly observed incarnation is adopted only through a currently
+matched parent or anchored group. Keep earlier incarnations in the same member history so PID reuse
+cannot erase an original cleanup obligation.
+
+Cleanup and guardian recovery for those commands distinguish a positively observed replacement from
+the recorded incarnation. Signals target only currently matching recorded identities; an unanchored
+surviving group stays unresolved. Cleanup recovery retains the bound incarnation readback beside its
+original launch, membership and immutable execution receipt. It never signals a replacement, replays
+the native assignment or changes an already failed check into success. Legacy requests and incomplete
+or mixed identity contracts retain conservative PID-absence recovery. Installing newer source does
+not upgrade historical evidence or grant recovery of another command's reservation.
+
 Workspace coordination covers this runner's jobs only. Default exclusive jobs serialize all
 overlapping roots. The explicit `--writer` mode, added in 2.6.0, permits shared readers beside one
 writer; overlapping writers still serialize. `--shared` readers carry a no-project-edits assignment
