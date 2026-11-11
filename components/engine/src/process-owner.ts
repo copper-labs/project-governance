@@ -1,6 +1,6 @@
 import { finalizeCoworkCommit, rejectedCoworkCommit, type CoworkCommitBinding } from "./cowork-commit-binding.ts";
 import {requireMachineIdentity} from "./machine-identity.ts";
-import { commandProcesses, recordedCommandMembers } from "./command-owner-recovery.ts";
+import { commandProcesses, recordedCommandMembers, commandIncarnationTracking } from "./command-owner-recovery.ts";
 import { startCommandGuardian } from "./command-guardian.ts";
 import { deliverCommandCompletion, type CompletionTarget } from "./completion-delivery.ts";
 import { CodexStream } from "./codex-stream.ts";
@@ -19,12 +19,13 @@ import { hostname } from "node:os";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { digest, durableJson, fileDigest, object, text } from "./core.ts";
 import { processHasExited } from "./process-state.ts";
+import { commandProcessesPresent, commandIdentityFields, isProcessFingerprint, type ProcessIdentity } from "./command-processes.ts";
 import type { CommandOperation } from "./workflow-types.ts";
 import { runtimeExecutionIdentity, type RuntimeExecutionIdentity } from "./runtime-execution-identity.ts";
 
 export interface CommandRequest {
   version: 1; id: string; operation: CommandOperation; deadlineMs: number; outputLimit: number;
-  ownerDigest: string; stdin?: string;
+  ownerDigest: string; processIdentityVersion?: 1; processIdentityTimezone?: "UTC"; stdin?: string;
   commitBinding?: CoworkCommitBinding;
   executionIdentity?: RuntimeExecutionIdentity;
   idleTimeoutMs?: number;
@@ -72,10 +73,10 @@ function nativeOperationEnvironment(request: CommandRequest): Record<string, str
 }
 
 /** Keep process identity even after exit so fast children have a complete launch record. */
-function processSnapshot(pid: number): { fingerprint: string; state: string } | null {
+function processSnapshot(pid: number, utc = false): { fingerprint: string; state: string } | null {
   if (!Number.isSafeInteger(pid) || pid < 2) return null;
   try {
-    const output = execFileSync("/bin/ps", ["-p", String(pid), "-o", "lstart=,stat="], { encoding: "utf8", timeout: 2000 }).trim();
+    const output = execFileSync("/bin/ps", ["-p", String(pid), "-o", "lstart=,stat="], { encoding: "utf8", timeout: 2000, env: utc ? { ...process.env, LC_ALL: "C", TZ: "UTC0" } : process.env }).trim();
     const match = /^(.*\S)\s+(\S+)$/u.exec(output);
     return match ? { fingerprint: match[1]!, state: match[2]! } : null;
   }
@@ -92,10 +93,30 @@ export function processLiveFingerprint(pid: number): string | null {
   return snapshot && !processHasExited(snapshot.state) ? snapshot.fingerprint : null;
 }
 
+/** New command identities have a fixed UTC start representation independent of caller timezone. */
+export function processIncarnation(pid: number): string | null {
+  const fingerprint = processSnapshot(pid, true)?.fingerprint;
+  return isProcessFingerprint(fingerprint) ? fingerprint : null;
+}
+
+/** Signals require the same live UTC incarnation; missing identity grants no signal authority. */
+export function processLiveIncarnation(pid: number): string | null {
+  const snapshot = processSnapshot(pid, true);
+  return snapshot && !processHasExited(snapshot.state) && isProcessFingerprint(snapshot.fingerprint) ? snapshot.fingerprint : null;
+}
+
+/** Bind the existing diagnostic fingerprint between matching UTC captures without changing legacy callers. */
+export function captureCommandIdentity(pid: number, expected?: string): ProcessIdentity | null {
+  const before = processIncarnation(pid);
+  if (!before || expected !== undefined && before !== expected) return null;
+  const fingerprint = processFingerprint(pid), after = processIncarnation(pid);
+  return fingerprint && before === after ? { pid, fingerprint, incarnation: before } : null;
+}
+
 /** Persisted submission is idempotent, including the uncertain interval before process acknowledgment. */
-export function submitCommand(directory: string, request: Omit<CommandRequest, "ownerDigest" | "version">): { directory: string; requestDigest: string; submitted: boolean } {
+export function submitCommand(directory: string, request: Omit<CommandRequest, "ownerDigest" | "version" | "processIdentityVersion" | "processIdentityTimezone">): { directory: string; requestDigest: string; submitted: boolean } {
   directory = resolve(directory);
-  const bound: CommandRequest = { ...request, version: 1, ownerDigest: fileDigest(OWNER), executionIdentity: runtimeExecutionIdentity() };
+  const bound: CommandRequest = { ...request, version: 1, processIdentityVersion: 1, processIdentityTimezone: "UTC", ownerDigest: fileDigest(OWNER), executionIdentity: runtimeExecutionIdentity() };
   validateCommandRequest(bound);
   const hash = digest(bound);
   const existing = () => {
@@ -144,6 +165,13 @@ export function observeCommand(directory: string, requestDigest: string): Comman
   if (!existsSync(ack)) return { state: "unknown", receipt: null };
   const owner = object(JSON.parse(readFileSync(ack, "utf8")));
   if (owner["requestDigest"] !== requestDigest) throw new Error("command owner identity mismatch");
+  const request = object(JSON.parse(readFileSync(join(directory, "request.json"), "utf8")));
+  if (digest(request) !== requestDigest) throw new Error("Command observation request changed");
+  if (request.processIdentityVersion === 1) {
+    if (request.processIdentityTimezone !== "UTC" || owner.processIdentityVersion !== 1 || owner.processIdentityTimezone !== "UTC" || !isProcessFingerprint(owner.incarnation))
+      return { state: "unknown", receipt: null };
+    return { state: processLiveIncarnation(Number(owner.pid)) === owner.incarnation ? "pending" : "unknown", receipt: null };
+  }
   return { state: processLiveFingerprint(Number(owner["pid"])) === owner["fingerprint"] ? "pending" : "unknown", receipt: null };
 }
 
@@ -183,6 +211,9 @@ export async function waitCommand(directory: string, requestDigest: string, mill
 }
 
 export function validateCommandRequest(request: CommandRequest): void {
+  if (request.processIdentityVersion !== undefined && request.processIdentityVersion !== 1 ||
+      request.processIdentityTimezone !== (request.processIdentityVersion === 1 ? "UTC" : undefined))
+    throw new Error("Unsupported process incarnation contract");
   nativeOperationEnvironment(request);
   credentialNames(request.operation.credentialEnv);
   if (request.executionIdentity !== undefined) {
@@ -223,9 +254,14 @@ async function execute(directory: string, expectedDigest: string): Promise<void>
       GOVERNANCE_GENERATION_TOKEN: generation.token, GOVERNANCE_GENERATION_OWNER: generation.owner });
     if (digest(current) !== digest(request.runtime)) throw new Error("Command destination runtime changed before execution");
   }
-  const machineId = requireMachineIdentity(), fingerprint = processFingerprint(process.pid);
-  if (!fingerprint) throw new Error("command owner identity unavailable");
-  durableJson(join(directory, "owner.json"), { pid: process.pid, fingerprint, requestDigest: expectedDigest });
+  const machineId = requireMachineIdentity();
+  const identity = request.processIdentityVersion === 1 ? captureCommandIdentity(process.pid)
+    : { pid: process.pid, fingerprint: processFingerprint(process.pid) };
+  if (!identity?.fingerprint) throw new Error("command owner identity unavailable");
+  const ownerIdentity = commandIdentityFields(identity), fingerprint = ownerIdentity.fingerprint;
+  const ownerRecord = { ...ownerIdentity, requestDigest: expectedDigest,
+    ...(request.processIdentityVersion === 1 ? { processIdentityVersion: 1, processIdentityTimezone: "UTC" } : {}) };
+  durableJson(join(directory, "owner.json"), ownerRecord);
   await startCommandGuardian(directory, expectedDigest);
   const started = Date.now(), startedAt = new Date(started).toISOString(), log = join(directory, "output.log");
   let registry: ResourceRegistry | undefined, leases: Lease[] = [];
@@ -269,19 +305,30 @@ async function execute(directory: string, expectedDigest: string): Promise<void>
   let bytes = 0, reason = "exit", requestedStop = false, closed = false, killTimer: ReturnType<typeof setTimeout> | undefined;
   // A crash between intent and acknowledgment is unresolved, never permission to replay.
   durableJson(join(directory, "launch.json"), { version: 1, requestDigest: expectedDigest,
-    state: "intent", host: hostname(), machineId, owner: { pid: process.pid, fingerprint }, startedAt });
+    state: "intent", host: hostname(), machineId, owner: ownerIdentity, startedAt });
+  let childIdentity: ProcessIdentity | undefined;
   const child = spawn(request.operation.argv[0]!, request.operation.argv.slice(1), {
     cwd: request.operation.cwd, env: { ...commandEnvironment({}), ...nativeOperationEnvironment(request), ...credentialEnvironment(request.operation.credentialEnv) }, detached: true, stdio: [request.stdin === undefined ? "ignore" : "pipe", "pipe", "pipe"],
   });
   const group = child.pid;
   if (group) {
     try {
+      const captured = request.processIdentityVersion === 1 ? captureCommandIdentity(group)
+        : { pid: group, fingerprint: processFingerprint(group) };
+      if (!captured?.fingerprint) throw new Error("Native process incarnation unavailable");
+      childIdentity = commandIdentityFields(captured);
+      // Publish the original member before the guardian can observe a spawned launch.
+      if (request.processIdentityVersion === 1) durableJson(join(directory, "group-members.json"), { version: 1,
+        processIdentityVersion: 1, processIdentityTimezone: "UTC", requestDigest: expectedDigest, group, members: [childIdentity], identityDigest: digest([childIdentity]) });
       durableJson(join(directory, "launch.json"), { version: 1, requestDigest: expectedDigest,
-        state: "spawned", host: hostname(), machineId, owner: { pid: process.pid, fingerprint }, startedAt,
-        child: { pid: group, processGroup: group, fingerprint: processFingerprint(group) } });
+        ...(request.processIdentityVersion === 1 ? { processIdentityVersion: 1, processIdentityTimezone: "UTC" } : {}),
+        state: "spawned", host: hostname(), machineId, owner: ownerIdentity, startedAt,
+        child: { ...childIdentity, processGroup: group } });
     } catch (error) {
-      // This live owner still owns the freshly spawned group even if persistence fails.
-      try { process.kill(-group, "SIGKILL"); } catch { /* Preserve unresolved launch evidence. */ }
+      // Failed identity capture grants no signal authority over a possibly reused PID.
+      if (childIdentity && (request.processIdentityVersion === 1 ? processLiveIncarnation(group) === childIdentity.incarnation : processLiveFingerprint(group) === childIdentity.fingerprint)) {
+        try { process.kill(group, "SIGKILL"); } catch { /* Preserve unresolved launch evidence. */ }
+      }
       throw error;
     }
   }
@@ -293,7 +340,18 @@ async function execute(directory: string, expectedDigest: string): Promise<void>
     try { return commandProcesses().some(row => row.group === group); }
     catch { return true; } // Failed inspection cannot prove the group has exited.
   };
-  const signal = (value: NodeJS.Signals) => { if (group) { try { process.kill(-group, value); } catch { /* Group may have exited between observation and signal. */ } } };
+  const signal = (value: NodeJS.Signals) => {
+    if (!group) return;
+    if (request.processIdentityVersion === 1) {
+      try {
+        const members = recordedCommandMembers(directory, expectedDigest, group);
+        commandIncarnationTracking(request, object(JSON.parse(readFileSync(join(directory, "launch.json"), "utf8"))), members, ownerRecord);
+        for (const member of members.members) if (processLiveIncarnation(member.pid) === member.incarnation) {
+          try { process.kill(member.pid, value); } catch { /* The checked incarnation may have just exited. */ }
+        }
+      } catch { /* Unknown identity retains cleanup obligations; it never grants signal authority. */ }
+    } else { try { process.kill(-group, value); } catch { /* Preserve the original legacy owner behavior. */ } }
+  };
   const stop = (why: string) => {
     if (requestedStop) return; requestedStop = true; reason = why; signal("SIGTERM");
     killTimer = setTimeout(() => signal("SIGKILL"), request.operation.terminationGraceMs ?? 1000);
@@ -384,7 +442,9 @@ async function execute(directory: string, expectedDigest: string): Promise<void>
     try {
       const recorded = recordedCommandMembers(directory, expectedDigest, group);
       const rows = commandProcesses();
-      if (!rows.some(row => row.group === group || recorded.pids.includes(row.pid))) { cleanup = "confirmed"; break; }
+      const launch = object(JSON.parse(readFileSync(join(directory, "launch.json"), "utf8")));
+      const positive = commandIncarnationTracking(request, launch, recorded, ownerRecord);
+      if (!commandProcessesPresent(rows, recorded.members, group, positive)) { cleanup = "confirmed"; break; }
     } catch { break; } // Invalid records or incomplete inventory never prove cleanup.
     const remaining = cleanupUntil - performance.now();
     if (remaining <= 0) break;
