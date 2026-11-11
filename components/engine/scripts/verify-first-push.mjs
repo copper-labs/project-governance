@@ -145,6 +145,7 @@ async function closeFixture({ registry, workspace, remote }, packageRoot) {
 
 /** Run the shipped preparation and ordinary managed push against an owned local bare remote. */
 export async function verifyFirstPush(packageRoot, archive, evidence) {
+  evidence = realpathSync(evidence);
   const fixture = createFixture(evidence);
   const report = { status: 'started', evidenceDirectory: evidence, sourceIdentity: 'synthetic local fixture' };
   let pushCompleted = false;

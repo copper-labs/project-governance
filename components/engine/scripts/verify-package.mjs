@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { verifyDecisionPilot } from "./verify-decision-pilot.mjs";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -51,6 +51,7 @@ try {
   const pythonParser = await verifyPythonParser(pkg, root);
   const firstPushDirectory = join(root, "first-push"); mkdirSync(firstPushDirectory);
   const firstPush = await verifyFirstPush(pkg, archive, firstPushDirectory);
+  assert.equal(firstPush.evidenceDirectory, realpathSync(firstPushDirectory));
   const beforeStaging = readFileSync(join(pkg, "package.json"));
   const staging = await verifyExplicitStaging(pkg, archive, manifest, root);
   const signoffPackage = join(staging.generationDirectory, 'node_modules/@organta/project-governance');
