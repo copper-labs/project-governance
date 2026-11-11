@@ -28,7 +28,20 @@ after the work has been framed and scoped.
 
 ## Workflow
 
-1. Inspect current files before editing and preserve unrelated user changes.
+1. Inspect current files before editing and preserve unrelated user changes. Before the first push
+   of a named branch without an upstream, carry the task's explicitly declared remote-tracking
+   integration target into Git's existing branch configuration:
+
+   ```sh
+   git branch --set-upstream-to="$declared_target"
+   ```
+
+   Set `declared_target` from the approved task or project target, such as a declared
+   `<remote>/<integration-branch>`. A missing or invalid target stops preparation. Keep an existing
+   upstream unless the operator deliberately changes it. The ordinary `git push --set-upstream`
+   invocation uses an explicit `<topic>:refs/heads/<topic>` refspec for the feature destination. Its
+   managed hook consumes the declared comparison, and Git records the published branch after success. This preparation uses the existing explicit-base/upstream resolver; it grants no
+   publication authority.
 2. Follow the plan's `Parallel support` decision. At a material blocker or long-running build,
    reassess whether bounded independent investigation can replace necessary work; do not repeat
    this assessment after every internal step. Continue useful work while readers investigate.

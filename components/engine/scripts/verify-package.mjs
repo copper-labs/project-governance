@@ -7,11 +7,12 @@ import { verifyMajorDelivery } from "./verify-major-delivery.mjs";
 import { verifyInstalledLint } from "./verify-installed-lint.mjs";
 import { verifyEvaluationProducers } from "../test/fixtures/release-evaluation-producers.mjs";
 import { verifyCheckRecovery } from "./verify-check-recovery.mjs";
+import { verifyFirstPush } from "./verify-first-push.mjs";
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { verifyDecisionPilot } from "./verify-decision-pilot.mjs";
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -48,6 +49,8 @@ try {
   if (host.trim() !== 'passed') throw new Error('Installed host API missing');
   if (!readFileSync(join(pkg, manifest.exports['./host/v1'].types), 'utf8').includes('HOST_API_VERSION')) throw new Error('Host API declarations missing');
   const pythonParser = await verifyPythonParser(pkg, root);
+  const firstPushDirectory = join(root, "first-push"); mkdirSync(firstPushDirectory);
+  const firstPush = await verifyFirstPush(pkg, archive, firstPushDirectory);
   const beforeStaging = readFileSync(join(pkg, "package.json"));
   const staging = await verifyExplicitStaging(pkg, archive, manifest, root);
   const signoffPackage = join(staging.generationDirectory, 'node_modules/@organta/project-governance');
@@ -71,7 +74,7 @@ try {
   const installedLint = lintToolRoot ? await verifyInstalledLint(pkg, archive, lintToolRoot)
     : { status: 'unqualified', reason: 'qualified-backend-tools-explicitly-unavailable', execution: 'not-performed' };
   const receipt = { status: installedLint.status === 'passed' ? 'passed' : 'unqualified', evidence_directory: root,
-    staging, prompt, greenfield, batchReview, majorDelivery, installedLint, pythonParser, decisionPilot: pilot, experiments,
+    staging, firstPush, prompt, greenfield, batchReview, majorDelivery, installedLint, pythonParser, decisionPilot: pilot, experiments,
     apiSignoff, hostApi: 'passed', workflowBinding: 'passed', version: manifest.version, installedCommand: 'passed',
     scope: 'offline installation and inactive staging, original evaluation producers, installed greenfield first-task, deterministic delivery/lint setup, explicit real-backend qualification and batch-before-review preparation proof, compiled Python source/comment analysis, public host API, configured workflow binding and decision consumers with fixture inference; not full semantic qualification, accepted ordinary tasks or release provenance; no live device or benefit claim' };
   writeFileSync(join(root, 'archive-proof-receipt.json'), JSON.stringify(receipt, null, 2) + '\n');

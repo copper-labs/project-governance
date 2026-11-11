@@ -151,3 +151,34 @@ test("native CLI reads pre-push stdin and rejects unsupported updates before dis
     assert.ok(!existsSync(join(f.root, "state/project-governance/check-runs")));
   } finally { f.close(); }
 });
+
+
+test("native CLI explains unavailable first-push bases privately before dispatch and preserves checkout state", () => {
+  const f = pushFixture();
+  try {
+    f.run("update-ref", "refs/remotes/origin/staging", f.base);
+    writeFileSync(join(f.root, "candidate.txt"), "intentional staged input\n"); f.run("add", "candidate.txt");
+    writeFileSync(join(f.root, "candidate.txt"), "intentional live input\n");
+    writeFileSync(join(f.root, "retained.txt"), "intentional untracked input\n");
+    const snapshot = () => ({ head: f.run("rev-parse", "HEAD"), refs: f.run("for-each-ref", "--format=%(refname) %(objectname)"),
+      index: readFileSync(join(f.root, ".git/index")).toString("base64"), live: readFileSync(join(f.root, "candidate.txt"), "utf8"),
+      retained: readFileSync(join(f.root, "retained.txt"), "utf8") });
+    const before = snapshot(), privateRemote = "ssh://private-remote-marker@example.invalid/fixture";
+    for (const base of ["", "refs/heads/private-missing-base-marker"]) {
+      const child = spawnSync(process.execPath, [fileURLToPath(new URL("../src/cli.ts", import.meta.url)), "hook", "pre-push", "origin", privateRemote], {
+        cwd: f.root, encoding: "utf8", timeout: 10000,
+        input: "refs/heads/topic " + f.candidate + " refs/heads/topic " + "0".repeat(40) + "\n",
+        env: { ...process.env, XDG_STATE_HOME: join(f.root, "state"), GOVERNANCE_BASE_REF: base },
+      });
+      assert.equal(child.status, 2); assert.equal(child.stdout, "");
+      const failure = JSON.parse(child.stderr);
+      assert.equal(failure.status, "failed"); assert.equal(failure.code, "pre-push-base-unavailable");
+      assert.match(failure.error, /GOVERNANCE_BASE_REF/); assert.match(failure.error, /base commit/);
+      assert.ok(!child.stderr.includes(privateRemote)); assert.ok(!child.stderr.includes("private-missing-base-marker"));
+      assert.ok(!existsSync(join(f.root, "state/project-governance/check-runs")));
+      assert.deepEqual(snapshot(), before);
+    }
+    const configured = hookCheckArguments(f.root, "pre-push", [], { GOVERNANCE_BASE_REF: "origin/staging" });
+    assert.equal(configured.at(-1), f.base);
+  } finally { f.close(); }
+});

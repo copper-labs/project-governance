@@ -94,7 +94,14 @@ Native pre-push accepts one bounded Git ref update and captures committed before
 The candidate comes from Git's stdin, even when it differs from HEAD. Existing remote updates use
 the supplied remote commit's merge base. A new branch requires the configured or upstream comparison;
 an unavailable base, multiple updates, deletions and noncommit objects refuse before dispatch.
+The maintained Work entry records an explicitly declared remote-tracking integration target as the
+new branch's upstream before its first ordinary push. The existing resolver consumes that declaration;
+Git records the published topic upstream only after the normal managed hook succeeds.
 A zero-argument manual hook proof pins HEAD and requires the configured or upstream comparison.
+An unavailable configured or upstream comparison returns the fixed public code
+`pre-push-base-unavailable` and corrective guidance before check dispatch. The diagnostic never
+reflects the supplied reference, remote or Git stderr, and does not guess a project branch,
+configure an upstream, alter checkout state or authorize a different comparison.
 Ordinary manual checks keep their current worktree scope unless an exact `--candidate-ref` is supplied.
 Committed capture never imports unrelated staged, unstaged or untracked inputs. Required inputs still
 come from the immutable base plus candidate overlay; restored local files cannot fill a committed gap.
