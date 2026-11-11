@@ -21,8 +21,14 @@ shows existing project-owned checks; it does not require a check after every edi
 
 ## Active
 
+- [Batched immutable secret scans](active/2026-11-10-batched-secret-scan.md)
+  retains exhaustive coverage while removing per-blob Git process overhead.
+
 - [Pre-push comparison diagnostics](active/2026-11-10-pre-push-base-diagnostic.md)
   explains missing comparison input and carries declared first-push targets through native Git.
+
+- [Native check observation and push budget](active/2026-11-09-native-check-observation.md)
+  preserves original check observation across publication races and supports a bounded native push budget.
 
 - [Native API decision restoration](active/2026-11-08-api-signoff-restoration.md)
   restores verification of existing exact approvals and qualifies the shipped adapter.

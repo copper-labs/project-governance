@@ -5,7 +5,7 @@ type: spec
 status: current
 owner: project-governance
 created: 2026-03-02
-updated: 2026-11-02
+updated: 2026-11-10
 summary: Contract for the package runtime, its configuration boundary, focused execution model, and bounded local telemetry.
 ---
 
@@ -129,6 +129,14 @@ index or worktree cannot hide an earlier pushed candidate. Unchanged candidate b
 The later-stage built-in secret scan is also a deliberate live exhaustive surface. Its pack result
 has no `subject_digest`; it is never attributed to the branch-aware changed digest shared by the
 other selected packs.
+
+Immutable secret-scan blobs use bounded groups in one Git batch stream per group, rather than a
+process per blob. Each response must match its requested object ID, blob type, exact byte count
+and delimiter, with no trailing output. Bodies remain streamed through the existing detector and
+hash owner; large binary inputs are not buffered as a whole. Replacement refs remain disabled,
+identical index/candidate objects share only their in-run scan, and any malformed, missing,
+failed or timed-out batch yields blocking unavailable-input findings. This optimization changes
+neither exhaustive coverage nor deadlines, waiver identity, hook selection or cross-run proof reuse.
 
 ## V1.1 Evidence-Integrity Contract
 

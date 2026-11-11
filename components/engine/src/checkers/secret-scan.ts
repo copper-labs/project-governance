@@ -1,10 +1,11 @@
-import { execFileSync, spawn } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { constants, createReadStream, existsSync, fstatSync, lstatSync, openSync, closeSync, readdirSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { AnySchema } from "ajv";
 import { safeSubjectPath, readSubjectSource, ValidationSubject, type ChangeScope, type SubjectSource } from "../change-subject.ts";
 import type { Finding } from "../checker-results.ts";
 import { scanSecretChunks, secretResult, secretWaivers, type SecretScan } from "./secrets.ts";
+import { scanSecretBlobBatch } from "./secret-blob-batch.ts";
 
 const gitEnv = () => ({ ...process.env, GIT_OPTIONAL_LOCKS: "0", GIT_NO_REPLACE_OBJECTS: "1" });
 const decode = (bytes: Buffer) => new TextDecoder("utf-8", { fatal: true }).decode(bytes);
@@ -65,22 +66,8 @@ async function scanFile(root: string, path: string): Promise<SecretScan | null> 
   try { return await scanSecretChunks(stream); } finally { stream.destroy(); }
 }
 
-/** Read a pinned blob with replacement refs disabled; process failure invalidates even an empty scan. */
-async function scanBlob(root: string, oid: string): Promise<SecretScan> {
-  if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(oid)) throw new Error("invalid Git blob identity");
-  const child = spawn("git", ["cat-file", "blob", oid], { cwd: root, env: gitEnv(), stdio: ["ignore", "pipe", "ignore"] });
-  const exit = new Promise<void>((resolve, reject) => {
-    child.once("error", () => reject(new Error("Git blob process failed to start")));
-    child.once("close", code => code === 0 ? resolve() : reject(new Error("Git blob process did not complete")));
-  });
-  const deadline = setTimeout(() => child.kill("SIGKILL"), 30_000);
-  try { const [scan] = await Promise.all([scanSecretChunks(child.stdout!), exit]); return scan; }
-  catch (error) { child.kill("SIGKILL"); await exit.catch(() => {}); throw error; }
-  finally { clearTimeout(deadline); }
-}
-
 async function scanPinned(root: string, source: SubjectSource): Promise<SecretScan> {
-  if (source.kind !== "worktree") return scanBlob(root, source.identity);
+  if (source.kind !== "worktree") return (await scanSecretBlobBatch(root, [source.identity])).get(source.identity)!;
   const result = source.file_type === "symlink" ? await scanSecretChunks([readSubjectSource(root, source)]) : await scanFile(root, source.path);
   if (!result || `sha256:${result.sha256}` !== source.identity) throw new Error("selected after-image changed before secret scan completed");
   return result;
@@ -100,21 +87,31 @@ export async function checkSecrets(root: string, options: { scope: ChangeScope; 
         try { const scan = await scanFile(root, path); if (scan) images.push({ path, scan }); }
         catch { failed(path, "working-tree content could not be scanned"); }
       }
-      for (const { path, oid } of sources.blobs) {
-        try { let scan = scans.get(oid); if (!scan) { scan = await scanBlob(root, oid); scans.set(oid, scan); } images.push({ path, scan }); }
-        catch { failed(path, "staged index blob could not be scanned"); }
-      }
+      const scanBlobs = async (blobs: Array<{ path: string; oid: string }>, detail: string) => {
+        const pending = [...new Set(blobs.map(blob => blob.oid))].filter(oid => !scans.has(oid));
+        for (let offset = 0; offset < pending.length; offset += 128) {
+          try {
+            for (const [oid, scan] of await scanSecretBlobBatch(root, pending.slice(offset, offset + 128))) scans.set(oid, scan);
+          } catch { /* Every unavailable identity below remains a blocking finding; later batches still run. */ }
+        }
+        for (const { path, oid } of blobs) {
+          const scan = scans.get(oid);
+          if (scan) images.push({ path, scan }); else failed(path, detail);
+        }
+      };
+      await scanBlobs(sources.blobs, "staged index blob could not be scanned");
       if (options.candidateScope) {
         if (!options.candidateScope.candidate_ref) throw new Error("Committed candidate identity required");
         const candidate = new ValidationSubject(root, options.candidateScope);
         // Reuse immutable index-blob scans, but cover candidate-only and unchanged committed inputs.
+        const committed: Array<{ path: string; oid: string }> = [];
         for (const path of candidate.paths()) {
           const source = candidate.source(path);
           if (!source || source.kind !== "git") throw new Error("Candidate source is not a committed blob");
           if (source.file_type !== "regular") continue;
-          try { let scan = scans.get(source.identity); if (!scan) { scan = await scanBlob(root, source.identity); scans.set(source.identity, scan); } images.push({ path, scan }); }
-          catch { failed(path, "committed candidate blob could not be scanned"); }
+          committed.push({ path, oid: source.identity });
         }
+        await scanBlobs(committed, "committed candidate blob could not be scanned");
       }
     } else {
       if (options.candidateScope) throw new Error("Committed union requires the exhaustive scan");
