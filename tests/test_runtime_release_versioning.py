@@ -101,6 +101,29 @@ class RuntimeReleaseVersioningTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 compatibility(raw, {**policy, **change})
 
+    def test_retained_wheel_proof_uses_a_binary_supported_python_minor(self) -> None:
+        """Keep all retained wheel proof jobs within the locked native wheel coverage."""
+        for relative, jobs in (
+            (".github/workflows/source-readiness.yml", ("source-readiness",)),
+            (".github/workflows/release.yml", ("release", "legacy-release")),
+        ):
+            workflow = yaml.load(
+                (ROOT / relative).read_text(encoding="utf-8"),
+                Loader=yaml.BaseLoader,
+            )
+            for job in jobs:
+                with self.subTest(workflow=relative, job=job):
+                    steps = workflow["jobs"][job]["steps"]
+                    python_steps = [
+                        step for step in steps
+                        if step.get("uses", "").startswith("actions/setup-python@")
+                    ]
+                    self.assertEqual(len(python_steps), 1)
+                    self.assertEqual(
+                        python_steps[0]["with"]["python-version"], "3.14",
+                        "A floating major can select an interpreter without locked binary wheels.",
+                    )
+
     def test_source_readiness_runs_once_at_candidate_boundaries(self) -> None:
         """Avoid complete release proof on every repair push and again after merge."""
         workflow = yaml.load(
