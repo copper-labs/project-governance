@@ -1,4 +1,7 @@
 import { test } from "node:test";
+import childProcess from "node:child_process";
+import fs from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
@@ -41,5 +44,47 @@ test("queued checks remain pending until claimed and never hide a failed worker"
     rmSync(join(directory, "failure.json"));
     durableJson(join(directory, "run.json"), { ...intent, state: "running" });
     assert.equal(inspectCheckRun(id, root).state, "incomplete");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+
+test("completion published during the owner probe is observed without another run", t => {
+  const root = mkdtempSync(join(tmpdir(), "check-status-completion-")), id = randomUUID(), directory = join(root, id);
+  try {
+    mkdirSync(directory);
+    durableJson(join(directory, "run.json"), { version: 1, id, plan: { execution_order: [] }, owner: { pid: 1234, fingerprint: "original" } });
+    const result = { run_id: id, status: "passed", termination_reason: "completed" };
+    const probe = t.mock.method(childProcess, "execFileSync", () => {
+      durableJson(join(directory, "result.json"), result);
+      throw new Error("Original owner exited after publication");
+    });
+    syncBuiltinESMExports();
+    try {
+      const observed = inspectCheckRun(id, root);
+      assert.equal(observed.state, "terminal"); assert.deepEqual(observed.result, result);
+    } finally { probe.mock.restore(); syncBuiltinESMExports(); }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("a claim appearing after the queued snapshot refreshes the worker identity", t => {
+  const root = mkdtempSync(join(tmpdir(), "check-status-start-")), id = randomUUID(), directory = join(root, id);
+  try {
+    mkdirSync(directory);
+    const queued = { version: 1, id, state: "queued", plan: { execution_order: [] }, owner: null };
+    const owner = { pid: process.pid, fingerprint: processFingerprint(process.pid) };
+    durableJson(join(directory, "run.json"), queued);
+    const original = fs.existsSync;
+    const claim = t.mock.method(fs, "existsSync", (path: fs.PathLike) => {
+      if (path === join(directory, "worker.claim")) {
+        durableJson(join(directory, "run.json"), { ...queued, state: "running", owner });
+        return true;
+      }
+      return original(path);
+    });
+    syncBuiltinESMExports();
+    try {
+      const observed = inspectCheckRun(id, root);
+      assert.equal(observed.state, "running"); assert.equal(observed.status, "outcome-unknown");
+    } finally { claim.mock.restore(); syncBuiltinESMExports(); }
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

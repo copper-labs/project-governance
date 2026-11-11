@@ -372,6 +372,24 @@ normal verdict parsing; nonzero exits still fail and lost execution stays unknow
 retains the original receipt digest and recovery digest separately. Missing or mismatched proof
 keeps the check blocked and retains its ownership obligations.
 
+Check observation refreshes an incomplete snapshot once because worker claim, owner acknowledgment
+and terminal result publication can cross separate reads. Foreground checks continue observing the
+same submitted run through such gaps within the existing deadline plus five-second observation
+allowance. A recorded orchestration failure still ends observation early; an unresolved owner at the
+bound remains `outcome-unknown` with exit 2. No observation dispatches another check, accepts a child
+command as the whole result, or changes native receipts. `check-status --run <id>` reconnects to
+original evidence; it cannot resume an aborted Git operation or substitute proof into a later hook.
+
+Native pre-push alone accepts `GOVERNANCE_PRE_PUSH_TIMEOUT_SECONDS` as an explicit numeric seconds
+budget. It forwards that value to the existing check deadline validator before dispatch: a positive
+integral millisecond count, at most 86400 seconds. The absent setting retains 300 seconds; empty,
+nonfinite, nonpositive, sub-millisecond and out-of-range values refuse. Other hooks and manual checks
+retain their existing settings. Operators may select a measured budget for one ordinary push, for
+example `GOVERNANCE_PRE_PUSH_TIMEOUT_SECONDS=600 git push`. This changes available execution time,
+not required checks, immutable candidate scope, acceptance, cleanup or permission to publish. A true
+deadline failure remains distinct from an observation gap. Runtime publication and deliberate adopter
+installation are required before this source behavior is available in an installed generation.
+
 Until deliberate adopter cutover, CI exercises both runtime implementations and verifies the wheel
 as well as the compiled package. The 2.x tag channel retains wheel release support; the 3.x tag
 channel publishes the unified package. Neither channel runs without an explicitly authorized tag,

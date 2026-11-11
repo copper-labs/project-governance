@@ -608,7 +608,9 @@ Use the owning command contract for structured request fields.
         console.log(JSON.stringify(prepared.summary ? { ...checkSummary(observed.result), ...(progress ? { planProgress: progress } : {}), ...(advice.value ? { decisionAdvice: advice.value } : {}),
           outputDelivery: output && "outputs" in output ? { outputs: output.outputs, coverage: output.coverage, episode: output.episode } : { reason: "output-delivery-unavailable" } } : projection));
         return progress?.status === "refused" ? 2 : advice.exitCode ?? (observed.status === "failed" ? 1 : 0); }
-      if (observed.state === "incomplete" || Date.now() - submittedAt >= prepared.deadlineMs + 5000) {
+      // An incomplete snapshot can race worker acknowledgment or terminal publication. Keep
+      // observing this same run within its existing budget; only a recorded failure ends it early.
+      if ((observed.state === "incomplete" && observed.orchestrator_failure) || Date.now() - submittedAt >= prepared.deadlineMs + 5000) {
         if (prepared.jsonOutput) durableJson(prepared.jsonOutput, observed);
         console.log(JSON.stringify(observed)); return 2;
       }

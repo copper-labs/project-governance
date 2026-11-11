@@ -12,7 +12,7 @@ const hash = path => createHash('sha256').update(readFileSync(path)).digest('hex
 /** Own the temporary Git process environment and preserve authored file/index observations. */
 function createFixture(evidence) {
   const workspace = join(evidence, 'project'), state = join(evidence, 'state');
-  const environment = { PATH: process.env.PATH, XDG_STATE_HOME: state,
+  const environment = { PATH: process.env.PATH, XDG_STATE_HOME: state, GOVERNANCE_PRE_PUSH_TIMEOUT_SECONDS: "600",
     GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: join(evidence, 'gitconfig') };
   writeFileSync(environment.GIT_CONFIG_GLOBAL, '');
   mkdirSync(workspace);
@@ -113,6 +113,7 @@ function verifyPublishedCandidate({ runs, workspace, remote, run, git, evidence 
   const directory = join(runs, ids[0]), dispatch = json(join(directory, 'dispatch.json'));
   const result = json(join(directory, 'result.json'));
   assert.equal(dispatch.trigger, 'hook');
+  assert.equal(dispatch.deadlineMs, 600000, 'The normal Git hook must forward the operator budget');
   assert.equal(dispatch.scope.base_ref, base);
   assert.equal(dispatch.scope.candidate_ref, candidate);
   assert.equal(result.status, 'passed');
@@ -127,7 +128,7 @@ function verifyPublishedCandidate({ runs, workspace, remote, run, git, evidence 
   const published = run('git', ['--git-dir', remote, 'for-each-ref', '--format=%(refname) %(objectname)', 'refs/heads/'], evidence);
   assert.deepEqual(published.split('\n').sort(), [`refs/heads/integration ${base}`, `refs/heads/topic ${candidate}`]);
   assert.equal(git('rev-parse', '--symbolic-full-name', '@{upstream}'), 'refs/remotes/origin/topic');
-  return { runId: ids[0], selectedPacks: dispatch.plan.selected_packs };
+  return { runId: ids[0], selectedPacks: dispatch.plan.selected_packs, deadlineMs: dispatch.deadlineMs };
 }
 
 /** Release only quiescent owned Git fixtures; retain original receipts and installation evidence. */
