@@ -5,7 +5,7 @@ type: spec
 status: active
 owner: project-governance
 created: 2026-09-23
-updated: 2026-10-04
+updated: 2026-11-14
 summary: Automatic prompt entry, a rebuildable SQLite repository index, source-backed relationships, bounded JEV selection with expansion and real-task qualification.
 ---
 
@@ -251,11 +251,31 @@ definitions, signatures, ranges and static import/export declarations. Do not cr
 program, type-check a host application, run its build or claim runtime call-graph precision. Extract
 Markdown titles, headings, literal summaries and local links through the existing document owners.
 
-Other languages retain safe file paths and the existing literal overview/symbol clues, clearly
-labelled heuristic. Unsupported or oversized files remain represented with a reason. A TypeScript
-parser is not proof of Swift, Kotlin, Python or Flutter structural coverage; current comment analyzers
-remain their separate enforcement owners. New parsers require a demonstrated retrieval need and
-packaging qualification, not a universal multi-language index in RC6.
+Rust, Kotlin (including Kotlin scripts), Swift, Dart, Objective-C and Java use pinned local
+Tree-sitter WASM grammars through `context-syntax.ts`. The common runtime initializes once;
+grammars load only on use. Captured bytes remain the sole source, and syntax/version changes
+invalidate the existing projection. Syntax errors, cancellation and unsupported Objective-C++
+produce explicit partial coverage without guessed complete spans. Other languages retain labelled
+heuristic clues. Grammar support does not establish language-version parity or compiler correctness.
+Current grammar gaps include Kotlin context receivers/parameters and some interface/enum forms,
+Swift and Rust newer modifiers/literals, and Objective-C annotation macros. These examples are not
+an exhaustive language-version matrix. Partial descriptors retain explicitly labelled heuristic
+name clues for search, without publishing guessed complete spans. Deadline/runtime failures stay
+visible but are not persisted as reusable content facts; subsequent refreshes retry them.
+
+KMP extraction preserves authored `expect`/`actual` modifiers. Source-set names are path-derived
+hints at delivery, not content-cached facts or inferred platform bindings. Kotlin script blocks
+provide source units; literal module declarations remain unresolved until an exact language-aware
+owner establishes a target. They cannot inherit TS module resolution or prove runtime callers.
+
+Conventional build scripts, manifests, version catalogs, text locks, native interop definitions
+and Apple build configuration participate in discovery. `context-build-files.ts` owns path roles;
+roles do not establish resolved dependencies, targets or task graphs. Kotlin/Swift/Rust build
+scripts use their language parser; other formats retain literal configuration clues and original
+source reads. Generated/cache folders, binaries and local machine overrides remain excluded.
+Comment analyzers and build/check execution retain their separate enforcement owners.
+File eligibility does not widen model disclosure: existing source-data consent and permitted paths
+still gate descriptors and original source passages. Configuration bodies are not secret-redacted.
 
 Reuse the existing per-file and per-window source limits as initial bounds: 256 KiB per file,
 4 MiB per window and 32 MiB per foreground invocation. Detailed extraction can stop; inventory

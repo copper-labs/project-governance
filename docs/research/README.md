@@ -5,7 +5,7 @@ type: research
 status: draft
 owner: project-governance
 created: 2026-09-18
-updated: 2026-10-04
+updated: 2026-11-14
 summary: Exploratory work that is not yet a specification, plan, or decision.
 ---
 
@@ -14,6 +14,13 @@ summary: Exploratory work that is not yet a specification, plan, or decision.
 Exploratory notes on ideas that may or may not become work. Nothing here is authoritative. A page
 graduates into `docs/specs/`, `docs/prds/`, or `docs/decisions/` if it earns it, and is deleted if
 it does not.
+
+## Source retrieval research
+
+- [Graphify evaluation](2026-11-14-graphify-evaluation.md) compares multilingual retrieval,
+  performance, source integrity and maintenance, including a possible replacement of the current index.
+- [Multilingual source extraction](2026-11-14-multilingual-source-extraction.md) evaluates parser
+  support for Rust, Kotlin, Swift, Dart, Objective-C and Java within the existing index.
 
 ## Decision-First Harness
 

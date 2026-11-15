@@ -1,4 +1,5 @@
 /** Maintain literal source facts while keeping every eligible path visible during bounded refresh. */
+import { buildPathClues } from "./context-build-files.ts";
 import { posix } from "node:path";
 import { createHash } from "node:crypto";
 import type { ValidationSubject } from "./change-subject.ts";
@@ -49,7 +50,10 @@ function documentationObservation(byPath: Map<string, SourceFacts>) {
 
 function pendingSourceOrder(pending: string[], previous: ReturnType<ProjectionStore["snapshot"]> | undefined) {
   pending.sort((a, b) => {
-    const rank = (path: string) => !previous?.files.get(path)?.factId ? 0 : previous.files.get(path)?.freshness === "unverified-pending" ? 1 : 2;
+    const rank = (path: string) => {
+      const file = previous?.files.get(path);
+      return file?.freshness === "syntax-retry-pending" && !file.factId ? 3 : !file?.factId ? 0 : file.freshness === "unverified-pending" ? 1 : 2;
+    };
     return rank(a) - rank(b) || a.localeCompare(b);
   });
 }
@@ -107,11 +111,11 @@ export function maintainContextProjection(subject: ValidationSubject, paths: str
       let fact: SourceFacts;
       const byteKey = `bytes:sha256:${createHash("sha256").update(bytes).digest("hex")}:${posix.extname(path)}`;
       const retained = priorKeys.get(byteKey);
-      try { fact = retained ?? extractSourceFacts(path, bytes); }
+      try { fact = retained ?? extractSourceFacts(path, bytes, deadlineAt); }
       catch { unavailable.push({ path, reason: "extraction-failed" }); continue; }
       // Paths belong to the current view, not content facts reused after a rename.
-      if (fact.descriptor) { const { path: _path, ...descriptor } = JSON.parse(fact.descriptor); fact.descriptor = JSON.stringify(descriptor); }
-      byPath.set(path, fact); facts.set(sourceFactId(fact, extractor), fact); if (retained) reused++; else extracted++;
+      if (fact.descriptor) { const { path: _path, buildRole: _buildRole, ...descriptor } = JSON.parse(fact.descriptor); fact.descriptor = JSON.stringify(descriptor); }
+      byPath.set(path, fact); if (!fact.retryable) facts.set(sourceFactId(fact, extractor), fact); if (retained) reused++; else extracted++;
       if (observation.sources.get(path)?.freshness === "unverified") observation.sources.set(path, { key: `bytes:${fact.digest}`, freshness: "captured-bytes" });
     }
   }
@@ -130,14 +134,18 @@ export function maintainContextProjection(subject: ValidationSubject, paths: str
     if (!fact && !missing.has(path)) unavailable.push({ path, reason: disposition });
     let retainedId: string | null = null;
     const prior = previous?.files.get(path), priorFact = prior?.factId && previous?.facts.get(prior.factId);
+    // Budget deferral must not erase retry ordering; the marker carries no reusable source facts.
+    const retryPending = fact?.retryable || !fact && previous?.extractor === extractor && prior?.freshness === "syntax-retry-pending" &&
+      (observed?.freshness === "unverified" || prior.key === observed?.key);
     // Pin unverified prior facts for hash reuse, never expose them as current descriptors or links.
     if (!fact && observed?.freshness === "unverified" && previous?.extractor === extractor && priorFact) {
       const id = sourceFactId(priorFact, extractor), bytes = retainedFacts.has(id) ? 0 : Buffer.byteLength(JSON.stringify(priorFact));
       if (factBytes + bytes <= factLimit) { factBytes += bytes; retainedFacts.add(id); retainedId = id; facts.set(id, priorFact); }
     }
     files.push({ path, key: observed ? disposition === "source-over-limit" ? oversizedKey(observed.key) : observed.key : null,
-      freshness: retainedId ? "unverified-pending" : observed?.freshness ?? "unverified", factId: fact ? sourceFactId(fact, extractor) : retainedId, disposition });
-    if (fact?.descriptor) entries.set(path, { text: JSON.stringify({ path, ...JSON.parse(fact.descriptor) }), sourceDigest: fact.digest });
+      // A transient parser failure remains visible now but cannot become permanent cached evidence.
+      freshness: retryPending ? "syntax-retry-pending" : retainedId ? "unverified-pending" : observed?.freshness ?? "unverified", factId: fact && !fact.retryable ? sourceFactId(fact, extractor) : retainedId, disposition });
+    if (fact?.descriptor) entries.set(path, { text: JSON.stringify({ path, ...JSON.parse(fact.descriptor), ...buildPathClues(path) }), sourceDigest: fact.digest });
   }
   const generation = digest({ locator, view: observation.view, extractor, files }), complete = byPath.size === inventory.length;
   let search: string[] = [], published = false;

@@ -134,6 +134,8 @@ shows existing project-owned checks; it does not require a check after every edi
 
 ## Completed
 
+- [Multilingual source extraction](completed/2026-11-14-multilingual-source-extraction.md) adds six-language syntax, KMP clues and build-file discovery.
+
 - [Cowork host plugin](completed/2026-11-10-cowork-host-plugin.md)
   delivered the qualified native development loop and distributable plugin in stable 4.6.0.
 

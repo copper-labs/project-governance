@@ -1,5 +1,6 @@
 /** Literal syntax facts for the disposable index. No build, type resolution or generated prose. */
 import ts from "typescript";
+import { extractNativeSyntax, SYNTAX_VERSION } from "./context-syntax.ts";
 import { extname, posix } from "node:path";
 import { createHash } from "node:crypto";
 import { sourceClues } from "./context-source-index.ts";
@@ -7,40 +8,42 @@ import { localDocumentLinks } from "./checkers/document-links.ts";
 import type { Candidate } from "./decisions.ts";
 import { SOURCE_CAPTURE_MAX_BYTES, SOURCE_CAPTURE_BATCH_MAX_BYTES } from "./source-capture-limits.ts";
 
-export const SOURCE_EXTRACTOR = "literal-syntax-13";
-export interface SourceSpan { kind: string; name: string; signature: string; start: number; end: number; level?: number; ancestry?: string[]; context?: SourceSpan[] }
-export interface SourceLink { kind: "import" | "export" | "require" | "reference" | "dynamic-import" | "document"; target: string; line: number }
+export const SOURCE_EXTRACTOR = `literal-syntax-14:${SYNTAX_VERSION}`;
+export interface SourceSpan { kind: string; name: string; signature: string; start: number; end: number; level?: number; ancestry?: string[]; context?: SourceSpan[]; modifiers?: string[] }
+export interface SourceLink { kind: "module" | "import" | "export" | "require" | "reference" | "dynamic-import" | "document"; target: string; line: number }
 export interface SourceFacts {
   digest: string; language: string; bytes: number; descriptor: string | null;
   coverage: "syntax" | "syntax-partial" | "markdown" | "heuristic" | "unavailable";
   spans: SourceSpan[]; links: SourceLink[]; documentationApplicable: boolean; overviewObserved: boolean;
+  retryable?: boolean;
 }
 
 /** Reuse current facts or extract only already captured bytes when the index is still cold. */
-export function capturedSourceSpans(candidates: Candidate[], cached: ReadonlyMap<string, Pick<SourceFacts, "digest" | "spans">>, deadlineAt: number) {
+export function capturedSourceSpans(candidates: Candidate[], cached: ReadonlyMap<string, Pick<SourceFacts, "digest" | "spans" | "retryable">>, deadlineAt: number) {
   if (candidates.length > 64) throw new Error("Too many captured sources for bounded syntax extraction");
   const started = performance.now(), spans: Record<string, SourceSpan[]> = {};
   const limitations: Array<{ path: string; reason: string }> = [];
   let reusedCount = 0, extractedCount = 0, capturedBytes = 0;
   for (const candidate of candidates) {
     const existing = cached.get(candidate.id);
-    if (existing?.digest === candidate.sourceDigest) { spans[candidate.id] = existing.spans; reusedCount++; continue; }
+    if (existing?.digest === candidate.sourceDigest && !existing.retryable) { spans[candidate.id] = existing.spans; reusedCount++; continue; }
     if (performance.now() >= deadlineAt) { limitations.push({ path: candidate.id, reason: "facts-deadline" }); continue; }
     const bytes = Buffer.byteLength(candidate.excerpt);
     if (bytes > SOURCE_CAPTURE_MAX_BYTES) { limitations.push({ path: candidate.id, reason: "facts-size-limit" }); continue; }
     if (capturedBytes + bytes > SOURCE_CAPTURE_BATCH_MAX_BYTES) { limitations.push({ path: candidate.id, reason: "facts-byte-limit" }); continue; }
     capturedBytes += bytes;
     try {
-      const facts = extractSourceFacts(candidate.id, Buffer.from(candidate.excerpt));
+      const facts = extractSourceFacts(candidate.id, Buffer.from(candidate.excerpt), deadlineAt);
       if (facts.digest !== candidate.sourceDigest) { limitations.push({ path: candidate.id, reason: "facts-source-mismatch" }); continue; }
       spans[candidate.id] = facts.spans; extractedCount++;
+      if (facts.retryable) limitations.push({ path: candidate.id, reason: JSON.parse(facts.descriptor ?? "{}").limitation === "syntax-deadline" ? "facts-deadline" : "facts-unavailable" });
     } catch { limitations.push({ path: candidate.id, reason: "facts-unavailable" }); }
   }
   return { spans, coverage: { capturedCount: candidates.length, reusedCount, extractedCount,
     spanFileCount: Object.values(spans).filter(items => items.length).length, limitations, elapsedMs: performance.now() - started } };
 }
 const bounded = (value: string, size: number) => Buffer.from(value).subarray(0, size).toString("utf8").replace(/\uFFFD$/u, "");
-export function extractSourceFacts(path: string, bytes: Buffer): SourceFacts {
+export function extractSourceFacts(path: string, bytes: Buffer, deadlineAt = performance.now() + 1000): SourceFacts {
   const extension = extname(path).toLowerCase(), clues = sourceClues(path, bytes);
   const facts: SourceFacts = { digest: "sha256:" + createHash("sha256").update(bytes).digest("hex"), language: extension.slice(1), bytes: bytes.length,
     descriptor: clues?.text ?? null, coverage: clues ? "heuristic" : "unavailable", spans: [], links: [],
@@ -49,7 +52,7 @@ export function extractSourceFacts(path: string, bytes: Buffer): SourceFacts {
   const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
   if (/^\.(?:[cm]?[jt]s|[jt]sx)$/u.test(extension)) extractTypeScriptFacts(path, text, facts);
   else if (/^\.mdx?$/u.test(extension)) extractMarkdownFacts(text, facts);
-  else extractHeuristicFacts(path, text, facts);
+  else if (!extractNativeSyntax(path, text, facts, deadlineAt)) extractHeuristicFacts(path, text, facts);
   return facts;
 }
 
@@ -232,6 +235,7 @@ export interface ResolvedSourceLink extends SourceLink { source: string; resolve
 /** A deliberately small, build-independent resolution policy. Ambiguity remains unresolved. */
 export function resolveSourceLink(source: string, link: SourceLink, inventory: Set<string>): Pick<ResolvedSourceLink, "resolved" | "reason"> {
   const target = link.target;
+  if (link.kind === "module") return { resolved: null, reason: "language-module-unresolved" };
   if (link.kind === "dynamic-import") return { resolved: null, reason: "dynamic" };
   if (/[\x00-\x1f\\]/u.test(target) || target.startsWith("/") || target.includes("://")) return { resolved: null, reason: "nonlocal" };
   if (link.kind !== "document" && link.kind !== "reference" && !target.startsWith(".")) return { resolved: null, reason: "package-or-alias" };

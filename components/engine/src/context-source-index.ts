@@ -1,3 +1,4 @@
+import { buildFileRole } from "./context-build-files.ts";
 import { extname } from "node:path";
 import { sourceFamilies } from "./checkers/comment-registry.ts";
 import { structuredDocument } from "./structured-document.ts";
@@ -101,6 +102,16 @@ export function sourceClues(path: string, bytes: Buffer) {
   if (markdown && text.startsWith("---\n") && frontmatter === undefined) metadataStatus = "incomplete-or-over-limit";
   const summary = typeof metadata.summary === "string" ? metadata.summary.replace(/\s+/gu, " ").trim() : undefined;
   const configuration = configurationClues(path, text);
+  const buildRole = buildFileRole(path);
+  if (buildRole && /\.(?:properties|xcconfig|def)$/iu.test(path)) {
+    let continuation = false;
+    for (const line of text.split(/\r?\n/u)) {
+      const match = !continuation && line.match(/^\s*([A-Za-z_][A-Za-z0-9_.-]{0,63})\s*[:=]/u);
+      continuation = (line.match(/\\+$/u)?.[0].length ?? 0) % 2 === 1;
+      if (match) configuration.keys.push(match[1]!);
+      if (configuration.keys.length >= 16) break;
+    }
+  }
   const documentation = bounded(summary ?? (markdown ? "" : leadingDocumentation(path, text) || configuration.purpose.join("; ")), 320);
   const lifecycle: Record<string, string | string[]> = {};
   for (const key of ["status", "supersedes", "superseded_by", "replaced_by"]) {
@@ -109,8 +120,8 @@ export function sourceClues(path: string, bytes: Buffer) {
     else if (Array.isArray(value)) lifecycle[key] = value.filter((item): item is string => typeof item === "string").slice(0, 8).map(item => bounded(item, 256));
   }
   // All text remains untrusted quoted source. It is never promoted to policy or factual proof.
-  return { text: headings.length || symbols.length || documentation || configuration.keys.length || Object.keys(lifecycle).length
-    ? JSON.stringify({ path, headings, symbols: [...new Set(symbols)], documentation,
+  return { text: headings.length || symbols.length || documentation || configuration.keys.length || Object.keys(lifecycle).length || buildRole
+    ? JSON.stringify({ path, ...(buildRole ? { buildRole } : {}), headings, symbols: [...new Set(symbols)], documentation,
       ...(configuration.keys.length ? { configurationKeys: configuration.keys } : {}), ...(markdown ? { lifecycle, metadataStatus } : {}) }) : null,
     overviewObserved: Boolean(documentation.trim() && !/^(?:["']?\s*["']?|[|>][+-]?|["']?(?:todo|tbd|null)["']?)$/iu.test(documentation)),
     documentationApplicable: markdown || Boolean(sourceFamilies[extname(path).toLowerCase()]) };

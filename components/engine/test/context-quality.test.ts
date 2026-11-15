@@ -36,7 +36,7 @@ test("deep native paths and source variants remain eligible without admitting un
   for (const path of ["src/component.vue", "src/component.svelte", "src/main.mts", "src/main.cts", `modules/${"nested/".repeat(25)}Feature.swift`]) assert.equal(localContextPath(path), true, path);
   for (const path of ["../private.ts", "src/../private.ts", "src/generated/output.ts", "secrets/token.ts", "src/.env", "src/code.ts\n", "src/" + "a".repeat(4100) + ".ts"]) assert.equal(localContextPath(path), false, path);
   const native = extractSourceFacts("src/Session.kt", Buffer.from("/** Stop old work without touching the new session. */\ninternal suspend fun cancelPrevious() {}\nfun startReplacement() {}\n"));
-  assert.equal(native.coverage, "heuristic");
+  assert.equal(native.coverage, "syntax");
   assert.deepEqual(native.spans.map(span => span.name), ["cancelPrevious", "startReplacement"]);
   assert.equal(extractSourceFacts("src/main.mts", Buffer.from("export function run() {}\n")).coverage, "syntax");
   assert.equal(extractSourceFacts("src/view.svelte", Buffer.from("<h1>Session</h1>\n")).coverage, "heuristic");
@@ -141,7 +141,7 @@ test("test labels describe behavior without evaluating expressions; capped secti
   assert.equal(many.coverage, "syntax-partial", "omitted literal labels must be disclosed");
   for (const [path, declaration] of [["docs/large.md", (i: number) => `# Section ${i}\nbody\n`], ["src/Large.kt", (i: number) => `fun function${i}() {}\n// details\n`]] as const) {
     const capped = extractSourceFacts(path, Buffer.from(Array.from({ length: 100 }, (_, i) => declaration(i)).join("")));
-    assert.equal(capped.spans.length, 96); assert.equal(capped.spans.at(-1)!.end, 192);
+    assert.equal(capped.spans.length, 96); assert.equal(capped.spans.at(-1)!.end, path.endsWith(".kt") ? 191 : 192);
     assert.equal(JSON.parse(capped.descriptor!).spanLimitReached, true);
   }
 });

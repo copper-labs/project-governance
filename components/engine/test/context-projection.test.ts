@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
+import { Parser } from "web-tree-sitter";
 import { ValidationSubject, resolveChangeScope } from "../src/change-subject.ts";
 import { maintainContextProjection } from "../src/context-projection.ts";
 import { extractSourceFacts, resolveSourceLink } from "../src/context-source-facts.ts";
@@ -71,6 +72,77 @@ test("staged and working source maps cannot borrow each other's contents; filter
   f.git("-c", "user.name=Fixture", "-c", "user.email=f@example.invalid", "commit", "-qm", "filtered");
   const filtered = f.subject(); const projection = maintainContextProjection(filtered, filtered.paths(), f.state);
   assert.match(filtered.read("a.ts").toString(), /\r\n$/); assert.equal(projection.facts.get("a.ts")?.bytes, readFileSync(join(f.root, "a.ts")).length);
+});
+
+test("digest reuse refreshes KMP source-set and build-role hints after a rename", t => {
+  const f = fixture(t), source = "actual fun clock(): Long = 0\n";
+  f.write("shared/src/commonMain/kotlin/Clock.kt", source);
+  f.write("build.gradle.kts", "plugins {\n    java\n}\n");
+  f.git("add", "."); f.git("-c", "user.name=Fixture", "-c", "user.email=f@example.invalid", "commit", "-qm", "sources");
+  const first = f.run();
+  assert.equal(JSON.parse(first.entries.get("shared/src/commonMain/kotlin/Clock.kt")!.text).sourceSetHint, "commonMain");
+  assert.equal(JSON.parse(first.entries.get("build.gradle.kts")!.text).buildRole, "gradle-script");
+  f.write("shared/src/iosMain/kotlin/.keep", "");
+  renameSync(join(f.root, "shared/src/commonMain/kotlin/Clock.kt"), join(f.root, "shared/src/iosMain/kotlin/Clock.kt"));
+  renameSync(join(f.root, "build.gradle.kts"), join(f.root, "helper.kts"));
+  const moved = f.run();
+  assert.equal(moved.status.reusedCount, 2);
+  assert.equal(JSON.parse(moved.entries.get("shared/src/iosMain/kotlin/Clock.kt")!.text).sourceSetHint, "iosMain");
+  assert.equal(JSON.parse(moved.entries.get("helper.kts")!.text).buildRole, undefined);
+  assert.ok(!moved.entries.has("shared/src/commonMain/kotlin/Clock.kt"));
+});
+
+test("cancelled native parsing retries unchanged source before warm syntax reuse", t => {
+  const f = fixture(t); f.write("Clock.kt", "fun clock(): Long = 0\n");
+  f.git("add", "."); f.git("-c", "user.name=Fixture", "-c", "user.email=f@example.invalid", "commit", "-qm", "source");
+  const parse = Parser.prototype.parse; let cancel = true;
+  t.mock.method(Parser.prototype, "parse", function (this: Parser, ...args: Parameters<Parser["parse"]>) {
+    if (cancel) { cancel = false; return null; }
+    return parse.apply(this, args);
+  });
+  const partial = f.run(); assert.equal(partial.facts.get("Clock.kt")?.coverage, "syntax-partial");
+  const retry = f.run(); assert.equal(retry.facts.get("Clock.kt")?.coverage, "syntax");
+  assert.equal(retry.status.extractedCount, 1); assert.equal(retry.status.reusedCount, 0);
+  assert.equal(f.run().status.reusedCount, 1);
+});
+
+test("same-byte Kotlin scripts and Objective-C variants retain distinct cached facts", t => {
+  const f = fixture(t), kotlin = "fun ready() {}\n", objc = "@interface Store : NSObject\n@end\n";
+  for (const extension of ["kt", "kts"]) f.write(`Ready.${extension}`, kotlin);
+  for (const extension of ["h", "m", "mm"]) f.write(`Store.${extension}`, objc);
+  f.git("add", "."); f.git("-c", "user.name=Fixture", "-c", "user.email=f@example.invalid", "commit", "-qm", "sources");
+  f.run(); const warm = f.run();
+  assert.equal(warm.status.reusedCount, 5);
+  assert.equal(new Set([...warm.facts.values()].map(fact => fact.language)).size, 5);
+  assert.equal(warm.facts.get("Store.mm")?.coverage, "syntax-partial"); assert.deepEqual(warm.facts.get("Store.mm")?.spans, []);
+  assert.equal(warm.facts.get("Store.m")?.coverage, "syntax"); assert.ok(warm.facts.get("Store.m")?.spans.length);
+});
+
+test("repeated parser cancellation cannot starve other pending source", t => {
+  const f = fixture(t), source = "fun blocked() {}\n".repeat(8);
+  f.write("A.kt", source); f.write("z.ts", "export const ready = true;\n");
+  t.mock.method(Parser.prototype, "parse", () => null);
+  f.run({ byteLimit: Buffer.byteLength(source) });
+  const next = f.run({ byteLimit: Buffer.byteLength(source) });
+  assert.equal(next.facts.get("z.ts")?.coverage, "syntax");
+});
+
+test("alternating retry groups cannot starve other pending source", t => {
+  const f = fixture(t), a = "fun a() {}\n".repeat(8), b = "fun b() {}\n".repeat(8);
+  f.write("A.kt", a); f.write("B.kt", b); f.write("z.ts", "export const ready = true;\n");
+  t.mock.method(Parser.prototype, "parse", () => null);
+  for (let i = 0; i < 6; i++) f.run({ byteLimit: Buffer.byteLength(a) });
+  assert.equal(f.run({ byteLimit: Buffer.byteLength(a) }).facts.get("z.ts")?.coverage, "syntax");
+});
+
+test("a cancelled duplicate cannot overwrite a successful shared content fact", t => {
+  const f = fixture(t), source = "fun ready() {}\n";
+  f.write("A.kt", source); f.write("B.kt", source);
+  f.git("add", "."); f.git("-c", "user.name=Fixture", "-c", "user.email=f@example.invalid", "commit", "-qm", "sources");
+  const parse = Parser.prototype.parse; let calls = 0;
+  t.mock.method(Parser.prototype, "parse", function (this: Parser, ...args: Parameters<Parser["parse"]>) { return ++calls === 2 ? null : parse.apply(this, args); });
+  const first = f.run(); assert.equal(first.facts.get("A.kt")?.coverage, "syntax"); assert.equal(first.facts.get("B.kt")?.coverage, "syntax-partial");
+  const warm = f.run(); assert.equal(warm.facts.get("A.kt")?.coverage, "syntax"); assert.equal(warm.facts.get("B.kt")?.coverage, "syntax");
 });
 
 test("assume-unchanged bytes cannot reuse the Git blob and selected edits are rejected", t => {
@@ -252,12 +324,12 @@ test("Kotlin enum class descriptions retain the declared type name", () => {
   assert.deepEqual(facts.spans.map(span => span.name), ["AllowedTarget", "ValidationCode", "validate"]);
   const descriptor = JSON.parse(facts.descriptor!);
   assert.deepEqual(descriptor.symbols, ["AllowedTarget", "ValidationCode", "validate"]);
-  assert.equal(descriptor.extraction, "heuristic");
+  assert.equal(descriptor.extraction, "syntax");
 });
 
 test("attached native annotations stay with their declaration's source range", () => {
   const facts = extractSourceFacts("src/GuardTest.kt", Buffer.from("fun earlier() { check(true) }\n\n@Test\n@Timeout(10)\nfun rejectsUnsafeInput() { check(!allowed) }\n"));
-  assert.deepEqual(facts.spans.map(span => [span.name, span.start, span.end]), [["earlier", 1, 2], ["rejectsUnsafeInput", 3, 6]]);
+  assert.deepEqual(facts.spans.map(span => [span.name, span.start, span.end]), [["earlier", 1, 1], ["rejectsUnsafeInput", 3, 5]]);
 });
 
 test("rebuild recovers corrupt and oversized caches without changing an active reader's snapshot", t => {

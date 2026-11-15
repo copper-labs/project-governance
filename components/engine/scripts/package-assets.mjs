@@ -25,3 +25,6 @@ for (const provider of ['claude', 'codex', 'gemini']) {
 for (const name of ["compiled-provider-commands", "compiled-startup-updates"]) {
   cpSync(new URL(`../assets/${name}.md`, import.meta.url), new URL(`skills/resources/${name}.md`, destination));
 }
+
+// Preserve the upstream notices of grammar binaries bundled as pinned dependencies.
+cpSync(new URL('../assets/source-grammar-notices.txt', import.meta.url), new URL('source-grammar-notices.txt', destination));

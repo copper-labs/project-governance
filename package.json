@@ -1,6 +1,6 @@
 {
   "name": "@organta/project-governance",
-  "version": "4.6.2",
+  "version": "4.7.0",
   "description": "Unified governance, durable development workflows and evidence",
   "license": "Apache-2.0",
   "type": "module",
@@ -28,7 +28,14 @@
     "fast-uri": "3.1.7",
     "saxes": "6.0.0",
     "typescript": "5.9.3",
-    "yaml": "2.9.0"
+    "yaml": "2.9.0",
+    "@lumis-sh/wasm-dart": "0.26.6",
+    "@lumis-sh/wasm-java": "0.26.3",
+    "@lumis-sh/wasm-kotlin": "0.26.5",
+    "@lumis-sh/wasm-objc": "0.26.2",
+    "@lumis-sh/wasm-rust": "0.26.5",
+    "@lumis-sh/wasm-swift": "0.26.3",
+    "web-tree-sitter": "0.27.1"
   },
   "devDependencies": {
     "@types/node": "24.10.1",
