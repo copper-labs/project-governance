@@ -41,7 +41,7 @@ export function verifiedNotices(subject: ValidationSubject): Map<string, string>
 }
 
 /** Report deterministic whitespace drift; valid preserved notices retain their upstream text verbatim. */
-export function checkFormat(subject: ValidationSubject, paths: readonly string[]) {
+export function checkFormat(subject: ValidationSubject, paths: readonly string[], readLargeSource?: (path: string) => Buffer | undefined) {
   const findings: Finding[] = [], preserved: string[] = [];
   let notices = new Map<string, string>();
   try { notices = verifiedNotices(subject); }
@@ -52,20 +52,29 @@ export function checkFormat(subject: ValidationSubject, paths: readonly string[]
     if (!knownText && !binEntry) continue;
     const source = subject.source(path);
     if (!source || source.file_type !== "regular") continue;
-    const content = subject.read(path), expected = notices.get(path);
+    const content = readLargeSource?.(path) ?? subject.read(path), expected = notices.get(path);
     if (expected && sha256(content) === expected) { preserved.push(path); continue; }
     if (expected) findings.push({ rule_id: "format.preservation-invalid", severity: "blocking", path, message: "selected notice bytes do not match the preserved SHA256" });
-    // Python splitlines also recognizes these Unicode line separators; preserve the existing rule.
     let text: string;
     try { text = decode(content); }
     catch (error) { if (binEntry && !knownText) continue; throw error; }
     // Pack globs include bin entries, but executable binaries are not authored text.
     if (binEntry && !knownText && text.includes("\0")) continue;
-    const lines = text.split(/\r\n|[\n\r\v\f\u001c-\u001e\u0085\u2028\u2029]/u);
-    lines.forEach((line, index) => {
-      // Python rstrip treats U+0085 as whitespace and does not treat the BOM as whitespace.
-      if (/[\u0009-\u000d\u001c-\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]$/u.test(line)) findings.push({ rule_id: "format.drift", severity: "blocking", path, line: index + 1, message: "trailing whitespace" });
-    });
+    // Python splitlines also recognizes these Unicode line separators. Scan offsets
+    // to keep memory bounded when a captured file contains many short lines.
+    const endings = /\r\n|[\n\r\v\f\u001c-\u001e\u0085\u2028\u2029]/gu;
+    const whitespace = /[\u0009-\u000d\u001c-\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]/u;
+    let start = 0, line = 1;
+    const inspect = (end: number) => {
+      if (end > start && whitespace.test(text[end - 1]!))
+        findings.push({ rule_id: "format.drift", severity: "blocking", path, line, message: "trailing whitespace" });
+    };
+    for (const ending of text.matchAll(endings)) {
+      inspect(ending.index);
+      start = ending.index + ending[0].length;
+      line++;
+    }
+    inspect(text.length);
   }
   return { version: 1, check: "format", status: findings.length ? "failed" : "passed", finding_count: findings.length, findings, preserved_notices: preserved };
 }

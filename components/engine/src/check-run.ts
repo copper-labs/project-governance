@@ -35,7 +35,7 @@ export function checkRunRoot(): string {
   return join(state, "project-governance", "check-runs");
 }
 /** Persist intent before dispatch and terminal evidence afterwards; interruption leaves an explicitly unfinished run. */
-export async function runChecks(packs: Packs, plan: ValidationPlan, request: Omit<BuiltinCheckRequest, "id">, options: { root?: string; deadlineMs?: number; deadlineAt?: number; reservedRunId?: string; } & CheckObservationContext = {}) {
+export async function runChecks(packs: Packs, plan: ValidationPlan, request: Omit<BuiltinCheckRequest, "id">, options: { root?: string; deadlineMs?: number; deadlineAt?: number; reservedRunId?: string; largeImmutablePacket?: boolean; } & CheckObservationContext = {}) {
   checkObservationContext(options.trigger, options.expectedStatus);
   const parent = options.root ?? checkRunRoot(); mkdirSync(parent, { recursive: true, mode: 0o700 });
   const checkRunsRoot = realpathSync(parent);
@@ -51,10 +51,12 @@ export async function runChecks(packs: Packs, plan: ValidationPlan, request: Omi
   durableJson(join(directory, "run.json"), { version: 1, id, ...executionIdentity, root: request.subject.root, started_at: startedAt, ...(options.trigger ? { trigger: options.trigger } : {}), ...(options.expectedStatus ? { expected_status: options.expectedStatus } : {}), state: "running", owner: { pid: process.pid, fingerprint: processFingerprint(process.pid) }, plan, scope: request.scope, packs_digest: digest(JSON.parse(JSON.stringify(packs))) });
   let prepared = false;
   try {
-    const packet = materializeChangePacket(request.subject.root, request.scope, join(directory, "packet"));
-    prepared = true;
     const cancelled = () => checkCancellationRequested(directory, id);
-    const result = await executeChecks(packs, plan, { ...request, registry: packs, checkRunsRoot }, undefined, async (entry, packId, index) => {
+    const packet = await materializeChangePacket(request.subject.root, request.scope, join(directory, "packet"), {
+      ...(options.largeImmutablePacket ? { largeImmutable: true, deadlineAt: deadline, cancelled } : {}),
+    });
+    prepared = true;
+    const result = await executeChecks(packs, plan, { ...request, registry: packs, checkRunsRoot, readLargeFormatSource: packet.readLargeAfter }, undefined, async (entry, packId, index) => {
       const packDirectory = join(directory, digest(packId).slice(7)); mkdirSync(packDirectory, { recursive: true, mode: 0o700 });
       const evidence = join(packDirectory, "evidence"); mkdirSync(evidence, { recursive: true, mode: 0o700 });
       const lint = packs[packId]?.lint === undefined ? null : prepareLintInputs(request.subject, request.scope, packs[packId]!.lint, packId, evidence, packs[packId]!._source);

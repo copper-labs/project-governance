@@ -16,7 +16,7 @@ function fixture() {
   return { root, git, base: git("rev-parse", "HEAD"), close: () => rmSync(root, { recursive: true, force: true }) };
 }
 
-test("pushed packet uses committed bytes and excludes a preserved 79 MiB untracked archive", () => {
+test("pushed packet uses committed bytes and excludes a preserved 79 MiB untracked archive", async () => {
   const f = fixture();
   try {
     writeFileSync(join(f.root, "code.ts"), "committed\n"); f.git("add", "code.ts"); f.git("commit", "-qm", "candidate");
@@ -27,7 +27,7 @@ test("pushed packet uses committed bytes and excludes a preserved 79 MiB untrack
     const scope = resolveChangeScope(f.root, { baseRef: f.base, candidateRef: candidate });
     assert.deepEqual(scope.records.map(record => record.path), ["code.ts"]);
     assert.equal(scope.candidate_ref, candidate);
-    const packet = materializeChangePacket(f.root, scope, join(f.root, "packet"));
+    const packet = await materializeChangePacket(f.root, scope, join(f.root, "packet"));
     assert.equal(readFileSync(packet.packet.records[0]!["after_path"] as string, "utf8"), "committed\n");
     assert.equal(new ValidationSubject(f.root, scope).read("unchanged.txt").toString(), "required base\n");
     assert.equal(f.git("status", "--short", "--", "vendor.zip"), "?? vendor.zip");
@@ -35,7 +35,7 @@ test("pushed packet uses committed bytes and excludes a preserved 79 MiB untrack
   } finally { f.close(); }
 });
 
-test("committed deletion, rename and symlink cannot be replaced by opposing live inputs", () => {
+test("committed deletion, rename and symlink cannot be replaced by opposing live inputs", async () => {
   const f = fixture();
   try {
     rmSync(join(f.root, "removed.txt")); renameSync(join(f.root, "code.ts"), join(f.root, "renamed.ts"));
@@ -47,7 +47,7 @@ test("committed deletion, rename and symlink cannot be replaced by opposing live
     assert.equal(subject.source("untracked-required.yaml"), null);
     assert.equal(subject.read("renamed.ts").toString(), "base\n");
     assert.equal(scope.records.find(record => record.path === "renamed.ts")?.previous_path, "code.ts");
-    const packet = materializeChangePacket(f.root, scope, join(f.root, "packet"));
+    const packet = await materializeChangePacket(f.root, scope, join(f.root, "packet"));
     const link = packet.packet.records.find(record => record["path"] === "pointer")!;
     assert.equal(link["after_file_type"], "symlink"); assert.equal(readFileSync(link["after_path"] as string, "utf8"), "/outside/never-read");
   } finally { f.close(); }

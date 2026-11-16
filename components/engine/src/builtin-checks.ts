@@ -31,6 +31,7 @@ export interface BuiltinCheckRequest {
   id: string; subject: ValidationSubject; scope: ChangeScope; assets: CheckerAssets;
   packIds: ReadonlySet<string>; stage: string; asOf: string;
   managedPaths?: Set<string>; workId?: string; runFixtureProof?: boolean;
+  readLargeFormatSource?: (path: string) => Buffer | undefined;
   registry?: Packs;
   packId?: string;
   // Detached workers retain the owning run store without inheriting ambient state configuration.
@@ -70,7 +71,7 @@ export async function runBuiltinCheck(request: BuiltinCheckRequest) {
         return checkJunitEvidence(subject, scope, owner);
       }
       case "kmp-surface-validation": return checkKmpSurface(subject);
-      case "format": return checkFormat(subject, paths);
+      case "format": return checkFormat(subject, paths, request.readLargeFormatSource);
       case "prose": return checkProse(subject, paths);
       case "test-quality": return checkTestQuality(subject, paths);
       case "documentation": {

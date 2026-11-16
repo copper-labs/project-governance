@@ -21,6 +21,7 @@ const WORKER = fileURLToPath(import.meta.url);
 interface CheckWork extends CheckObservationContext {
   version: 1; trigger?: "manual" | "hook" | "test"; id: string; root: string; runsRoot: string; assetsRoot: string; workerDigest: string;
   packs: Packs; plan: ValidationPlan; scope: ChangeScope; stage: string; asOf: string; deadlineMs: number; deadlineAt: number;
+  largeImmutablePacket?: true;
   narrative: Pick<BuiltinCheckRequest, "commit" | "pullRequest">; managedPaths: string[]; runFixtureProof: boolean; workId: string;
   generation: RuntimeReader | null;
   decisionContext?: DecisionTaskContext;
@@ -48,6 +49,8 @@ export function dispatchChecks(packs: Packs, plan: ValidationPlan, request: Omit
   const runsRoot = realpathSync(root), id = randomUUID(), directory = join(runsRoot, id); mkdirSync(directory, { mode: 0o700 });
   const work: CheckWork = { version: 1, ...observation, id, root: request.subject.root, runsRoot, assetsRoot: request.assets.root, workerDigest: fileDigest(WORKER),
     generation: retainRuntimeReader(`check:${id}`, { workspace: request.subject.root, stage: request.stage }),
+    ...(observation.trigger === "hook" && ["pre-commit", "pre-push"].includes(request.stage) &&
+      process.env.GOVERNANCE_LARGE_IMMUTABLE_PACKET === "1" ? { largeImmutablePacket: true } : {}),
     ...(options.decisionContext ? { decisionContext: options.decisionContext } : {}),
     ...(options.taskBinding ? { taskBinding: options.taskBinding } : {}),
     deadlineAt: Date.now() + (options.deadlineMs ?? 300000),
@@ -69,7 +72,7 @@ async function worker(directory: string, expectedDigest: string) {
   try {
     const result = await runChecks(work.packs, work.plan, { subject: new ValidationSubject(work.root, work.scope), scope: work.scope,
       assets: new PackagedCheckerAssets(work.assetsRoot), packIds: new Set(Object.keys(work.packs)), stage: work.stage, asOf: work.asOf, workId: work.workId, managedPaths: new Set(work.managedPaths), runFixtureProof: work.runFixtureProof, ...work.narrative },
-    { root: work.runsRoot, deadlineMs: work.deadlineMs, deadlineAt: work.deadlineAt, reservedRunId: work.id, ...checkObservationContext(work.trigger, work.expectedStatus) });
+    { root: work.runsRoot, deadlineMs: work.deadlineMs, deadlineAt: work.deadlineAt, reservedRunId: work.id, ...(work.largeImmutablePacket ? { largeImmutablePacket: true } : {}), ...checkObservationContext(work.trigger, work.expectedStatus) });
     // Native check completion resolves its generation obligation; exceptions retain it for reconciliation.
     const unresolved = result.results.some(pack => pack.commands.some(command => command.termination_reason === "cleanup-unknown" || command.termination_reason === "outcome-unknown"));
     if (!unresolved) releaseRuntimeReader(work.generation);

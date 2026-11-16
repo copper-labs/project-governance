@@ -300,3 +300,24 @@ boundary inspection, clean installed-package journey proof, independent review a
 Actual host/adopter qualification is reported separately. Publication does not require upgrading
 active projects, and upgrade tests must preserve other worktrees and conversations. Uncompleted
 delivery slices cannot be described as released features.
+
+### Large immutable images in installed Git checks
+
+The ordinary check still refuses source images over 16 MiB by default. A local
+operator can set `GOVERNANCE_LARGE_IMMUTABLE_PACKET=1` for a normal Git pre-commit
+or pre-push invocation when the selected comparison includes large immutable
+images. The installed runtime takes the option at dispatch and records it in its
+bound worker request. This changes capture capacity only. The hook selects and
+runs its ordinary packs under its original deadline.
+
+The extension admits regular Git blobs and staged index after-images up to
+128 MiB each and caps the complete packet at 512 MiB. Working-tree images,
+symlink payloads, unborn comparisons, and non-hook or non-immutable subjects
+retain their existing limits. The worker streams each larger blob to a private
+image, verifies the object ID, length, and SHA-256, and publishes the ordinary
+version-one packet only after every image succeeds. Failure removes unpublished
+images and retains a terminal failure with no checker commands started. The
+formatter reads its admitted large after-image from that packet and verifies
+its length and SHA-256 again. Existing context and other checker input limits
+keep their own owners. This is local validation, with no disclosure or policy
+exception implied.
