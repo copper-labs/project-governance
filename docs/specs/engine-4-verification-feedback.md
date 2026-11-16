@@ -318,6 +318,7 @@ image, verifies the object ID, length, and SHA-256, and publishes the ordinary
 version-one packet only after every image succeeds. Failure removes unpublished
 images and retains a terminal failure with no checker commands started. The
 formatter reads its admitted large after-image from that packet and verifies
-its length and SHA-256 again. Existing context and other checker input limits
+its length and SHA-256 again. Bounded Git batches verify the framing and object
+identity of the smaller immutable images in the same comparison. Existing context and other checker input limits
 keep their own owners. This is local validation, with no disclosure or policy
 exception implied.

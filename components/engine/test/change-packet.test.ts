@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync, openSync, closeSync, ftruncateSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { resolveChangeScope } from "../src/change-subject.ts";
+import { resolveChangeScope, subjectDigest } from "../src/change-subject.ts";
 import { materializeChangePacket, PacketCaptureError } from "../src/change-packet.ts";
 import { fileDigest } from "../src/core.ts";
 
@@ -91,6 +91,22 @@ test("the immutable extension refuses an over-budget Git blob before publishing 
     const destination = join(root, "packet");
     await assert.rejects(materializeChangePacket(root, resolveChangeScope(root, { staged: true }), destination, { largeImmutable: true }),
       error => error instanceof PacketCaptureError && error.capture.size_bytes === max + 1 && error.capture.limit_bytes === max);
+    assert.equal(existsSync(destination), false);
+    const large = 17 * 1024 * 1024;
+    const input = join(root, "within-cap.bin");
+    const smallerFd = openSync(input, "wx");
+    try { ftruncateSync(smallerFd, large); } finally { closeSync(smallerFd); }
+    git("add", "within-cap.bin");
+    const scope = resolveChangeScope(root, { staged: true });
+    const record = scope.records.find(item => item.path === "within-cap.bin")!;
+    const source = record.after!;
+    const records = Array.from({ length: 31 }, (_, index) => {
+      const path = `packet-${index}.bin`;
+      return { ...record, path, after: { ...source, path } };
+    });
+    await assert.rejects(materializeChangePacket(root, { ...scope, records, subject_digest: subjectDigest(records) },
+      destination, { largeImmutable: true }), error => error instanceof PacketCaptureError &&
+      error.capture.size_bytes === large && error.capture.limit_bytes === 2 * 1024 * 1024);
     assert.equal(existsSync(destination), false);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
