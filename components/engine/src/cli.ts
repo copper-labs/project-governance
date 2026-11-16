@@ -2,7 +2,7 @@
 import { workflowResourceReleaseCommand } from "./workflow-resource-release.ts";
 import { evaluationCommand } from "./evaluation-command.ts";
 import { RELEASE_VERSION } from "./release-version.ts";
-import { durableJson } from "./core.ts";
+import { digest, durableJson } from "./core.ts";
 import { checkSummary } from "./check-summary.ts";
 import { checkOutput } from "./check-output.ts";
 import { checkObservationContext } from "./check-observation-context.ts";
@@ -62,6 +62,7 @@ import { buildPlan } from "./planning.ts";
 import { join, resolve, dirname, basename } from "node:path";
 import { checkTelemetry, reviewCheckRun } from "./check-telemetry.ts";
 import { checkRunRoot } from "./check-run.ts";
+import { nestedLargePacket } from "./check-nested-packet.ts";
 import { requestCheckCancellation } from "./check-cancellation.ts";
 import { inspectCheckRun } from "./check-status.ts";
 import { CheckRecoveryRefusal, reconcileCheckRun } from "./check-recovery.ts";
@@ -113,8 +114,14 @@ export function prepareCommand(args: string[], root: string, builtinDirectory: s
   if (!stage && (!packs.length || mode === "all")) throw new Error("--stage is required for this selection");
   if (mode === "all" && (values.staged || paths.length || baseRef)) throw new Error("All mode cannot combine with a comparison scope");
   if (values.staged && (paths.length || baseRef || stage !== "pre-commit")) throw new Error("Staged scope requires pre-commit and cannot combine with paths or a base");
-  const scope = resolveChangeScope(root, { all: mode === "all" || stage === "commit-msg", staged: values.staged ?? (stage === "pre-commit" && !paths.length && !baseRef && !candidateRef),
-    paths, ...(baseRef ? { baseRef } : {}), ...(candidateRef ? { candidateRef } : {}) });
+  const nested = command === "check" ? nestedLargePacket(root, { trigger, packs, stage, mode, paths,
+    ...(values.staged === undefined ? {} : { staged: values.staged }),
+    ...(baseRef === undefined ? {} : { baseRef }), ...(candidateRef === undefined ? {} : { candidateRef }),
+    detached: values.detach === true }) : null;
+  const effectiveCandidate = candidateRef ?? nested?.candidateRef;
+  const scope = resolveChangeScope(root, { all: mode === "all" || stage === "commit-msg", staged: values.staged ?? (stage === "pre-commit" && !paths.length && !baseRef && !effectiveCandidate),
+    paths, ...(baseRef ? { baseRef } : {}), ...(effectiveCandidate ? { candidateRef: effectiveCandidate } : {}) });
+  if (nested && digest(nested.scope) !== digest(scope)) throw new Error("Nested dependency check resolved a different parent subject");
   const subject = new ValidationSubject(root, scope), registry = loadSubjectPacks(subject, builtinDirectory);
   const narrative = command === "check" ? narrativeInputs(root, {
     ...(typeof values["commit-message-file"] === "string" ? { commitFile: values["commit-message-file"] } : {}),
@@ -151,7 +158,7 @@ export function prepareCommand(args: string[], root: string, builtinDirectory: s
     if (!items.length || items.some(item => item.check!.packs.some(id => !plan.selected_packs.includes(id)))) throw new Error("Check selection does not fulfill the batch's declared verification");
     progress = { path, batch: batch.id, digest: parsed.digest, items: items.map(item => item.id) };
   }
-  return { plan, progress, scope, subject, registry, narrative, workId, decisionOptions, deadlineMs, ...observation, jsonOutput: typeof jsonOutput === "string" ? jsonOutput : null, summary: values.summary === true, detach: values["detach"] === true };
+  return { plan, progress, scope, subject, registry, narrative, workId, decisionOptions, deadlineMs, nested, ...observation, jsonOutput: typeof jsonOutput === "string" ? jsonOutput : null, summary: values.summary === true, detach: values["detach"] === true };
 }
 
 export function planCommand(args: string[], root: string, builtinDirectory: string) {
@@ -551,7 +558,7 @@ Use the owning command contract for structured request fields.
     const submission = dispatchChecks(prepared.registry, prepared.plan, {
       subject: prepared.subject, scope: prepared.scope, assets: new PackagedCheckerAssets(), packIds: new Set(Object.keys(prepared.registry)),
       stage: prepared.plan.stage ?? "", asOf: new Date().toISOString(), workId: prepared.workId, ...prepared.narrative,
-    }, { deadlineMs: prepared.deadlineMs, ...(prepared.decisionOptions.context ? { decisionContext: prepared.decisionOptions.context } : {}),
+    }, { deadlineMs: prepared.deadlineMs, ...(prepared.nested ? { nested: prepared.nested } : {}), ...(prepared.decisionOptions.context ? { decisionContext: prepared.decisionOptions.context } : {}),
       ...(prepared.decisionOptions.binding ? { taskBinding: prepared.decisionOptions.binding } : {}),
       ...checkObservationContext(prepared.trigger, prepared.expectedStatus) });
     if (prepared.detach) {

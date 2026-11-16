@@ -64,7 +64,10 @@ export async function runChecks(packs: Packs, plan: ValidationPlan, request: Omi
         ...(request.commit ? { commit_message_file: request.commit.path } : {}),
         ...(request.pullRequest ? { pr_body_file: request.pullRequest.path, pr_title: request.pullRequest.title } : {}) });
       const result = await runNativeCheckCommand({ directory: join(packDirectory, `command-${index}`), id: `${id}:${packId}:${index}`, root: request.subject.root,
-        argv, credentialEnv: commandCredentialNames(entry), deadlineMs: Math.max(1, Math.min(deadlineMs, deadline - Date.now())), cancelled, env: { ...packet.env, ...(lint?.env ?? {}), GOVERNANCE_WORK_ID: request.workId ?? "", PROJECT_GOVERNANCE_RUN_ID: id, PROJECT_GOVERNANCE_EVIDENCE_ROOT: evidence } });
+        argv, credentialEnv: commandCredentialNames(entry), deadlineMs: Math.max(1, Math.min(deadlineMs, deadline - Date.now())), cancelled, env: { ...packet.env, ...(lint?.env ?? {}),
+          ...(options.largeImmutablePacket && options.trigger === "hook" && request.scope.base_ref &&
+            (request.scope.mode === "staged" || request.scope.candidate_ref) ? { PROJECT_GOVERNANCE_LARGE_IMMUTABLE_PARENT: id } : {}),
+          GOVERNANCE_WORK_ID: request.workId ?? "", PROJECT_GOVERNANCE_RUN_ID: id, PROJECT_GOVERNANCE_EVIDENCE_ROOT: evidence } });
       if (!lint || result.status === "failed" && (result.process_failure || result.failure_kind === "credential-unavailable")) return result;
       const raw = JSON.parse(result.stdout), files = lint.value.snapshots.map(entry => ({ path: entry.path, sha256: entry.sha256 }));
       if (raw.input_manifest?.status !== "complete" || digest(raw.input_manifest.files) !== digest(files)) throw new Error("Lint result does not cover its captured inputs");

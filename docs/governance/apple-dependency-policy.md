@@ -21,8 +21,15 @@ eventual removal decision. The package runtime does not infer that decision or s
 details.
 
 SwiftPM-only implementation plans do not require a CocoaPods exception. The planning approval
-gate applies to CocoaPods terms (`CocoaPods`, `Podfile`, and `.podspec`), including plans that
-mention both package managers. CocoaPods approval must remain current and bound to the work item.
+gate applies to introduced or changed CocoaPods reference blocks (`CocoaPods`, `Podfile`, and
+`.podspec`), including plans that mention both package managers. Compare captured candidate and
+original paragraphs, fenced examples and heading context. Unchanged historical or non-adoption
+references do not require a new exception when unrelated plan prose or metadata changes. Repeated
+new blocks and moving a reference into a different heading context still require review; no heading
+named history, quotation or code fence exempts new CocoaPods text. This conservative comparison
+does not infer adoption intent from English wording. An unavailable exact comparison fails closed.
+CocoaPods approval must remain current and bound to the work item. Actual dependency-surface
+changes retain their existing approval checks independently of plan text.
 
 The check caller supplies that identity through `GOVERNANCE_WORK_ID`. The engine captures it before
 dispatch and preserves it in the detached check request. Built-in approval validation receives the

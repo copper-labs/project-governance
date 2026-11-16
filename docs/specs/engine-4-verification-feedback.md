@@ -322,3 +322,11 @@ its length and SHA-256 again. Bounded Git batches verify the framing and object
 identity of the smaller immutable images in the same comparison. Existing context and other checker input limits
 keep their own owners. This is local validation, with no disclosure or policy
 exception implied.
+
+A foreground native `dependencies` check invoked by a checker in this hook can
+inherit the option from its live parent. The runtime verifies the parent
+packet digest, workspace, runtime generation, deadline and exact comparison
+subject. The dependency check resolves the same staged index or the same
+committed push candidate. It runs its own check and retains its own findings
+under the remaining parent deadline. The option does not propagate to further
+children or independently invoked checks.

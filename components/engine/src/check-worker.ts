@@ -22,6 +22,7 @@ interface CheckWork extends CheckObservationContext {
   version: 1; trigger?: "manual" | "hook" | "test"; id: string; root: string; runsRoot: string; assetsRoot: string; workerDigest: string;
   packs: Packs; plan: ValidationPlan; scope: ChangeScope; stage: string; asOf: string; deadlineMs: number; deadlineAt: number;
   largeImmutablePacket?: true;
+  largePacketParent?: string;
   narrative: Pick<BuiltinCheckRequest, "commit" | "pullRequest">; managedPaths: string[]; runFixtureProof: boolean; workId: string;
   generation: RuntimeReader | null;
   decisionContext?: DecisionTaskContext;
@@ -42,18 +43,20 @@ function selectedCredentialEnvironment(packs: Packs, plan: ValidationPlan): Reco
   return environment;
 }
 /** Reserve a single detached owner before launching. Reconnection only observes the returned run ID. */
-export function dispatchChecks(packs: Packs, plan: ValidationPlan, request: Omit<BuiltinCheckRequest, "id" | "assets"> & { assets: PackagedCheckerAssets }, options: { root?: string; deadlineMs?: number; decisionContext?: DecisionTaskContext; taskBinding?: TaskBindingReceipt } & CheckObservationContext = {}) {
+export function dispatchChecks(packs: Packs, plan: ValidationPlan, request: Omit<BuiltinCheckRequest, "id" | "assets"> & { assets: PackagedCheckerAssets }, options: { root?: string; deadlineMs?: number; nested?: { deadlineAt: number; runId: string }; decisionContext?: DecisionTaskContext; taskBinding?: TaskBindingReceipt } & CheckObservationContext = {}) {
   const observation = checkObservationContext(options.trigger, options.expectedStatus);
   const environment = { ...commandEnvironment({}), ...selectedCredentialEnvironment(packs, plan) };
   const root = options.root ?? checkRunRoot(); mkdirSync(root, { recursive: true, mode: 0o700 });
   const runsRoot = realpathSync(root), id = randomUUID(), directory = join(runsRoot, id); mkdirSync(directory, { mode: 0o700 });
+  const deadlineAt = Math.min(options.nested?.deadlineAt ?? Infinity, Date.now() + (options.deadlineMs ?? 300000));
   const work: CheckWork = { version: 1, ...observation, id, root: request.subject.root, runsRoot, assetsRoot: request.assets.root, workerDigest: fileDigest(WORKER),
     generation: retainRuntimeReader(`check:${id}`, { workspace: request.subject.root, stage: request.stage }),
-    ...(observation.trigger === "hook" && ["pre-commit", "pre-push"].includes(request.stage) &&
+    ...(options.nested ? { largeImmutablePacket: true, largePacketParent: options.nested.runId } :
+      observation.trigger === "hook" && ["pre-commit", "pre-push"].includes(request.stage) &&
       process.env.GOVERNANCE_LARGE_IMMUTABLE_PACKET === "1" ? { largeImmutablePacket: true } : {}),
     ...(options.decisionContext ? { decisionContext: options.decisionContext } : {}),
     ...(options.taskBinding ? { taskBinding: options.taskBinding } : {}),
-    deadlineAt: Date.now() + (options.deadlineMs ?? 300000),
+    deadlineAt,
     packs, plan, scope: request.scope, stage: request.stage, asOf: request.asOf, deadlineMs: options.deadlineMs ?? 300000,
     managedPaths: [...(request.managedPaths ?? [])], runFixtureProof: request.runFixtureProof ?? false, workId: request.workId ?? "",
     narrative: { ...(request.commit ? { commit: request.commit } : {}), ...(request.pullRequest ? { pullRequest: request.pullRequest } : {}) } };

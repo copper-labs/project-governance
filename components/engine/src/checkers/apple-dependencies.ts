@@ -1,6 +1,7 @@
 import { appleSource } from "./apple-source-scan.ts";
+import { introducedPlanReferences } from "./apple-plan-changes.ts";
 import type { AnySchema } from "ajv";
-import { ValidationSubject, type ChangeScope } from "../change-subject.ts";
+import { ValidationSubject, readSubjectSource, type ChangeScope } from "../change-subject.ts";
 import { findingSummary, type Finding } from "../checker-results.ts";
 import { glob } from "../planning.ts";
 import { isoDate, schemaErrors } from "../schema-validation.ts";
@@ -74,8 +75,19 @@ export async function checkAppleDependencies(subject: ValidationSubject, scope: 
     const error = !options.workId ? "GOVERNANCE_WORK_ID is required to bind approval to planned work" : !item ? "no operator-approved CocoaPods exception matches this path" : approvalError(item, options.workId, options.today);
     if (error) add("apple.cocoapods-exception-required", path, `CocoaPods is an exception to SPM-first policy: ${error}.`);
   }
-  for (const path of plans) if (contains(read(path).toLowerCase(), cocoTerms) && (!options.workId || !entries.some(item => !approvalError(item, options.workId, options.today))))
-    add("apple.cocoapods-planning-approval", path, "This plan discusses CocoaPods without a recorded operator approval.");
+  for (const path of plans) {
+    if (!contains(read(path).toLowerCase(), cocoTerms)) continue;
+    try {
+      const record = scope.records.find(record => record.path === path)!;
+      const decode = (bytes: Buffer) => new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+      // Token summaries cannot prove unchanged prose; compare the exact captured regular sources.
+      const before = record.before?.file_type === "regular" && matches(record.before.path, ["docs/exec-plans/**/*.md", "docs/exec-plans/*.md"])
+        ? decode(readSubjectSource(subject.root, record.before)) : "";
+      const after = decode(subject.read(path));
+      if (introducedPlanReferences(before, after, cocoTerms) && (!options.workId || !entries.some(item => !approvalError(item, options.workId, options.today))))
+        add("apple.cocoapods-planning-approval", path, "This plan introduces or changes CocoaPods planning text without a recorded operator approval.");
+    } catch { add("apple.input-unavailable", path, "Apple policy could not compare this captured plan with its original contents."); }
+  }
   if (scope.mode === "all" && coco.length) add("apple.existing-cocoapods", coco[0]!, "Existing CocoaPods use requires a compatibility decision before expansion or removal.", "advisory");
   return { version: 1, check: "apple-dependency-policy", ...findingSummary(findings), stage: options.stage, policy: "swiftpm-first", discovery: { swiftpm: spm, cocoapods: coco }, findings };
 }
