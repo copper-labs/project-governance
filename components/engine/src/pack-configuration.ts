@@ -4,6 +4,7 @@ import { parse } from "yaml";
 import { object, text } from "./core.ts";
 import type { ValidationSubject } from "./change-subject.ts";
 import { parseLintDeclaration } from "./lint-configuration.ts";
+import { approvedSourceRangeInputs } from "./checkers/dependency-source-ranges.ts";
 import { commandCredentialNames } from "./command-argv.ts";
 
 export interface Pack extends Record<string, unknown> {
@@ -44,7 +45,14 @@ export function loadSubjectPacks(subject: ValidationSubject, builtinDirectory: s
     const text = new TextDecoder("utf-8", { fatal: true }).decode(subject.read(path, 1024 * 1024));
     documents.push({ source: path, value: object(parse(text) ?? {}, path), origin: "target" });
   }
-  return mergePacks(documents);
+  const packs = mergePacks(documents);
+  if (packs["dependencies"]) {
+    const inputs = approvedSourceRangeInputs(subject);
+    for (const pack of Object.values(packs)) if (pack.id === "dependencies" || pack.replaces_builtin_packs.includes("dependencies")) {
+      pack.path_globs = [...new Set([...pack.path_globs, ...inputs])];
+    }
+  }
+  return packs;
 }
 
 export function mergePacks(documents: Array<{ source: string; value: Record<string, unknown>; origin: "builtin" | "target" }>): Packs {

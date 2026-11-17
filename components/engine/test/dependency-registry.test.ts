@@ -19,3 +19,17 @@ test("registry trust rejects URL rewriting and ambiguous scope configuration", (
   assert.equal(npmUrlMatches("pkg", "", "https://registry.npmjs.org/pkg/", {}, true), true);
   assert.equal(npmUrlMatches("pkg", "", "https://registry.npmjs.org/%ZZ"), false);
 });
+
+test("two explicit routes retain exact scope and URL checks", () => {
+  const legacy = "https://packages.example.invalid/registry/npm/";
+  const current = "https://packages.example.invalid/sdk/registry/npm/";
+  const registries = { "@example": [legacy, current] };
+  assert.deepEqual(registryPolicyErrors(registries), []);
+  for (const base of registries["@example"]) {
+    assert.equal(npmUrlMatches("@example/pkg", "/1.2.3", base + "@example/pkg/1.2.3", registries), true);
+    assert.equal(npmUrlMatches("@example/pkg", "/1.2.3", base + "@example/pkg/1.2.4", registries), false);
+    assert.equal(npmUrlMatches("@other/pkg", "/1.2.3", base + "@other/pkg/1.2.3", registries), false);
+  }
+  assert.equal(npmUrlMatches("@example/pkg", "/1.2.3", current + "shadow/@example/pkg/1.2.3", registries), false);
+  assert.ok(registryPolicyErrors({ "@example": [legacy, legacy.slice(0, -1)] }).length);
+});

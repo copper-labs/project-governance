@@ -1,3 +1,4 @@
+import { dirname, join } from "node:path";
 import { checkKmpSurface } from "./checkers/kmp-surface.ts";
 import { parse } from "yaml";
 import type { AnySchema } from "ajv";
@@ -92,7 +93,9 @@ export async function runBuiltinCheck(request: BuiltinCheckRequest) {
         if (!request.pullRequest) return failures("Pull-request checking requires the exact title and body inputs.");
         return checkPrDescription(request.pullRequest.title, request.pullRequest.body, request.pullRequest.path);
       case "dependencies": return checkDependencies(subject, scope, { policyPath: "config/policies/dependency-freshness.yaml",
-        evidencePath: "config/policies/dependency-freshness-evidence.yaml", overridesPath: "config/policies/dependency-freshness-overrides.yaml", asOf: request.asOf, defaultPolicy: assets.policy("dependency-freshness") });
+        evidencePath: "config/policies/dependency-freshness-evidence.yaml", overridesPath: "config/policies/dependency-freshness-overrides.yaml", asOf: request.asOf,
+        ...(request.checkRunsRoot ? { archivesDirectory: join(dirname(request.checkRunsRoot), "dependency-archives") } : {}),
+        defaultPolicy: assets.policy("dependency-freshness") });
       case "apple-dependencies": return await checkAppleDependencies(subject, scope, { policy: mapping("apple-dependencies"), exceptions: mapping("apple-dependency-exceptions"),
         schema: assets.schema("apple-dependency-exception"), workId: request.workId ?? "", today, stage: request.stage });
       case "comments": return await checkComments(subject, scope, { policy: document("source-comments"), registry: document("source-comment-adapters"),

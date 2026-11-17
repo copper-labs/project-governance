@@ -1,21 +1,14 @@
-import { coordinateFields, coordinateKey, recordCoordinate, dependencyFieldErrors, dependencyRegistryErrors } from "./dependency-evidence.ts";
+import type { NpmRegistries } from "./dependency-registry.ts";
+import { coordinateFields, dependencyFieldErrors, indexDependencyRecords } from "./dependency-evidence.ts";
 import { dependencyMoment, dayMicroseconds } from "./dependency-time.ts";
 import { authoritativeDependencySource } from "./dependency-sources.ts";
 const fields = [...coordinateFields, "published_at", "source_url", "reason", "risk_owner", "approved_by", "approver_role", "approved_at", "expires_at", "follow_up", "evidence"];
 const utcDay = (moment: bigint) => moment >= 0n ? moment / dayMicroseconds : (moment - dayMicroseconds + 1n) / dayMicroseconds;
 /** An override is valid only for an exact release, named operator approval and bounded current time window. */
-export function indexDependencyOverrides(document: Record<string, unknown>, maximumDays: number, asOf: bigint, relevant: Set<string>, registries: Record<string, string> = {}) {
+export function indexDependencyOverrides(document: Record<string, unknown>, maximumDays: number, asOf: bigint, relevant: Set<string>, registries: NpmRegistries = {}) {
   if (!Number.isSafeInteger(maximumDays) || maximumDays <= 0) throw new Error("Invalid override maximum duration");
-  const indexed = new Map<string, Record<string, unknown>>(), matched = new Set<string>(), seen = new Set<string>();
-  const errors = dependencyRegistryErrors(document, "overrides", "overrides");
-  if (errors.length) return { indexed, matched: new Set(relevant), errors };
-  for (const [index, raw] of (document["overrides"] as unknown[]).entries()) {
-    const coordinate = recordCoordinate(raw); if (!coordinate) continue;
-    const key = coordinateKey(coordinate); if (!relevant.has(key)) continue;
-    matched.add(key);
-    const record = raw as Record<string, unknown>, label = `overrides.overrides[${index + 1}]`, problems = dependencyFieldErrors(record, fields, fields, label);
-    const duplicate = seen.has(key); seen.add(key);
-    if (duplicate) { problems.push(`${label}: duplicate dependency coordinate`); indexed.delete(key); }
+  return indexDependencyRecords(document, "overrides", "overrides", relevant, registries, (record, coordinate, label) => {
+    const problems = dependencyFieldErrors(record, fields, fields, label);
     try {
       const approved = dependencyMoment(record["approved_at"], `${label}.approved_at`), expires = dependencyMoment(record["expires_at"], `${label}.expires_at`, true);
       const published = dependencyMoment(record["published_at"], `${label}.published_at`);
@@ -28,8 +21,6 @@ export function indexDependencyOverrides(document: Record<string, unknown>, maxi
     if (!authoritativeDependencySource(coordinate, record["source_url"], registries)) problems.push(`${label}.source_url: expected an authoritative HTTPS URL bound to the exact dependency coordinate`);
     for (const field of ["reason", "risk_owner", "approved_by", "follow_up", "evidence"]) if (typeof record[field] !== "string" || !record[field].trim()) problems.push(`${label}.${field}: must be a non-empty string`);
     if (record["approver_role"] !== "operator") problems.push(`${label}.approver_role: must be operator`);
-    errors.push(...problems);
-    if (!problems.length && !duplicate) indexed.set(key, structuredClone(record));
-  }
-  return { indexed, matched, errors };
+    return problems;
+  });
 }

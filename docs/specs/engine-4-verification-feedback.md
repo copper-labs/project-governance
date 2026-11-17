@@ -330,3 +330,113 @@ subject. The dependency check resolves the same staged index or the same
 committed push candidate. It runs its own check and retains its own findings
 under the remaining parent deadline. The option does not propagate to further
 children or independently invoked checks.
+
+### Proposed admission of npm library ranges
+
+The check may admit a prerelease caret declaration in a staged or committed
+comparison when its Git base independently approves the complete target set
+and pins the exact selection receipt. The base dependency policy supplies
+`npm_range_targets` and `npm_range_selections_sha256`. Current policy also opts
+in, and the exact tarball route must be trusted by both policies. Each npm
+scope may name one exact HTTPS base or an explicit list of distinct bases.
+This lets an adopter retain exact evidence for an older route while adding a
+new route for the same scope.
+
+The release owner enumerates the complete expected target set from the verified
+signed selections and release requirements before reviewing the receipt.
+Each expected row identifies the literal manifest `path`, `field`, `name`,
+and `range`, plus the `target` and `selection_id`. It binds the target's
+verified `proof_sha256`, `artifact_id`, exact `version`, `origin`, and
+`archive_sha256` to its actual `consumer_path` and `consumer_sha256`.
+Use an exact target identity from the signed selection, including the
+architecture when the release distinguishes it. The checker requires exactly
+one matching proof row per expected target. The proof cannot choose its own
+coverage or substitute another variant, signed readback, or consumer.
+
+Store the UTF-8 JSON receipt in `dependency-range-selections.yaml` beside the
+policy so the ordinary dependency pack observes receipt changes. Its
+`version` is 2 and its `selections` array uses the following records.
+
+- `edge` gives the manifest `path`, `field` (`dependencies`), dependency
+  `name`, literal `range`, `manifest_sha256`, and `expires_at`.
+- `selected` gives the verified `target`, `selection_id`, `artifact_id`,
+  `proof_sha256`, exact `version`, tarball URL in `resolved`, and signed
+  `archive_sha256`.
+- `archive` gives the observed archive `sha256` and SHA-512 `integrity`.
+- `lock` binds the approved consumer's sibling `package-lock.json` by
+  `path` and `sha256`. Its `name`, `version`, `resolved` and `integrity`
+  match the exact top-level package entry.
+
+The release owner verifies the signed selection, availability, and actual
+archive bytes before the operator approves the target set and receipt in
+the base. The engine checks the immutable consumer manifest and lock together.
+Their root name and version and the exact installed dependency pin must agree.
+It rechecks the approved range when its manifest, consumer, lock, dependency
+policy, receipt, freshness evidence or override changes. Every admitted
+exact coordinate still uses the ordinary freshness rules. Candidate policy
+and receipt edits can prepare future authority. Only an accepted base grants
+authority to the current comparison.
+
+Admitted coordinates use freshness evidence and operator overrides from the
+exact registry base in the verified tarball URL. The evidence's exact metadata
+URL supplies that base. Two trusted routes may have different release ages for
+the same version. Evidence at one base cannot satisfy the other. A matching
+digest alone does not establish a cross-route publication date.
+
+### Proposed signed gateway npm integrity
+
+A comparison base may approve `npm_signed_lock_targets` for a verified signed
+selection whose gateway emits SHA-256 SRI. Each entry gives `target`,
+`selection_id`, `proof_sha256`, `consumer_path`, `lock_sha256`, `expires_at`,
+and the signed npm `artifacts`. Each artifact gives `name`, `version`,
+`artifact_id`, `archive_sha256` and `size_bytes`. The release owner derives
+this inventory from the original signatures and the operator's expected
+targets. The check joins the inventory to a base-approved range target,
+its captured consumer manifest and its exact lock. The current policy opts
+in and trusts the exact selected route.
+
+Retain the whole fetched archive as `<sha256 hex>.tgz` in the runtime state
+directory's `dependency-archives` folder, beside `check-runs`. The checker
+reads bounded regular files there and recomputes the hash and byte count.
+Each listed top-level node must match the signed size and digest, exact
+coordinate, verified origin, exact consumer pin and captured lock SRI.
+Only those nodes receive SHA-256 admission. Ordinary nodes still use SHA-512,
+and each admitted node receives route-bound freshness checking. The checker
+leaves archive retrieval and publisher signature verification with the release
+owner. The local check uses the accepted base proof and actual retained bytes.
+
+### Proposed source-stage npm range admission
+
+A source promotion can verify a producer relationship before a private build
+exists. The comparison base can approve `npm_source_ranges` with a
+`projection_sha256` and independent expected `inputs` and `targets` lists.
+The input list gives exact repository paths the producer projection reads.
+Each target gives the exact manifest `path`, `field`, dependency `name`,
+literal `range`, `recipe`, `framework`, `os`, `provider_path`,
+`component_id`, `artifact_id`, and emitted `version`.
+
+The source owner derives the projection from the existing producer and its
+immutable input graph. Put UTF-8 JSON in `dependency-source-ranges.yaml`
+beside the dependency policy. It has `version: 1`, `inputs` with each
+`path` and `sha256`, and `bindings` with the same target fields plus
+`source_name` and `source_version` from the provider manifest. Review all
+expected recipes and OS targets and every input that determines that output.
+The check matches those sets to the accepted base, reads the captured producer
+inputs, and verifies the provider manifests. The emitted name and version can
+differ from the authored package identity when that projection is approved.
+A changed producer input selects the existing dependency pack or its declared
+replacement, including a change that touches only a resolver file.
+
+This admission clears the exact range syntax finding and emits
+`source_range_admissions` as evidence of source ownership. Registry origin,
+publication dates and installation enter through private qualification.
+Ordinary dependency checks still apply to other entries. When the base also
+binds signed consumer proof for a manifest, that proof governs admission.
+
+The release owner consumes a passing, original `signed_lock_admissions`
+receipt at the private consumer qualification step, after committing the
+source and acquiring the exact signed candidate. Bind that receipt's target,
+selection and proof digest, consumer and lock digests, and archive closure
+to the same clean source, plan and built artifact set. It supplies the
+signed dependency result for the existing release qualification evidence.
+Require the original passing receipt and check complete target coverage.

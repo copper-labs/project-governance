@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { coordinateKey, indexDependencyEvidence } from "../src/checkers/dependency-evidence.ts";
+import { coordinateKey, indexDependencyEvidence, registryCoordinateKey } from "../src/checkers/dependency-evidence.ts";
 import { dependency } from "../src/checkers/dependency-manifests.ts";
 import { dependencyMoment } from "../src/checkers/dependency-time.ts";
 const coordinate = dependency("pkg", "npm", "1.2.3", "direct"), key = coordinateKey(coordinate);
@@ -19,4 +19,18 @@ test("duplicates and incompatible registries cannot leave accepted evidence behi
   const result = run([record, record]); assert.equal(result.indexed.size, 0); assert.match(result.errors.join(" "), /duplicate/u);
   const legacy = indexDependencyEvidence({ version: 1, owner: "team", records: [record] }, 14, dependencyMoment("2026-09-20", "as_of"), new Set([key]));
   assert.equal(legacy.indexed.size, 0); assert.ok(legacy.matched.has(key)); assert.match(legacy.errors[0]!, /migrate/u);
+});
+
+
+test("same-coordinate routes retain independent age records and keep duplicate checks per route", () => {
+  const dependencyItem = dependency("@example/pkg", "npm", "1.2.3", "direct");
+  const older = "https://packages.example.invalid/registry/npm", newer = "https://packages.example.invalid/sdk/registry/npm";
+  const legacy = { ...record, ...dependencyItem, source_url: older + "/@example/pkg/1.2.3" };
+  const recent = { ...legacy, source_url: newer + "/@example/pkg/1.2.3", published_at: "2026-09-14" };
+  const legacyKey = registryCoordinateKey(dependencyItem, older), newerKey = registryCoordinateKey(dependencyItem, newer);
+  const result = indexDependencyEvidence({ version: 2, owner: "team", records: [legacy, recent] }, 14,
+    dependencyMoment("2026-09-20", "as_of"), new Set([legacyKey, newerKey]), { "@example": [older, newer] });
+  assert.deepEqual([...result.indexed.keys()], [legacyKey]);
+  assert.ok(result.matched.has(newerKey));
+  assert.match(result.errors.join(" "), /younger/u);
 });

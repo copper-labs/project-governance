@@ -1,8 +1,8 @@
 import type { DependencyCoordinate } from "./dependency-manifests.ts";
-import { npmUrlMatches } from "./dependency-registry.ts";
+import { npmUrlMatches, type NpmRegistries } from "./dependency-registry.ts";
 
 /** Validate the complete release identity without fetching or trusting URL prefixes alone. */
-export function authoritativeDependencySource(coordinate: DependencyCoordinate, value: unknown, registries: Record<string, string> = {}): boolean {
+export function authoritativeDependencySource(coordinate: DependencyCoordinate, value: unknown, registries: NpmRegistries = {}): boolean {
   const { ecosystem, name, version } = coordinate;
   if (ecosystem === "npm") return npmUrlMatches(name, `/${version}`, value, registries, true);
   if (typeof value !== "string" || /[\s\\?#;]/u.test(value)) return false;

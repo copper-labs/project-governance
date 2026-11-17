@@ -324,6 +324,13 @@ export class ValidationSubject {
     }
   }
 
+  /** Read a comparison-base identity without consulting candidate overlays. */
+  baseSource(path: string): SubjectSource | null {
+    safeSubjectPath(path);
+    const base = this.#scope.base_ref;
+    return base ? structuredClone(this.baseSources()?.get(path) ?? entry(this.root, "git", path, base)) : null;
+  }
+
   source(path: string): SubjectSource | null {
     safeSubjectPath(path);
     if (this.#scope.scope === "all") {
@@ -336,8 +343,7 @@ export class ValidationSubject {
       }
     }
     if (this.#overlay.has(path)) return structuredClone(this.#overlay.get(path)!);
-    if (this.#scope.unborn) return null;
-    return structuredClone(this.baseSources()?.get(path) ?? entry(this.root, "git", path, this.#scope.base_ref!));
+    return this.baseSource(path);
   }
 
   get readsWorkingTree(): boolean { return this.#workingTree; }

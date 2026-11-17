@@ -1,12 +1,12 @@
 import { dependency, npmExact, npmDefect, objectValue, type DependencyCoordinate, type DependencyDefect } from "./dependency-manifests.ts";
-import { npmUrlMatches } from "./dependency-registry.ts";
+import { npmUrlMatches, type NpmRegistries } from "./dependency-registry.ts";
 export function validSha512Integrity(value: unknown): boolean {
   if (typeof value !== "string" || !value.startsWith("sha512-")) return false;
   const encoded = value.slice(7);
   return /^[A-Za-z0-9+/]{86}==$/u.test(encoded) && Buffer.from(encoded, "base64").length === 64;
 }
 /** Bundled bytes inherit the enclosing registry tarball integrity, never an invented child URL. */
-function bundledEntries(rows: Array<[string, unknown]>, registries: Record<string, string>): Set<string> {
+function bundledEntries(rows: Array<[string, unknown]>, registries: NpmRegistries): Set<string> {
   const entries = new Map(rows), covered = new Set<string>();
   for (const [ownerPath, owner] of rows) {
     if (!objectValue(owner) || owner["link"] === true || !Array.isArray(owner["bundleDependencies"]) || !ownerPath.includes("node_modules/")) continue;
@@ -49,7 +49,7 @@ function bundledEntries(rows: Array<[string, unknown]>, registries: Record<strin
   return covered;
 }
 /** Lock defects are keyed by package content, not installation depth, so relocation does not erase debt. */
-export function parsePackageLock(path: string, source: string, registries: Record<string, string> = {}) {
+export function parsePackageLock(path: string, source: string, registries: NpmRegistries = {}, signedIntegrities?: ReadonlyMap<string, string>) {
   let document: unknown;
   try { document = JSON.parse(source); } catch { throw new Error(`${path}: invalid package-lock.json`); }
   if (!objectValue(document)) throw new Error(`${path}: package-lock.json must contain an object`);
@@ -82,7 +82,8 @@ export function parsePackageLock(path: string, source: string, registries: Recor
     if (!npmExact.test(version)) entryDefects.push(npmDefect("lock", name, "version", rawVersion, `${path}: lock package must use an exact major.minor.patch registry version`));
     const leaf = name.split("/").at(-1)!;
     if (!(bundled.has(entryPath) && entry["resolved"] === undefined) && !npmUrlMatches(name, `/-/${leaf}-${version}.tgz`, entry["resolved"], registries)) entryDefects.push(npmDefect("lock", name, "source", entry["resolved"] ?? null, `${path}: lock package must resolve from its trusted npm registry tarball`));
-    if (!(bundled.has(entryPath) && entry["integrity"] === undefined) && !validSha512Integrity(entry["integrity"])) entryDefects.push(npmDefect("lock", name, "integrity", entry["integrity"] ?? null, `${path}: lock package requires valid sha512 integrity`));
+    if (!(bundled.has(entryPath) && entry["integrity"] === undefined) && !validSha512Integrity(entry["integrity"]) &&
+        (!signedIntegrities?.has(entryPath) || signedIntegrities.get(entryPath) !== entry["integrity"])) entryDefects.push(npmDefect("lock", name, "integrity", entry["integrity"] ?? null, `${path}: lock package requires valid sha512 integrity`));
     defects.push(...entryDefects);
     if (!entryDefects.length) values.push(dependency(name, "npm", version, entry["dev"] === true ? "development" : entry["optional"] === true ? "optional" : "transitive"));
   }

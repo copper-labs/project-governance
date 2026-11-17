@@ -1,9 +1,9 @@
 import { parse } from "yaml";
 import { objectValue } from "./dependency-manifests.ts";
-import { npmConfigRegistryMatches } from "./dependency-registry.ts";
+import { npmConfigRegistryMatches, type NpmRegistries } from "./dependency-registry.ts";
 
 /** Committed package-manager configuration may select trusted registries, never carry credentials or replace TLS trust. */
-export function validateNpmrc(path: string, source: string, registries: Record<string, string> = {}): void {
+export function validateNpmrc(path: string, source: string, registries: NpmRegistries = {}): void {
   for (const [index, raw] of source.split(/\r\n|[\n\r]/u).entries()) {
     const line = raw.trim(); if (!line || /^[#;]/u.test(line)) continue;
     const separator = line.indexOf("=");
