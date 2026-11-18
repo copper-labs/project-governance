@@ -55,6 +55,7 @@ export function nestedImmutablePacket(root: string, selection: {
   const packet = JSON.parse(bytes.toString("utf8"));
   for (const key of ["kind", "version", "scope", "mode", "base_ref", "candidate_ref", "candidate_tree", "subject_digest"] as const)
     if (packet[key] !== scope[key]) throw invalid();
+  if (digest(packet.source_range_push ?? null) !== digest(scope.source_range_push ?? null)) throw invalid();
   if (dispatch.stage === "pre-commit" && scope.mode === "staged" && !scope.candidate_ref &&
       selection.stage === "pre-commit" && selection.staged === true && !selection.baseRef && !selection.candidateRef)
     return { scope, deadlineAt, runId: id, largeImmutable };

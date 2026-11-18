@@ -1,3 +1,4 @@
+import { sourceRangeOwnerLocator, verifySourceRangeOwner } from "./dependency-source-range-owner.ts";
 import { npmRegistryBases, type NpmRegistries } from "./dependency-registry.ts";
 import { posix } from "node:path";
 import { parse } from "yaml";
@@ -15,7 +16,7 @@ import { validateNpmrc, validateYarnrc } from "./dependency-config.ts";
 import { validateDependencyPolicy } from "./dependency-policy.ts";
 import { indexDependencyEvidence, registryCoordinateKey } from "./dependency-evidence.ts";
 import { npmSelectionInput, readNpmRangeSelections, resolveNpmRanges } from "./dependency-range-selections.ts";
-import { admitSourceRanges, readSourceRangeProjection, sameSourceRangeScope, verifySourceRangeConsumers, verifySourceRangeInputs, verifySourceRangeTransition } from "./dependency-source-ranges.ts";
+import { admitSourceRanges, readSourceRangeProjection, sameSourceRangeScope, verifySourceRangeConsumers, verifySourceRangeInputs, verifySourceRangeRefresh, verifySourceRangeTransition } from "./dependency-source-ranges.ts";
 import { retainedArchiveIntegrities, verifySignedLock } from "./dependency-signed-lock.ts";
 import { indexDependencyOverrides } from "./dependency-overrides.ts";
 import { dependencyMoment } from "./dependency-time.ts";
@@ -61,6 +62,7 @@ function loadSourceRangeProof(subject: ValidationSubject, scope: ChangeScope, po
       const source = readSourceRangeProjection(readSubjectSource(subject.root, projection, 4 * 1024 * 1024), baseAuthority.sourceRanges);
       let reviewed = source;
       let bindingChange = false;
+      let combinedRefresh = false;
       const applyingTransition = approval && (receiptChanged || baseAuthority.sourceRanges.digest !== policy.sourceRanges.digest);
       recheckSourceRanges = authorityChanged || [...source.inputs.keys()].some(path => changedPaths.has(path));
       if (authorityChanged || applyingTransition) {
@@ -73,6 +75,14 @@ function loadSourceRangeProof(subject: ValidationSubject, scope: ChangeScope, po
           reviewed = successor;
         } else if (!sameSourceRangeScope(source, successor)) {
           throw new Error("Changed source range bindings or input paths require explicit comparison-base approval");
+        } else if (!receiptChanged && !approval && baseAuthority.sourceRanges.digest !== policy.sourceRanges.digest) {
+          const owner = scope.source_range_push ? scope.source_range_push.owner : sourceRangeOwnerLocator(subject.root);
+          if (owner) {
+            verifySourceRangeRefresh(subject, policyPath, baseAuthority.sourceRanges.digest, policy.sourceRanges.digest, source, successor);
+            verifySourceRangeOwner(owner, subject, scope, baseAuthority.sourceRanges.digest, policy.sourceRanges.digest, successor.inputs);
+            combinedRefresh = true;
+            reviewed = successor;
+          }
         }
       }
       if (recheckSourceRanges || [...source.byPath.keys()].some(path => changedPaths.has(path))) {
@@ -93,8 +103,8 @@ function loadSourceRangeProof(subject: ValidationSubject, scope: ChangeScope, po
           const readPrior = readInputs(true);
           verifySourceRangeInputs(source, readPrior);
           verifySourceRangeConsumers(source, readPrior);
-          verifySourceRangeConsumers(reviewed, readInput);
         }
+        if (bindingChange || combinedRefresh) verifySourceRangeConsumers(reviewed, readInput);
         sourceRanges = reviewed;
       }
     } catch {

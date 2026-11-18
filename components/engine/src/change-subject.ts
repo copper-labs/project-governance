@@ -21,6 +21,14 @@ export interface ChangeRecord {
   status: "added" | "deleted" | "modified" | "renamed"; path: string; previous_path: string | null;
   before: SubjectSource | null; after: SubjectSource | null; changed_ranges: Array<{ start: number; end: number }>;
 }
+export interface SourceRangeApprovalLocator {
+  repository: string;
+  branch: string;
+  comment: string;
+}
+export interface SourceRangePushApproval {
+  owner: SourceRangeApprovalLocator | null;
+}
 export interface ChangeScope {
   kind: "project-governance-change-packet"; version: 1; scope: "all" | "changed"; mode: "all" | "staged" | "changed" | "explicit";
   base_ref: string | null; records: ChangeRecord[]; subject_digest: string | null;
@@ -28,9 +36,12 @@ export interface ChangeScope {
   unborn?: true;
   /** Exact pushed commit, when capture deliberately excludes live checkout and index bytes. */
   candidate_ref?: string;
-  /** Full tree identity captured when a protected source projection approval is consumed. */
+  /** Full tree identity captured for exact source projection approvals. */
   candidate_tree?: string;
+  /** The native push pins its approval locator, including an absent decision. */
+  source_range_push?: SourceRangePushApproval;
 }
+export const SOURCE_RANGE_PROJECTION_PATH = "config/policies/dependency-source-ranges.yaml";
 export const SOURCE_RANGE_TRANSITION_PATH = "config/policies/dependency-source-range-transition.yaml";
 const hash = (bytes: Buffer | string) => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 
@@ -278,8 +289,8 @@ export function resolveChangeScope(root: string, options: { staged?: boolean; al
     return [...records.values()].sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
   };
   const records = snapshot();
-  const consumesTransition = (options.staged || candidate) &&
-    records.some(record => record.path === SOURCE_RANGE_TRANSITION_PATH && record.status === "deleted");
+  const consumesTransition = (options.staged || candidate) && records.some(record =>
+    (record.path === SOURCE_RANGE_TRANSITION_PATH && record.status === "deleted") || record.path === SOURCE_RANGE_PROJECTION_PATH);
   // Capture the exact tree between the two ordinary packet observations. Unstaged bytes never enter it.
   const readTree = () => gitText(root, candidate ? ["rev-parse", "--verify", `${candidate}^{tree}`] : ["write-tree"]);
   const tree = consumesTransition ? readTree() : undefined;

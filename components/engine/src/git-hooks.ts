@@ -2,6 +2,8 @@ import { execFileSync } from "node:child_process";
 import { parseArgs } from "node:util";
 import { narrativeFile } from "./narrative-inputs.ts";
 import type { Readable } from "node:stream";
+import { sourceRangeOwnerLocator, sourceRangeRepository } from "./checkers/dependency-source-range-owner.ts";
+import { SOURCE_RANGE_PROJECTION_PATH, SOURCE_RANGE_TRANSITION_PATH, type SourceRangePushApproval } from "./change-subject.ts";
 import { readPushRefUpdate } from "./push-ref-input.ts";
 
 export const GIT_HOOKS = ["commit-msg", "pre-commit", "pre-push", "pre-pr"] as const;
@@ -48,12 +50,27 @@ function pushCheckArguments(candidate: string, base: string): string[] {
   return ["--summary", "--stage", "pre-push", "--mode", "impacted", "--candidate-ref", candidate, "--base-ref", base];
 }
 
-/** Actual Git pushes supply immutable endpoints; remote names and locations never enter the check request. */
-export async function prePushCheckArguments(root: string, args: string[], input: Readable = process.stdin, environment: NodeJS.ProcessEnv = process.env): Promise<string[]> {
-  if (!args.length) return hookCheckArguments(root, "pre-push", args, environment);
+/** An out-of-tree review for one protected branch must never authorize a different destination. */
+function sourceRangePushApproval(root: string, args: string[], candidate: string, base: string, remote: string | null, remoteRef: string): SourceRangePushApproval {
+  const changed = pushGit(root, ["diff", "--name-only", "--no-ext-diff", "--no-renames", base, candidate, "--", SOURCE_RANGE_PROJECTION_PATH]);
+  // The raw remote tree can differ from the check's merge base. Keep absent authority pinned too.
+  if (!changed || pushGit(root, ["ls-tree", base, "--", SOURCE_RANGE_TRANSITION_PATH])) return { owner: null };
+  const owner = sourceRangeOwnerLocator(root);
+  if (owner && (remote !== base || args[0] !== "origin" || sourceRangeRepository(args[1]!) !== owner.repository ||
+      remoteRef !== `refs/heads/${owner.branch}`)) throw new Error("Source range review does not authorize this push destination");
+  return { owner };
+}
+
+/** Actual Git pushes supply immutable comparison endpoints and validate any reviewed destination. */
+export async function prePushCheckRequest(root: string, args: string[], input: Readable = process.stdin, environment: NodeJS.ProcessEnv = process.env):
+  Promise<{ args: string[]; sourceRangePush: SourceRangePushApproval }> {
+  if (!args.length) return { args: hookCheckArguments(root, "pre-push", args, environment), sourceRangePush: { owner: null } };
   if (args.length !== 2) throw new Error("pre-push expects Git's remote name and location");
   const update = await readPushRefUpdate(input);
-  return pushCheckArguments(exactPushCommit(root, update.candidate), update.remote ? exactPushCommit(root, update.remote) : pushComparisonBase(root, environment));
+  const candidate = exactPushCommit(root, update.candidate);
+  const base = update.remote ? exactPushCommit(root, update.remote) : pushComparisonBase(root, environment);
+  const sourceRangePush = sourceRangePushApproval(root, args, candidate, base, update.remote, update.remoteRef);
+  return { args: pushCheckArguments(candidate, base), sourceRangePush };
 }
 
 /** Hook inputs choose a fixed check boundary, not arbitrary runtime commands or install actions. */

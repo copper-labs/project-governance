@@ -511,6 +511,33 @@ candidate. Ordinary freshness, signed locks, other dependencies and all
 other pack checks still apply. A later refresh or allocation needs its own
 receipt and exact review.
 
+### Proposed combined source range refresh
+
+When the existing receipt commit cannot pass ordinary checks on its own, an
+owner may review one exact hash-only refresh in a private GitHub issue. Use the
+native issue author and separate reviewer accounts. The reviewer must be an
+individual currently authorized to push the target branch by its GitHub
+protection. The target must enforce protection for admins and disallow force
+pushes and deletion. The installed checker rereads the open, unedited request,
+unmodified approval comment, branch head and protection during each check.
+The next local dependency check rejects a closed issue or removed approval
+comment. A decision that changes after the check has read it can still race
+the Git push.
+An issue that has been closed remains ineligible after reopening. Start a
+new request and obtain a fresh approval.
+
+The request binds the repository ID, branch, current base, final tree, both
+projection digests, every captured successor input hash, and the exact
+executing checker lock and archive. The existing refresh restrictions still
+apply. The checker also rereads all candidate consumer ranges. In normal push
+hooks, the outgoing Git endpoint and target must match the reviewed repository
+and branch. The outer hook captures the locator for the nested dependency
+check, which uses that value for its live GitHub read. A retry may verify the same tuple while the same base is live.
+Once the branch advances, the previous approval cannot authorize another
+transition. GitHub requests are read only and occur only when a local Git
+approval locator selects this route. API signoff and the other packs retain
+their current commands and authority.
+
 The release owner consumes a passing, original `signed_lock_admissions`
 receipt at the private consumer qualification step, after committing the
 source and acquiring the exact signed candidate. Bind that receipt's target,

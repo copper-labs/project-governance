@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { prepareCommand } from "../src/cli.ts";
-import { GIT_HOOKS, gitHookLauncher, hookCheckArguments, prePushCheckArguments } from "../src/git-hooks.ts";
+import { GIT_HOOKS, gitHookLauncher, hookCheckArguments, prePushCheckRequest } from "../src/git-hooks.ts";
 
 const git = (root: string, args: string[]) => execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 
@@ -80,7 +80,7 @@ test("native pre-push binds Git-supplied commits despite different HEAD, index, 
     writeFileSync(join(f.root, "candidate.txt"), "unstaged input\n");
     writeFileSync(join(f.root, "untracked.zip"), "retained artifact");
     const privateRemote = "ssh://private-value@example.invalid/repository";
-    const args = await prePushCheckArguments(f.root, ["literal remote '$()", privateRemote], updateInput(f.candidate, f.base), { GOVERNANCE_BASE_REF: "missing-override" });
+    const { args } = await prePushCheckRequest(f.root, ["literal remote '$()", privateRemote], updateInput(f.candidate, f.base), { GOVERNANCE_BASE_REF: "missing-override" });
     assert.deepEqual(args.slice(-4), ["--candidate-ref", f.candidate, "--base-ref", f.base]);
     assert.ok(!JSON.stringify(args).includes(privateRemote));
     const prepared = prepareCommand(args, f.root, fileURLToPath(new URL("../../../src/project_governance_runtime/packs/", import.meta.url)), "check");
@@ -95,9 +95,9 @@ test("new-branch and manual pre-push require a configured or upstream comparison
   const f = pushFixture();
   try {
     const zero = "0".repeat(f.candidate.length);
-    await assert.rejects(prePushCheckArguments(f.root, ["origin", "private-location"], updateInput(f.candidate, zero), {}), /unavailable/);
-    const configured = await prePushCheckArguments(f.root, ["origin", "private-location"], updateInput(f.candidate, zero), { GOVERNANCE_BASE_REF: f.base });
-    assert.deepEqual(configured.slice(-4), ["--candidate-ref", f.candidate, "--base-ref", f.base]);
+    await assert.rejects(prePushCheckRequest(f.root, ["origin", "private-location"], updateInput(f.candidate, zero), {}), /unavailable/);
+    const configured = await prePushCheckRequest(f.root, ["origin", "private-location"], updateInput(f.candidate, zero), { GOVERNANCE_BASE_REF: f.base });
+    assert.deepEqual(configured.args.slice(-4), ["--candidate-ref", f.candidate, "--base-ref", f.base]);
     const manual = hookCheckArguments(f.root, "pre-push", [], { GOVERNANCE_BASE_REF: f.base });
     assert.deepEqual(manual.slice(-4), ["--candidate-ref", f.run("rev-parse", "HEAD"), "--base-ref", f.base]);
     assert.throws(() => hookCheckArguments(f.root, "pre-push", [], {}), /unavailable/);
@@ -106,8 +106,8 @@ test("new-branch and manual pre-push require a configured or upstream comparison
     f.run("config", "remote.origin.url", "https://example.invalid/fixture");
     f.run("config", "remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*");
     f.run("config", `branch.${branch}.remote`, "origin"); f.run("config", `branch.${branch}.merge`, "refs/heads/main");
-    const upstream = await prePushCheckArguments(f.root, ["origin", "private-location"], updateInput(f.candidate, zero), {});
-    assert.deepEqual(upstream.slice(-4), ["--candidate-ref", f.candidate, "--base-ref", f.base]);
+    const upstream = await prePushCheckRequest(f.root, ["origin", "private-location"], updateInput(f.candidate, zero), {});
+    assert.deepEqual(upstream.args.slice(-4), ["--candidate-ref", f.candidate, "--base-ref", f.base]);
   } finally { f.close(); }
 });
 
@@ -116,12 +116,12 @@ test("pre-push rejects noncommit endpoints without retaining private remote inpu
   try {
     const blob = f.run("rev-parse", "HEAD:candidate.txt"), privateRemote = "remote-secret-value";
     for (const [candidate, remote] of [[blob, f.base], [f.candidate, blob]]) {
-      await assert.rejects(prePushCheckArguments(f.root, ["origin", privateRemote], updateInput(candidate!, remote!), {}), error => {
+      await assert.rejects(prePushCheckRequest(f.root, ["origin", privateRemote], updateInput(candidate!, remote!), {}), error => {
         assert.ok(error instanceof Error); assert.match(error.message, /exact commit object/); assert.ok(!error.message.includes(privateRemote)); return true;
       });
     }
     f.run("tag", "-a", "annotated", "-m", "annotation", f.candidate);
-    await assert.rejects(prePushCheckArguments(f.root, ["origin", privateRemote], updateInput(f.run("rev-parse", "annotated"), f.base), {}), /exact commit object/);
+    await assert.rejects(prePushCheckRequest(f.root, ["origin", privateRemote], updateInput(f.run("rev-parse", "annotated"), f.base), {}), /exact commit object/);
   } finally { f.close(); }
 });
 

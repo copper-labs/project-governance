@@ -6,6 +6,7 @@ import { inspectRuntimeGeneration } from "./runtime-inspection.ts";
 
 export interface RuntimeExecutionIdentity { runtimeVersion: string; archiveDigest: string | null }
 let captured: RuntimeExecutionIdentity | undefined;
+let capturedLockDigest: string | undefined;
 
 /** Capture this executing package's original verified generation, never an adopter's current lock. */
 export function runtimeExecutionIdentity(): RuntimeExecutionIdentity {
@@ -18,8 +19,17 @@ export function runtimeExecutionIdentity(): RuntimeExecutionIdentity {
       if (packageRoot !== join(generation, "node_modules/@organta/project-governance") ||
           ![join(packageRoot, "dist/engine/src/runtime-execution-identity.js"), join(packageRoot, "dist/engine/src/runtime-execution-identity.ts")].includes(module)) return { ...captured };
       const original = inspectRuntimeGeneration(generation);
-      if (original.runtimeVersion === RELEASE_VERSION) captured = { runtimeVersion: original.runtimeVersion, archiveDigest: original.archiveDigest };
+      if (original.runtimeVersion === RELEASE_VERSION) {
+        captured = { runtimeVersion: original.runtimeVersion, archiveDigest: original.archiveDigest };
+        capturedLockDigest = original.lockDigest;
+      }
     } catch { /* Source, plain npm payloads and unverified generations keep exact archive identity unknown. */ }
   }
   return { ...captured };
+}
+
+/** The original parsed lock digest of this verified generation. */
+export function executingRuntimeLockDigest(): string | undefined {
+  runtimeExecutionIdentity();
+  return capturedLockDigest;
 }

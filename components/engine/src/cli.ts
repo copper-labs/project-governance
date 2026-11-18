@@ -36,7 +36,7 @@ import { kmpDoctorFindings } from "./checkers/kmp-doctor.ts";
 import { decisionTelemetryCommand } from "./decision-history.ts";
 import { contextStateRoot } from "./context-command.ts";
 import { installGitHooks, planGitHookInstallation } from "./git-hook-installation.ts";
-import { hookCheckArguments, prePushCheckArguments } from "./git-hooks.ts";
+import { hookCheckArguments, prePushCheckRequest } from "./git-hooks.ts";
 import { inspectRuntimeGeneration } from "./runtime-inspection.ts";
 import { invokeRuntimeGeneration } from "./runtime-invocation.ts";
 import { contextRouteCommand } from "./context-route-command.ts";
@@ -56,7 +56,7 @@ import { narrativeFile } from "./narrative-inputs.ts";
 import { workflowCommand, workflowExitCode } from "./workflow-command.ts";
 import { fileURLToPath } from "node:url";
 import { realpathSync, existsSync } from "node:fs";
-import { resolveChangeScope, ValidationSubject } from "./change-subject.ts";
+import { resolveChangeScope, ValidationSubject, type SourceRangePushApproval } from "./change-subject.ts";
 import { loadSubjectPacks } from "./pack-configuration.ts";
 import { buildPlan } from "./planning.ts";
 import { join, resolve, dirname, basename } from "node:path";
@@ -84,7 +84,7 @@ import { installLintSetup } from "./lint-installation.ts";
 import { readReleaseEvaluation, releaseEvaluationMarkdown } from "./release-evaluation.ts";
 
 /** Public argument parsing rejects conflicting subjects before reading a candidate. */
-export function prepareCommand(args: string[], root: string, builtinDirectory: string, command: "plan" | "check" = "plan") {
+export function prepareCommand(args: string[], root: string, builtinDirectory: string, command: "plan" | "check" = "plan", nativePush?: SourceRangePushApproval) {
   const { values, positionals } = parseArgs({ args, strict: true, allowPositionals: false, options: {
     stage: { type: "string" }, mode: { type: "string", default: "impacted" }, staged: { type: "boolean" },
     "changed-path": { type: "string", multiple: true }, "base-ref": { type: "string" }, "candidate-ref": { type: "string" }, pack: { type: "string", multiple: true },
@@ -121,6 +121,8 @@ export function prepareCommand(args: string[], root: string, builtinDirectory: s
   const effectiveCandidate = candidateRef ?? nested?.candidateRef;
   const scope = resolveChangeScope(root, { all: mode === "all" || stage === "commit-msg", staged: values.staged ?? (stage === "pre-commit" && !paths.length && !baseRef && !effectiveCandidate),
     paths, ...(baseRef ? { baseRef } : {}), ...(effectiveCandidate ? { candidateRef: effectiveCandidate } : {}) });
+  const sourceRangePush = nativePush ?? nested?.scope.source_range_push;
+  if (sourceRangePush && scope.candidate_tree) scope.source_range_push = sourceRangePush;
   if (nested && digest(nested.scope) !== digest(scope)) throw new Error("Nested dependency check resolved a different parent subject");
   const subject = new ValidationSubject(root, scope), registry = loadSubjectPacks(subject, builtinDirectory);
   const narrative = command === "check" ? narrativeInputs(root, {
@@ -165,7 +167,7 @@ export function planCommand(args: string[], root: string, builtinDirectory: stri
   const prepared = prepareCommand(args, root, builtinDirectory);
   return { ...prepared.plan, change_scope: prepared.scope };
 }
-export async function main(args = process.argv.slice(2)): Promise<number> {
+export async function main(args = process.argv.slice(2), nativePush?: SourceRangePushApproval): Promise<number> {
   try {
     const command = args[0];
     if (command === "--help" || command === "-h" || command === "help") {
@@ -248,8 +250,8 @@ Use the owning command contract for structured request fields.
     }
     if (command === "hook") {
       const root = realpathSync(process.cwd()), hook = args[1] ?? "", hookArgs = args.slice(2);
-      const checkArgs = hook === "pre-push" ? await prePushCheckArguments(root, hookArgs) : hookCheckArguments(root, hook, hookArgs);
-      return main(["check", "--trigger", "hook", ...checkArgs]);
+      const check = hook === "pre-push" ? await prePushCheckRequest(root, hookArgs) : { args: hookCheckArguments(root, hook, hookArgs), sourceRangePush: undefined };
+      return main(["check", "--trigger", "hook", ...check.args], check.sourceRangePush);
     }
     if (command === "docs") {
       if (args[1] === "init") {
@@ -548,7 +550,7 @@ Use the owning command contract for structured request fields.
       return observed.state === "terminal" ? (observed.status === "failed" ? 1 : 0) : 2;
     }
     if (command !== "plan" && command !== "check") throw new Error("Unsupported command");
-    const prepared = prepareCommand(args.slice(1), realpathSync(process.cwd()), fileURLToPath(new URL("../assets/packs/", import.meta.url)), command);
+    const prepared = prepareCommand(args.slice(1), realpathSync(process.cwd()), fileURLToPath(new URL("../assets/packs/", import.meta.url)), command, nativePush);
     if (command === "plan") {
       const advice = await withDecisionCancellation(options => checkDecisionAdvice(prepared, prepared.decisionOptions, false, options));
       const result = { ...prepared.plan, change_scope: prepared.scope };

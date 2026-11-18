@@ -113,6 +113,17 @@ function policyOutsideBindingChanges(bytes: string) {
   return canonical({ ...policy, npm_source_ranges: unchanged });
 }
 
+/** Hash refreshes preserve the full accepted dependency scope and policy. */
+export function verifySourceRangeRefresh(subject: ValidationSubject, policyPath: string, priorDigest: string,
+  nextDigest: string, prior: SourceRangeProjection, next: SourceRangeProjection): void {
+  if (!sameSourceRangeScope(prior, next)) throw new Error("Source projection refresh changed the approved paths or bindings");
+  const basePolicy = subject.baseSource(policyPath);
+  if (!basePolicy) throw new Error("Original source range policy is missing");
+  const oldPolicy = readSubjectSource(subject.root, basePolicy, 4 * 1024 * 1024).toString("utf8");
+  if (oldPolicy.replace(priorDigest, nextDigest) !== subject.read(policyPath, 4 * 1024 * 1024).toString("utf8"))
+    throw new Error("Source projection refresh changed the dependency policy outside the digest");
+}
+
 /** The comparison base binds both one-use routes to the exact tree that consumes its receipt. */
 export function verifySourceRangeTransition(subject: ValidationSubject, scope: ChangeScope, receipt: SubjectSource,
   policyPath: string, priorDigest: string, nextDigest: string,
@@ -128,11 +139,11 @@ export function verifySourceRangeTransition(subject: ValidationSubject, scope: C
       row.candidate_tree !== scope.candidate_tree || subject.source(SOURCE_RANGE_TRANSITION_PATH) ||
       !subject.isAdditionOnlyBase(row.prior_base, SOURCE_RANGE_TRANSITION_PATH))
     throw new Error("Source projection approval does not bind this base and candidate");
-  const basePolicy = subject.baseSource(policyPath);
-  if (!basePolicy) throw new Error("Original source range policy is missing");
-  const oldPolicy = readSubjectSource(subject.root, basePolicy, 4 * 1024 * 1024).toString("utf8");
-  const newPolicy = subject.read(policyPath, 4 * 1024 * 1024).toString("utf8");
   if (version === 2) {
+    const basePolicy = subject.baseSource(policyPath);
+    if (!basePolicy) throw new Error("Original source range policy is missing");
+    const oldPolicy = readSubjectSource(subject.root, basePolicy, 4 * 1024 * 1024).toString("utf8");
+    const newPolicy = subject.read(policyPath, 4 * 1024 * 1024).toString("utf8");
     if (fields.workspace_sha256 !== hash(Buffer.from(subject.root, "utf8")) || !sameInputPaths(prior, next))
       throw new Error("Source binding transition changed the approved workspace or input paths");
     const changes = bindingChanges(prior, next);
@@ -142,9 +153,7 @@ export function verifySourceRangeTransition(subject: ValidationSubject, scope: C
       throw new Error("Source binding transition changed unrelated dependency policy");
     return "bindings";
   }
-  if (!sameSourceRangeScope(prior, next)) throw new Error("Source projection refresh changed the approved paths or bindings");
-  if (oldPolicy.replace(priorDigest, nextDigest) !== newPolicy)
-    throw new Error("Source projection refresh changed the dependency policy outside the digest");
+  verifySourceRangeRefresh(subject, policyPath, priorDigest, nextDigest, prior, next);
   return "hashes";
 }
 

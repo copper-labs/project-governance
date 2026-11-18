@@ -1,9 +1,9 @@
 import type { Readable } from "node:stream";
 
-export interface PushRefUpdate { candidate: string; remote: string | null }
+export interface PushRefUpdate { candidate: string; remote: string | null; remoteRef: string }
 const MAX_PUSH_INPUT_BYTES = 65536;
 
-/** Ref names are framing only. Exact object IDs bind the comparison without trusting remote text. */
+/** Exact object IDs bind the comparison. Destination text is used only for equality against an approved target. */
 export function parsePushRefUpdate(bytes: Buffer): PushRefUpdate {
   if (bytes.length > MAX_PUSH_INPUT_BYTES) throw new Error("Pre-push input exceeds byte limit");
   let text: string;
@@ -14,7 +14,7 @@ export function parsePushRefUpdate(bytes: Buffer): PushRefUpdate {
   const fields = /^([^\s\0]+) ((?:[a-f0-9]{40}|[a-f0-9]{64})) ([^\s\0]+) ((?:[a-f0-9]{40}|[a-f0-9]{64}))$/u.exec(lines[0]);
   if (!fields || Buffer.byteLength(fields[1]!) > 4096 || Buffer.byteLength(fields[3]!) > 4096 || fields[2]!.length !== fields[4]!.length) throw new Error("Pre-push ref input is malformed");
   if (/^0+$/u.test(fields[2]!)) throw new Error("Pre-push deletion candidates are unsupported");
-  return { candidate: fields[2]!, remote: /^0+$/u.test(fields[4]!) ? null : fields[4]! };
+  return { candidate: fields[2]!, remote: /^0+$/u.test(fields[4]!) ? null : fields[4]!, remoteRef: fields[3]! };
 }
 
 /** A hook cannot wait indefinitely for a caller or buffer an unbounded ref stream. */

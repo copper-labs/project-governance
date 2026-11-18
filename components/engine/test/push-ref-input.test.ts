@@ -8,9 +8,9 @@ const update = (candidate = oid, base = remote) => `refs/heads/topic ${candidate
 
 test("pre-push input handles split UTF8 framing and exact SHA1 or SHA256 endpoints", async () => {
   const bytes = Buffer.from(update().replaceAll("topic", "café"));
-  assert.deepEqual(await readPushRefUpdate(Readable.from([...bytes].map(byte => Buffer.from([byte])))), { candidate: oid, remote });
-  assert.deepEqual(parsePushRefUpdate(Buffer.from(update(oid, "0".repeat(40)))), { candidate: oid, remote: null });
-  assert.deepEqual(parsePushRefUpdate(Buffer.from(update("a".repeat(64), "b".repeat(64)))), { candidate: "a".repeat(64), remote: "b".repeat(64) });
+  assert.deepEqual(await readPushRefUpdate(Readable.from([...bytes].map(byte => Buffer.from([byte])))), { candidate: oid, remote, remoteRef: "refs/heads/café" });
+  assert.deepEqual(parsePushRefUpdate(Buffer.from(update(oid, "0".repeat(40)))), { candidate: oid, remote: null, remoteRef: "refs/heads/topic" });
+  assert.deepEqual(parsePushRefUpdate(Buffer.from(update("a".repeat(64), "b".repeat(64)))), { candidate: "a".repeat(64), remote: "b".repeat(64), remoteRef: "refs/heads/topic" });
 });
 
 test("pre-push input rejects empty, multiple, deletion and malformed updates", () => {
