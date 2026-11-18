@@ -15,7 +15,7 @@ import { validateNpmrc, validateYarnrc } from "./dependency-config.ts";
 import { validateDependencyPolicy } from "./dependency-policy.ts";
 import { indexDependencyEvidence, registryCoordinateKey } from "./dependency-evidence.ts";
 import { npmSelectionInput, readNpmRangeSelections, resolveNpmRanges } from "./dependency-range-selections.ts";
-import { admitSourceRanges, readSourceRangeProjection, verifySourceRangeInputs, verifySourceRangeTransition } from "./dependency-source-ranges.ts";
+import { admitSourceRanges, readSourceRangeProjection, sameSourceRangeScope, verifySourceRangeConsumers, verifySourceRangeInputs, verifySourceRangeTransition } from "./dependency-source-ranges.ts";
 import { retainedArchiveIntegrities, verifySignedLock } from "./dependency-signed-lock.ts";
 import { indexDependencyOverrides } from "./dependency-overrides.ts";
 import { dependencyMoment } from "./dependency-time.ts";
@@ -104,6 +104,7 @@ function loadRangeProofs(subject: ValidationSubject, scope: ChangeScope, options
         throw new Error("Missing valid comparison-base source range authority");
       const source = readSourceRangeProjection(readSubjectSource(subject.root, projection, 4 * 1024 * 1024), baseAuthority.sourceRanges);
       let reviewed = source;
+      let bindingChange = false;
       const applyingTransition = approval && (receiptChanged || baseAuthority.sourceRanges.digest !== policy.sourceRanges.digest);
       recheckSourceRanges = authorityChanged || [...source.inputs.keys()].some(path => changedPaths.has(path));
       if (authorityChanged || applyingTransition) {
@@ -111,21 +112,33 @@ function loadRangeProofs(subject: ValidationSubject, scope: ChangeScope, options
         if (future?.file_type !== "regular" || future.kind === "worktree") throw new Error("Missing captured source range projection");
         const successor = readSourceRangeProjection(readSubjectSource(subject.root, future, 4 * 1024 * 1024), policy.sourceRanges);
         if (applyingTransition) {
-          verifySourceRangeTransition(subject, scope, approval, options.policyPath,
-            baseAuthority.sourceRanges.digest, policy.sourceRanges.digest, source, successor);
+          bindingChange = verifySourceRangeTransition(subject, scope, approval, options.policyPath,
+            baseAuthority.sourceRanges.digest, policy.sourceRanges.digest, source, successor) === "bindings";
           reviewed = successor;
+        } else if (!sameSourceRangeScope(source, successor)) {
+          throw new Error("Changed source range bindings or input paths require explicit comparison-base approval");
         }
       }
       if (recheckSourceRanges || [...source.byPath.keys()].some(path => changedPaths.has(path))) {
-        let remaining = SOURCE_CAPTURE_BATCH_MAX_BYTES;
-        verifySourceRangeInputs(reviewed, path => {
-          const input = subject.source(path);
-          if (input?.file_type !== "regular" || input.kind === "worktree" || remaining < 1)
-            throw new Error("Source range proof requires bounded immutable producer inputs");
-          const bytes = readSubjectSource(subject.root, input, Math.min(SOURCE_CAPTURE_MAX_BYTES, remaining));
-          remaining -= bytes.length;
-          return bytes;
-        });
+        const readInputs = (fromBase: boolean) => {
+          let remaining = SOURCE_CAPTURE_BATCH_MAX_BYTES;
+          return (path: string) => {
+            const input = fromBase ? subject.baseSource(path) : subject.source(path);
+            if (input?.file_type !== "regular" || input.kind === "worktree" || remaining < 1)
+              throw new Error("Source range proof requires bounded immutable inputs");
+            const bytes = readSubjectSource(subject.root, input, Math.min(SOURCE_CAPTURE_MAX_BYTES, remaining));
+            remaining -= bytes.length;
+            return bytes;
+          };
+        };
+        const readInput = readInputs(false);
+        verifySourceRangeInputs(reviewed, readInput);
+        if (bindingChange) {
+          const readPrior = readInputs(true);
+          verifySourceRangeInputs(source, readPrior);
+          verifySourceRangeConsumers(source, readPrior);
+          verifySourceRangeConsumers(reviewed, readInput);
+        }
         sourceRanges = reviewed;
       }
     } catch {

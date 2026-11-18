@@ -461,7 +461,33 @@ inputs may live only in the prospective source when the earlier approval was
 accepted as a policy-only commit. The policy edit is limited to the projection
 digest. Deleting or changing the receipt without applying the refresh fails.
 Normal nested dependency and other checks still run under their existing limits.
-Changes to binding values or input paths require their own policy review.
+
+A version-2 receipt authorizes a separately reviewed version allocation on the
+same input paths and owners. Only the literal dependency range, emitted version
+and provider source version may change. The consumer path, field and package,
+recipe, framework, OS, provider path, source name, component and artifact stay
+bound to their previous values. A receipt cannot add or duplicate a target.
+Version 1 retains its unchanged-binding contract.
+
+Version 2 keeps the four identity fields above and adds two required values.
+`workspace_sha256` hashes the UTF-8 canonical root of the named promotion
+checkout, without a newline. `binding_changes_sha256` uses the runtime's
+canonical JSON digest of the ordered list of changed `{before, after}` pairs.
+Each pair contains both complete projection rows. Order the pairs by the
+canonical JSON of each row's `[path, field, name, recipe, framework, os]` key.
+The reviewer approves the exact pairs, old and new projection bytes, the
+original parent, named checkout and complete candidate tree. Verify the hosted
+review and protected base before use. The checker verifies the Git and digest
+bindings. The hosted review establishes the reviewer's identity.
+
+Both checks require the previous accepted policy and the exact staged or
+committed successor. Only the projection digest and versioned source range
+targets may change in the dependency policy. Version 2 verifies both the
+previous producer hashes, provider identities and consumer ranges against the
+immutable comparison base and the successor values against the captured
+candidate. Ordinary freshness, signed locks, other dependencies and all
+other pack checks still apply. A later refresh or allocation needs its own
+receipt and exact review.
 
 The release owner consumes a passing, original `signed_lock_admissions`
 receipt at the private consumer qualification step, after committing the

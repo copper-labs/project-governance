@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
@@ -9,6 +9,7 @@ import { resolveChangeScope, ValidationSubject } from "../src/change-subject.ts"
 import { checkDependencies } from "../src/checkers/dependencies.ts";
 import { loadSubjectPacks } from "../src/pack-configuration.ts";
 import { buildPlan } from "../src/planning.ts";
+import { digest } from "../src/core.ts";
 
 const path = "binding/package.json", providerPath = "producer/package.json", resolver = "build/graph.js";
 const proofPath = "config/policies/dependency-source-ranges.yaml";
@@ -194,6 +195,129 @@ test("a proof refresh fails closed on policy-only, unauthorized, stale, mismatch
     "wrong-new-digest", "extra-base-change", "stale-base", "retained-approval", "delete-receipt-only", "delete-with-unrelated-change", "wrong-input-bytes", "widened-target", "widened-input", "rebound-provider",
     "other-policy-change"] as const) {
     const result = refreshFixture(mode);
+    assert.equal(result.source_range_admissions, undefined, mode);
+    assert.ok(result.findings.some(row => row.rule_id === "dependency.source-range-invalid"), mode);
+  }
+});
+
+type BindingCase = "approved" | "unapproved" | "policy-only" | "candidate-approval" | "old-format" | "prior-producer-bytes" |
+  "stale-base" | "wrong-parent" | "wrong-tree" | "wrong-root" | "wrong-delta" | "wrong-old-proof" |
+  "widened-input" | "widened-path" | "widened-package" | "widened-provider" | "wrong-owner" |
+  "duplicate-target" | "producer-bytes" | "consumer-bytes" | "other-policy" | "delete-only";
+
+function bindingFixture(mode: BindingCase) {
+  const scratch = realpathSync(mkdtempSync(join(tmpdir(), "dependency-binding-change-")));
+  const root = join(scratch, "source");
+  mkdirSync(root);
+  const git = (...args: string[]) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
+  const write = (relative: string, contents: string) => {
+    const file = join(root, relative);
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, contents);
+  };
+  try {
+    git("init", "-q"); git("config", "user.name", "Fixture"); git("config", "user.email", "fixture@example.invalid");
+    const otherProvider = "alternate/package.json";
+    const priorInputs = [providerPath, resolver, otherProvider];
+    const nextInputs = mode === "widened-input" ? [...priorInputs, "build/new.js"] : priorInputs;
+    const beforeProvider = { name: "@project/movement", version: "1.0.0-beta.1" };
+    const afterProvider = { name: mode === "wrong-owner" ? "@project/renamed" : beforeProvider.name, version: "1.0.0-beta.2" };
+    const priorTargets = [target, { ...target, os: "ios" }];
+    const nextTargets = priorTargets.map(row => ({ ...row, range: "^1.0.0-beta.2", version: "1.0.0-beta.2.movement" }));
+    if (mode === "widened-path") for (const row of nextTargets) row.path = "new-consumer/package.json";
+    if (mode === "widened-package") for (const row of nextTargets) row.name = "@project/other-carrier";
+    if (mode === "widened-provider") for (const row of nextTargets) row.provider_path = otherProvider;
+    if (mode === "duplicate-target") nextTargets.push({ ...nextTargets[0]!, range: "^1.0.0-beta.1" });
+    const bindings = (targets: typeof priorTargets, provider: typeof beforeProvider) =>
+      targets.map(row => ({ ...row, source_name: provider.name, source_version: provider.version }));
+    const priorRows = bindings(priorTargets, beforeProvider);
+    const nextRows = bindings(nextTargets, afterProvider);
+    const projection = (rows: typeof priorRows, paths: string[], provider: string, graph: string) => json({
+      version: 1, bindings: rows, inputs: paths.map(path => ({
+        path, sha256: sha256(path.endsWith("/package.json") ? provider : graph),
+      })),
+    });
+    const oldProof = projection(priorRows, priorInputs, json(beforeProvider), "old input");
+    const newProof = projection(nextRows, nextInputs, json(afterProvider), "new input");
+    const policy = (proof: string, targets: typeof priorTargets, inputs: string[], minimum = 14) => json({
+      version: 1, owner: "fixture", minimum_age_days: minimum, fail_closed_when_unknown: true,
+      evidence_path: options.evidencePath, override_max_days: 30,
+      npm_source_ranges: { projection_sha256: sha256(proof), targets, inputs },
+    });
+    write(proofPath, oldProof);
+    write(options.policyPath, policy(oldProof, priorTargets, priorInputs));
+    write(path, json(declaration));
+    for (const input of priorInputs) write(input, input.endsWith("/package.json") ? json(beforeProvider) :
+      mode === "prior-producer-bytes" ? "altered base input" : "old input");
+    git("add", "."); git("commit", "-qm", "Fixture original approval");
+    const priorBase = git("rev-parse", "HEAD");
+    if (mode !== "delete-only") {
+      write(proofPath, newProof);
+      write(options.policyPath, policy(newProof, nextTargets, nextInputs, mode === "other-policy" ? 15 : 14));
+    }
+    if (mode !== "delete-only" && mode !== "policy-only") {
+      const next = nextTargets[0]!;
+      write(next.path, json({ ...declaration, dependencies: {
+        [next.name]: mode === "consumer-bytes" ? target.range : next.range, outside: "2.2.0",
+      } }));
+      for (const input of nextInputs) write(input, input.endsWith("/package.json") ? json(afterProvider) :
+        mode === "producer-bytes" ? "altered input" : "new input");
+    }
+    git("add", ".");
+    const tree = git("write-tree");
+    git("reset", "--hard", priorBase);
+    const shared = {
+      prior_base: mode === "wrong-parent" ? "a".repeat(40) : priorBase,
+      candidate_tree: mode === "wrong-tree" ? git("rev-parse", "HEAD^{tree}") : tree,
+      previous_projection_sha256: sha256(mode === "wrong-old-proof" ? newProof : oldProof),
+      successor_projection_sha256: sha256(newProof),
+    };
+    const changes = priorRows.map((before, index) => ({ before, after: nextRows[index]! }));
+    const approval = json(mode === "old-format" ? { version: 1, ...shared } : {
+      version: 2, ...shared, workspace_sha256: sha256(root),
+      binding_changes_sha256: digest(mode === "wrong-delta" ? changes.slice(1) : changes),
+    });
+    if (mode !== "unapproved" && mode !== "candidate-approval") {
+      write(transitionPath, approval); git("add", transitionPath); git("commit", "-qm", "Fixture one-use approval");
+    }
+    if (mode === "stale-base") {
+      write("unrelated.txt", "This new comparison base cannot authorize the transition.");
+      git("add", "."); git("commit", "-qm", "Advance past fixture approval");
+    }
+    const base = git("rev-parse", "HEAD");
+    git("read-tree", "--reset", "-u", tree);
+    if (mode === "candidate-approval") { write(transitionPath, approval); git("add", transitionPath); }
+    if (mode === "approved") write(resolver, "unrelated unstaged bytes");
+    const stagedScope = resolveChangeScope(root, { staged: true });
+    const staged = checkDependencies(new ValidationSubject(root, stagedScope), stagedScope, options);
+    git("commit", "-qm", "Consume fixture receipt");
+    const candidateRef = git("rev-parse", "HEAD");
+    const committedScope = resolveChangeScope(root, { baseRef: base, candidateRef });
+    assert.deepEqual(checkDependencies(new ValidationSubject(root, committedScope), committedScope, options), staged, mode);
+    if (mode === "wrong-root") {
+      const otherRoot = join(scratch, "different-source");
+      assert.equal(staged.source_range_admissions?.length, 2, "The original workspace qualifies.");
+      cpSync(root, otherRoot, { recursive: true });
+      const clonedScope = resolveChangeScope(otherRoot, { baseRef: base, candidateRef });
+      return checkDependencies(new ValidationSubject(otherRoot, clonedScope), clonedScope, options);
+    }
+    return staged;
+  } finally { rmSync(scratch, { recursive: true, force: true }); }
+}
+
+test("an exact version-two binding change consumes its independently scoped receipt for staged and committed checks", () => {
+  const result = bindingFixture("approved");
+  assert.deepEqual(result.source_range_admissions?.map(row => [row.os, row.version]),
+    [["android", "1.0.0-beta.2.movement"], ["ios", "1.0.0-beta.2.movement"]]);
+  assert.ok(result.findings.some(row => row.rule_id === "dependency.evidence-missing" && row.path === path));
+  assert.ok(result.findings.every(row => row.rule_id === "dependency.evidence-missing"));
+});
+
+test("binding changes refuse unapproved or stale authority, changed bytes, wrong workspace and widened ownership", () => {
+  for (const mode of ["unapproved", "policy-only", "candidate-approval", "old-format", "stale-base", "wrong-parent",
+    "wrong-tree", "wrong-root", "wrong-delta", "wrong-old-proof", "widened-input", "widened-path", "widened-package",
+    "widened-provider", "wrong-owner", "duplicate-target", "prior-producer-bytes", "producer-bytes", "consumer-bytes", "other-policy", "delete-only"] as const) {
+    const result = bindingFixture(mode);
     assert.equal(result.source_range_admissions, undefined, mode);
     assert.ok(result.findings.some(row => row.rule_id === "dependency.source-range-invalid"), mode);
   }

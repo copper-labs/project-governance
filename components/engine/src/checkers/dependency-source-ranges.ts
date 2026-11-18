@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { posix } from "node:path";
 import { parse } from "yaml";
 import { readSubjectSource, safeSubjectPath, SOURCE_RANGE_TRANSITION_PATH, type ChangeScope, type SubjectSource, type ValidationSubject } from "../change-subject.ts";
-import { canonical } from "../core.ts";
+import { canonical, digest } from "../core.ts";
 import { npmExact, npmName, objectValue, type DependencyDefect } from "./dependency-manifests.ts";
 import { compatibleNpmPrereleaseRange } from "./dependency-range-selections.ts";
 
@@ -80,26 +80,72 @@ export function readSourceRangeProjection(bytes: Buffer, authority: ReturnType<t
   return { inputs, byPath };
 }
 
-/** A protected successor can refresh bytes for the same scope once, on exactly the reviewed tree. */
+type SourceRangeProjection = ReturnType<typeof readSourceRangeProjection>;
+const bindingRows = (projection: SourceRangeProjection) => [...projection.byPath.values()].flat();
+const sameInputPaths = (prior: SourceRangeProjection, next: SourceRangeProjection) =>
+  canonical([...prior.inputs.keys()].sort()) === canonical([...next.inputs.keys()].sort());
+
+export function sameSourceRangeScope(prior: SourceRangeProjection, next: SourceRangeProjection) {
+  return sameInputPaths(prior, next) && canonical(bindingRows(prior)) === canonical(bindingRows(next));
+}
+
+/** Pair exact rows on the original consumer and target identity, which cannot change. */
+function bindingChanges(prior: SourceRangeProjection, next: SourceRangeProjection) {
+  const identityFields = ["path", "field", "name", "recipe", "framework", "os"] as const;
+  const key = (row: Binding) => canonical(identityFields.map(field => row[field]));
+  const previousRows = bindingRows(prior), nextRows = bindingRows(next);
+  const before = new Map(previousRows.map(row => [key(row), row]));
+  const after = new Map(nextRows.map(row => [key(row), row]));
+  if (before.size !== previousRows.length || after.size !== nextRows.length || before.size !== after.size)
+    throw new Error("Source binding transition changed or duplicated its approved targets");
+  return [...before.keys()].sort().flatMap(id => {
+    const oldRow = before.get(id)!, newRow = after.get(id);
+    if (!newRow || (["provider_path", "component_id", "artifact_id", "source_name"] as const).some(field => oldRow[field] !== newRow[field]))
+      throw new Error("Source binding transition changed the approved package or producer owner");
+    return canonical(oldRow) === canonical(newRow) ? [] : [{ before: oldRow, after: newRow }];
+  });
+}
+
+function policyOutsideBindingChanges(bytes: string) {
+  const policy: unknown = parse(bytes);
+  if (!objectValue(policy) || !objectValue(policy.npm_source_ranges)) throw new Error("Invalid source binding policy");
+  const { projection_sha256: _digest, targets: _targets, ...unchanged } = policy.npm_source_ranges;
+  return canonical({ ...policy, npm_source_ranges: unchanged });
+}
+
+/** The comparison base binds both one-use routes to the exact tree that consumes its receipt. */
 export function verifySourceRangeTransition(subject: ValidationSubject, scope: ChangeScope, receipt: SubjectSource,
   policyPath: string, priorDigest: string, nextDigest: string,
-  prior: ReturnType<typeof readSourceRangeProjection>, next: ReturnType<typeof readSourceRangeProjection>) {
+  prior: SourceRangeProjection, next: SourceRangeProjection): "hashes" | "bindings" {
   if (receipt.file_type !== "regular") throw new Error("Source projection approval must be a regular base file");
   const approval = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(readSubjectSource(subject.root, receipt, 4096))) as unknown;
-  if (!objectValue(approval) || approval["version"] !== 1) throw new Error("Invalid source projection approval");
-  const { version: _, ...fields } = approval;
-  const row = strings(fields, ["prior_base", "candidate_tree", "previous_projection_sha256", "successor_projection_sha256"] as const);
+  if (!objectValue(approval) || (approval.version !== 1 && approval.version !== 2)) throw new Error("Invalid source projection approval");
+  const { version, ...fields } = approval;
+  const common = ["prior_base", "candidate_tree", "previous_projection_sha256", "successor_projection_sha256"] as const;
+  const row = version === 1 ? strings(fields, common)
+    : strings(fields, [...common, "workspace_sha256", "binding_changes_sha256"] as const);
   if (priorDigest === nextDigest || row.previous_projection_sha256 !== priorDigest || row.successor_projection_sha256 !== nextDigest ||
       row.candidate_tree !== scope.candidate_tree || subject.source(SOURCE_RANGE_TRANSITION_PATH) ||
       !subject.isAdditionOnlyBase(row.prior_base, SOURCE_RANGE_TRANSITION_PATH))
     throw new Error("Source projection approval does not bind this base and candidate");
-  if (canonical([...prior.inputs.keys()].sort()) !== canonical([...next.inputs.keys()].sort()) ||
-      canonical([...prior.byPath.values()].flat()) !== canonical([...next.byPath.values()].flat()))
-    throw new Error("Source projection refresh changed the approved paths or bindings");
   const basePolicy = subject.baseSource(policyPath);
-  if (!basePolicy || readSubjectSource(subject.root, basePolicy, 4 * 1024 * 1024).toString("utf8")
-    .replace(priorDigest, nextDigest) !== subject.read(policyPath, 4 * 1024 * 1024).toString("utf8"))
+  if (!basePolicy) throw new Error("Original source range policy is missing");
+  const oldPolicy = readSubjectSource(subject.root, basePolicy, 4 * 1024 * 1024).toString("utf8");
+  const newPolicy = subject.read(policyPath, 4 * 1024 * 1024).toString("utf8");
+  if (version === 2) {
+    if (fields.workspace_sha256 !== hash(Buffer.from(subject.root, "utf8")) || !sameInputPaths(prior, next))
+      throw new Error("Source binding transition changed the approved workspace or input paths");
+    const changes = bindingChanges(prior, next);
+    if (!changes.length || fields.binding_changes_sha256 !== digest(changes))
+      throw new Error("Source binding transition differs from the approved old and new rows");
+    if (policyOutsideBindingChanges(oldPolicy) !== policyOutsideBindingChanges(newPolicy))
+      throw new Error("Source binding transition changed unrelated dependency policy");
+    return "bindings";
+  }
+  if (!sameSourceRangeScope(prior, next)) throw new Error("Source projection refresh changed the approved paths or bindings");
+  if (oldPolicy.replace(priorDigest, nextDigest) !== newPolicy)
     throw new Error("Source projection refresh changed the dependency policy outside the digest");
+  return "hashes";
 }
 
 export function verifySourceRangeInputs(projection: ReturnType<typeof readSourceRangeProjection>, read: (path: string) => Buffer) {
@@ -118,6 +164,17 @@ export function verifySourceRangeInputs(projection: ReturnType<typeof readSource
     const provider = providers.get(row.provider_path);
     if (provider?.name !== row.source_name || provider.version !== row.source_version)
       throw new Error("Captured provider package differs from the producer projection");
+  }
+}
+
+/** A binding change must describe the literal range in the captured consumer manifest. */
+export function verifySourceRangeConsumers(projection: SourceRangeProjection, read: (path: string) => Buffer) {
+  for (const [path, rows] of projection.byPath) {
+    const manifest: unknown = JSON.parse(new TextDecoder("utf8", { fatal: true }).decode(read(path)));
+    if (!objectValue(manifest) || !objectValue(manifest.dependencies)) throw new Error("Invalid captured consumer manifest");
+    const dependencies = manifest.dependencies;
+    if (rows.some(row => dependencies[row.name] !== row.range))
+      throw new Error("Captured consumer range differs from the reviewed binding");
   }
 }
 
