@@ -103,10 +103,14 @@ export function prepareCommand(args: string[], root: string, builtinDirectory: s
   const observation = checkObservationContext(trigger, expected);
   const jsonOutput = values["json-output"];
   if (jsonOutput !== undefined && (typeof jsonOutput !== "string" || !jsonOutput.trim() || values.detach)) throw new Error("JSON output requires a path and a foreground check");
-  const timeout = values["timeout-seconds"];
-  const deadlineMs = timeout === undefined ? 300000 : Number(timeout) * 1000;
-  if (!Number.isSafeInteger(deadlineMs) || deadlineMs <= 0 || deadlineMs > 86400000) throw new Error("Invalid timeout");
   const mode = values.mode, stage = values.stage ?? null, paths = values["changed-path"] ?? [], packs = values.pack ?? [];
+  const timeout = values["timeout-seconds"];
+  // An expanded immutable comparison can finish all checks without a different hook or a second capture.
+  const expandedHook = observation.trigger === "hook" && (
+    (stage === "pre-commit" || stage === "pre-push") && process.env.GOVERNANCE_LARGE_IMMUTABLE_PACKET === "1"
+    || stage === "pre-push" && process.env.GOVERNANCE_LARGE_IMMUTABLE_COMPARISON !== undefined);
+  const deadlineMs = timeout === undefined ? (expandedHook ? 900000 : 300000) : Number(timeout) * 1000;
+  if (!Number.isSafeInteger(deadlineMs) || deadlineMs <= 0 || deadlineMs > 86400000) throw new Error("Invalid timeout");
   const baseRef = values["base-ref"] ?? process.env["GOVERNANCE_BASE_REF"]?.trim(), candidateRef = values["candidate-ref"];
   if (candidateRef !== undefined && (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(candidateRef) || /^0+$/u.test(candidateRef))) throw new Error("Candidate reference must be an exact commit object ID");
   if (candidateRef && (mode === "all" || values.staged || paths.length || stage === "commit-msg")) throw new Error("Committed candidate cannot combine with all, staged, changed paths or commit-message scope");

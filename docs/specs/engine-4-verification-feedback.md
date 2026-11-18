@@ -307,8 +307,10 @@ The ordinary check still refuses source images over 16 MiB by default. A local
 operator can set `GOVERNANCE_LARGE_IMMUTABLE_PACKET=1` for a normal Git pre-commit
 or pre-push invocation when the selected comparison includes large immutable
 images. The installed runtime takes the option at dispatch and records it in its
-bound worker request. This changes capture capacity only. The hook selects and
-runs its ordinary packs under its original deadline.
+bound worker request. The expanded pre-commit and pre-push checks have a
+15-minute default deadline to finish all their ordinary packs. An exact
+immutable pre-push comparison uses the same deadline. Other hook and manual
+defaults and explicit command deadlines keep their existing values.
 
 The extension admits regular Git blobs and staged index after-images up to
 128 MiB each and caps the complete packet at 512 MiB. Working-tree images,

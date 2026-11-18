@@ -73,6 +73,35 @@ function pushFixture() {
 }
 const updateInput = (candidate: string, remote: string) => Readable.from([`refs/heads/topic ${candidate} refs/heads/topic ${remote}\n`]);
 
+test("expanded immutable hooks have time to finish without changing ordinary or explicit deadlines", async () => {
+  const f = pushFixture();
+  const packet = process.env.GOVERNANCE_LARGE_IMMUTABLE_PACKET;
+  const comparison = process.env.GOVERNANCE_LARGE_IMMUTABLE_COMPARISON;
+  try {
+    delete process.env.GOVERNANCE_LARGE_IMMUTABLE_PACKET;
+    delete process.env.GOVERNANCE_LARGE_IMMUTABLE_COMPARISON;
+    const builtin = fileURLToPath(new URL("../../../src/project_governance_runtime/packs/", import.meta.url));
+    const check = (args: string[]) => prepareCommand(args, f.root, builtin, "check").deadlineMs;
+    const commit = hookCheckArguments(f.root, "pre-commit", []);
+    const push = await prePushCheckRequest(f.root, ["origin", "ssh://fixture.invalid/repository"],
+      updateInput(f.candidate, f.base), {});
+    assert.equal(check(["--trigger", "hook", ...push.args]), 300000);
+    process.env.GOVERNANCE_LARGE_IMMUTABLE_COMPARISON = `${f.base}:${f.candidate}`;
+    assert.equal(check(["--trigger", "hook", ...push.args]), 900000);
+    assert.equal(check([...push.args]), 300000);
+    assert.equal(check(["--trigger", "hook", ...push.args, "--timeout-seconds", "12"]), 12000);
+    assert.equal(check(["--trigger", "hook", ...commit]), 300000);
+    process.env.GOVERNANCE_LARGE_IMMUTABLE_PACKET = "1";
+    assert.equal(check(["--trigger", "hook", ...commit]), 900000);
+  } finally {
+    if (packet === undefined) delete process.env.GOVERNANCE_LARGE_IMMUTABLE_PACKET;
+    else process.env.GOVERNANCE_LARGE_IMMUTABLE_PACKET = packet;
+    if (comparison === undefined) delete process.env.GOVERNANCE_LARGE_IMMUTABLE_COMPARISON;
+    else process.env.GOVERNANCE_LARGE_IMMUTABLE_COMPARISON = comparison;
+    f.close();
+  }
+});
+
 test("native pre-push binds Git-supplied commits despite different HEAD, index, worktree and environment", async () => {
   const f = pushFixture();
   try {
