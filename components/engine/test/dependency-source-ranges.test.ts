@@ -101,3 +101,100 @@ test("admission respects exact declaration and comparison-base authority", () =>
   assert.equal(candidate.source_range_admissions, undefined);
   assert.equal(candidate.findings.filter(row => row.rule_id === "dependency.unsupported-format").length, 1);
 });
+
+const transitionPath = "config/policies/dependency-source-range-transition.yaml";
+type RefreshCase = "approved" | "policy-only" | "unapproved" | "candidate-approval" | "wrong-parent" |
+  "wrong-tree" | "wrong-old-digest" | "wrong-new-digest" | "extra-base-change" | "stale-base" | "retained-approval" | "delete-receipt-only" | "delete-with-unrelated-change" |
+  "wrong-input-bytes" | "widened-target" | "widened-input" | "rebound-provider" | "other-policy-change";
+
+function refreshFixture(mode: RefreshCase) {
+  const root = mkdtempSync(join(tmpdir(), "dependency-source-refresh-"));
+  const git = (...args: string[]) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
+  const write = (path: string, content: string) => {
+    const output = join(root, path); mkdirSync(dirname(output), { recursive: true }); writeFileSync(output, content);
+  };
+  try {
+    git("init", "-q"); git("config", "user.name", "Fixture"); git("config", "user.email", "fixture@example.invalid");
+    const oldTargets = [target, { ...target, os: "ios" }];
+    const nextTargets = mode === "widened-target" ? [...oldTargets, { ...target, recipe: "experience" }] : oldTargets;
+    const provider = json({ name: "@project/movement", version: "1.0.0-beta.1" });
+    const nextProvider = mode === "rebound-provider" ? json({ name: "@project/other", version: "1.0.0-beta.1" }) : provider;
+    const inputs = [providerPath, resolver], nextInputs = mode === "widened-input" ? [...inputs, "build/extra.js"] : inputs;
+    const projection = (paths: string[], targets: typeof oldTargets, provider: string, graph: string) => json({
+      version: 1,
+      inputs: paths.map(path => ({ path, sha256: sha256(path === providerPath ? provider : graph) })),
+      bindings: targets.map(row => ({ ...row, source_name: JSON.parse(provider).name, source_version: JSON.parse(provider).version })),
+    });
+    const oldProof = projection(inputs, oldTargets, provider, "previous producer");
+    const nextProof = projection(nextInputs, nextTargets, nextProvider, "new producer");
+    const policy = (proof: string, targets: typeof oldTargets, inputs: string[], minimum = 14) => json({
+      version: 1, owner: "fixture", minimum_age_days: minimum, fail_closed_when_unknown: true,
+      evidence_path: options.evidencePath, override_max_days: 30,
+      npm_source_ranges: { projection_sha256: sha256(proof), targets, inputs },
+    });
+    write(options.policyPath, policy(oldProof, oldTargets, inputs));
+    write(proofPath, oldProof);
+    write(providerPath, provider);
+    git("add", "."); git("commit", "-qm", "Original approved projection");
+    const originalBase = git("rev-parse", "HEAD");
+
+    const discardsApproval = mode === "delete-receipt-only" || mode === "delete-with-unrelated-change";
+    if (!discardsApproval) {
+      write(options.policyPath, policy(nextProof, nextTargets, nextInputs, mode === "other-policy-change" ? 15 : 14));
+      write(proofPath, nextProof);
+    }
+    if (mode === "delete-with-unrelated-change") write("unrelated.txt", "This change does not apply the approval.");
+    if (!discardsApproval && mode !== "policy-only") {
+      write(resolver, mode === "wrong-input-bytes" ? "unreviewed producer" : "new producer");
+      write(providerPath, nextProvider);
+      write(path, json(declaration));
+      if (mode === "widened-input") write("build/extra.js", "new producer");
+    }
+    git("add", ".");
+    const tree = git("write-tree");
+    git("reset", "--hard", originalBase);
+    const approval = json({
+      version: 1,
+      prior_base: mode === "wrong-parent" ? "a".repeat(40) : originalBase,
+      candidate_tree: mode === "wrong-tree" ? git("rev-parse", "HEAD^{tree}") : tree,
+      previous_projection_sha256: mode === "wrong-old-digest" ? sha256("old") : sha256(oldProof),
+      successor_projection_sha256: mode === "wrong-new-digest" ? sha256("new") : sha256(discardsApproval ? oldProof : nextProof),
+    });
+    if (mode !== "unapproved" && mode !== "candidate-approval") {
+      write(transitionPath, approval);
+      if (mode === "extra-base-change") write("other.txt", "unrelated change alongside approval");
+      git("add", "."); git("commit", "-qm", "Accept only the exact transition");
+    }
+    if (mode === "stale-base") {
+      write("after-approval.txt", "This commit is outside the reviewed transition.");
+      git("add", "."); git("commit", "-qm", "Advance past the approval base");
+    }
+    const base = git("rev-parse", "HEAD");
+    git("read-tree", "--reset", "-u", tree);
+    if (mode === "candidate-approval" || mode === "retained-approval") { write(transitionPath, approval); git("add", transitionPath); }
+    const stagedScope = resolveChangeScope(root, { staged: true });
+    if (mode === "approved") write(resolver, "unrelated unstaged bytes");
+    const staged = checkDependencies(new ValidationSubject(root, stagedScope), stagedScope, options);
+    git("commit", "-qm", "Apply candidate exactly");
+    const committedScope = resolveChangeScope(root, { baseRef: base, candidateRef: git("rev-parse", "HEAD") });
+    const committed = checkDependencies(new ValidationSubject(root, committedScope), committedScope, options);
+    assert.deepEqual(committed, staged, mode);
+    return staged;
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}
+
+test("protected base can approve a projection refresh for one exact staged and committed tree", () => {
+  const result = refreshFixture("approved");
+  assert.deepEqual(result.source_range_admissions?.map(row => row.os), ["android", "ios"]);
+  assert.deepEqual(result.findings.map(row => row.rule_id), ["dependency.evidence-missing"]);
+});
+
+test("a proof refresh fails closed on policy-only, unauthorized, stale, mismatched or widened subjects", () => {
+  for (const mode of ["policy-only", "unapproved", "candidate-approval", "wrong-parent", "wrong-tree", "wrong-old-digest",
+    "wrong-new-digest", "extra-base-change", "stale-base", "retained-approval", "delete-receipt-only", "delete-with-unrelated-change", "wrong-input-bytes", "widened-target", "widened-input", "rebound-provider",
+    "other-policy-change"] as const) {
+    const result = refreshFixture(mode);
+    assert.equal(result.source_range_admissions, undefined, mode);
+    assert.ok(result.findings.some(row => row.rule_id === "dependency.source-range-invalid"), mode);
+  }
+});

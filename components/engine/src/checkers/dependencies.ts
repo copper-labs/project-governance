@@ -2,7 +2,7 @@ import { npmRegistryBases, type NpmRegistries } from "./dependency-registry.ts";
 import { posix } from "node:path";
 import { parse } from "yaml";
 import { canonical } from "../core.ts";
-import { ValidationSubject, readSubjectSource, type ChangeScope } from "../change-subject.ts";
+import { ValidationSubject, readSubjectSource, SOURCE_RANGE_TRANSITION_PATH, type ChangeScope } from "../change-subject.ts";
 import { SOURCE_CAPTURE_MAX_BYTES, SOURCE_CAPTURE_BATCH_MAX_BYTES } from "../source-capture-limits.ts";
 import { findingSummary, type Finding } from "../checker-results.ts";
 import { glob } from "../planning.ts";
@@ -15,7 +15,7 @@ import { validateNpmrc, validateYarnrc } from "./dependency-config.ts";
 import { validateDependencyPolicy } from "./dependency-policy.ts";
 import { indexDependencyEvidence, registryCoordinateKey } from "./dependency-evidence.ts";
 import { npmSelectionInput, readNpmRangeSelections, resolveNpmRanges } from "./dependency-range-selections.ts";
-import { admitSourceRanges, readSourceRangeProjection, verifySourceRangeInputs } from "./dependency-source-ranges.ts";
+import { admitSourceRanges, readSourceRangeProjection, verifySourceRangeInputs, verifySourceRangeTransition } from "./dependency-source-ranges.ts";
 import { retainedArchiveIntegrities, verifySignedLock } from "./dependency-signed-lock.ts";
 import { indexDependencyOverrides } from "./dependency-overrides.ts";
 import { dependencyMoment } from "./dependency-time.ts";
@@ -92,22 +92,33 @@ function loadRangeProofs(subject: ValidationSubject, scope: ChangeScope, options
   }
   let sourceRanges: ReturnType<typeof readSourceRangeProjection> | undefined;
   let recheckSourceRanges = false;
+  const authorityChanged = changedPaths.has(sourceRangePath) || changedPaths.has(options.policyPath);
+  const receiptChanged = changedPaths.has(SOURCE_RANGE_TRANSITION_PATH);
+  const approval = authorityChanged || receiptChanged ? subject.baseSource(SOURCE_RANGE_TRANSITION_PATH) : null;
+  if (approval && receiptChanged && !baseAuthority?.sourceRanges)
+    add("dependency.source-range-invalid", sourceRangePath, "Source range approval requires valid comparison-base authority.");
   if (baseAuthority?.sourceRanges) {
     try {
       const projection = subject.baseSource(sourceRangePath);
       if (baseAuthority.findings.length || policy.findings.length || !policy.sourceRanges || projection?.file_type !== "regular")
         throw new Error("Missing valid comparison-base source range authority");
       const source = readSourceRangeProjection(readSubjectSource(subject.root, projection, 4 * 1024 * 1024), baseAuthority.sourceRanges);
-      const authorityChanged = changedPaths.has(sourceRangePath) || changedPaths.has(options.policyPath);
+      let reviewed = source;
+      const applyingTransition = approval && (receiptChanged || baseAuthority.sourceRanges.digest !== policy.sourceRanges.digest);
       recheckSourceRanges = authorityChanged || [...source.inputs.keys()].some(path => changedPaths.has(path));
-      if (authorityChanged) {
+      if (authorityChanged || applyingTransition) {
         const future = subject.source(sourceRangePath);
         if (future?.file_type !== "regular" || future.kind === "worktree") throw new Error("Missing captured source range projection");
-        readSourceRangeProjection(readSubjectSource(subject.root, future, 4 * 1024 * 1024), policy.sourceRanges);
+        const successor = readSourceRangeProjection(readSubjectSource(subject.root, future, 4 * 1024 * 1024), policy.sourceRanges);
+        if (applyingTransition) {
+          verifySourceRangeTransition(subject, scope, approval, options.policyPath,
+            baseAuthority.sourceRanges.digest, policy.sourceRanges.digest, source, successor);
+          reviewed = successor;
+        }
       }
       if (recheckSourceRanges || [...source.byPath.keys()].some(path => changedPaths.has(path))) {
         let remaining = SOURCE_CAPTURE_BATCH_MAX_BYTES;
-        verifySourceRangeInputs(source, path => {
+        verifySourceRangeInputs(reviewed, path => {
           const input = subject.source(path);
           if (input?.file_type !== "regular" || input.kind === "worktree" || remaining < 1)
             throw new Error("Source range proof requires bounded immutable producer inputs");
@@ -115,7 +126,7 @@ function loadRangeProofs(subject: ValidationSubject, scope: ChangeScope, options
           remaining -= bytes.length;
           return bytes;
         });
-        sourceRanges = source;
+        sourceRanges = reviewed;
       }
     } catch {
       add("dependency.source-range-invalid", sourceRangePath, "Source range proof differs from the accepted targets or captured producer inputs.");

@@ -205,7 +205,8 @@ export async function materializeChangePacket(root: string, scope: ChangeScope, 
     }
     assertActive();
     const packet = { kind: scope.kind, version: scope.version, scope: scope.scope, mode: scope.mode, base_ref: scope.base_ref,
-      ...(scope.candidate_ref ? { candidate_ref: scope.candidate_ref } : {}), subject_digest: logicalDigest, records };
+      ...(scope.candidate_ref ? { candidate_ref: scope.candidate_ref } : {}),
+      ...(scope.candidate_tree ? { candidate_tree: scope.candidate_tree } : {}), subject_digest: logicalDigest, records };
     const path = join(directory, "change-packet.json");
     durableJson(path, packet);
     chmodSync(path, 0o400);

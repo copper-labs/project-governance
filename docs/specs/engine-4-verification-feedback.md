@@ -433,6 +433,36 @@ publication dates and installation enter through private qualification.
 Ordinary dependency checks still apply to other entries. When the base also
 binds signed consumer proof for a manifest, that proof governs admission.
 
+A protected comparison base can approve a one-use refresh when producer bytes
+change and every source binding and input path stays the same. The approval
+commit has exactly one parent, the original approved base, and adds only
+`config/policies/dependency-source-range-transition.yaml`. The receipt contains JSON with this schema:
+
+```json
+{
+  "version": 1,
+  "prior_base": "<original approved base commit>",
+  "candidate_tree": "<reviewed Git tree without the approval file>",
+  "previous_projection_sha256": "sha256:<old projection digest>",
+  "successor_projection_sha256": "sha256:<new projection digest>"
+}
+```
+
+Review the exact approval commit through the protected branch's normal process.
+The Git comparison proves which approval bytes are in the base. If branch
+settings do not enforce independent review, the promotion owner must separately
+verify that review for the exact approval commit before using it as the base.
+The promotion candidate consumes the approval file in the same change that
+updates the projection and its policy digest. Both staged and committed checks
+require the approved Git tree, compare the complete source bindings and input
+paths against the original approval, and read all successor inputs from the
+captured Git subject. The prior projection is the approved scope record. Its
+inputs may live only in the prospective source when the earlier approval was
+accepted as a policy-only commit. The policy edit is limited to the projection
+digest. Deleting or changing the receipt without applying the refresh fails.
+Normal nested dependency and other checks still run under their existing limits.
+Changes to binding values or input paths require their own policy review.
+
 The release owner consumes a passing, original `signed_lock_admissions`
 receipt at the private consumer qualification step, after committing the
 source and acquiring the exact signed candidate. Bind that receipt's target,

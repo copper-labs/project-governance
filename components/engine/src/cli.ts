@@ -62,7 +62,7 @@ import { buildPlan } from "./planning.ts";
 import { join, resolve, dirname, basename } from "node:path";
 import { checkTelemetry, reviewCheckRun } from "./check-telemetry.ts";
 import { checkRunRoot } from "./check-run.ts";
-import { nestedLargePacket } from "./check-nested-packet.ts";
+import { nestedImmutablePacket } from "./check-nested-packet.ts";
 import { requestCheckCancellation } from "./check-cancellation.ts";
 import { inspectCheckRun } from "./check-status.ts";
 import { CheckRecoveryRefusal, reconcileCheckRun } from "./check-recovery.ts";
@@ -114,7 +114,7 @@ export function prepareCommand(args: string[], root: string, builtinDirectory: s
   if (!stage && (!packs.length || mode === "all")) throw new Error("--stage is required for this selection");
   if (mode === "all" && (values.staged || paths.length || baseRef)) throw new Error("All mode cannot combine with a comparison scope");
   if (values.staged && (paths.length || baseRef || stage !== "pre-commit")) throw new Error("Staged scope requires pre-commit and cannot combine with paths or a base");
-  const nested = command === "check" ? nestedLargePacket(root, { trigger, packs, stage, mode, paths,
+  const nested = command === "check" ? nestedImmutablePacket(root, { trigger, packs, stage, mode, paths,
     ...(values.staged === undefined ? {} : { staged: values.staged }),
     ...(baseRef === undefined ? {} : { baseRef }), ...(candidateRef === undefined ? {} : { candidateRef }),
     detached: values.detach === true }) : null;

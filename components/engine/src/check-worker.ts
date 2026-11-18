@@ -43,7 +43,7 @@ function selectedCredentialEnvironment(packs: Packs, plan: ValidationPlan): Reco
   return environment;
 }
 /** Reserve a single detached owner before launching. Reconnection only observes the returned run ID. */
-export function dispatchChecks(packs: Packs, plan: ValidationPlan, request: Omit<BuiltinCheckRequest, "id" | "assets"> & { assets: PackagedCheckerAssets }, options: { root?: string; deadlineMs?: number; nested?: { deadlineAt: number; runId: string }; decisionContext?: DecisionTaskContext; taskBinding?: TaskBindingReceipt } & CheckObservationContext = {}) {
+export function dispatchChecks(packs: Packs, plan: ValidationPlan, request: Omit<BuiltinCheckRequest, "id" | "assets"> & { assets: PackagedCheckerAssets }, options: { root?: string; deadlineMs?: number; nested?: { deadlineAt: number; runId: string; largeImmutable: boolean }; decisionContext?: DecisionTaskContext; taskBinding?: TaskBindingReceipt } & CheckObservationContext = {}) {
   const observation = checkObservationContext(options.trigger, options.expectedStatus);
   const environment = { ...commandEnvironment({}), ...selectedCredentialEnvironment(packs, plan) };
   const root = options.root ?? checkRunRoot(); mkdirSync(root, { recursive: true, mode: 0o700 });
@@ -51,7 +51,7 @@ export function dispatchChecks(packs: Packs, plan: ValidationPlan, request: Omit
   const deadlineAt = Math.min(options.nested?.deadlineAt ?? Infinity, Date.now() + (options.deadlineMs ?? 300000));
   const work: CheckWork = { version: 1, ...observation, id, root: request.subject.root, runsRoot, assetsRoot: request.assets.root, workerDigest: fileDigest(WORKER),
     generation: retainRuntimeReader(`check:${id}`, { workspace: request.subject.root, stage: request.stage }),
-    ...(options.nested ? { largeImmutablePacket: true, largePacketParent: options.nested.runId } :
+    ...(options.nested ? { ...(options.nested.largeImmutable ? { largeImmutablePacket: true } : {}), largePacketParent: options.nested.runId } :
       observation.trigger === "hook" && ["pre-commit", "pre-push"].includes(request.stage) &&
       process.env.GOVERNANCE_LARGE_IMMUTABLE_PACKET === "1" ? { largeImmutablePacket: true } : {}),
     ...(options.decisionContext ? { decisionContext: options.decisionContext } : {}),

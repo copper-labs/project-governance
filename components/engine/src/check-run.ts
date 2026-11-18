@@ -65,7 +65,7 @@ export async function runChecks(packs: Packs, plan: ValidationPlan, request: Omi
         ...(request.pullRequest ? { pr_body_file: request.pullRequest.path, pr_title: request.pullRequest.title } : {}) });
       const result = await runNativeCheckCommand({ directory: join(packDirectory, `command-${index}`), id: `${id}:${packId}:${index}`, root: request.subject.root,
         argv, credentialEnv: commandCredentialNames(entry), deadlineMs: Math.max(1, Math.min(deadlineMs, deadline - Date.now())), cancelled, env: { ...packet.env, ...(lint?.env ?? {}),
-          ...(options.largeImmutablePacket && options.trigger === "hook" && request.scope.base_ref &&
+          ...((options.largeImmutablePacket || request.scope.candidate_tree) && options.trigger === "hook" && request.scope.base_ref &&
             (request.scope.mode === "staged" || request.scope.candidate_ref) ? { PROJECT_GOVERNANCE_LARGE_IMMUTABLE_PARENT: id } : {}),
           GOVERNANCE_WORK_ID: request.workId ?? "", PROJECT_GOVERNANCE_RUN_ID: id, PROJECT_GOVERNANCE_EVIDENCE_ROOT: evidence } });
       if (!lint || result.status === "failed" && (result.process_failure || result.failure_kind === "credential-unavailable")) return result;

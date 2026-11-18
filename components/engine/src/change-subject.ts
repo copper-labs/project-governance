@@ -28,7 +28,10 @@ export interface ChangeScope {
   unborn?: true;
   /** Exact pushed commit, when capture deliberately excludes live checkout and index bytes. */
   candidate_ref?: string;
+  /** Full tree identity captured when a protected source projection approval is consumed. */
+  candidate_tree?: string;
 }
+export const SOURCE_RANGE_TRANSITION_PATH = "config/policies/dependency-source-range-transition.yaml";
 const hash = (bytes: Buffer | string) => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 
 /** No shell, external diff driver or implicit alternate comparison base participates in identity. */
@@ -275,9 +278,16 @@ export function resolveChangeScope(root: string, options: { staged?: boolean; al
     return [...records.values()].sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
   };
   const records = snapshot();
-  if (canonical(records) !== canonical(snapshot())) throw new Error("comparison subject changed while resolving");
+  const consumesTransition = (options.staged || candidate) &&
+    records.some(record => record.path === SOURCE_RANGE_TRANSITION_PATH && record.status === "deleted");
+  // Capture the exact tree between the two ordinary packet observations. Unstaged bytes never enter it.
+  const readTree = () => gitText(root, candidate ? ["rev-parse", "--verify", `${candidate}^{tree}`] : ["write-tree"]);
+  const tree = consumesTransition ? readTree() : undefined;
+  if (canonical(records) !== canonical(snapshot()) || (tree !== undefined &&
+      (readTree() !== tree || (options.staged && gitText(root, ["rev-parse", "--verify", "HEAD"]) !== base))))
+    throw new Error("comparison subject changed while resolving");
   return { kind: "project-governance-change-packet", version: 1, scope: "changed", mode: options.staged ? "staged" : paths.length ? "explicit" : "changed",
-    base_ref: base, ...(candidate ? { candidate_ref: candidate } : {}), records, subject_digest: subjectDigest(records) };
+    base_ref: base, ...(candidate ? { candidate_ref: candidate } : {}), ...(tree ? { candidate_tree: tree } : {}), records, subject_digest: subjectDigest(records) };
 }
 
 
@@ -329,6 +339,15 @@ export class ValidationSubject {
     safeSubjectPath(path);
     const base = this.#scope.base_ref;
     return base ? structuredClone(this.baseSources()?.get(path) ?? entry(this.root, "git", path, base)) : null;
+  }
+
+  /** A source-range approval must occupy a Git base commit that adds exactly its receipt. */
+  isAdditionOnlyBase(parent: string, path: string): boolean {
+    const base = this.#scope.base_ref;
+    if (!base || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(parent)) return false;
+    safeSubjectPath(path);
+    return gitText(this.root, ["show", "-s", "--format=%P", base]) === parent &&
+      decode(git(this.root, ["diff-tree", "-r", "--no-commit-id", "--name-status", "-z", "--no-renames", "--ignore-submodules=none", parent, base])) === `A\0${path}\0`;
   }
 
   source(path: string): SubjectSource | null {

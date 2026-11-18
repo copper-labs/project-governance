@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { posix } from "node:path";
 import { parse } from "yaml";
-import { readSubjectSource, safeSubjectPath, type ValidationSubject } from "../change-subject.ts";
+import { readSubjectSource, safeSubjectPath, SOURCE_RANGE_TRANSITION_PATH, type ChangeScope, type SubjectSource, type ValidationSubject } from "../change-subject.ts";
 import { canonical } from "../core.ts";
 import { npmExact, npmName, objectValue, type DependencyDefect } from "./dependency-manifests.ts";
 import { compatibleNpmPrereleaseRange } from "./dependency-range-selections.ts";
@@ -78,6 +78,28 @@ export function readSourceRangeProjection(bytes: Buffer, authority: ReturnType<t
     byPath.set(row.path, bindings);
   }
   return { inputs, byPath };
+}
+
+/** A protected successor can refresh bytes for the same scope once, on exactly the reviewed tree. */
+export function verifySourceRangeTransition(subject: ValidationSubject, scope: ChangeScope, receipt: SubjectSource,
+  policyPath: string, priorDigest: string, nextDigest: string,
+  prior: ReturnType<typeof readSourceRangeProjection>, next: ReturnType<typeof readSourceRangeProjection>) {
+  if (receipt.file_type !== "regular") throw new Error("Source projection approval must be a regular base file");
+  const approval = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(readSubjectSource(subject.root, receipt, 4096))) as unknown;
+  if (!objectValue(approval) || approval["version"] !== 1) throw new Error("Invalid source projection approval");
+  const { version: _, ...fields } = approval;
+  const row = strings(fields, ["prior_base", "candidate_tree", "previous_projection_sha256", "successor_projection_sha256"] as const);
+  if (priorDigest === nextDigest || row.previous_projection_sha256 !== priorDigest || row.successor_projection_sha256 !== nextDigest ||
+      row.candidate_tree !== scope.candidate_tree || subject.source(SOURCE_RANGE_TRANSITION_PATH) ||
+      !subject.isAdditionOnlyBase(row.prior_base, SOURCE_RANGE_TRANSITION_PATH))
+    throw new Error("Source projection approval does not bind this base and candidate");
+  if (canonical([...prior.inputs.keys()].sort()) !== canonical([...next.inputs.keys()].sort()) ||
+      canonical([...prior.byPath.values()].flat()) !== canonical([...next.byPath.values()].flat()))
+    throw new Error("Source projection refresh changed the approved paths or bindings");
+  const basePolicy = subject.baseSource(policyPath);
+  if (!basePolicy || readSubjectSource(subject.root, basePolicy, 4 * 1024 * 1024).toString("utf8")
+    .replace(priorDigest, nextDigest) !== subject.read(policyPath, 4 * 1024 * 1024).toString("utf8"))
+    throw new Error("Source projection refresh changed the dependency policy outside the digest");
 }
 
 export function verifySourceRangeInputs(projection: ReturnType<typeof readSourceRangeProjection>, read: (path: string) => Buffer) {
