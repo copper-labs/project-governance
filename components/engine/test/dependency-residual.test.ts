@@ -115,6 +115,34 @@ test("stale and registry locks, peer links and symlinked owner manifests fail cl
   });
 });
 
+test("an unverified ancestor blocks new and otherwise unchanged tracked links", () => {
+  for (const mode of ["symlink", "oversized", "malformed"]) fixture(({ write, git, check, root }) => {
+    write(consumer, { dependencies: { [name]: spec } });
+    write(owner, { name, version });
+    write(lock, makeLock());
+    write("workspace.json", { workspaces: ["fixtures/*"] });
+    git("add", ".");
+    const absent = git("rev-parse", "HEAD");
+    assert.deepEqual(check().findings, [], mode);
+    git("commit", "-qm", "Admit link with no ancestor manifest");
+    const admitted = git("rev-parse", "HEAD");
+    const ancestor = join(root, "package.json");
+    if (mode === "symlink") symlinkSync("workspace.json", ancestor);
+    if (mode === "oversized") write("package.json", { workspaces: ["fixtures/*"], description: "a".repeat(4 * 1024 * 1024) });
+    if (mode === "malformed") writeFileSync(ancestor, "{");
+    git("add", "package.json");
+    const verifyBlocked = (result: ReturnType<typeof checkDependencies>) => {
+      assert.equal(result.tracked_npm_link_admissions, undefined, mode);
+      assert(result.findings.some(row => row.path === consumer && row.rule_id === "dependency.unsupported-format"), mode);
+    };
+    verifyBlocked(check());
+    git("commit", "-qm", "Introduce an unverified ancestor");
+    const unverified = git("rev-parse", "HEAD");
+    verifyBlocked(check(absent, unverified));
+    verifyBlocked(check(admitted, unverified));
+  });
+});
+
 test("a tracked directory with an archive suffix cannot impersonate an npm file link", () => fixture(({ write, git, check }) => {
   const archiveSpec = spec + ".tgz";
   write(consumer, { dependencies: { [name]: archiveSpec } });

@@ -30,13 +30,17 @@ function immutableJson(subject: ValidationSubject, source?: SubjectSource | null
   } catch { /* Unavailable or malformed inputs do not establish a local resolution. */ }
 }
 
-function hasWorkspaceOwner(directory: string, lookup: (path: string) => Record<string, unknown> | undefined): boolean {
-  // An npm workspace is installed by its enclosing root lock, not by the sibling lock.
+function ancestorBlocksLocalLock(subject: ValidationSubject, directory: string, lookup: (path: string) => SubjectSource | null): boolean {
+  // Trust the sibling lock only when each present ancestor can rule out workspace ownership.
   const ancestors = directory.split("/");
   while (directory !== "." && ancestors.length) {
     ancestors.pop();
     const root = ancestors.join("/") || ".";
-    const raw = lookup(posix.join(root, "package.json"))?.workspaces;
+    const source = lookup(posix.join(root, "package.json"));
+    if (!source) continue;
+    const manifest = immutableJson(subject, source);
+    if (!manifest) return true;
+    const raw = manifest.workspaces;
     if (raw === undefined) continue;
     const patterns = objectValue(raw) ? raw.packages : raw;
     if (!Array.isArray(patterns) || patterns.some(pattern => typeof pattern !== "string" ||
@@ -57,7 +61,7 @@ export function admitTrackedNpmLinks(subject: ValidationSubject, manifest: Subje
   for (const defect of defects) {
     const edge = localTarget(manifest.path, defect);
     if (!edge || lookup(edge.shrinkwrapPath) ||
-        hasWorkspaceOwner(posix.dirname(manifest.path), path => immutableJson(subject, lookup(path)))) continue;
+        ancestorBlocksLocalLock(subject, posix.dirname(manifest.path), lookup)) continue;
     const ownerSource = lookup(edge.ownerPath), lockSource = lookup(edge.lockPath);
     if (!ownerSource || !lockSource) continue;
     const owner = immutableJson(subject, ownerSource), lock = immutableJson(subject, lockSource);
@@ -91,7 +95,7 @@ export function trackedNpmLinkConsumers(subject: ValidationSubject, scope: Chang
         const edge = localTarget(path, defect);
         if (!edge) return false;
         if (changedPaths.has(edge.ownerPath) || changedPaths.has(edge.lockPath) || changedPaths.has(edge.shrinkwrapPath)) return true;
-        return hasWorkspaceOwner(posix.dirname(path), ancestor => changedPaths.has(ancestor) ? immutableJson(subject, subject.source(ancestor)) : undefined);
+        return ancestorBlocksLocalLock(subject, posix.dirname(path), ancestor => changedPaths.has(ancestor) ? subject.source(ancestor) : null);
       });
     } catch { return false; }
   });
