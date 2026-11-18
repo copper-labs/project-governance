@@ -48,6 +48,10 @@ export function sourceRangeOwnerDecision(request: string) {
   return `Approve Project Governance source-range transition ${digest(request)}`;
 }
 
+export function sourceRangeAdministratorDecision(request: string) {
+  return `Authorize Project Governance source-range transition as repository administrator ${digest(request)}`;
+}
+
 const commentQuery = `query($id: ID!) {
   viewer { databaseId }
   node(id: $id) { ... on IssueComment {
@@ -55,7 +59,7 @@ const commentQuery = `query($id: ID!) {
     author { ... on User { databaseId } }
     issue { body state lastEditedAt author { ... on User { databaseId } }
       closureHistory: timelineItems(first: 1, itemTypes: [CLOSED_EVENT, REOPENED_EVENT]) { nodes { __typename } }
-      repository { databaseId nameWithOwner }
+      repository { databaseId nameWithOwner viewerPermission }
     }
   } }
 }`;
@@ -91,20 +95,24 @@ export function verifySourceRangeOwnerResponse(response: Record<string, unknown>
   const issue = object(comment.issue, "GitHub review request");
   const repository = object(issue.repository, "GitHub review repository");
   const request = sourceRangeOwnerRequest(expected), reviewer = ownerId(comment.author);
+  const author = ownerId(issue.author);
+  const authorized = reviewer === author
+    ? repository.viewerPermission === "ADMIN" && comment.body === sourceRangeAdministratorDecision(request)
+    : comment.body === sourceRangeOwnerDecision(request);
   const users = object(protection.restrictions, "GitHub branch restrictions").users;
   const closureHistory = object(issue.closureHistory, "GitHub review closure history").nodes;
   if (repository.databaseId !== expected.repositoryId || typeof repository.nameWithOwner !== "string" ||
       repository.nameWithOwner.toLowerCase() !== expected.repository || issue.state !== "OPEN" ||
       !Array.isArray(closureHistory) || closureHistory.length !== 0 ||
-      issue.lastEditedAt !== null || issue.body !== request || ownerId(issue.author) !== ownerId(response.viewer) ||
-      reviewer === ownerId(issue.author) || comment.lastEditedAt !== null || comment.isMinimized !== false ||
-      comment.body !== sourceRangeOwnerDecision(request) || liveBranch.name !== expected.branch || liveBranch.protected !== true ||
+      issue.lastEditedAt !== null || issue.body !== request || author !== ownerId(response.viewer) ||
+      !authorized || comment.lastEditedAt !== null || comment.isMinimized !== false ||
+      liveBranch.name !== expected.branch || liveBranch.protected !== true ||
       object(liveBranch.commit, "GitHub branch commit").sha !== expected.base ||
       object(protection.enforce_admins, "GitHub branch admin enforcement").enabled !== true ||
       object(protection.allow_force_pushes, "GitHub force push policy").enabled !== false ||
       object(protection.allow_deletions, "GitHub deletion policy").enabled !== false ||
       !Array.isArray(users) || !users.some(user => user?.id === reviewer && user?.type === "User"))
-    throw new Error("Hosted source range review is absent, stale, altered or lacks independent owner authority");
+    throw new Error("Hosted source range decision is absent, stale, altered or unauthorized");
 }
 
 /** Bind approval to the executing checker, captured source tree and still-live protected base. */

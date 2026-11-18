@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { materializeChangePacket } from "../src/change-packet.ts";
 import { prepareCommand } from "../src/cli.ts";
 import { resolveChangeScope, SOURCE_RANGE_PROJECTION_PATH } from "../src/change-subject.ts";
-import { sourceRangeOwnerDecision, sourceRangeOwnerRequest, sourceRangeRepository,
+import { sourceRangeAdministratorDecision, sourceRangeOwnerDecision, sourceRangeOwnerRequest, sourceRangeRepository,
   verifySourceRangeOwnerResponse } from "../src/checkers/dependency-source-range-owner.ts";
 import { prePushCheckRequest } from "../src/git-hooks.ts";
 
@@ -23,7 +23,8 @@ function syntheticHostedReview() {
   const packet = sourceRangeOwnerRequest(expected);
   return { response: { viewer: { databaseId: 21 }, node: { body: sourceRangeOwnerDecision(packet), lastEditedAt: null as string | null,
     isMinimized: false, author: { databaseId: 22 }, issue: { body: packet, state: "OPEN", lastEditedAt: null as string | null,
-      author: { databaseId: 21 }, closureHistory: { nodes: [] as Array<{ __typename: string }> | null }, repository: { databaseId: 11, nameWithOwner: "fixture/project" } } } },
+      author: { databaseId: 21 }, closureHistory: { nodes: [] as Array<{ __typename: string }> | null },
+      repository: { databaseId: 11, nameWithOwner: "fixture/project", viewerPermission: "ADMIN" } } } },
   branch: { name: expected.branch, protected: true, commit: { sha: expected.base } },
   protection: { enforce_admins: { enabled: true }, allow_force_pushes: { enabled: false }, allow_deletions: { enabled: false },
     restrictions: { users: [{ type: "User", id: 22 }] } } };
@@ -33,6 +34,21 @@ test("exact hosted approval admits the complete request from a different current
   const { response, branch, protection } = syntheticHostedReview();
   verifySourceRangeOwnerResponse(response, expected, branch, protection);
   assert.match(response.node.issue.body, /"producerInputs"/);
+});
+
+test("repository administrator can authorize their exact protected transition explicitly", () => {
+  const { response, branch, protection } = syntheticHostedReview();
+  response.node.author.databaseId = response.viewer.databaseId;
+  protection.restrictions.users[0]!.id = response.viewer.databaseId;
+  assert.throws(() => verifySourceRangeOwnerResponse(response, expected, branch, protection));
+  response.node.body = sourceRangeAdministratorDecision(response.node.issue.body);
+  verifySourceRangeOwnerResponse(response, expected, branch, protection);
+  assert.throws(() => verifySourceRangeOwnerResponse(response, { ...expected, candidateTree: "c".repeat(40) }, branch, protection));
+  assert.throws(() => verifySourceRangeOwnerResponse(response, expected, branch, {
+    ...protection, restrictions: { users: [] },
+  }));
+  response.node.issue.repository.viewerPermission = "MAINTAIN";
+  assert.throws(() => verifySourceRangeOwnerResponse(response, expected, branch, protection));
 });
 
 test("hosted approval refuses absent, edited, withdrawn, self-approved and unentitled decisions", () => {

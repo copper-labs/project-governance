@@ -514,10 +514,13 @@ receipt and exact review.
 ### Proposed combined source range refresh
 
 When the existing receipt commit cannot pass ordinary checks on its own, an
-owner may review one exact hash-only refresh in a private GitHub issue. Use the
-native issue author and separate reviewer accounts. The reviewer must be an
-individual currently authorized to push the target branch by its GitHub
-protection. The target must enforce protection for admins and disallow force
+owner may review one exact hash-only refresh in a private GitHub issue. The
+ordinary review uses a separate reviewer account. An issue author who has
+GitHub repository administrator permission may authorize their own exact
+transition using the distinct comment `Authorize Project Governance
+source-range transition as repository administrator <request digest>`.
+GitHub must still identify the person making the decision as an individual
+allowed to push the protected target. The target must enforce protection for admins and disallow force
 pushes and deletion. The installed checker rereads the open, unedited request,
 unmodified approval comment, branch head and protection during each check.
 The next local dependency check rejects a closed issue or removed approval
