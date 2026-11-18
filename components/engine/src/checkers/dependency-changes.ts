@@ -1,7 +1,7 @@
 import type { Finding } from "../checker-results.ts";
 import { coordinateKey } from "./dependency-evidence.ts";
-import type { DependencyCoordinate, DependencyDefect } from "./dependency-manifests.ts";
-export interface DependencyImage { values: DependencyCoordinate[]; defects: DependencyDefect[] }
+import type { DependencyCoordinate, DependencyDefect, ScopedNpmOverride } from "./dependency-manifests.ts";
+export interface DependencyImage { values: DependencyCoordinate[]; defects: DependencyDefect[]; scopedOverrides?: ScopedNpmOverride[] }
 export interface DependencyChange { path: string; after: DependencyCoordinate[]; changed: Map<string, DependencyCoordinate>; local: Set<string>; removed: boolean }
 const fields: Record<string, string[]> = { direct: ["dependencies"], development: ["devDependencies"], optional: ["optionalDependencies"], peer: ["peerDependencies"], override: ["overrides", "resolutions", "pnpm.overrides"], toolchain: ["packageManager"] };
 function repairKeys(path: string, coordinate: DependencyCoordinate): string[] {
@@ -20,11 +20,17 @@ export function dependencyChange(path: string, before: DependencyImage, after: D
     const key = coordinateKey(coordinate);
     if (!previous.has(key) && !repairKeys(path, coordinate).some(key => repaired.has(key))) changed.set(key, coordinate);
   }
+  // Compare leaf changes within their authored parent. Evidence still uses the leaf release and artifact type.
+  const scopedKey = (row: ScopedNpmOverride) => JSON.stringify([row.parent, coordinateKey(row.coordinate)]);
+  const priorOverrides = new Set((before.scopedOverrides ?? []).map(scopedKey));
+  for (const row of after.scopedOverrides ?? []) {
+    if (!priorOverrides.has(scopedKey(row))) changed.set(coordinateKey(row.coordinate), row.coordinate);
+  }
   const priorDefects = new Set(before.defects.map(defect => JSON.stringify(defect.identity)));
   for (const defect of after.defects) if (!priorDefects.has(JSON.stringify(defect.identity))) findings.push({ rule_id: "dependency.unsupported-format", path, severity: "blocking", message: defect.message });
   for (const [key, coordinate] of changed) if (workspace.consumers.has(path) && coordinate.ecosystem === "npm" &&
     ["direct", "development", "optional", "peer"].includes(coordinate.artifact_type) && workspace.versions.get(coordinate.name) === coordinate.version) local.add(key);
-  return { change: { path, after: after.values, changed, local, removed: false } satisfies DependencyChange, findings };
+  return { change: { path, after: [...after.values, ...(after.scopedOverrides ?? []).map(row => row.coordinate)], changed, local, removed: false } satisfies DependencyChange, findings };
 }
 export function evaluateDependencyChanges(changes: DependencyChange[], evidence: Map<string, unknown>, evidenceMatches: Set<string>, overrides: Map<string, unknown>, overrideMatches: Set<string>) {
   const checked: Record<string, unknown>[] = [], findings: Finding[] = [], uncovered = new Map<string, string>();

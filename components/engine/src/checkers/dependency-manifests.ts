@@ -1,5 +1,6 @@
 import { canonical } from "../core.ts";
 export interface DependencyCoordinate { ecosystem: string; name: string; version: string; artifact_type: string }
+export interface ScopedNpmOverride { parent: string; coordinate: DependencyCoordinate }
 export interface DependencyDefect { identity: string[]; repair_key: string[]; message: string }
 export const npmExact = /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/u;
 export const npmName = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/u;
@@ -28,16 +29,25 @@ export function parseRequirements(path: string, source: string): DependencyCoord
   if (logical) throw new Error(`${path}: incomplete continued requirement`);
   return values;
 }
-export function parsePackageManifest(path: string, source: string): { values: DependencyCoordinate[]; defects: DependencyDefect[] } {
+export function parsePackageManifest(path: string, source: string): { values: DependencyCoordinate[]; defects: DependencyDefect[]; scopedOverrides?: ScopedNpmOverride[] } {
   let document: unknown;
   try { document = JSON.parse(source); } catch { throw new Error(`${path}: invalid package.json`); }
   if (!objectValue(document)) throw new Error(`${path}: package.json must contain an object`);
   const values: DependencyCoordinate[] = [], defects: DependencyDefect[] = [];
+  const scopedOverrides: ScopedNpmOverride[] = [];
   const append = (raw: unknown, field: string, artifact: string) => {
     if (raw === undefined || raw === null) return;
     if (!objectValue(raw)) throw new Error(`${path}: ${field} must be an object`);
     for (const [name, version] of Object.entries(raw).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)) {
       if (!npmName.test(name)) defects.push(npmDefect("manifest", name, field, version, `${path}: ${field} key must be an exact npm package name without selectors or globs`));
+      else if (field === "overrides" && objectValue(version)) {
+        const children = Object.entries(version).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
+        if (!children.length || children.some(([child, pin]) => !npmName.test(child) || typeof pin !== "string" || !npmExact.test(pin))) {
+          defects.push(npmDefect("manifest", name, field, version, `${path}: npm dependency must use an exact major.minor.patch registry version`));
+        } else {
+          for (const [child, pin] of children) scopedOverrides.push({ parent: name, coordinate: dependency(child, "npm", pin as string, "override") });
+        }
+      }
       else if (typeof version !== "string" || !npmExact.test(version)) defects.push(npmDefect("manifest", name, field, version, `${path}: npm dependency must use an exact major.minor.patch registry version`));
       else values.push(dependency(name, "npm", version, artifact));
     }
@@ -55,5 +65,5 @@ export function parsePackageManifest(path: string, source: string): { values: De
     if (!match || !npmExact.test(match[2]!)) defects.push(npmDefect("manifest", match?.[1] ?? "<packageManager>", "packageManager", manager, `${path}: packageManager must use an exact manager@version pin`));
     else values.push(dependency(match[1]!, "npm", match[2]!, "toolchain"));
   }
-  return { values, defects };
+  return { values, defects, ...(scopedOverrides.length ? { scopedOverrides } : {}) };
 }

@@ -20,6 +20,7 @@ import { retainedArchiveIntegrities, verifySignedLock } from "./dependency-signe
 import { indexDependencyOverrides } from "./dependency-overrides.ts";
 import { dependencyMoment } from "./dependency-time.ts";
 import { localWorkspaceCoordinates } from "./dependency-workspaces.ts";
+import { admitTrackedNpmLinks, trackedNpmLinkConsumers } from "./dependency-local-links.ts";
 import { dependencyChange, evaluateDependencyChanges, type DependencyImage, type DependencyChange } from "./dependency-changes.ts";
 const governedPatterns = ["package.json", "**/package.json", "package-lock.json", "**/package-lock.json", "pnpm-workspace.yaml", "**/pnpm-workspace.yaml", "requirements*.txt", "**/requirements*.txt", "pom.xml", "**/pom.xml", ".npmrc", "**/.npmrc", ".yarnrc.yml", "**/.yarnrc.yml", ".github/workflows/*.yml", ".github/workflows/*.yaml"];
 export const governedDependencyPath = (path: string) => governedPatterns.some(pattern => glob(path, pattern));
@@ -172,6 +173,11 @@ function prepareRangeInputs(subject: ValidationSubject, scope: ChangeScope, opti
     const source = subject.source(path);
     if (source) records.push({ path, before: source, after: source });
   }
+  for (const path of trackedNpmLinkConsumers(subject, scope, changedPaths)) {
+    if (records.some(record => record.path === path)) continue;
+    const source = subject.source(path);
+    if (source) records.push({ path, before: source, after: source });
+  }
   const usedLocks = new Set<string>();
   for (const [path, selections] of ranges ?? []) {
     if (!rangePolicyTouched && !changedPaths.has(path) &&
@@ -225,6 +231,7 @@ export function checkDependencies(subject: ValidationSubject, scope: ChangeScope
   const { records, signedLocks, loadSelectionInput } = prepareRangeInputs(subject, scope, options, proofs, asOf, add);
   const changes: DependencyChange[] = [], relevant = new Set<string>();
   const sourceAdmissions: ReturnType<typeof admitSourceRanges>["rows"] = [];
+  const localLinkAdmissions: ReturnType<typeof admitTrackedNpmLinks>["rows"] = [];
   for (const record of records) {
     if (!governedDependencyPath(record.path)) {
       if (scope.mode === "explicit") add("dependency.unsupported-format", record.path, "Explicit dependency path is outside the supported governed surface.");
@@ -260,6 +267,15 @@ export function checkDependencies(subject: ValidationSubject, scope: ChangeScope
         after.defects = after.defects.filter(defect => !admitted.admitted.has(canonical(defect.identity)));
         sourceAdmissions.push(...admitted.rows);
       }
+      if (scope.mode === "staged" || scope.candidate_ref) {
+        if (record.before) {
+          const prior = admitTrackedNpmLinks(subject, record.before, before.defects, true);
+          before.defects = before.defects.filter(defect => !prior.admitted.has(defect));
+        }
+        const local = admitTrackedNpmLinks(subject, record.after, after.defects, false);
+        after.defects = after.defects.filter(defect => !local.admitted.has(defect));
+        localLinkAdmissions.push(...local.rows);
+      }
       const result = dependencyChange(record.path, before, after, workspace);
       // Every admitted range remains an external exact coordinate, even when a local workspace happens to match.
       for (const { coordinate, registry } of [...(resolution?.coordinates ?? []), ...(signedLock?.coordinates ?? [])]) {
@@ -281,5 +297,6 @@ export function checkDependencies(subject: ValidationSubject, scope: ChangeScope
   findings.push(...evaluated.findings);
   return { version: 1, check: "dependency-freshness", ...findingSummary(findings), minimum_age_days: policy.minimumAgeDays, evaluated_at: options.asOf, checked: evaluated.checked, findings,
     ...(sourceAdmissions.length ? { source_range_admissions: sourceAdmissions } : {}),
+    ...(localLinkAdmissions.length ? { tracked_npm_link_admissions: localLinkAdmissions } : {}),
     ...(signedLocks.size ? { signed_lock_admissions: [...signedLocks.values()].map(proof => proof.admission) } : {}) };
 }
