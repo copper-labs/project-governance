@@ -1,3 +1,4 @@
+/** Record each run and share its immutable packet with the selected check commands. */
 import { RELEASE_VERSION } from "./release-version.ts";
 import { checkObservationContext, type CheckObservationContext } from "./check-observation-context.ts";
 import { projectRunMetric } from "./telemetry-projection.ts";
@@ -7,7 +8,7 @@ import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { digest, durableJson, fileDigest } from "./core.ts";
-import { materializeChangePacket, PacketCaptureError } from "./change-packet.ts";
+import { materializeChangePacket, PacketCaptureError, type ExactPacketComparison } from "./change-packet.ts";
 import { commandCredentialNames, resolveCommandArgv } from "./command-argv.ts";
 import { runNativeCheckCommand } from "./native-check-command.ts";
 import { checkCancellationRequested } from "./check-cancellation.ts";
@@ -35,7 +36,7 @@ export function checkRunRoot(): string {
   return join(state, "project-governance", "check-runs");
 }
 /** Persist intent before dispatch and terminal evidence afterwards; interruption leaves an explicitly unfinished run. */
-export async function runChecks(packs: Packs, plan: ValidationPlan, request: Omit<BuiltinCheckRequest, "id">, options: { root?: string; deadlineMs?: number; deadlineAt?: number; reservedRunId?: string; largeImmutablePacket?: boolean; } & CheckObservationContext = {}) {
+export async function runChecks(packs: Packs, plan: ValidationPlan, request: Omit<BuiltinCheckRequest, "id">, options: { root?: string; deadlineMs?: number; deadlineAt?: number; reservedRunId?: string; largeImmutablePacket?: boolean; exactPacketComparison?: ExactPacketComparison; } & CheckObservationContext = {}) {
   checkObservationContext(options.trigger, options.expectedStatus);
   const parent = options.root ?? checkRunRoot(); mkdirSync(parent, { recursive: true, mode: 0o700 });
   const checkRunsRoot = realpathSync(parent);
@@ -48,12 +49,13 @@ export async function runChecks(packs: Packs, plan: ValidationPlan, request: Omi
   if (!Number.isSafeInteger(deadlineMs) || deadlineMs <= 0 || deadlineMs > 86_400_000) throw new Error("Invalid check timeout");
   const deadline = options.deadlineAt ?? Date.now() + deadlineMs;
   if (!Number.isSafeInteger(deadline) || deadline <= 0) throw new Error("Invalid check deadline");
-  durableJson(join(directory, "run.json"), { version: 1, id, ...executionIdentity, root: request.subject.root, started_at: startedAt, ...(options.trigger ? { trigger: options.trigger } : {}), ...(options.expectedStatus ? { expected_status: options.expectedStatus } : {}), state: "running", owner: { pid: process.pid, fingerprint: processFingerprint(process.pid) }, plan, scope: request.scope, packs_digest: digest(JSON.parse(JSON.stringify(packs))) });
+  durableJson(join(directory, "run.json"), { version: 1, id, ...executionIdentity, root: request.subject.root, started_at: startedAt, ...(options.trigger ? { trigger: options.trigger } : {}), ...(options.expectedStatus ? { expected_status: options.expectedStatus } : {}), ...(options.exactPacketComparison ? { exact_packet_comparison: options.exactPacketComparison } : {}), state: "running", owner: { pid: process.pid, fingerprint: processFingerprint(process.pid) }, plan, scope: request.scope, packs_digest: digest(JSON.parse(JSON.stringify(packs))) });
   let prepared = false;
   try {
     const cancelled = () => checkCancellationRequested(directory, id);
     const packet = await materializeChangePacket(request.subject.root, request.scope, join(directory, "packet"), {
       ...(options.largeImmutablePacket ? { largeImmutable: true, deadlineAt: deadline, cancelled } : {}),
+      ...(options.exactPacketComparison ? { exactComparison: options.exactPacketComparison } : {}),
     });
     prepared = true;
     const result = await executeChecks(packs, plan, { ...request, registry: packs, checkRunsRoot, readLargeFormatSource: packet.readLargeAfter }, undefined, async (entry, packId, index) => {

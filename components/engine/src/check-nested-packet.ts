@@ -1,3 +1,5 @@
+/** Verify the bound large-packet parent before preparing a nested dependency check. */
+import { assertExactPacketComparison, type ExactPacketComparison } from "./change-packet.ts";
 import { createHash } from "node:crypto";
 import { existsSync, realpathSync } from "node:fs";
 import { basename, dirname, isAbsolute, join } from "node:path";
@@ -13,7 +15,7 @@ export const LARGE_PACKET_PARENT_ENV = "PROJECT_GOVERNANCE_LARGE_IMMUTABLE_PAREN
 export function nestedImmutablePacket(root: string, selection: {
   trigger: string; packs: string[]; stage: string | null; mode: string;
   paths: string[]; staged?: boolean; baseRef?: string; candidateRef?: string; detached: boolean;
-}, env = process.env): { scope: ChangeScope; deadlineAt: number; candidateRef?: string; runId: string; largeImmutable: boolean } | null {
+}, env = process.env): { scope: ChangeScope; deadlineAt: number; candidateRef?: string; runId: string; largeImmutable: boolean; exactComparison?: ExactPacketComparison } | null {
   const id = env[LARGE_PACKET_PARENT_ENV];
   if (id === undefined || selection.trigger !== "manual" ||
       selection.packs.length !== 1 || selection.packs[0] !== "dependencies") return null;
@@ -41,6 +43,13 @@ export function nestedImmutablePacket(root: string, selection: {
   if (scope?.scope !== "changed" || (!largeImmutable && !scope.candidate_tree) || scope.unborn || !scope.base_ref || !scope.subject_digest ||
       scope.subject_digest !== subjectDigest(scope.records) || digest(scope) !== digest(intent.scope) ||
       env.PROJECT_GOVERNANCE_SUBJECT_DIGEST !== scope.subject_digest) throw invalid();
+  const exactComparison = dispatch.exactPacketComparison as ExactPacketComparison | undefined;
+  if (digest(exactComparison ?? null) !== digest(intent.exact_packet_comparison ?? null)) throw invalid();
+  if (exactComparison !== undefined) {
+    if (dispatch.stage !== "pre-push" || !largeImmutable || !exactComparison || typeof exactComparison !== "object" ||
+        Object.keys(exactComparison).sort().join(",") !== "base,candidate") throw invalid();
+    assertExactPacketComparison(scope, exactComparison);
+  }
   const { bytes, type } = worktreeBytes(dirname(path), basename(path));
   if (type !== "regular" || createHash("sha256").update(bytes).digest("hex") !== env.PROJECT_GOVERNANCE_CHANGE_PACKET_SHA256) throw invalid();
   const packet = JSON.parse(bytes.toString("utf8"));
@@ -52,6 +61,6 @@ export function nestedImmutablePacket(root: string, selection: {
   if (dispatch.stage === "pre-push" && scope.mode === "changed" && scope.candidate_ref &&
       selection.stage === "pre-pr" && !selection.staged && selection.baseRef === scope.base_ref &&
       (!selection.candidateRef || selection.candidateRef === scope.candidate_ref))
-    return { scope, deadlineAt, candidateRef: scope.candidate_ref, runId: id, largeImmutable };
+    return { scope, deadlineAt, candidateRef: scope.candidate_ref, runId: id, largeImmutable, ...(exactComparison ? { exactComparison } : {}) };
   throw invalid();
 }

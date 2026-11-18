@@ -331,6 +331,28 @@ committed push candidate. It runs its own check and retains its own findings
 under the remaining parent deadline. The option does not propagate to further
 children or independently invoked checks.
 
+### Expanded capture for one exact local comparison
+
+A local pre-push check can set
+`GOVERNANCE_LARGE_IMMUTABLE_COMPARISON=<base-commit>:<candidate-commit>` for
+an immutable comparison that exceeds the ordinary 512 MiB limit. Both object
+IDs must match the resolved comparison, including the merge base. A staged,
+filtered, unborn or live comparison cannot use this option. The check still
+selects and runs the ordinary pre-push packs through one version-one packet.
+
+This opt-in admits at most 2 GiB of logical image bytes, counting every side
+even when the same blob occurs more than once. Capture streams large images
+and reads small images in bounded batches. It verifies the original Git object
+ID, byte length and SHA-256 before publishing any record. Repeated blob IDs
+share one private, read-only file through separate packet image paths. The
+per-image, worker deadline and cancellation rules still apply.
+
+The policy and approvals are resolved exactly as in an ordinary pre-push
+check. The option grants capture capacity only. The live dependency child can
+inherit the exact comparison through its existing verified parent link. It
+keeps its own packet and results and uses the remaining parent deadline.
+The runtime records the bound comparison in the worker request and run intent.
+
 ### Proposed admission of npm library ranges
 
 The check may admit a prerelease caret declaration in a staged or committed

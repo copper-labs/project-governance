@@ -110,3 +110,38 @@ test("the immutable extension refuses an over-budget Git blob before publishing 
     assert.equal(existsSync(destination), false);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test("expanded committed packet retains every side beyond the ordinary 512 MiB limit", async () => {
+  const root = mkdtempSync(join(tmpdir(), "expanded-immutable-packet-"));
+  const git = (...args: string[]) => execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+  const deadlineAt = Date.now() + 30_000;
+  try {
+    git("init", "-q"); git("config", "user.name", "Fixture"); git("config", "user.email", "fixture@example.invalid");
+    git("commit", "--allow-empty", "-qm", "base");
+    const base = git("rev-parse", "HEAD");
+    const image = Buffer.alloc(17 * 1024 * 1024); image[0] = 13;
+    writeFileSync(join(root, "input.data"), image);
+    const blob = git("hash-object", "-w", "input.data");
+    for (let index = 0; index < 31; index++) git("update-index", "--add", "--cacheinfo", `100644,${blob},image-${index}.bin`);
+    git("commit", "-qm", "reviewed candidate");
+    const candidate = git("rev-parse", "HEAD"), scope = resolveChangeScope(root, { baseRef: base, candidateRef: candidate });
+    const exactComparison = { base, candidate };
+    const target = join(root, "packet"), expanded = { largeImmutable: true, deadlineAt, exactComparison };
+
+    await assert.rejects(materializeChangePacket(root, scope, target, { largeImmutable: true, deadlineAt }),
+      (error: unknown) => error instanceof PacketCaptureError && error.capture.reason === "source-over-limit");
+    await assert.rejects(materializeChangePacket(root, scope, target, { ...expanded, exactComparison: { base: candidate, candidate } }), /exact committed comparison/);
+    await assert.rejects(materializeChangePacket(root, { ...scope, mode: "staged" }, target, expanded), /exact committed comparison/);
+    await assert.rejects(materializeChangePacket(root, scope, target, { ...expanded, cancelled: () => true }), /capture/);
+    assert.equal(existsSync(target), false);
+
+    const result = await materializeChangePacket(root, scope, target, expanded);
+    const paths = result.packet.records.map(record => record.after_path as string);
+    assert.equal(new Set(paths).size, 31);
+    assert.equal(result.packet.subject_digest, scope.subject_digest);
+    const expected = fileDigest(join(root, "input.data")).slice(7);
+    assert.ok(result.packet.records.every(record => record.before_path === null && record.after_sha256 === expected));
+    assert.equal(fileDigest(paths.at(-1)!).slice(7), expected);
+    assert.deepEqual(result.readLargeAfter("image-30.bin"), image);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
